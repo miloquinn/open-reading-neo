@@ -110,6 +110,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesDisabled => '已停用';
 
   @override
+  String get bookSourcesRunnable => '可直接使用';
+
+  @override
+  String get bookSourcesPendingCompatibility => '待兼容';
+
+  @override
+  String get bookSourcesManagementSearchHint => '搜索名称、网址、备注或分组';
+
+  @override
+  String get bookSourcesClearSearch => '清空搜索';
+
+  @override
+  String get bookSourcesAllGroups => '全部分组';
+
+  @override
+  String get bookSourcesChooseGroup => '选择书源分组';
+
+  @override
+  String get bookSourcesSearchGroups => '搜索分组';
+
+  @override
+  String get bookSourcesNoMatchingSources => '没有符合当前搜索和筛选条件的书源';
+
+  @override
+  String get bookSourcesResetFilters => '重置';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return '显示 $visible / 共 $total 个';
+  }
+
+  @override
   String get bookSourcesRemove => '移除';
 
   @override
@@ -131,7 +163,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesImportLink => '导入链接';
 
   @override
-  String get bookSourcesAnalyze => '分析书源';
+  String get bookSourcesAnalyze => '读取书源';
 
   @override
   String get bookSourcesDetectedOrsp => '识别为：ORSP 书源';
@@ -199,10 +231,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '我确认自己有权访问相关内容，且不会利用书源绕过登录、付费、DRM 或其他访问控制。';
 
   @override
-  String get bookSourcesConnect => '连接并校验';
+  String get bookSourcesConnect => '读取并导入';
 
   @override
-  String get bookSourcesConnecting => '正在校验协议…';
+  String get bookSourcesConnecting => '正在处理书源…';
 
   @override
   String get bookSourcesAdded => '书源已添加';
@@ -1916,7 +1948,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get additionalSourcesImportTitle => '导入书源 JSON';
 
   @override
-  String get additionalSourcesImportNotice => '导入内容会先进行兼容性预检，并保持停用，需由你主动开启。';
+  String get additionalSourcesImportNotice =>
+      '导入只做本地解析、去重和兼容性标记，不会逐条联网检测；可运行的书源按原配置启用，待兼容书源会保留但保持停用。';
 
   @override
   String get additionalSourcesChooseFile => '从 JSON 文件添加';
@@ -1933,6 +1966,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '可直接使用 $supported 个，部分支持 $partial 个，待兼容 $unsupported 个，跳过 $skipped 条';
+  }
+
+  @override
   String get additionalSourcesAvailable => '可使用';
 
   @override
@@ -1942,7 +1985,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get additionalSourcesUnsupported => '暂不支持';
 
   @override
-  String get additionalSourcesImportConfirm => '停用状态导入';
+  String get additionalSourcesImportConfirm => '批量导入';
 
   @override
   String additionalSourcesImported(int count) {
@@ -2289,7 +2332,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLibraryOpenAnimationMinimal => '极简淡入';
 
   @override
-  String get settingsLibraryOpenAnimationMinimalHint => '快速稳定地淡入，没有方向位移';
+  String get settingsLibraryOpenAnimationMinimalHint => '稳定淡入正文，没有方向位移';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => '纸面浮现';
@@ -2304,10 +2347,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLibraryOpenAnimationPageSlideHint => '阅读纸面从侧边短距离滑入';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => '双页展开';
+  String get settingsLibraryOpenAnimationPaceTitle => '动画节奏';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint => '两侧纸面从中缝向外展开';
+  String get settingsLibraryOpenAnimationFast => '快速';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint => '正文就绪后快速淡入，缩短等待感';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => '优雅';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint => '延长正文渐显，平稳衔接到阅读页';
 
   @override
   String get settingsAccentFollowTheme => '强调色：跟随主题';
@@ -4223,6 +4275,120 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerNoAnnotationsHint => '选中文字即可高亮或添加文字批注；点击带下划线的批注文字可再次查看笔记。';
+
+  @override
+  String get replaceRulesTitle => '替换净化';
+
+  @override
+  String get replaceRulesSettingsSubtitle => '清理正文中的广告、推广语等无关内容';
+
+  @override
+  String get replaceRulesImport => '导入规则';
+
+  @override
+  String get replaceRulesExport => '导出规则';
+
+  @override
+  String get replaceRulesSearchHint => '搜索规则名称、分组或表达式';
+
+  @override
+  String get replaceRulesUnnamed => '未命名规则';
+
+  @override
+  String get replaceRulesDeleteValue => '删除';
+
+  @override
+  String get replaceRulesCreate => '新建规则';
+
+  @override
+  String get replaceRulesEmptyTitle => '还没有替换规则';
+
+  @override
+  String get replaceRulesEmptyBody => '可以导入 Legado JSON，或新建一条正则规则。';
+
+  @override
+  String get replaceRulesNoSearchResults => '没有匹配的规则';
+
+  @override
+  String get replaceRulesCreateTitle => '新建替换规则';
+
+  @override
+  String get replaceRulesEditTitle => '编辑替换规则';
+
+  @override
+  String get replaceRulesNameLabel => '规则名称';
+
+  @override
+  String get replaceRulesPatternLabel => '匹配内容 / 正则表达式';
+
+  @override
+  String get replaceRulesPatternHelper => '要删除广告时，将“替换为”留空即可';
+
+  @override
+  String get replaceRulesReplacementLabel => '替换为';
+
+  @override
+  String get replaceRulesRegexLabel => '使用正则表达式';
+
+  @override
+  String get replaceRulesScopeTitleLabel => '作用于章节标题';
+
+  @override
+  String get replaceRulesScopeContentLabel => '作用于正文';
+
+  @override
+  String get replaceRulesGroupLabel => '分组（可选）';
+
+  @override
+  String get replaceRulesScopeLabel => '作用范围（可选）';
+
+  @override
+  String get replaceRulesScopeHelper => '多个书名或书源名称用分号分隔';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => '排除范围（可选）';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => '删除这条规则？';
+
+  @override
+  String get replaceRulesDeleteConfirmBody => '这条规则将从当前设备移除。';
+
+  @override
+  String replaceRulesImported(int count) {
+    return '已导入 $count 条规则';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return '规则文件不能超过 $max';
+  }
+
+  @override
+  String get replaceRulesExported => '规则已导出';
+
+  @override
+  String get replaceRulesPatternRequired => '请输入匹配内容或正则表达式';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return '表达式不能超过 $max 个字符';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return '正则表达式无效：$error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return '最多支持 $max 条规则';
+  }
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -4331,6 +4497,38 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesDisabled => '已停用';
 
   @override
+  String get bookSourcesRunnable => '可直接使用';
+
+  @override
+  String get bookSourcesPendingCompatibility => '待相容';
+
+  @override
+  String get bookSourcesManagementSearchHint => '搜尋名稱、網址、備註或群組';
+
+  @override
+  String get bookSourcesClearSearch => '清除搜尋';
+
+  @override
+  String get bookSourcesAllGroups => '全部群組';
+
+  @override
+  String get bookSourcesChooseGroup => '選擇書源群組';
+
+  @override
+  String get bookSourcesSearchGroups => '搜尋群組';
+
+  @override
+  String get bookSourcesNoMatchingSources => '沒有符合目前搜尋和篩選條件的書源';
+
+  @override
+  String get bookSourcesResetFilters => '重設';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return '顯示 $visible / 共 $total 個';
+  }
+
+  @override
   String get bookSourcesRemove => '移除';
 
   @override
@@ -4352,7 +4550,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesImportLink => '匯入連結';
 
   @override
-  String get bookSourcesAnalyze => '分析書源';
+  String get bookSourcesAnalyze => '讀取書源';
 
   @override
   String get bookSourcesDetectedOrsp => '識別為：ORSP 書源';
@@ -4420,10 +4618,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '我確認自己有權存取相關內容，且不會利用書源繞過登入、付費、DRM 或其他存取控制。';
 
   @override
-  String get bookSourcesConnect => '連接並驗證';
+  String get bookSourcesConnect => '讀取並匯入';
 
   @override
-  String get bookSourcesConnecting => '正在驗證協定…';
+  String get bookSourcesConnecting => '正在處理書源…';
 
   @override
   String get bookSourcesAdded => '書源已新增';
@@ -6094,7 +6292,8 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get additionalSourcesImportTitle => '匯入書源 JSON';
 
   @override
-  String get additionalSourcesImportNotice => '匯入內容會先進行相容性預檢，並保持停用，需由你主動開啟。';
+  String get additionalSourcesImportNotice =>
+      '匯入只做本機解析、去重和相容性標記，不會逐一連線檢測；可執行書源依原設定啟用，待相容書源會保留但保持停用。';
 
   @override
   String get additionalSourcesChooseFile => '從 JSON 檔案新增';
@@ -6111,6 +6310,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '可直接使用 $supported 個，部分支援 $partial 個，待相容 $unsupported 個，略過 $skipped 條';
+  }
+
+  @override
   String get additionalSourcesAvailable => '可使用';
 
   @override
@@ -6120,7 +6329,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get additionalSourcesUnsupported => '暫不支援';
 
   @override
-  String get additionalSourcesImportConfirm => '停用狀態匯入';
+  String get additionalSourcesImportConfirm => '批次匯入';
 
   @override
   String additionalSourcesImported(int count) {
@@ -6467,7 +6676,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLibraryOpenAnimationMinimal => '極簡淡入';
 
   @override
-  String get settingsLibraryOpenAnimationMinimalHint => '快速穩定地淡入，沒有方向位移';
+  String get settingsLibraryOpenAnimationMinimalHint => '穩定淡入正文，沒有方向位移';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => '紙面浮現';
@@ -6482,10 +6691,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLibraryOpenAnimationPageSlideHint => '閱讀紙面從側邊短距離滑入';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => '雙頁展開';
+  String get settingsLibraryOpenAnimationPaceTitle => '動畫節奏';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint => '兩側紙面從中縫向外展開';
+  String get settingsLibraryOpenAnimationFast => '快速';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint => '正文就緒後快速淡入，縮短等待感';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => '優雅';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint => '延長正文漸顯，平穩銜接至閱讀頁';
 
   @override
   String get settingsAccentFollowTheme => '強調色：跟隨主題';
@@ -8401,4 +8619,118 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readerNoAnnotationsHint => '選取文字即可高亮或新增文字批註；點擊帶底線的批註文字可再次查看筆記。';
+
+  @override
+  String get replaceRulesTitle => '替換淨化';
+
+  @override
+  String get replaceRulesSettingsSubtitle => '清理正文中的廣告、推廣語等無關內容';
+
+  @override
+  String get replaceRulesImport => '匯入規則';
+
+  @override
+  String get replaceRulesExport => '匯出規則';
+
+  @override
+  String get replaceRulesSearchHint => '搜尋規則名稱、群組或運算式';
+
+  @override
+  String get replaceRulesUnnamed => '未命名規則';
+
+  @override
+  String get replaceRulesDeleteValue => '刪除';
+
+  @override
+  String get replaceRulesCreate => '新增規則';
+
+  @override
+  String get replaceRulesEmptyTitle => '還沒有替換規則';
+
+  @override
+  String get replaceRulesEmptyBody => '可以匯入 Legado JSON，或新增一條正則規則。';
+
+  @override
+  String get replaceRulesNoSearchResults => '沒有符合的規則';
+
+  @override
+  String get replaceRulesCreateTitle => '新增替換規則';
+
+  @override
+  String get replaceRulesEditTitle => '編輯替換規則';
+
+  @override
+  String get replaceRulesNameLabel => '規則名稱';
+
+  @override
+  String get replaceRulesPatternLabel => '符合內容 / 正則運算式';
+
+  @override
+  String get replaceRulesPatternHelper => '要刪除廣告時，將「替換為」留空即可';
+
+  @override
+  String get replaceRulesReplacementLabel => '替換為';
+
+  @override
+  String get replaceRulesRegexLabel => '使用正則運算式';
+
+  @override
+  String get replaceRulesScopeTitleLabel => '套用於章節標題';
+
+  @override
+  String get replaceRulesScopeContentLabel => '套用於正文';
+
+  @override
+  String get replaceRulesGroupLabel => '群組（選填）';
+
+  @override
+  String get replaceRulesScopeLabel => '作用範圍（選填）';
+
+  @override
+  String get replaceRulesScopeHelper => '多個書名或書源名稱請用分號分隔';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => '排除範圍（選填）';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => '刪除這條規則？';
+
+  @override
+  String get replaceRulesDeleteConfirmBody => '這條規則將從目前裝置移除。';
+
+  @override
+  String replaceRulesImported(int count) {
+    return '已匯入 $count 條規則';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return '匯入失敗：$error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return '規則檔案不能超過 $max';
+  }
+
+  @override
+  String get replaceRulesExported => '規則已匯出';
+
+  @override
+  String get replaceRulesPatternRequired => '請輸入符合內容或正則運算式';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return '運算式不能超過 $max 個字元';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return '正則運算式無效：$error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return '最多支援 $max 條規則';
+  }
 }

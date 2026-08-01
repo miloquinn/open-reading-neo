@@ -1,30 +1,47 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 
+import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import '../services/book_source_network_policy.dart';
 import 'legado_book_source.dart';
 
 class LegadoImportPreview {
-  const LegadoImportPreview({required this.sources, required this.errors});
+  LegadoImportPreview({
+    required this.sources,
+    required this.errors,
+    this.duplicates = 0,
+  }) : _reports = Map.unmodifiable({
+         for (final source in sources)
+           source.stableId: const LegadoCompatibilityScanner().scan(source),
+       });
 
   final List<LegadoBookSource> sources;
   final List<String> errors;
+  final int duplicates;
+  final Map<String, LegadoCompatibilityReport> _reports;
 
   int get supported => _count(LegadoCompatibilityLevel.supported);
   int get partial => _count(LegadoCompatibilityLevel.partial);
   int get unsupported => _count(LegadoCompatibilityLevel.unsupported);
+  int get skipped => errors.length + duplicates;
 
-  int _count(LegadoCompatibilityLevel level) => sources
-      .where(
+  int _count(LegadoCompatibilityLevel level) =>
+      _reports.values.where((report) => report.level == level).length;
+
+  LegadoCompatibilityReport reportFor(LegadoBookSource source) =>
+      _reports[source.stableId]!;
+
+  List<RegisteredBookSource> toRegisteredSources() => sources
+      .map(
         (source) =>
-            const LegadoCompatibilityScanner().scan(source).level == level,
+            source.toRegisteredSource(compatibilityReport: reportFor(source)),
       )
-      .length;
+      .toList(growable: false);
 }
 
 class LegadoSourceImportService {
@@ -72,7 +89,29 @@ class LegadoSourceImportService {
     return _collect(_parseBytes(bytes));
   }
 
+  Future<LegadoImportPreview> parseBytesAsync(Uint8List bytes) async {
+    return _collect(await compute(_parseLegadoImportBytes, bytes));
+  }
+
+  LegadoImportPreview parseDecoded(Object? decoded) {
+    return _collect(
+      parseLegadoSourcePayload(
+        decoded,
+        maxSources: maxSources,
+        maxNestedUrls: maxNestedUrls,
+      ),
+    );
+  }
+
   LegadoSourceImportResult _parseBytes(Uint8List bytes) {
+    return _parseLegadoImportBytes(bytes);
+  }
+
+  Future<LegadoSourceImportResult> _parseBytesAsync(Uint8List bytes) {
+    return compute(_parseLegadoImportBytes, bytes);
+  }
+
+  static LegadoSourceImportResult _parseLegadoImportBytes(Uint8List bytes) {
     if (bytes.length > maxImportBytes) {
       throw const FormatException('Source file exceeds the 64 MiB limit.');
     }
@@ -130,7 +169,7 @@ class LegadoSourceImportService {
       throw const FormatException('Too many nested source URLs.');
     }
     final bytes = await _download(uri);
-    final parsed = _parseBytes(bytes);
+    final parsed = await _parseBytesAsync(bytes);
     for (final source in parsed.sources) {
       byUrl[source.url] = source;
       if (byUrl.length > maxSources) {
@@ -200,6 +239,10 @@ class LegadoSourceImportService {
   }
 
   LegadoImportPreview _collect(LegadoSourceImportResult result) {
-    return LegadoImportPreview(sources: result.sources, errors: result.errors);
+    return LegadoImportPreview(
+      sources: result.sources,
+      errors: result.errors,
+      duplicates: result.duplicates,
+    );
   }
 }

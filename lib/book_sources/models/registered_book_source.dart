@@ -1,4 +1,5 @@
 import '../protocol/book_source_protocol.dart';
+import '../legado/legado_explore.dart';
 
 enum BookSourceProtocolKind { orsp, legado }
 
@@ -107,6 +108,15 @@ class RegisteredBookSource {
         'Stored compatible book source is missing its source configuration.',
       );
     }
+    final capabilities = (json['capabilities'] as List? ?? const [])
+        .whereType<String>()
+        .toSet();
+    if (sourceProtocol == BookSourceProtocolKind.legado &&
+        sourceConfig != null &&
+        capabilities.isNotEmpty &&
+        parseLegadoExploreCatalog(sourceConfig).canBrowse) {
+      capabilities.addAll(const {'categories', 'browse'});
+    }
     return RegisteredBookSource(
       id: id,
       name: name,
@@ -123,9 +133,7 @@ class RegisteredBookSource {
       languages: (json['languages'] as List? ?? const [])
           .whereType<String>()
           .toList(growable: false),
-      capabilities: (json['capabilities'] as List? ?? const [])
-          .whereType<String>()
-          .toSet(),
+      capabilities: capabilities,
       maxCatalogPageSize: maxCatalogPageSize,
       enabled: json['enabled'] as bool? ?? true,
       addedAt:

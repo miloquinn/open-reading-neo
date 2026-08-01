@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 import '../legado/legado_source_import_service.dart';
 import '../models/registered_book_source.dart';
@@ -51,9 +52,9 @@ class BookSourceImportAnalyzer {
     Object? directError;
     try {
       final bytes = await _additionalImporter.downloadBytes(input);
-      final result = analyzeBytes(bytes, documentUri: uri);
+      final result = await analyzeBytesAsync(bytes, documentUri: uri);
       if (result.kind == BookSourceImportKind.additional &&
-          result.sources.isEmpty) {
+          result.additionalPreview!.sources.isEmpty) {
         final nested = await _additionalImporter.loadUrl(input);
         if (nested.sources.isEmpty) {
           throw const FormatException(
@@ -85,33 +86,69 @@ class BookSourceImportAnalyzer {
   }
 
   BookSourceImportAnalysis analyzeBytes(Uint8List bytes, {Uri? documentUri}) {
-    if (bytes.length > LegadoSourceImportService.maxImportBytes) {
-      throw const FormatException('Source file exceeds the 64 MiB limit.');
-    }
-    late final Object? decoded;
-    try {
-      decoded = jsonDecode(utf8.decode(bytes, allowMalformed: false));
-    } on FormatException catch (error) {
-      throw FormatException('Source JSON is invalid: ${error.message}');
-    }
-
-    if (decoded is Map && decoded['protocol'] == openReadingSourceProtocol) {
-      final manifest = BookSourceManifest.fromJson(
-        decoded.map((key, value) => MapEntry('$key', value)),
-      );
-      final manifestUrl =
-          documentUri ??
-          manifest.apiBaseUrl.resolve('/$openReadingSourceDiscoveryPath');
-      return BookSourceImportAnalysis.orsp(
-        RegisteredBookSource.fromManifest(
-          manifest: manifest,
-          manifestUrl: manifestUrl,
-        ),
-      );
-    }
-
-    return BookSourceImportAnalysis.additional(
-      _additionalImporter.parseBytes(bytes),
+    return _analyzeBookSourceBytes(
+      bytes,
+      documentUri: documentUri,
+      additionalImporter: _additionalImporter,
     );
+  }
+
+  Future<BookSourceImportAnalysis> analyzeBytesAsync(
+    Uint8List bytes, {
+    Uri? documentUri,
+  }) {
+    return compute(_analyzeBookSourceBytesInBackground, {
+      'bytes': bytes,
+      if (documentUri != null) 'documentUri': documentUri.toString(),
+    });
+  }
+}
+
+BookSourceImportAnalysis _analyzeBookSourceBytesInBackground(
+  Map<String, Object?> message,
+) {
+  final bytes = message['bytes']! as Uint8List;
+  final documentUri = switch (message['documentUri']) {
+    final String value => Uri.parse(value),
+    _ => null,
+  };
+  return _analyzeBookSourceBytes(bytes, documentUri: documentUri);
+}
+
+BookSourceImportAnalysis _analyzeBookSourceBytes(
+  Uint8List bytes, {
+  Uri? documentUri,
+  LegadoSourceImportService? additionalImporter,
+}) {
+  if (bytes.length > LegadoSourceImportService.maxImportBytes) {
+    throw const FormatException('Source file exceeds the 64 MiB limit.');
+  }
+  late final Object? decoded;
+  try {
+    decoded = jsonDecode(utf8.decode(bytes, allowMalformed: false));
+  } on FormatException catch (error) {
+    throw FormatException('Source JSON is invalid: ${error.message}');
+  }
+
+  if (decoded is Map && decoded['protocol'] == openReadingSourceProtocol) {
+    final manifest = BookSourceManifest.fromJson(
+      decoded.map((key, value) => MapEntry('$key', value)),
+    );
+    final manifestUrl =
+        documentUri ??
+        manifest.apiBaseUrl.resolve('/$openReadingSourceDiscoveryPath');
+    return BookSourceImportAnalysis.orsp(
+      RegisteredBookSource.fromManifest(
+        manifest: manifest,
+        manifestUrl: manifestUrl,
+      ),
+    );
+  }
+
+  final importer = additionalImporter ?? LegadoSourceImportService();
+  try {
+    return BookSourceImportAnalysis.additional(importer.parseDecoded(decoded));
+  } finally {
+    if (additionalImporter == null) importer.close();
   }
 }

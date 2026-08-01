@@ -137,7 +137,15 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('categories'), findsOneWidget);
-    expect(find.text('Enabled'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey('bookSourceCard-org.example.long-source'),
+        ),
+        matching: find.text('Enabled'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -329,6 +337,72 @@ void main() {
     expect(find.text('CC BY 4.0'), findsOneWidget);
     expect(find.text('Licensed public catalog.'), findsOneWidget);
     expect(find.textContaining('does not verify or endorse'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('large source collections build lazily and remain searchable', (
+    tester,
+  ) async {
+    unmountPage(tester);
+    final sources = List.generate(
+      600,
+      (index) => RegisteredBookSource(
+        id: 'org.example.bulk-$index',
+        name: 'Source ${index.toString().padLeft(3, '0')}',
+        description: '',
+        manifestUrl: Uri.parse('https://source-$index.example/source.json'),
+        apiBaseUrl: Uri.parse('https://source-$index.example/api/'),
+        protocolVersion: '1.5',
+        languages: const ['en'],
+        capabilities: const {'search', 'detail', 'catalog', 'content'},
+        enabled: true,
+        addedAt: DateTime.utc(2026, 8, 2),
+      ),
+    );
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        sources.map((source) => source.toJson()).toList(),
+      ),
+    });
+
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(500, 900);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceManagementPage(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Showing 600 of 600'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('bookSourceCard-org.example.bulk-599')),
+      findsNothing,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('bookSourceManagementSearchField')),
+      'Source 599',
+    );
+    await tester.pump();
+
+    expect(find.text('Showing 1 of 600'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bookSourceCard-org.example.bulk-599')),
+        matching: find.text('Source 599'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('bookSourcesSelectionModeButton')));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Select all'));
+    await tester.pump();
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
     expect(tester.takeException(), isNull);
   });
 }

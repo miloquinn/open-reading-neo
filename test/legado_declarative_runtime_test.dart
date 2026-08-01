@@ -328,6 +328,85 @@ void main() {
       expect(content.content, '第一段\n第二段');
     });
 
+    test('loads declarative discovery channels and paged books', () async {
+      final transport = _FakeTransport({
+        'https://books.test/rank?page=2': '''
+          <div class="explore-book">
+            <a href="/book/2"><span class="title">第二页书籍</span></a>
+            <span class="writer">作者乙</span>
+          </div>
+        ''',
+      });
+      final raw = Map<String, dynamic>.from(_htmlSource().raw)
+        ..addAll({
+          'exploreUrl': '排行榜::/rank?page={{page}}',
+          'ruleExplore': {
+            'bookList': 'class.explore-book',
+            'name': 'class.title@text',
+            'author': 'class.writer@text',
+            'bookUrl': 'tag.a@href',
+          },
+        });
+      final source = LegadoBookSource.fromJson(
+        raw,
+      ).toRegisteredSource(enabled: true);
+      final runtime = LegadoRuntime(transport: transport);
+
+      final categories = await runtime.getExploreCategories(source);
+      expect(categories.single.name, '排行榜');
+      final page = await runtime.browse(
+        source,
+        category: categories.single.id,
+        page: 2,
+      );
+
+      expect(page.page, 2);
+      expect(page.items.single.title, '第二页书籍');
+      expect(page.items.single.author, '作者乙');
+      expect(page.items.single.id, 'https://books.test/book/2');
+      expect(page.hasMore, isTrue);
+    });
+
+    test(
+      'discovery falls back to search rules when ruleExplore is empty',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/latest?page=1': '''
+          <div class="book">
+            <a href="/book/3"><span class="name">沿用搜索规则</span></a>
+          </div>
+        ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['exploreUrl'] = '最新::/latest?page={{page}}';
+        final source = LegadoBookSource.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = LegadoRuntime(transport: transport);
+        final category = (await runtime.getExploreCategories(source)).single;
+
+        final page = await runtime.browse(source, category: category.id);
+
+        expect(page.items.single.title, '沿用搜索规则');
+      },
+    );
+
+    test('rejects discovery URLs not declared by the source', () async {
+      final transport = _FakeTransport(const {});
+      final raw = Map<String, dynamic>.from(_htmlSource().raw)
+        ..['exploreUrl'] = '排行::/rank?page={{page}}';
+      final source = LegadoBookSource.fromJson(
+        raw,
+      ).toRegisteredSource(enabled: true);
+      final runtime = LegadoRuntime(transport: transport);
+
+      await expectLater(
+        runtime.browse(source, category: 'https://attacker.example/books'),
+        throwsA(isA<BookSourceProtocolException>()),
+      );
+      expect(transport.requests, isEmpty);
+    });
+
     test('rejects unsupported behavior before sending a request', () async {
       final transport = _FakeTransport(const {});
       final raw = Map<String, dynamic>.from(_htmlSource().raw);

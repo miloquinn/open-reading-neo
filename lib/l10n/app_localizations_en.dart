@@ -117,6 +117,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesDisabled => 'Disabled';
 
   @override
+  String get bookSourcesRunnable => 'Ready to use';
+
+  @override
+  String get bookSourcesPendingCompatibility => 'Compatibility pending';
+
+  @override
+  String get bookSourcesManagementSearchHint =>
+      'Search name, URL, notes, or group';
+
+  @override
+  String get bookSourcesClearSearch => 'Clear search';
+
+  @override
+  String get bookSourcesAllGroups => 'All groups';
+
+  @override
+  String get bookSourcesChooseGroup => 'Choose a source group';
+
+  @override
+  String get bookSourcesSearchGroups => 'Search groups';
+
+  @override
+  String get bookSourcesNoMatchingSources =>
+      'No sources match the current search and filters';
+
+  @override
+  String get bookSourcesResetFilters => 'Reset';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return 'Showing $visible of $total';
+  }
+
+  @override
   String get bookSourcesRemove => 'Remove';
 
   @override
@@ -139,7 +173,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesImportLink => 'Import link';
 
   @override
-  String get bookSourcesAnalyze => 'Analyze';
+  String get bookSourcesAnalyze => 'Read sources';
 
   @override
   String get bookSourcesDetectedOrsp => 'Detected: ORSP';
@@ -209,10 +243,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'I confirm that I am authorized to access this content and will not use the source to bypass sign-in, payment, DRM, or other access controls.';
 
   @override
-  String get bookSourcesConnect => 'Connect and validate';
+  String get bookSourcesConnect => 'Read and import';
 
   @override
-  String get bookSourcesConnecting => 'Validating protocol…';
+  String get bookSourcesConnecting => 'Processing sources…';
 
   @override
   String get bookSourcesAdded => 'Source added';
@@ -2002,7 +2036,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      'Imported sources are checked before use and remain disabled until you enable them.';
+      'Import only parses, deduplicates, and marks compatibility locally. It does not probe every source online. Runnable sources keep their imported enabled state; incompatible sources remain stored but disabled.';
 
   @override
   String get additionalSourcesChooseFile => 'Add from JSON file';
@@ -2019,6 +2053,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '$supported ready, $partial partially supported, $unsupported compatibility pending, $skipped skipped';
+  }
+
+  @override
   String get additionalSourcesAvailable => 'Available';
 
   @override
@@ -2028,7 +2072,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get additionalSourcesUnsupported => 'Not supported';
 
   @override
-  String get additionalSourcesImportConfirm => 'Import disabled';
+  String get additionalSourcesImportConfirm => 'Import all';
 
   @override
   String additionalSourcesImported(int count) {
@@ -2405,7 +2449,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLibraryOpenAnimationMinimalHint =>
-      'A quick, stable fade with no directional movement';
+      'Fade in the text without directional movement';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => 'Paper rise';
@@ -2422,11 +2466,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'The reading page enters with a short sideways motion';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => 'Book spread';
+  String get settingsLibraryOpenAnimationPaceTitle => 'Animation pace';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint =>
-      'Two paper halves open outward from the center';
+  String get settingsLibraryOpenAnimationFast => 'Fast';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint =>
+      'Fade in quickly once the text is ready';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => 'Elegant';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint =>
+      'Reveal the text more gradually for a calmer handoff';
 
   @override
   String get settingsAccentFollowTheme => 'Accent color: follow theme';
@@ -4435,4 +4489,124 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerNoAnnotationsHint =>
       'Select text to highlight or add a comment. Tap an underlined comment to read it again.';
+
+  @override
+  String get replaceRulesTitle => 'Replace & clean';
+
+  @override
+  String get replaceRulesSettingsSubtitle =>
+      'Remove ads, promotions, and other unwanted text while reading';
+
+  @override
+  String get replaceRulesImport => 'Import rules';
+
+  @override
+  String get replaceRulesExport => 'Export rules';
+
+  @override
+  String get replaceRulesSearchHint => 'Search names, groups, or patterns';
+
+  @override
+  String get replaceRulesUnnamed => 'Unnamed rule';
+
+  @override
+  String get replaceRulesDeleteValue => 'Remove';
+
+  @override
+  String get replaceRulesCreate => 'New rule';
+
+  @override
+  String get replaceRulesEmptyTitle => 'No replacement rules';
+
+  @override
+  String get replaceRulesEmptyBody =>
+      'Import a Legado JSON file or create a regular-expression rule.';
+
+  @override
+  String get replaceRulesNoSearchResults => 'No matching rules';
+
+  @override
+  String get replaceRulesCreateTitle => 'New replacement rule';
+
+  @override
+  String get replaceRulesEditTitle => 'Edit replacement rule';
+
+  @override
+  String get replaceRulesNameLabel => 'Rule name';
+
+  @override
+  String get replaceRulesPatternLabel => 'Text or regular expression to match';
+
+  @override
+  String get replaceRulesPatternHelper =>
+      'Leave the replacement empty to remove matched text';
+
+  @override
+  String get replaceRulesReplacementLabel => 'Replace with';
+
+  @override
+  String get replaceRulesRegexLabel => 'Use a regular expression';
+
+  @override
+  String get replaceRulesScopeTitleLabel => 'Apply to chapter titles';
+
+  @override
+  String get replaceRulesScopeContentLabel => 'Apply to chapter content';
+
+  @override
+  String get replaceRulesGroupLabel => 'Group (optional)';
+
+  @override
+  String get replaceRulesScopeLabel => 'Scope (optional)';
+
+  @override
+  String get replaceRulesScopeHelper =>
+      'Separate book titles or source names with semicolons';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => 'Excluded scope (optional)';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => 'Delete this rule?';
+
+  @override
+  String get replaceRulesDeleteConfirmBody =>
+      'The rule will be removed from this device.';
+
+  @override
+  String replaceRulesImported(int count) {
+    return 'Imported $count rules';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return 'Could not import rules: $error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return 'The rule file exceeds $max';
+  }
+
+  @override
+  String get replaceRulesExported => 'Rules exported';
+
+  @override
+  String get replaceRulesPatternRequired =>
+      'Enter text or a regular expression to match';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return 'The pattern exceeds $max characters';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return 'Invalid regular expression: $error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return 'A maximum of $max rules is supported';
+  }
 }

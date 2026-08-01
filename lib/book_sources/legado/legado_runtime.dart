@@ -57,6 +57,75 @@ class LegadoRuntime {
     );
   }
 
+  Future<List<BookSourceCategory>> getExploreCategories(
+    RegisteredBookSource registered,
+  ) async {
+    final source = _source(registered);
+    _ensureRunnable(source);
+    final catalog = source.exploreCatalog;
+    if (!catalog.canBrowse) {
+      throw BookSourceProtocolException(
+        catalog.error ?? 'This compatible source has no discovery channels.',
+      );
+    }
+    return catalog.entries
+        .map((entry) => BookSourceCategory(id: entry.url, name: entry.title))
+        .toList(growable: false);
+  }
+
+  Future<BookSourceSearchPage> browse(
+    RegisteredBookSource registered, {
+    required String? category,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final source = _source(registered);
+    _ensureRunnable(source);
+    final catalog = source.exploreCatalog;
+    if (!catalog.canBrowse) {
+      throw BookSourceProtocolException(
+        catalog.error ?? 'This compatible source has no discovery channels.',
+      );
+    }
+    final entry = catalog.entries
+        .where((entry) => entry.url == category)
+        .firstOrNull;
+    if (entry == null) {
+      throw const BookSourceProtocolException(
+        'Choose a discovery channel before browsing this source.',
+      );
+    }
+    final response = await _request(
+      source,
+      entry.url,
+      variables: {'page': '$page'},
+    );
+    final document = LegadoRuleDocument.parse(response.body, response.finalUri);
+    final exploreRule = source.rule('ruleExplore');
+    final rule = _optionalRule(exploreRule, 'bookList').isEmpty
+        ? source.rule('ruleSearch')
+        : exploreRule;
+    final contexts = _rules.evaluateList(
+      document,
+      null,
+      _requiredRule(rule, 'bookList'),
+    );
+    final books = <BookSourceBook>[];
+    for (final context in contexts.take(_maxSearchItems)) {
+      final book = _bookFromRules(document, context, rule);
+      if (book != null) books.add(book);
+    }
+    return BookSourceSearchPage(
+      items: books,
+      page: page,
+      pageSize: books.isEmpty ? pageSize : books.length,
+      // Legado pages do not carry a hasMore envelope. Match Legado-E by
+      // probing the next page after any non-empty result; the UI stops when a
+      // page is empty or contributes no new source/book identities.
+      hasMore: books.isNotEmpty,
+    );
+  }
+
   Future<BookSourceBook> getBook(
     RegisteredBookSource registered,
     String bookId,
@@ -270,10 +339,7 @@ class LegadoRuntime {
 
   void _ensureRunnable(LegadoBookSource source) {
     final report = const LegadoCompatibilityScanner().scan(source);
-    final blockedIssues = report.issues.where(
-      (issue) => issue != LegadoCompatibilityIssue.complexJsonPath,
-    );
-    if (blockedIssues.isNotEmpty) {
+    if (!report.canRun) {
       throw const BookSourceProtocolException(
         'This compatible source uses features that are not supported yet.',
       );

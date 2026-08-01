@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../legado/legado_book_source.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
@@ -17,12 +18,10 @@ class BookSourceRegistry {
   Stream<void> get changes => _changesController.stream;
 
   Future<List<RegisteredBookSource>> load() async {
-    return _load(filterUnverified: true);
+    return _load();
   }
 
-  Future<List<RegisteredBookSource>> _load({
-    required bool filterUnverified,
-  }) async {
+  Future<List<RegisteredBookSource>> _load() async {
     final preferences = await SharedPreferences.getInstance();
     final raw = preferences.getString(_storageKey);
     if (raw == null || raw.trim().isEmpty) return const [];
@@ -34,28 +33,39 @@ class BookSourceRegistry {
       for (final item in decoded) {
         if (item is! Map) continue;
         try {
-          sources.add(
-            RegisteredBookSource.fromJson(
-              item.map((key, value) => MapEntry('$key', value)),
-            ),
+          final stored = RegisteredBookSource.fromJson(
+            item.map((key, value) => MapEntry('$key', value)),
           );
+          sources.add(_refreshLocalCompatibility(stored));
         } catch (_) {
           // Skip a damaged entry instead of making the whole registry unusable.
         }
       }
       sources.sort((a, b) => a.name.compareTo(b.name));
-      if (!filterUnverified) return sources;
-      return sources
-          .where(
-            (source) =>
-                source.sourceProtocol == BookSourceProtocolKind.orsp ||
-                (source.capabilities.isNotEmpty &&
-                    source.sourceConfig?['_openReadingReadingChainVerifiedAt']
-                        is String),
-          )
-          .toList(growable: false);
+      return sources;
     } catch (_) {
       return const [];
+    }
+  }
+
+  RegisteredBookSource _refreshLocalCompatibility(RegisteredBookSource source) {
+    if (source.sourceProtocol != BookSourceProtocolKind.legado ||
+        source.sourceConfig == null) {
+      return source;
+    }
+    try {
+      final compatible = LegadoBookSource.fromJson(source.sourceConfig!);
+      final report = const LegadoCompatibilityScanner().scan(compatible);
+      return compatible.toRegisteredSource(
+        enabled: source.enabled,
+        readingChainVerified: isReadingChainVerifiedLegadoSource(source),
+        compatibilityReport: report,
+        addedAt: source.addedAt,
+      );
+    } on FormatException {
+      // Keep a legacy record visible even if its raw configuration can no
+      // longer be executed. The management page can still remove or replace it.
+      return source;
     }
   }
 
@@ -65,16 +75,18 @@ class BookSourceRegistry {
     final preferences = await SharedPreferences.getInstance();
     final additionalEnabled =
         preferences.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
-    final sources = await load();
-    if (additionalEnabled) return sources;
-    return sources
+    final runnable = (await load()).where(
+      (source) => source.capabilities.isNotEmpty,
+    );
+    if (additionalEnabled) return runnable.toList(growable: false);
+    return runnable
         .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
         .toList(growable: false);
   }
 
   Future<List<RegisteredBookSource>> upsert(RegisteredBookSource source) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false)).toList();
+      final sources = (await _load()).toList();
       final index = sources.indexWhere((item) => item.id == source.id);
       if (index >= 0) {
         final previous = sources[index];
@@ -115,9 +127,7 @@ class BookSourceRegistry {
       } else {
         sources.add(source);
       }
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -127,7 +137,7 @@ class BookSourceRegistry {
     Iterable<RegisteredBookSource> imported,
   ) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false)).toList();
+      final sources = (await _load()).toList();
       final indexes = <String, int>{
         for (var index = 0; index < sources.length; index++)
           sources[index].id: index,
@@ -166,21 +176,19 @@ class BookSourceRegistry {
           languages: source.languages,
           capabilities: source.capabilities,
           maxCatalogPageSize: source.maxCatalogPageSize,
-          enabled: source.enabled && source.capabilities.isNotEmpty,
+          enabled: previous.enabled && source.capabilities.isNotEmpty,
           addedAt: previous.addedAt,
           sourceProtocol: source.sourceProtocol,
           sourceConfig: source.sourceConfig,
         );
       }
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
   Future<List<RegisteredBookSource>> setEnabled(String id, bool enabled) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false))
+      final sources = (await _load())
           .map((source) {
             if (source.id != id) return source;
             if (enabled && source.capabilities.isEmpty) {
@@ -191,9 +199,7 @@ class BookSourceRegistry {
             return source.copyWith(enabled: enabled);
           })
           .toList(growable: false);
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -218,24 +224,20 @@ class BookSourceRegistry {
 
   Future<List<RegisteredBookSource>> remove(String id) async {
     return _mutate(() async {
-      final sources = (await _load(
-        filterUnverified: false,
-      )).where((source) => source.id != id).toList();
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      final sources = (await _load())
+          .where((source) => source.id != id)
+          .toList();
+      return _saveAndPublish(sources);
     });
   }
 
   Future<List<RegisteredBookSource>> removeAll(Iterable<String> ids) async {
     final removed = ids.toSet();
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false))
+      final sources = (await _load())
           .where((source) => !removed.contains(source.id))
           .toList(growable: false);
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -245,16 +247,14 @@ class BookSourceRegistry {
   ) async {
     final selected = ids.toSet();
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false))
+      final sources = (await _load())
           .map((source) {
             if (!selected.contains(source.id)) return source;
             final canEnable = source.capabilities.isNotEmpty;
             return source.copyWith(enabled: enabled && canEnable);
           })
           .toList(growable: false);
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -266,16 +266,14 @@ class BookSourceRegistry {
     RegisteredBookSource source,
   ) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false)).toList();
+      final sources = (await _load()).toList();
       final index = sources.indexWhere((item) => item.id == source.id);
       if (index < 0) {
         sources.add(source);
       } else {
         sources[index] = source;
       }
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -299,5 +297,14 @@ class BookSourceRegistry {
       _storageKey,
       jsonEncode(sources.map((source) => source.toJson()).toList()),
     );
+  }
+
+  Future<List<RegisteredBookSource>> _saveAndPublish(
+    List<RegisteredBookSource> sources,
+  ) async {
+    sources.sort((a, b) => a.name.compareTo(b.name));
+    await _save(sources);
+    _changesController.add(null);
+    return List.unmodifiable(sources);
   }
 }

@@ -12,6 +12,7 @@ import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_sources_page.dart';
 import 'package:xxread/pages/book_sources/source_search_page.dart';
+import 'package:xxread/services/core/app_settings_service.dart';
 
 void main() {
   setUp(() {
@@ -243,6 +244,44 @@ void main() {
     expect(find.text('Book of Source B'), findsOneWidget);
     expect(find.text('Book of Source A'), findsNothing);
   });
+
+  testWidgets('discover page selects a Legado source, channel, and next page', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 1000);
+    addTearDown(tester.view.reset);
+    final source = _legadoDiscoverySource();
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+      additionalSourceProtocolsPreferenceKey: true,
+    });
+    final client = _DiscoveryBookSourceClient();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: BookSourcesPage(client: client)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(ChoiceChip, 'Legado E'), findsOneWidget);
+    expect(find.text('Ranking'), findsOneWidget);
+    expect(find.text('Channel Book 1'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Legado E'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ranking'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('bookSourceCategoryLoadMore')));
+    await tester.pumpAndSettle();
+
+    expect(client.requestedPages, [1, 1, 2]);
+    expect(find.text('Channel Book 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _DelayedScopeClient extends BookSourceClient {
@@ -326,6 +365,76 @@ RegisteredBookSource _source() => RegisteredBookSource(
   enabled: true,
   addedAt: DateTime.utc(2026, 7, 13),
 );
+
+RegisteredBookSource _legadoDiscoverySource() => RegisteredBookSource(
+  id: 'legado-e',
+  name: 'Legado E',
+  description: '',
+  manifestUrl: Uri.parse('https://legado.example'),
+  apiBaseUrl: Uri.parse('https://legado.example'),
+  protocolVersion: 'legado-3',
+  languages: const [],
+  capabilities: const {
+    'search',
+    'detail',
+    'catalog',
+    'content',
+    'categories',
+    'browse',
+  },
+  enabled: true,
+  addedAt: DateTime.utc(2026, 8, 1),
+  sourceProtocol: BookSourceProtocolKind.legado,
+  sourceConfig: const {
+    'bookSourceName': 'Legado E',
+    'bookSourceUrl': 'https://legado.example',
+    'searchUrl': '/search?q={{key}}',
+    'exploreUrl': 'Ranking::/rank?page={{page}}',
+    'ruleSearch': {'bookList': '.book', 'bookUrl': 'a@href', 'name': 'a@text'},
+    'ruleBookInfo': {'name': 'h1@text'},
+    'ruleToc': {
+      'chapterList': '.chapter',
+      'chapterName': 'text',
+      'chapterUrl': 'href',
+    },
+    'ruleContent': {'content': '#content@text'},
+    '_openReadingReadingChainVerifiedAt': '2026-08-01T00:00:00Z',
+  },
+);
+
+class _DiscoveryBookSourceClient extends BookSourceClient {
+  final List<int> requestedPages = [];
+
+  @override
+  Future<List<BookSourceCategory>> getCategories(
+    RegisteredBookSource source,
+  ) async => const [BookSourceCategory(id: '/rank', name: 'Ranking')];
+
+  @override
+  Future<BookSourceSearchPage> browse(
+    RegisteredBookSource source, {
+    String? category,
+    String sort = 'latest',
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    requestedPages.add(page);
+    return BookSourceSearchPage(
+      items: [
+        BookSourceBook(
+          id: 'channel-book-$page',
+          title: 'Channel Book $page',
+          author: 'Author',
+          description: '',
+          categories: const [],
+        ),
+      ],
+      page: page,
+      pageSize: 1,
+      hasMore: page == 1,
+    );
+  }
+}
 
 class _PagingBookSourceClient extends BookSourceClient {
   final List<int> requestedPages = [];

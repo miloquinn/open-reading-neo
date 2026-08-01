@@ -293,6 +293,66 @@ abstract class AppLocalizations {
   /// **'Disabled'**
   String get bookSourcesDisabled;
 
+  /// No description provided for @bookSourcesRunnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to use'**
+  String get bookSourcesRunnable;
+
+  /// No description provided for @bookSourcesPendingCompatibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Compatibility pending'**
+  String get bookSourcesPendingCompatibility;
+
+  /// No description provided for @bookSourcesManagementSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search name, URL, notes, or group'**
+  String get bookSourcesManagementSearchHint;
+
+  /// No description provided for @bookSourcesClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get bookSourcesClearSearch;
+
+  /// No description provided for @bookSourcesAllGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get bookSourcesAllGroups;
+
+  /// No description provided for @bookSourcesChooseGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a source group'**
+  String get bookSourcesChooseGroup;
+
+  /// No description provided for @bookSourcesSearchGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'Search groups'**
+  String get bookSourcesSearchGroups;
+
+  /// No description provided for @bookSourcesNoMatchingSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No sources match the current search and filters'**
+  String get bookSourcesNoMatchingSources;
+
+  /// No description provided for @bookSourcesResetFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get bookSourcesResetFilters;
+
+  /// No description provided for @bookSourcesVisibleCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {visible} of {total}'**
+  String bookSourcesVisibleCount(int visible, int total);
+
   /// No description provided for @bookSourcesRemove.
   ///
   /// In en, this message translates to:
@@ -338,7 +398,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesAnalyze.
   ///
   /// In en, this message translates to:
-  /// **'Analyze'**
+  /// **'Read sources'**
   String get bookSourcesAnalyze;
 
   /// No description provided for @bookSourcesDetectedOrsp.
@@ -456,13 +516,13 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesConnect.
   ///
   /// In en, this message translates to:
-  /// **'Connect and validate'**
+  /// **'Read and import'**
   String get bookSourcesConnect;
 
   /// No description provided for @bookSourcesConnecting.
   ///
   /// In en, this message translates to:
-  /// **'Validating protocol…'**
+  /// **'Processing sources…'**
   String get bookSourcesConnecting;
 
   /// No description provided for @bookSourcesAdded.
@@ -3629,7 +3689,7 @@ abstract class AppLocalizations {
   /// No description provided for @additionalSourcesImportNotice.
   ///
   /// In en, this message translates to:
-  /// **'Imported sources are checked before use and remain disabled until you enable them.'**
+  /// **'Import only parses, deduplicates, and marks compatibility locally. It does not probe every source online. Runnable sources keep their imported enabled state; incompatible sources remain stored but disabled.'**
   String get additionalSourcesImportNotice;
 
   /// No description provided for @additionalSourcesChooseFile.
@@ -3656,6 +3716,17 @@ abstract class AppLocalizations {
   /// **'{supported} available, {partial} partially supported, {unsupported} not supported'**
   String additionalSourcesPreview(int supported, int partial, int unsupported);
 
+  /// No description provided for @additionalSourcesPreviewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'{supported} ready, {partial} partially supported, {unsupported} compatibility pending, {skipped} skipped'**
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  );
+
   /// No description provided for @additionalSourcesAvailable.
   ///
   /// In en, this message translates to:
@@ -3677,7 +3748,7 @@ abstract class AppLocalizations {
   /// No description provided for @additionalSourcesImportConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Import disabled'**
+  /// **'Import all'**
   String get additionalSourcesImportConfirm;
 
   /// No description provided for @additionalSourcesImported.
@@ -4349,7 +4420,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLibraryOpenAnimationMinimalHint.
   ///
   /// In en, this message translates to:
-  /// **'A quick, stable fade with no directional movement'**
+  /// **'Fade in the text without directional movement'**
   String get settingsLibraryOpenAnimationMinimalHint;
 
   /// No description provided for @settingsLibraryOpenAnimationPaperRise.
@@ -4376,17 +4447,35 @@ abstract class AppLocalizations {
   /// **'The reading page enters with a short sideways motion'**
   String get settingsLibraryOpenAnimationPageSlideHint;
 
-  /// No description provided for @settingsLibraryOpenAnimationBookSpread.
+  /// No description provided for @settingsLibraryOpenAnimationPaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Book spread'**
-  String get settingsLibraryOpenAnimationBookSpread;
+  /// **'Animation pace'**
+  String get settingsLibraryOpenAnimationPaceTitle;
 
-  /// No description provided for @settingsLibraryOpenAnimationBookSpreadHint.
+  /// No description provided for @settingsLibraryOpenAnimationFast.
   ///
   /// In en, this message translates to:
-  /// **'Two paper halves open outward from the center'**
-  String get settingsLibraryOpenAnimationBookSpreadHint;
+  /// **'Fast'**
+  String get settingsLibraryOpenAnimationFast;
+
+  /// No description provided for @settingsLibraryOpenAnimationFastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fade in quickly once the text is ready'**
+  String get settingsLibraryOpenAnimationFastHint;
+
+  /// No description provided for @settingsLibraryOpenAnimationElegant.
+  ///
+  /// In en, this message translates to:
+  /// **'Elegant'**
+  String get settingsLibraryOpenAnimationElegant;
+
+  /// No description provided for @settingsLibraryOpenAnimationElegantHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal the text more gradually for a calmer handoff'**
+  String get settingsLibraryOpenAnimationElegantHint;
 
   /// Accent summary when following the app theme
   ///
@@ -7815,6 +7904,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select text to highlight or add a comment. Tap an underlined comment to read it again.'**
   String get readerNoAnnotationsHint;
+
+  /// No description provided for @replaceRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace & clean'**
+  String get replaceRulesTitle;
+
+  /// No description provided for @replaceRulesSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove ads, promotions, and other unwanted text while reading'**
+  String get replaceRulesSettingsSubtitle;
+
+  /// No description provided for @replaceRulesImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import rules'**
+  String get replaceRulesImport;
+
+  /// No description provided for @replaceRulesExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export rules'**
+  String get replaceRulesExport;
+
+  /// No description provided for @replaceRulesSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search names, groups, or patterns'**
+  String get replaceRulesSearchHint;
+
+  /// No description provided for @replaceRulesUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed rule'**
+  String get replaceRulesUnnamed;
+
+  /// No description provided for @replaceRulesDeleteValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get replaceRulesDeleteValue;
+
+  /// No description provided for @replaceRulesCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New rule'**
+  String get replaceRulesCreate;
+
+  /// No description provided for @replaceRulesEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No replacement rules'**
+  String get replaceRulesEmptyTitle;
+
+  /// No description provided for @replaceRulesEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a Legado JSON file or create a regular-expression rule.'**
+  String get replaceRulesEmptyBody;
+
+  /// No description provided for @replaceRulesNoSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching rules'**
+  String get replaceRulesNoSearchResults;
+
+  /// No description provided for @replaceRulesCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New replacement rule'**
+  String get replaceRulesCreateTitle;
+
+  /// No description provided for @replaceRulesEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit replacement rule'**
+  String get replaceRulesEditTitle;
+
+  /// No description provided for @replaceRulesNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule name'**
+  String get replaceRulesNameLabel;
+
+  /// No description provided for @replaceRulesPatternLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Text or regular expression to match'**
+  String get replaceRulesPatternLabel;
+
+  /// No description provided for @replaceRulesPatternHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the replacement empty to remove matched text'**
+  String get replaceRulesPatternHelper;
+
+  /// No description provided for @replaceRulesReplacementLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace with'**
+  String get replaceRulesReplacementLabel;
+
+  /// No description provided for @replaceRulesRegexLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a regular expression'**
+  String get replaceRulesRegexLabel;
+
+  /// No description provided for @replaceRulesScopeTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to chapter titles'**
+  String get replaceRulesScopeTitleLabel;
+
+  /// No description provided for @replaceRulesScopeContentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to chapter content'**
+  String get replaceRulesScopeContentLabel;
+
+  /// No description provided for @replaceRulesGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group (optional)'**
+  String get replaceRulesGroupLabel;
+
+  /// No description provided for @replaceRulesScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope (optional)'**
+  String get replaceRulesScopeLabel;
+
+  /// No description provided for @replaceRulesScopeHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate book titles or source names with semicolons'**
+  String get replaceRulesScopeHelper;
+
+  /// No description provided for @replaceRulesExcludeScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded scope (optional)'**
+  String get replaceRulesExcludeScopeLabel;
+
+  /// No description provided for @replaceRulesDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this rule?'**
+  String get replaceRulesDeleteConfirmTitle;
+
+  /// No description provided for @replaceRulesDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The rule will be removed from this device.'**
+  String get replaceRulesDeleteConfirmBody;
+
+  /// Replacement-rule import success
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} rules'**
+  String replaceRulesImported(int count);
+
+  /// Replacement-rule import error
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import rules: {error}'**
+  String replaceRulesImportFailed(String error);
+
+  /// Replacement-rule import file size error
+  ///
+  /// In en, this message translates to:
+  /// **'The rule file exceeds {max}'**
+  String replaceRulesImportTooLarge(String max);
+
+  /// No description provided for @replaceRulesExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules exported'**
+  String get replaceRulesExported;
+
+  /// No description provided for @replaceRulesPatternRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter text or a regular expression to match'**
+  String get replaceRulesPatternRequired;
+
+  /// Replacement-rule pattern size error
+  ///
+  /// In en, this message translates to:
+  /// **'The pattern exceeds {max} characters'**
+  String replaceRulesPatternTooLong(int max);
+
+  /// Replacement-rule regular expression error
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid regular expression: {error}'**
+  String replaceRulesInvalidRegex(String error);
+
+  /// Replacement-rule count error
+  ///
+  /// In en, this message translates to:
+  /// **'A maximum of {max} rules is supported'**
+  String replaceRulesTooMany(int max);
 }
 
 class _AppLocalizationsDelegate

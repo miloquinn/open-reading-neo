@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../models/registered_book_source.dart';
+import 'legado_explore.dart';
 
 enum LegadoCompatibilityLevel { supported, partial, unsupported }
 
@@ -53,11 +54,16 @@ class LegadoBookSource {
   String get comment => _string(raw['bookSourceComment']);
   int get type => _integer(raw['bookSourceType']);
   String get searchUrl => _string(raw['searchUrl']);
+  String get exploreUrl => _string(raw['exploreUrl']);
+  bool get enabledExplore => raw['enabledExplore'] != false;
+  bool get enabled => raw['enabled'] != false;
   bool get enabledCookieJar => raw['enabledCookieJar'] == true;
   int get lastUpdateTime => _integer(raw['lastUpdateTime']);
   int get respondTime => _integer(raw['respondTime']);
 
   Uri get baseUri => Uri.parse(url.split('#').first);
+
+  LegadoExploreCatalog get exploreCatalog => parseLegadoExploreCatalog(raw);
 
   String get stableId =>
       'legado.${sha256.convert(utf8.encode(url)).toString().substring(0, 24)}';
@@ -99,11 +105,15 @@ class LegadoBookSource {
   }
 
   RegisteredBookSource toRegisteredSource({
-    bool enabled = false,
+    bool? enabled,
     bool readingChainVerified = false,
+    LegadoCompatibilityReport? compatibilityReport,
+    DateTime? addedAt,
   }) {
-    final report = const LegadoCompatibilityScanner().scan(this);
-    final canEnable = report.canRun && readingChainVerified;
+    final report =
+        compatibilityReport ?? const LegadoCompatibilityScanner().scan(this);
+    final canEnable = report.canRun;
+    final shouldEnable = enabled ?? this.enabled;
     return RegisteredBookSource(
       id: stableId,
       name: name,
@@ -114,17 +124,27 @@ class LegadoBookSource {
       protocolVersion: 'legado-3',
       languages: const [],
       capabilities: canEnable
-          ? const {'search', 'detail', 'catalog', 'content'}
+          ? {
+              'search',
+              'detail',
+              'catalog',
+              'content',
+              if (exploreCatalog.canBrowse) ...{'categories', 'browse'},
+            }
           : const {},
-      enabled: enabled && canEnable,
-      addedAt: DateTime.now(),
+      enabled: shouldEnable && canEnable,
+      addedAt: addedAt ?? DateTime.now(),
       sourceProtocol: BookSourceProtocolKind.legado,
       sourceConfig: {
         ...raw,
+        '_openReadingCompatibilityLevel': report.level.name,
+        '_openReadingCompatibilityIssues':
+            report.issues.map((issue) => issue.name).toList()..sort(),
         if (readingChainVerified)
-          '_openReadingReadingChainVerifiedAt': DateTime.now()
-              .toUtc()
-              .toIso8601String(),
+          '_openReadingReadingChainVerifiedAt':
+              raw['_openReadingReadingChainVerifiedAt'] is String
+              ? raw['_openReadingReadingChainVerifiedAt']
+              : DateTime.now().toUtc().toIso8601String(),
       },
     );
   }
@@ -166,9 +186,22 @@ class LegadoCompatibilityScanner {
     if (source.rule('ruleToc').isEmpty || source.rule('ruleContent').isEmpty) {
       issues.add(LegadoCompatibilityIssue.missingReadingRules);
     }
-    if (source.enabledCookieJar) issues.add(LegadoCompatibilityIssue.cookies);
+    final configuredHeaders = _staticJsonObject(source.raw['header']);
+    if (configuredHeaders.keys.any((key) => '$key'.toLowerCase() == 'cookie')) {
+      issues.add(LegadoCompatibilityIssue.cookies);
+    }
 
-    _walk(source.raw, (key, value) {
+    final coreConfiguration = Map<String, dynamic>.from(source.raw)
+      ..remove('enabledExplore')
+      ..remove('exploreUrl')
+      ..remove('exploreScreen')
+      ..remove('ruleExplore')
+      // Login support is optional in Legado. Its mere presence must not make
+      // otherwise public search and reading rules unusable.
+      ..remove('loginUrl')
+      ..remove('loginUi')
+      ..remove('loginCheckJs');
+    _walk(coreConfiguration, (key, value) {
       if (value is! String || value.trim().isEmpty) return;
       final field = key.toLowerCase();
       final text = value.toLowerCase();
@@ -215,6 +248,8 @@ class LegadoCompatibilityScanner {
     const blocked = {
       LegadoCompatibilityIssue.audio,
       LegadoCompatibilityIssue.video,
+      LegadoCompatibilityIssue.image,
+      LegadoCompatibilityIssue.file,
       LegadoCompatibilityIssue.javascript,
       LegadoCompatibilityIssue.webView,
       LegadoCompatibilityIssue.login,
@@ -244,11 +279,13 @@ class LegadoSourceImportResult {
     required this.sources,
     required this.sourceUrls,
     required this.errors,
+    required this.duplicates,
   });
 
   final List<LegadoBookSource> sources;
   final List<Uri> sourceUrls;
   final List<String> errors;
+  final int duplicates;
 }
 
 LegadoSourceImportResult parseLegadoSources(
@@ -258,7 +295,18 @@ LegadoSourceImportResult parseLegadoSources(
 }) {
   final text = input.replaceFirst('\ufeff', '').trim();
   if (text.isEmpty) throw const FormatException('Source JSON is empty.');
-  final decoded = jsonDecode(text);
+  return parseLegadoSourcePayload(
+    jsonDecode(text),
+    maxSources: maxSources,
+    maxNestedUrls: maxNestedUrls,
+  );
+}
+
+LegadoSourceImportResult parseLegadoSourcePayload(
+  Object? decoded, {
+  int maxSources = 10000,
+  int maxNestedUrls = 50,
+}) {
   final sourceUrls = <Uri>[];
   final candidates = <Object?>[];
   if (decoded is List) {
@@ -299,6 +347,7 @@ LegadoSourceImportResult parseLegadoSources(
   }
   final byUrl = <String, LegadoBookSource>{};
   final errors = <String>[];
+  var duplicates = 0;
   for (var index = 0; index < candidates.length; index++) {
     final candidate = candidates[index];
     if (candidate is! Map) {
@@ -309,6 +358,7 @@ LegadoSourceImportResult parseLegadoSources(
       final source = LegadoBookSource.fromJson(
         candidate.map((key, value) => MapEntry('$key', value)),
       );
+      if (byUrl.containsKey(source.url)) duplicates++;
       byUrl[source.url] = source;
     } on FormatException catch (error) {
       errors.add('Item ${index + 1}: ${error.message}');
@@ -318,6 +368,7 @@ LegadoSourceImportResult parseLegadoSources(
     sources: List.unmodifiable(byUrl.values),
     sourceUrls: List.unmodifiable(sourceUrls),
     errors: List.unmodifiable(errors),
+    duplicates: duplicates,
   );
 }
 
@@ -349,6 +400,19 @@ bool _isStaticJsonObject(String value) {
   } on FormatException {
     return false;
   }
+}
+
+Map<Object?, Object?> _staticJsonObject(Object? value) {
+  Object? decoded = value;
+  if (value is String) {
+    if (value.trim().isEmpty) return const {};
+    try {
+      decoded = jsonDecode(value);
+    } on FormatException {
+      return const {};
+    }
+  }
+  return decoded is Map ? decoded : const {};
 }
 
 bool _isRuleField(String field) => const {

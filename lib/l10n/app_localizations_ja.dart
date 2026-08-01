@@ -111,6 +111,38 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesDisabled => '無効';
 
   @override
+  String get bookSourcesRunnable => 'すぐに使用可能';
+
+  @override
+  String get bookSourcesPendingCompatibility => '互換対応待ち';
+
+  @override
+  String get bookSourcesManagementSearchHint => '名前、URL、メモ、グループを検索';
+
+  @override
+  String get bookSourcesClearSearch => '検索をクリア';
+
+  @override
+  String get bookSourcesAllGroups => 'すべてのグループ';
+
+  @override
+  String get bookSourcesChooseGroup => 'ソースグループを選択';
+
+  @override
+  String get bookSourcesSearchGroups => 'グループを検索';
+
+  @override
+  String get bookSourcesNoMatchingSources => '現在の検索とフィルターに一致するソースはありません';
+
+  @override
+  String get bookSourcesResetFilters => 'リセット';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return '$total 件中 $visible 件を表示';
+  }
+
+  @override
   String get bookSourcesRemove => '削除';
 
   @override
@@ -132,7 +164,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesImportLink => 'リンクをインポート';
 
   @override
-  String get bookSourcesAnalyze => 'ソースを分析';
+  String get bookSourcesAnalyze => 'ソースを読み込む';
 
   @override
   String get bookSourcesDetectedOrsp => '検出: ORSP ソース';
@@ -201,10 +233,10 @@ class AppLocalizationsJa extends AppLocalizations {
       '関連コンテンツへのアクセス権限があり、ログイン、支払い、DRM、その他のアクセス制御を回避するためにソースを使用しないことを確認します。';
 
   @override
-  String get bookSourcesConnect => '接続して検証';
+  String get bookSourcesConnect => '読み込んでインポート';
 
   @override
-  String get bookSourcesConnecting => 'プロトコルを検証中…';
+  String get bookSourcesConnecting => 'ソースを処理中…';
 
   @override
   String get bookSourcesAdded => 'ソースを追加しました';
@@ -1931,7 +1963,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      'インポートしたソースは事前確認され、有効にするまで無効のままです。';
+      'インポート時はローカルで解析・重複除去・互換性マークのみを行い、各ソースへの通信確認はしません。実行可能なソースは元の有効状態を維持し、未対応ソースも無効のまま保存します。';
 
   @override
   String get additionalSourcesChooseFile => 'JSON ファイルから追加';
@@ -1948,6 +1980,16 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return 'すぐに使用可能 $supported、一部対応 $partial、互換対応待ち $unsupported、スキップ $skipped';
+  }
+
+  @override
   String get additionalSourcesAvailable => '利用可能';
 
   @override
@@ -1957,7 +1999,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get additionalSourcesUnsupported => '未対応';
 
   @override
-  String get additionalSourcesImportConfirm => '無効のままインポート';
+  String get additionalSourcesImportConfirm => '一括インポート';
 
   @override
   String additionalSourcesImported(int count) {
@@ -2313,8 +2355,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLibraryOpenAnimationMinimal => 'シンプルなフェード';
 
   @override
-  String get settingsLibraryOpenAnimationMinimalHint =>
-      '方向移動のない、すばやく安定したフェードです';
+  String get settingsLibraryOpenAnimationMinimalHint => '方向移動なしで本文を安定して表示します';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => '紙面の浮上';
@@ -2330,10 +2371,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLibraryOpenAnimationPageSlideHint => '読書画面が横から短い距離だけ入ります';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => '見開き展開';
+  String get settingsLibraryOpenAnimationPaceTitle => 'アニメーションの速さ';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint => '左右の紙面が中央から外側へ開きます';
+  String get settingsLibraryOpenAnimationFast => '高速';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint => '本文の準備後、すばやくフェードインします';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => '優雅';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint =>
+      '本文をゆっくり表示し、穏やかに読書画面へ移ります';
 
   @override
   String get settingsAccentFollowTheme => 'アクセントカラー：テーマに従う';
@@ -4268,4 +4319,118 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get readerNoAnnotationsHint =>
       '文章を選択してハイライトやコメントを追加できます。下線付きのコメントをタップすると内容を確認できます。';
+
+  @override
+  String get replaceRulesTitle => '置換・クリーンアップ';
+
+  @override
+  String get replaceRulesSettingsSubtitle => '本文中の広告や宣伝など不要な文章を取り除きます';
+
+  @override
+  String get replaceRulesImport => 'ルールを読み込む';
+
+  @override
+  String get replaceRulesExport => 'ルールを書き出す';
+
+  @override
+  String get replaceRulesSearchHint => '名前、グループ、パターンを検索';
+
+  @override
+  String get replaceRulesUnnamed => '名前のないルール';
+
+  @override
+  String get replaceRulesDeleteValue => '削除';
+
+  @override
+  String get replaceRulesCreate => 'ルールを追加';
+
+  @override
+  String get replaceRulesEmptyTitle => '置換ルールはまだありません';
+
+  @override
+  String get replaceRulesEmptyBody => 'Legado の JSON を読み込むか、正規表現ルールを作成できます。';
+
+  @override
+  String get replaceRulesNoSearchResults => '一致するルールはありません';
+
+  @override
+  String get replaceRulesCreateTitle => '置換ルールを追加';
+
+  @override
+  String get replaceRulesEditTitle => '置換ルールを編集';
+
+  @override
+  String get replaceRulesNameLabel => 'ルール名';
+
+  @override
+  String get replaceRulesPatternLabel => '一致させる文字列 / 正規表現';
+
+  @override
+  String get replaceRulesPatternHelper => '一致した文字列を削除するには、置換後を空欄にします';
+
+  @override
+  String get replaceRulesReplacementLabel => '置換後';
+
+  @override
+  String get replaceRulesRegexLabel => '正規表現を使用';
+
+  @override
+  String get replaceRulesScopeTitleLabel => '章タイトルに適用';
+
+  @override
+  String get replaceRulesScopeContentLabel => '本文に適用';
+
+  @override
+  String get replaceRulesGroupLabel => 'グループ（任意）';
+
+  @override
+  String get replaceRulesScopeLabel => '適用範囲（任意）';
+
+  @override
+  String get replaceRulesScopeHelper => '書名または書籍ソース名をセミコロンで区切ります';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => '除外範囲（任意）';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => 'このルールを削除しますか？';
+
+  @override
+  String get replaceRulesDeleteConfirmBody => 'この端末からルールが削除されます。';
+
+  @override
+  String replaceRulesImported(int count) {
+    return '$count 件のルールを読み込みました';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return 'ルールを読み込めませんでした: $error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return 'ルールファイルは $max 以下にしてください';
+  }
+
+  @override
+  String get replaceRulesExported => 'ルールを書き出しました';
+
+  @override
+  String get replaceRulesPatternRequired => '一致させる文字列または正規表現を入力してください';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return 'パターンは $max 文字以下にしてください';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return '正規表現が無効です: $error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return 'ルールは最大 $max 件までです';
+  }
 }

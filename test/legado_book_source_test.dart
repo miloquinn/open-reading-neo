@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/legado/legado_book_source.dart';
+import 'package:xxread/book_sources/legado/legado_explore.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
@@ -13,21 +14,28 @@ Map<String, dynamic> _source({
   int type = 0,
   bool cookies = false,
   String contentRule = '#content@text',
-}) => {
-  'bookSourceName': name,
-  'bookSourceUrl': url,
-  'bookSourceType': type,
-  'enabledCookieJar': cookies,
-  'searchUrl': '/search?q={{key}}',
-  'ruleSearch': {'bookList': '.book', 'bookUrl': 'a@href', 'name': 'a@text'},
-  'ruleBookInfo': {'name': 'h1@text'},
-  'ruleToc': {
-    'chapterList': '.chapters a',
-    'chapterName': 'text',
-    'chapterUrl': 'href',
-  },
-  'ruleContent': {'content': contentRule},
-};
+  String? exploreUrl,
+  Object? ruleExplore,
+}) {
+  final source = <String, dynamic>{
+    'bookSourceName': name,
+    'bookSourceUrl': url,
+    'bookSourceType': type,
+    'enabledCookieJar': cookies,
+    'searchUrl': '/search?q={{key}}',
+    'ruleSearch': {'bookList': '.book', 'bookUrl': 'a@href', 'name': 'a@text'},
+    'ruleBookInfo': {'name': 'h1@text'},
+    'ruleToc': {
+      'chapterList': '.chapters a',
+      'chapterName': 'text',
+      'chapterUrl': 'href',
+    },
+    'ruleContent': {'content': contentRule},
+  };
+  if (exploreUrl != null) source['exploreUrl'] = exploreUrl;
+  if (ruleExplore != null) source['ruleExplore'] = ruleExplore;
+  return source;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -73,7 +81,7 @@ void main() {
     expect(nested.sourceUrls, hasLength(2));
   });
 
-  test('preflight distinguishes runnable, partial, and blocked sources', () {
+  test('preflight distinguishes runnable and blocked sources', () {
     const scanner = LegadoCompatibilityScanner();
     final supported = scanner.scan(LegadoBookSource.fromJson(_source()));
     expect(supported.level, LegadoCompatibilityLevel.supported);
@@ -81,13 +89,18 @@ void main() {
     final image = scanner.scan(
       LegadoBookSource.fromJson(_source(type: 2, name: 'Images')),
     );
-    expect(image.level, LegadoCompatibilityLevel.partial);
+    expect(image.level, LegadoCompatibilityLevel.unsupported);
     expect(image.canRun, isFalse);
+
+    final cookieJar = scanner.scan(
+      LegadoBookSource.fromJson(_source(cookies: true, name: 'Cookie jar')),
+    );
+    expect(cookieJar.level, LegadoCompatibilityLevel.supported);
 
     for (final raw in [
       _source(type: 1, name: 'Audio'),
       _source(type: 4, name: 'Video'),
-      _source(cookies: true, name: 'Cookies'),
+      {..._source(name: 'Cookie header'), 'header': '{"Cookie":"sid=1"}'},
       _source(contentRule: '@js:result', name: 'Script'),
     ]) {
       expect(
@@ -105,6 +118,68 @@ void main() {
     });
 
     expect(const LegadoCompatibilityScanner().scan(source).canRun, isTrue);
+  });
+
+  test('parses legacy and JSON discovery channels', () {
+    final legacy = parseLegadoExploreCatalog(
+      _source(
+        exploreUrl:
+            '玄幻::/rank?kind=xuanhuan&page={{page}}&&完本::/finished?page={{page}}',
+      ),
+    );
+    expect(legacy.canBrowse, isTrue);
+    expect(
+      legacy.entries.map((entry) => entry.title),
+      orderedEquals(['玄幻', '完本']),
+    );
+
+    final json = parseLegadoExploreCatalog(
+      _source(
+        exploreUrl: jsonEncode([
+          {'title': '排行', 'url': '/rank?page={{page}}'},
+          {'title': '关键词', 'type': 'text'},
+          {'title': '完本', 'type': 'url', 'url': '/finished?page={{page}}'},
+        ]),
+      ),
+    );
+    expect(json.canBrowse, isTrue);
+    expect(json.hasUnsupportedEntries, isTrue);
+    expect(
+      json.entries.map((entry) => entry.title),
+      orderedEquals(['排行', '完本']),
+    );
+  });
+
+  test('discovery scripts do not disable an otherwise runnable source', () {
+    final source = LegadoBookSource.fromJson(
+      _source(exploreUrl: '@js:JSON.stringify([])'),
+    );
+
+    expect(const LegadoCompatibilityScanner().scan(source).canRun, isTrue);
+    final registered = source.toRegisteredSource(readingChainVerified: true);
+    expect(registered.capabilities, contains('search'));
+    expect(registered.capabilities, isNot(contains('browse')));
+    expect(parseLegadoExploreCatalog(source.raw).canBrowse, isFalse);
+  });
+
+  test('declarative discovery adds categories and browse capabilities', () {
+    final registered = LegadoBookSource.fromJson(
+      _source(exploreUrl: '排行榜::/rank?page={{page}}'),
+    ).toRegisteredSource(readingChainVerified: true);
+
+    expect(registered.capabilities, containsAll(['categories', 'browse']));
+  });
+
+  test('stored verified sources gain declarative discovery capabilities', () {
+    final source = LegadoBookSource.fromJson(
+      _source(exploreUrl: '排行榜::/rank?page={{page}}'),
+    ).toRegisteredSource(readingChainVerified: true);
+    final stored = source.toJson()
+      ..['capabilities'] = ['search', 'detail', 'catalog', 'content'];
+
+    final restored = RegisteredBookSource.fromJson(stored);
+
+    expect(restored.capabilities, containsAll(['categories', 'browse']));
   });
 
   test('malformed serialized rules are unsupported instead of crashing', () {
@@ -127,20 +202,34 @@ void main() {
 
     expect(restored.sourceProtocol, BookSourceProtocolKind.legado);
     expect(restored.sourceConfig?['bookSourceName'], 'Declarative source');
-    expect(restored.enabled, isFalse);
+    expect(restored.enabled, isTrue);
   });
 
   test(
-    'registry hides legacy compatible imports without live verification',
+    'registry keeps locally assessed imports without live verification',
     () async {
       final source = LegadoBookSource.fromJson(_source()).toRegisteredSource();
       SharedPreferences.setMockInitialValues({
         'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
       });
 
-      expect(await BookSourceRegistry().load(), isEmpty);
+      expect(await BookSourceRegistry().load(), hasLength(1));
     },
   );
+
+  test('registry refreshes local capabilities without reimporting', () async {
+    final source = LegadoBookSource.fromJson(_source()).toRegisteredSource();
+    final legacy = source.toJson()
+      ..['capabilities'] = <String>[]
+      ..['enabled'] = false;
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([legacy]),
+    });
+
+    final restored = (await BookSourceRegistry().load()).single;
+    expect(restored.capabilities, contains('search'));
+    expect(restored.enabled, isFalse);
+  });
 
   test(
     'verified bulk import stays enabled and respects runtime gate',

@@ -121,7 +121,7 @@ lib/
 - `pages/settings/settings_page.dart`：应用设置、版本与维护入口，按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”五个分区组织；重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
 - `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片的添加/编辑/删除/激活与 AI 预处理开关从主设置页整体迁入，存储键（`reader_ai_quick_models_v1` 等）保持不变。
 - `pages/settings/sync/`：WebDAV 概览、独立连接配置、即时保存的同步内容开关和书籍文件管理页；书源、书架信息、阅读进度等元数据自动同步，原文件需先开启上传权限，再按书选择上传或下载。新导入书籍提供“每次询问（默认）/ 自动上传 / 始终手动”三种策略；自动上传只处理符合安全限制的真正新增本地文件。
-- `pages/settings/replace_rules_page.dart` 与 `services/reader/replace_rule_service.dart`：全局“替换净化”规则管理与执行边界。规则使用 SharedPreferences JSON 持久化，支持新建、编辑、启停、删除、搜索、排序、JSON 导入导出，以及 Legado 新旧字段（`pattern`/`regex`、`name`/`replaceSummary`、`isEnabled`/`enable`、`scope`/`useTo`、`order`/`serialNumber`）；规则可按书名/书源范围、排除范围和标题/正文类型生效。设置页提供稳定入口，本地文字阅读器和在线书源阅读器控制栏提供快速入口；标题与正文都在分页前净化，EPUB/Kindle 富文本会重算样式块偏移并保留图片，规则变更后当前阅读器清理文字/分页缓存并按现有进度重排。
+- `pages/settings/replace_rules_page.dart` 与 `services/reader/replace_rule_service.dart`：全局“替换净化”规则管理与执行边界。规则使用 SharedPreferences JSON 持久化，支持新建、编辑、启停、删除、搜索、排序、JSON 导入导出，以及常见新旧字段（`pattern`/`regex`、`name`/`replaceSummary`、`isEnabled`/`enable`、`scope`/`useTo`、`order`/`serialNumber`）；规则可按书名/书源范围、排除范围和标题/正文类型生效。设置页提供稳定入口，本地文字阅读器和在线书源阅读器控制栏提供快速入口；标题与正文都在分页前净化，EPUB/Kindle 富文本会重算样式块偏移并保留图片，规则变更后当前阅读器清理文字/分页缓存并按现有进度重排。
 - `services/sync/`：本地优先的 WebDAV v1 同步实现。每台设备写入独立的不可变变更批次，使用 HLC、tombstone 和记录级 LWW 合并；`book_sources` 按书源 ID 同步公开注册信息，在线书籍通过 `source_id + source_book_id`、书源快照和书籍快照恢复为可直接打开的书架项，在线章节进度复用 `progress` 数据集同步，但章节正文、目录、封面路径和缓存始终留在设备本地。新上传书籍以未加密的原始字节和原始文件名保存在 `books/<书名 - 作者>/`，同名异内容使用 `(2)`、`(3)` 可读编号避免覆盖。SHA-256 仅保存在同步元数据和本地索引中用于校验，历史无扩展名 blob 仍可下载；持久封面继续独立按 SHA-256 内容寻址。`sync_dataset_catalog.dart` 分离稳定协议数据集与当前版本能力，暂未开放的笔记/高亮记录可保留在同步镜像中，但不会扫描或写入业务表。
 - `pages/settings/custom_fonts_page.dart`：用户字体库的导入、应用、重命名和删除入口。
 - `widgets/side_toast.dart`：应用内短反馈的统一浮层。手机在顶部居中、宽屏在右上展示，连续提示直接替换；普通/成功提示短暂停留，警告/错误略延长，并通过 `IgnorePointer` 保证通知出现时底层操作仍可点击。页面内不再直接使用底部 `SnackBar`。
@@ -287,19 +287,19 @@ EPUB 图片块与其后的正文共用同一个显示投影：携带图片的第
 
 书源服务边界：
 
-- `BookSourceRegistry`：注册和启用状态。所有结构合法的导入记录都会保留；`loadRunnable()` 才按全局协议开关和本地运行能力缩小运行集合。注册表目前以单份 SharedPreferences JSON 持久化，批量导入只序列化和写入一次且直接返回内存结果，单项/批量变更通过全局异步尾队列串行，避免并发覆盖。
+- `BookSourceRegistry`：注册和启用状态。所有结构合法的导入记录都会保留；`loadRunnable()` 才按全局协议开关和本地运行能力缩小运行集合。换源等交互入口使用 `loadRunnableInBackground()`，把大型注册表 JSON 解码、阅读书源兼容扫描和运行门禁过滤移到后台 isolate，主 isolate 只恢复已筛选记录。注册表目前以单份 SharedPreferences JSON 持久化，批量导入只序列化和写入一次且直接返回内存结果，单项/批量变更通过全局异步尾队列串行，避免并发覆盖。
 - `BookSourceClient`：协议请求。
-- `LegadoSourceImportService` / `BookSourceImportAnalyzer`：64 MiB、最多 10,000 条的聚合导入边界；单次 UTF-8/JSON 解码，按 `bookSourceUrl` 保留最后一条，分别统计无效项和重复项。文件解析使用后台 isolate；URL 输入只在直接内容不是有效书源且声明嵌套 URL 时递归加载。能力扫描只生成本地摘要，不执行站点可用性探测，也不作为保存书源的前置条件。
-- `LegadoRuntime` / `LegadoHttpTransport`：阅读书源的应用内执行链路。请求按书源维持独立 Cookie 会话，接收并校验 `Set-Cookie` 的域、路径、Secure 与过期属性，支持配置中的静态 Cookie；重定向按浏览器语义处理 301/302/303/307/308，跨站时移除 Host、Authorization 和静态 Cookie。源级请求头支持 `source.getKey()`、`source.bookSourceUrl` 等常见取值表达式。DNS 解析后优先 IPv4 并逐个回退全部已校验地址，单个 CDN/IPv6 地址不可达时不会直接判定整个书源失败。
+- `SourceImportService` / `BookSourceImportAnalyzer`：64 MiB、最多 10,000 条的聚合导入边界；单次 UTF-8/JSON 解码，按 `bookSourceUrl` 保留最后一条，分别统计无效项和重复项。文件解析使用后台 isolate；URL 输入只在直接内容不是有效书源且声明嵌套 URL 时递归加载。能力扫描只生成本地摘要，不执行站点可用性探测，也不作为保存书源的前置条件。
+- `SourceRuntime` / `SourceHttpTransport`：阅读书源的应用内执行链路。请求按书源维持独立 Cookie 会话，接收并校验 `Set-Cookie` 的域、路径、Secure 与过期属性，支持配置中的静态 Cookie；重定向按浏览器语义处理 301/302/303/307/308，跨站时移除 Host、Authorization 和静态 Cookie。源级请求头支持 `source.getKey()`、`source.bookSourceUrl` 等常见取值表达式。普通公网 DNS 使用已校验地址连接；虚拟 DNS 的保留地址在同样检查后使用系统网络通道，避免本地隧道被自定义连接破坏。脚本网络调用通过暂停、APP 请求和上下文重放实现同步语义。
 - `BookSourceChapterText`：仅把 HTML/纯文本响应转换为 canonical chapter text，并清理重复远端页码；HTML 和 64 KiB 以上正文通过后台 isolate 规范化，短纯文本保留直接路径以避免 isolate 开销。若正文最前面的首行/首段与接口标题或目录标题规范化后完全相同，则像本地 TXT 章节解析一样剥离该重复标题。不注入首行缩进、段间距或章节标题，这些展示语义全部交给共享文字阅读内核。
 - `BookSourceChapterCache`：章节正文的内存/磁盘缓存和并发去重；网络结果进入内存后立即返回，目录与正文 JSON 持久化在后台完成，磁盘失败不阻断阅读。同一缓存键的后台写入严格串行并通过临时文件替换；缓存清理递增写入代次，使清理前尚未完成的任务不能重新创建旧缓存。在线阅读器的 canonical 正文只保留最近 8 章，优先预取下一章并在正文首帧后生成分页布局，再机会式准备上一章与更远的后一章。水平滑动到相邻章节时，真实预览页先在当前 `PageView` 内完成整段动画，只有 `ScrollEnd` 确认停在边界页后才提交章节状态；提交后复用已预热布局，并让新控制器直接挂接目标页，避免停稳后的可见重置。中途回滑会取消待提交切章，进度持久化不阻塞跨章提交。
 - `SourceCoverCache`：书源封面 URL 级请求去重、最多 4 路并发、瞬态失败单次退避重试、压缩字节内存 LRU 和应用缓存目录磁盘缓存；单 URL 驱逐使用独立 epoch，旧请求完成时不能覆盖或移除新请求。
 - `BookSourceShelfService`：在线书籍加入本地书架；完整下载以最多 3 章为一批并发抓取，按目录顺序持续写入同目录 `.part` 文件，每批 flush 后释放正文对象，完成后再改名为正式 TXT，内存占用不随整书篇幅线性增长。任务级取消会停止目录/章节请求并删除未完成的 `.part`；书源提供远程封面时下载到文档目录的 `covers/` 作为书架持久封面，缺失时生成统一封面。
 - `BookSourceReadingProgressStore`：在线章节阅读进度。
-- `legado/legado_explore.dart`：阅读书源发现入口；把旧式 `标题::URL` 和 JSON `type=url` 入口转换为静态频道。导入阶段只解析、去重并按已有规则组声明可尝试能力，不逐源联网或因其他高级规则整体禁用；请求模板与规则语法在实际调用对应搜索、详情、目录、正文或发现能力时按需校验。
+- `source_engine/source_explore.dart`：阅读书源发现入口；把旧式 `标题::URL` 和 JSON `type=url` 入口转换为静态频道。导入阶段只解析、去重并按已有规则组声明可尝试能力，不逐源联网或因其他高级规则整体禁用；请求模板与规则语法在实际调用对应搜索、详情、目录、正文或发现能力时按需校验。
 
 发现页提供共享同一缓存、分页、详情和阅读链路的两种视图，并通过 `book_source_discover_layout_v1` 记忆选择：标准布局先展示可发现书源，再展示当前范围可用的推荐/分类/最新栏目；列表布局以 Sliver 惰性列出书源，单项展开本地频道，选择频道后收起目录并进入该频道书单，通过“更换”返回目录。只有一个栏目时标准布局自动省略栏目切换。
-Legado 的安全发现入口映射为分类频道，频道书单通过 `ruleExplore` 解析并在缺失时回退
+阅读书源的安全发现入口映射为分类频道，频道书单通过 `ruleExplore` 解析并在缺失时回退
 `ruleSearch`，继续复用统一书籍卡片、详情、阅读与加入书架链路。分类书单支持分页加载，
 下一页为空或没有新增 `sourceId + bookId` 时停止，防止忽略页码的第三方站点无限重复请求。
 推荐分区和分类保留来源边界；最新列表保留各源内部顺序后按来源均衡穿插，每个书籍身份

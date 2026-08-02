@@ -4342,7 +4342,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get replaceRulesEmptyTitle => '还没有替换规则';
 
   @override
-  String get replaceRulesEmptyBody => '可以导入 Legado JSON，或新建一条正则规则。';
+  String get replaceRulesEmptyBody => '可以导入阅读书源 JSON，或新建一条正则规则。';
 
   @override
   String get replaceRulesNoSearchResults => '没有匹配的规则';
@@ -8724,7 +8724,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get replaceRulesEmptyTitle => '還沒有替換規則';
 
   @override
-  String get replaceRulesEmptyBody => '可以匯入 Legado JSON，或新增一條正則規則。';
+  String get replaceRulesEmptyBody => '可以匯入閱讀書源 JSON，或新增一條正則規則。';
 
   @override
   String get replaceRulesNoSearchResults => '沒有符合的規則';

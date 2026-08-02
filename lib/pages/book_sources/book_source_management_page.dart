@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:xxread/book_sources/legado/legado_source_import_service.dart';
+import 'package:xxread/book_sources/source_engine/source_import_service.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
@@ -33,12 +33,12 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   final BookSourceRegistry _registry = BookSourceRegistry();
   final TextEditingController _searchController = TextEditingController();
   BookSourceClient? _client;
-  LegadoSourceImportService? _importService;
+  SourceImportService? _importService;
   BookSourceImportAnalyzer? _importAnalyzer;
 
   BookSourceClient get _sourceClient => _client ??= BookSourceClient();
-  LegadoSourceImportService get _additionalImportService =>
-      _importService ??= LegadoSourceImportService();
+  SourceImportService get _additionalImportService =>
+      _importService ??= SourceImportService();
   BookSourceImportAnalyzer get _sourceImportAnalyzer => _importAnalyzer ??=
       BookSourceImportAnalyzer(additionalImporter: _additionalImportService);
   List<RegisteredBookSource> _sources = const [];
@@ -752,14 +752,14 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             height: 1.4,
           ),
         ),
-        if (source.sourceProtocol == BookSourceProtocolKind.legado ||
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource ||
             groups.isNotEmpty) ...[
           const SizedBox(height: 7),
           Wrap(
             spacing: 7,
             runSpacing: 5,
             children: [
-              if (source.sourceProtocol == BookSourceProtocolKind.legado)
+              if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
                 _buildSourceMetaPill(
                   runnable
                       ? context.l10n.bookSourcesRunnable
@@ -1138,7 +1138,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       );
       if (result == null || result.files.isEmpty) return;
       final file = result.files.single;
-      if (file.size > LegadoSourceImportService.maxImportBytes) {
+      if (file.size > SourceImportService.maxImportBytes) {
         setRouteState(() => errorText = 'Source file exceeds 64 MiB.');
         return;
       }

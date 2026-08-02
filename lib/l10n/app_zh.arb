@@ -2236,7 +2236,7 @@
   "replaceRulesDeleteValue": "删除",
   "replaceRulesCreate": "新建规则",
   "replaceRulesEmptyTitle": "还没有替换规则",
-  "replaceRulesEmptyBody": "可以导入 Legado JSON，或新建一条正则规则。",
+  "replaceRulesEmptyBody": "可以导入阅读书源 JSON，或新建一条正则规则。",
   "replaceRulesNoSearchResults": "没有匹配的规则",
   "replaceRulesCreateTitle": "新建替换规则",
   "replaceRulesEditTitle": "编辑替换规则",

@@ -53,6 +53,10 @@ dependencies:
 
   # 数据处理
   html: ^0.15.6
+  json_path: ^0.9.0
+
+  # 阅读书源脚本运行时（Android/Windows/Linux 使用 QuickJS，Apple 使用 JavaScriptCore）
+  flutter_js: ^0.8.7
 
   # UI
   fl_chart: ^1.2.0
@@ -76,6 +80,7 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   sqflite_common_ffi_web: ^1.1.2
   audioplayers: ^6.8.1
+  pointycastle: ^4.0.0
 
 dev_dependencies:
   flutter_test:

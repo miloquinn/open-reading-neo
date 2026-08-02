@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import '../legado/legado_source_import_service.dart';
+import '../source_engine/source_import_service.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
@@ -23,7 +23,7 @@ class BookSourceImportAnalysis {
     );
   }
 
-  factory BookSourceImportAnalysis.additional(LegadoImportPreview preview) {
+  factory BookSourceImportAnalysis.additional(SourceImportPreview preview) {
     return BookSourceImportAnalysis._(
       kind: BookSourceImportKind.additional,
       sources: const [],
@@ -33,14 +33,14 @@ class BookSourceImportAnalysis {
 
   final BookSourceImportKind kind;
   final List<RegisteredBookSource> sources;
-  final LegadoImportPreview? additionalPreview;
+  final SourceImportPreview? additionalPreview;
 }
 
 class BookSourceImportAnalyzer {
-  BookSourceImportAnalyzer({LegadoSourceImportService? additionalImporter})
-    : _additionalImporter = additionalImporter ?? LegadoSourceImportService();
+  BookSourceImportAnalyzer({SourceImportService? additionalImporter})
+    : _additionalImporter = additionalImporter ?? SourceImportService();
 
-  final LegadoSourceImportService _additionalImporter;
+  final SourceImportService _additionalImporter;
 
   Future<BookSourceImportAnalysis> analyzeUrl(String input) async {
     final uri = Uri.tryParse(input.trim());
@@ -118,9 +118,9 @@ BookSourceImportAnalysis _analyzeBookSourceBytesInBackground(
 BookSourceImportAnalysis _analyzeBookSourceBytes(
   Uint8List bytes, {
   Uri? documentUri,
-  LegadoSourceImportService? additionalImporter,
+  SourceImportService? additionalImporter,
 }) {
-  if (bytes.length > LegadoSourceImportService.maxImportBytes) {
+  if (bytes.length > SourceImportService.maxImportBytes) {
     throw const FormatException('Source file exceeds the 64 MiB limit.');
   }
   late final Object? decoded;
@@ -145,7 +145,7 @@ BookSourceImportAnalysis _analyzeBookSourceBytes(
     );
   }
 
-  final importer = additionalImporter ?? LegadoSourceImportService();
+  final importer = additionalImporter ?? SourceImportService();
   try {
     return BookSourceImportAnalysis.additional(importer.parseDecoded(decoded));
   } finally {

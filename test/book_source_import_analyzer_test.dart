@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_import_analyzer.dart';
-import 'package:xxread/book_sources/legado/legado_source_import_service.dart';
+import 'package:xxread/book_sources/source_engine/source_import_service.dart';
 
 Uint8List _bytes(Object value) =>
     Uint8List.fromList(utf8.encode(jsonEncode(value)));
@@ -75,7 +75,7 @@ void main() {
     );
     expect(
       imported.single.sourceConfig?['_openReadingCompatibilityLevel'],
-      'unsupported',
+      'supported',
     );
   });
 
@@ -96,11 +96,8 @@ void main() {
   });
 
   test('accepts realistic aggregate files larger than the old 4 MiB limit', () {
-    expect(LegadoSourceImportService.maxImportBytes, 64 * 1024 * 1024);
-    expect(
-      LegadoSourceImportService.maxImportBytes,
-      greaterThan(25 * 1024 * 1024),
-    );
+    expect(SourceImportService.maxImportBytes, 64 * 1024 * 1024);
+    expect(SourceImportService.maxImportBytes, greaterThan(25 * 1024 * 1024));
   });
 
   test('parses aggregate bytes off the UI isolate', () async {

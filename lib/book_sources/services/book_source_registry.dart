@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../legado/legado_book_source.dart';
+import '../source_engine/source_config.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
@@ -49,24 +50,7 @@ class BookSourceRegistry {
   }
 
   RegisteredBookSource _refreshLocalCompatibility(RegisteredBookSource source) {
-    if (source.sourceProtocol != BookSourceProtocolKind.legado ||
-        source.sourceConfig == null) {
-      return source;
-    }
-    try {
-      final compatible = LegadoBookSource.fromJson(source.sourceConfig!);
-      final report = const LegadoCompatibilityScanner().scan(compatible);
-      return compatible.toRegisteredSource(
-        enabled: source.enabled,
-        readingChainVerified: isReadingChainVerifiedLegadoSource(source),
-        compatibilityReport: report,
-        addedAt: source.addedAt,
-      );
-    } on FormatException {
-      // Keep a legacy record visible even if its raw configuration can no
-      // longer be executed. The management page can still remove or replace it.
-      return source;
-    }
+    return _refreshStoredCompatibility(source);
   }
 
   /// Returns sources that may participate in runtime requests right now.
@@ -82,6 +66,21 @@ class BookSourceRegistry {
     return runnable
         .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
         .toList(growable: false);
+  }
+
+  /// Loads the runnable set without decoding and compatibility-scanning a
+  /// large imported registry on the UI isolate.
+  Future<List<RegisteredBookSource>> loadRunnableInBackground() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_storageKey);
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final additionalEnabled =
+        preferences.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
+    final maps = await compute(_decodeRunnableSourceMaps, <String, Object>{
+      'raw': raw,
+      'additionalEnabled': additionalEnabled,
+    });
+    return maps.map(RegisteredBookSource.fromJson).toList(growable: false);
   }
 
   Future<List<RegisteredBookSource>> upsert(RegisteredBookSource source) async {
@@ -140,12 +139,13 @@ class BookSourceRegistry {
       final sources = (await _load()).toList();
       final indexes = <String, int>{
         for (var index = 0; index < sources.length; index++)
-          sources[index].id: index,
+          _sourceIdentity(sources[index]): index,
       };
       for (final source in imported) {
-        final index = indexes[source.id];
+        final identity = _sourceIdentity(source);
+        final index = indexes[identity];
         if (index == null) {
-          indexes[source.id] = sources.length;
+          indexes[identity] = sources.length;
           sources.add(source);
           continue;
         }
@@ -161,7 +161,9 @@ class BookSourceRegistry {
           );
         }
         sources[index] = RegisteredBookSource(
-          id: source.id,
+          // Preserve the original ID when migrating imported-source naming;
+          // shelf entries and downloaded books may already reference it.
+          id: previous.id,
           name: source.name,
           description: source.description,
           manifestUrl: source.manifestUrl,
@@ -306,5 +308,66 @@ class BookSourceRegistry {
     await _save(sources);
     _changesController.add(null);
     return List.unmodifiable(sources);
+  }
+}
+
+String _sourceIdentity(RegisteredBookSource source) {
+  if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+    final configuredUrl = source.sourceConfig?['bookSourceUrl'];
+    if (configuredUrl is String && configuredUrl.trim().isNotEmpty) {
+      return 'reading-source:${configuredUrl.trim()}';
+    }
+  }
+  return 'protocol:${source.sourceProtocol.name}:id:${source.id}';
+}
+
+List<Map<String, dynamic>> _decodeRunnableSourceMaps(
+  Map<String, Object> request,
+) {
+  final raw = request['raw']! as String;
+  final additionalEnabled = request['additionalEnabled']! as bool;
+  final decoded = jsonDecode(raw);
+  if (decoded is! List) return const [];
+  final sources = <RegisteredBookSource>[];
+  for (final item in decoded) {
+    if (item is! Map) continue;
+    try {
+      final stored = RegisteredBookSource.fromJson(
+        item.map((key, value) => MapEntry('$key', value)),
+      );
+      final source = _refreshStoredCompatibility(stored);
+      if (source.capabilities.isEmpty) continue;
+      if (!additionalEnabled &&
+          source.sourceProtocol != BookSourceProtocolKind.orsp) {
+        continue;
+      }
+      sources.add(source);
+    } catch (_) {
+      // Match load(): one damaged record must not hide the remaining sources.
+    }
+  }
+  sources.sort((a, b) => a.name.compareTo(b.name));
+  return sources.map((source) => source.toJson()).toList(growable: false);
+}
+
+RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
+  if (source.sourceProtocol != BookSourceProtocolKind.readingSource ||
+      source.sourceConfig == null) {
+    return source;
+  }
+  try {
+    final compatible = ReadingSourceConfig.fromJson(source.sourceConfig!);
+    final report = const SourceCompatibilityScanner().scan(compatible);
+    return compatible.toRegisteredSource(
+      id: source.id,
+      enabled: source.enabled,
+      readingChainVerified: isReadingChainVerifiedSource(source),
+      compatibilityReport: report,
+      addedAt: source.addedAt,
+    );
+  } on FormatException {
+    // Keep a legacy record visible even if its raw configuration can no
+    // longer be executed. The management page can still remove or replace it.
+    return source;
   }
 }

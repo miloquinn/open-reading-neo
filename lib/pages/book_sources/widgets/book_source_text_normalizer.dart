@@ -8,7 +8,8 @@ import 'package:html/parser.dart' as html_parser;
 String normalizeBookSourceDescription(String value) {
   if (value.trim().isEmpty) return '';
 
-  var normalized = value
+  var normalized = _decodeEscapedUnicode(value)
+      .replaceAll(r'\/', '/')
       .replaceAll(RegExp(r'<\s*br\s*/?\s*>', caseSensitive: false), '\n')
       .replaceAll(
         RegExp(r'</\s*(?:p|div|li|tr|h[1-6])\s*>', caseSensitive: false),
@@ -32,6 +33,7 @@ String normalizeBookSourceDescription(String value) {
       .replaceAll('\u00a0', ' ')
       .replaceAll('\u200b', '')
       .replaceAll('\ufeff', '')
+      .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]'), '')
       .replaceAll(RegExp(r'[ \t\f\v]+'), ' ');
 
   final lines = normalized
@@ -41,4 +43,11 @@ String normalizeBookSourceDescription(String value) {
       .map((line) => line.trim())
       .toList(growable: false);
   return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+}
+
+String _decodeEscapedUnicode(String input) {
+  return input.replaceAllMapped(RegExp(r'\\u([0-9a-fA-F]{4})'), (match) {
+    final codePoint = int.tryParse(match.group(1)!, radix: 16);
+    return codePoint == null ? match.group(0)! : String.fromCharCode(codePoint);
+  });
 }

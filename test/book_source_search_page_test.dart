@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_sources_page.dart';
@@ -245,43 +246,47 @@ void main() {
     expect(find.text('Book of Source A'), findsNothing);
   });
 
-  testWidgets('discover page selects a Legado source, channel, and next page', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 1000);
-    addTearDown(tester.view.reset);
-    final source = _legadoDiscoverySource();
-    SharedPreferences.setMockInitialValues({
-      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
-      additionalSourceProtocolsPreferenceKey: true,
-    });
-    final client = _DiscoveryBookSourceClient();
+  testWidgets(
+    'discover page selects a reading source, channel, and next page',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+      final source = _readingDiscoverySource();
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+        additionalSourceProtocolsPreferenceKey: true,
+      });
+      final client = _DiscoveryBookSourceClient();
 
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: BookSourcesPage(client: client)),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(ChoiceChip, 'Legado E'), findsOneWidget);
-    expect(find.text('Ranking'), findsOneWidget);
-    expect(find.text('Channel Book 1'), findsOneWidget);
+      expect(
+        find.widgetWithText(ChoiceChip, 'reading source E'),
+        findsOneWidget,
+      );
+      expect(find.text('Ranking'), findsOneWidget);
+      expect(find.text('Channel Book 1'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Legado E'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, 'reading source E'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Ranking'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('bookSourceCategoryLoadMore')));
-    await tester.pumpAndSettle();
+      expect(find.text('Ranking'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('bookSourceCategoryLoadMore')));
+      await tester.pumpAndSettle();
 
-    expect(client.requestedPages, [1, 1, 2]);
-    expect(find.text('Channel Book 2'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(client.requestedPages, [1, 1, 2]);
+      expect(find.text('Channel Book 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _DelayedScopeClient extends BookSourceClient {
@@ -302,6 +307,7 @@ class _DelayedScopeClient extends BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
     final completer = Completer<void>();
     _completers.putIfAbsent(source.id, () => []).add(completer);
@@ -333,6 +339,7 @@ class _ScopeTrackingClient extends BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
     searchedSourceIds.add(source.id);
     return BookSourceSearchPage(
@@ -366,13 +373,13 @@ RegisteredBookSource _source() => RegisteredBookSource(
   addedAt: DateTime.utc(2026, 7, 13),
 );
 
-RegisteredBookSource _legadoDiscoverySource() => RegisteredBookSource(
-  id: 'legado-e',
-  name: 'Legado E',
+RegisteredBookSource _readingDiscoverySource() => RegisteredBookSource(
+  id: 'reading-source',
+  name: 'reading source E',
   description: '',
-  manifestUrl: Uri.parse('https://legado.example'),
-  apiBaseUrl: Uri.parse('https://legado.example'),
-  protocolVersion: 'legado-3',
+  manifestUrl: Uri.parse('https://source.example'),
+  apiBaseUrl: Uri.parse('https://source.example'),
+  protocolVersion: 'reading-source-1',
   languages: const [],
   capabilities: const {
     'search',
@@ -384,10 +391,10 @@ RegisteredBookSource _legadoDiscoverySource() => RegisteredBookSource(
   },
   enabled: true,
   addedAt: DateTime.utc(2026, 8, 1),
-  sourceProtocol: BookSourceProtocolKind.legado,
+  sourceProtocol: BookSourceProtocolKind.readingSource,
   sourceConfig: const {
-    'bookSourceName': 'Legado E',
-    'bookSourceUrl': 'https://legado.example',
+    'bookSourceName': 'reading source E',
+    'bookSourceUrl': 'https://source.example',
     'searchUrl': '/search?q={{key}}',
     'exploreUrl': 'Ranking::/rank?page={{page}}',
     'ruleSearch': {'bookList': '.book', 'bookUrl': 'a@href', 'name': 'a@text'},
@@ -445,6 +452,7 @@ class _PagingBookSourceClient extends BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
     requestedPages.add(page);
     final start = page == 1 ? 1 : 11;

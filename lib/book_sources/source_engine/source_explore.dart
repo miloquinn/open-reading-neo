@@ -1,35 +1,35 @@
 import 'dart:convert';
 
 import '../protocol/book_source_protocol.dart';
-import 'legado_request.dart';
-import 'legado_rule_engine.dart';
+import 'source_request.dart';
+import 'source_rule_engine.dart';
 
-/// A safe, declarative discovery channel extracted from a Legado source.
+/// A safe, declarative discovery channel extracted from a reading source.
 ///
-/// Legado-E also accepts script-generated entries and interactive controls.
+/// Some source files also contain script-generated entries and interactive controls.
 /// Those stay outside this model until a separately sandboxed runtime exists.
-class LegadoExploreEntry {
-  const LegadoExploreEntry({required this.title, required this.url});
+class SourceExploreEntry {
+  const SourceExploreEntry({required this.title, required this.url});
 
   final String title;
   final String url;
 }
 
-class LegadoExploreCatalog {
-  const LegadoExploreCatalog({
+class SourceExploreCatalog {
+  const SourceExploreCatalog({
     required this.entries,
     this.hasUnsupportedEntries = false,
     this.error,
   });
 
-  final List<LegadoExploreEntry> entries;
+  final List<SourceExploreEntry> entries;
   final bool hasUnsupportedEntries;
   final String? error;
 
   bool get canBrowse => entries.isNotEmpty && error == null;
 }
 
-/// Parses the declarative subset of Legado/Legado-E `exploreUrl`.
+/// Parses discovery-channel declarations from imported reading sources.
 ///
 /// Supported inputs:
 /// - `title::url` entries separated by `&&` or newlines;
@@ -38,17 +38,17 @@ class LegadoExploreCatalog {
 /// The returned catalog is also preflighted against the existing bounded
 /// request and rule engines, so advertising `categories`/`browse` never opts a
 /// source into JavaScript, stateful actions, XPath, or complex JSONPath.
-LegadoExploreCatalog parseLegadoExploreCatalog(Map<String, dynamic> raw) {
+SourceExploreCatalog parseSourceExploreCatalog(Map<String, dynamic> raw) {
   if (raw['enabledExplore'] == false) {
-    return const LegadoExploreCatalog(entries: []);
+    return const SourceExploreCatalog(entries: []);
   }
   final exploreUrl = _string(raw['exploreUrl']);
   if (exploreUrl.isEmpty) {
-    return const LegadoExploreCatalog(entries: []);
+    return const SourceExploreCatalog(entries: []);
   }
   final lowered = exploreUrl.toLowerCase();
   if (lowered.startsWith('@js:') || lowered.startsWith('<js>')) {
-    return const LegadoExploreCatalog(
+    return const SourceExploreCatalog(
       entries: [],
       hasUnsupportedEntries: true,
       error: 'Dynamic discovery scripts are not supported.',
@@ -62,11 +62,11 @@ LegadoExploreCatalog parseLegadoExploreCatalog(Map<String, dynamic> raw) {
 
   try {
     final baseUri = Uri.parse(_string(raw['bookSourceUrl']).split('#').first);
-    final safeEntries = <LegadoExploreEntry>[];
+    final safeEntries = <SourceExploreEntry>[];
     var hasUnsupportedEntries = parsed.hasUnsupportedEntries;
     for (final entry in parsed.entries) {
       try {
-        LegadoRequestTemplate.parse(
+        SourceRequestTemplate.parse(
           entry.url,
           baseUri: baseUri,
           variables: const {'page': '1'},
@@ -77,7 +77,7 @@ LegadoExploreCatalog parseLegadoExploreCatalog(Map<String, dynamic> raw) {
       }
     }
     _ensureExploreRulesSupported(raw);
-    return LegadoExploreCatalog(
+    return SourceExploreCatalog(
       entries: List.unmodifiable(safeEntries),
       hasUnsupportedEntries: hasUnsupportedEntries,
       error: safeEntries.isEmpty
@@ -85,7 +85,7 @@ LegadoExploreCatalog parseLegadoExploreCatalog(Map<String, dynamic> raw) {
           : null,
     );
   } on Object catch (error) {
-    return LegadoExploreCatalog(
+    return SourceExploreCatalog(
       entries: const [],
       hasUnsupportedEntries: true,
       error: '$error',
@@ -93,23 +93,23 @@ LegadoExploreCatalog parseLegadoExploreCatalog(Map<String, dynamic> raw) {
   }
 }
 
-LegadoExploreCatalog _parseJsonEntries(String input) {
+SourceExploreCatalog _parseJsonEntries(String input) {
   Object? decoded;
   try {
     decoded = jsonDecode(input);
   } on FormatException {
-    return const LegadoExploreCatalog(
+    return const SourceExploreCatalog(
       entries: [],
       error: 'Discovery channels must be valid JSON.',
     );
   }
   if (decoded is! List) {
-    return const LegadoExploreCatalog(
+    return const SourceExploreCatalog(
       entries: [],
       error: 'Discovery channels must be a JSON array.',
     );
   }
-  final entries = <LegadoExploreEntry>[];
+  final entries = <SourceExploreEntry>[];
   var hasUnsupportedEntries = false;
   for (final value in decoded) {
     if (value is! Map) {
@@ -127,16 +127,16 @@ LegadoExploreCatalog _parseJsonEntries(String input) {
       hasUnsupportedEntries = true;
       continue;
     }
-    entries.add(LegadoExploreEntry(title: title, url: url));
+    entries.add(SourceExploreEntry(title: title, url: url));
   }
-  return LegadoExploreCatalog(
+  return SourceExploreCatalog(
     entries: List.unmodifiable(entries),
     hasUnsupportedEntries: hasUnsupportedEntries,
   );
 }
 
-LegadoExploreCatalog _parseLegacyEntries(String input) {
-  final entries = <LegadoExploreEntry>[];
+SourceExploreCatalog _parseLegacyEntries(String input) {
+  final entries = <SourceExploreEntry>[];
   var hasUnsupportedEntries = false;
   for (final item in input.split(RegExp(r'(?:&&|\r?\n)+'))) {
     final value = item.trim();
@@ -152,9 +152,9 @@ LegadoExploreCatalog _parseLegacyEntries(String input) {
       hasUnsupportedEntries = true;
       continue;
     }
-    entries.add(LegadoExploreEntry(title: title, url: url));
+    entries.add(SourceExploreEntry(title: title, url: url));
   }
-  return LegadoExploreCatalog(
+  return SourceExploreCatalog(
     entries: List.unmodifiable(entries),
     hasUnsupportedEntries: hasUnsupportedEntries,
   );
@@ -174,7 +174,7 @@ void _ensureExploreRulesSupported(Map<String, dynamic> raw) {
   for (final entry in activeRules.entries) {
     final value = entry.value;
     if (value is String) {
-      LegadoRuleEngine.ensureSupported(
+      SourceRuleEngine.ensureSupported(
         value,
         field: 'ruleExplore.${entry.key}',
       );

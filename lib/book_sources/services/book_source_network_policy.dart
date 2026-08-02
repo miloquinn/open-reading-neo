@@ -136,6 +136,13 @@ class BookSourceNetworkPolicy {
     return false;
   }
 
+  static bool isSyntheticDnsAddress(InternetAddress address) {
+    final bytes = address.rawAddress;
+    return bytes.length == 4 &&
+        bytes[0] == 198 &&
+        (bytes[1] == 18 || bytes[1] == 19);
+  }
+
   static bool _isAlwaysBlockedAddress(InternetAddress address) {
     if (address.isMulticast) return true;
     final bytes = address.rawAddress;

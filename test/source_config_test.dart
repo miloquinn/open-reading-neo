@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xxread/book_sources/legado/legado_book_source.dart';
-import 'package:xxread/book_sources/legado/legado_explore.dart';
+import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/source_explore.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
@@ -43,10 +43,10 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test('parses object, list, wrappers, BOM, and isolates bad items', () {
-    final object = parseLegadoSources(jsonEncode(_source()));
+    final object = parseReadingSources(jsonEncode(_source()));
     expect(object.sources, hasLength(1));
 
-    final list = parseLegadoSources(
+    final list = parseReadingSources(
       '\ufeff${jsonEncode([
         _source(),
         {'bookSourceName': 'Broken'},
@@ -56,7 +56,7 @@ void main() {
     expect(list.sources, hasLength(1));
     expect(list.errors, hasLength(2));
 
-    final wrapper = parseLegadoSources(
+    final wrapper = parseReadingSources(
       jsonEncode({
         'sources': [_source(name: 'Wrapped')],
       }),
@@ -65,12 +65,12 @@ void main() {
   });
 
   test('deduplicates by source URL and accepts nested URL bundles', () {
-    final parsed = parseLegadoSources(
+    final parsed = parseReadingSources(
       jsonEncode([_source(name: 'Old'), _source(name: 'New')]),
     );
     expect(parsed.sources.single.name, 'New');
 
-    final nested = parseLegadoSources(
+    final nested = parseReadingSources(
       jsonEncode({
         'sourceUrls': [
           'https://example.org/a.json',
@@ -82,53 +82,59 @@ void main() {
   });
 
   test('preflight distinguishes runnable and blocked sources', () {
-    const scanner = LegadoCompatibilityScanner();
-    final supported = scanner.scan(LegadoBookSource.fromJson(_source()));
-    expect(supported.level, LegadoCompatibilityLevel.supported);
+    const scanner = SourceCompatibilityScanner();
+    final supported = scanner.scan(ReadingSourceConfig.fromJson(_source()));
+    expect(supported.level, SourceCompatibilityLevel.supported);
 
     final image = scanner.scan(
-      LegadoBookSource.fromJson(_source(type: 2, name: 'Images')),
+      ReadingSourceConfig.fromJson(_source(type: 2, name: 'Images')),
     );
-    expect(image.level, LegadoCompatibilityLevel.unsupported);
+    expect(image.level, SourceCompatibilityLevel.unsupported);
     expect(image.canRun, isFalse);
 
     final cookieJar = scanner.scan(
-      LegadoBookSource.fromJson(_source(cookies: true, name: 'Cookie jar')),
+      ReadingSourceConfig.fromJson(_source(cookies: true, name: 'Cookie jar')),
     );
-    expect(cookieJar.level, LegadoCompatibilityLevel.supported);
+    expect(cookieJar.level, SourceCompatibilityLevel.supported);
 
     final cookieHeader = scanner.scan(
-      LegadoBookSource.fromJson({
+      ReadingSourceConfig.fromJson({
         ..._source(name: 'Cookie header'),
         'header': '{"Cookie":"sid=1"}',
       }),
     );
-    expect(cookieHeader.level, LegadoCompatibilityLevel.supported);
+    expect(cookieHeader.level, SourceCompatibilityLevel.supported);
 
     for (final raw in [
       _source(type: 1, name: 'Audio'),
       _source(type: 4, name: 'Video'),
-      _source(contentRule: '@js:result', name: 'Script'),
     ]) {
       expect(
-        scanner.scan(LegadoBookSource.fromJson(raw)).level,
-        LegadoCompatibilityLevel.unsupported,
+        scanner.scan(ReadingSourceConfig.fromJson(raw)).level,
+        SourceCompatibilityLevel.unsupported,
       );
     }
+    final scripted = scanner.scan(
+      ReadingSourceConfig.fromJson(
+        _source(contentRule: '@js:result', name: 'Script'),
+      ),
+    );
+    expect(scripted.level, SourceCompatibilityLevel.supported);
+    expect(scripted.canRun, isTrue);
   });
 
   test('metadata comments do not get interpreted as executable rules', () {
-    final source = LegadoBookSource.fromJson({
+    final source = ReadingSourceConfig.fromJson({
       ..._source(),
       'bookSourceComment':
           '// Error: failed to connect to an old mirror during testing',
     });
 
-    expect(const LegadoCompatibilityScanner().scan(source).canRun, isTrue);
+    expect(const SourceCompatibilityScanner().scan(source).canRun, isTrue);
   });
 
   test('parses legacy and JSON discovery channels', () {
-    final legacy = parseLegadoExploreCatalog(
+    final legacy = parseSourceExploreCatalog(
       _source(
         exploreUrl:
             '玄幻::/rank?kind=xuanhuan&page={{page}}&&完本::/finished?page={{page}}',
@@ -140,7 +146,7 @@ void main() {
       orderedEquals(['玄幻', '完本']),
     );
 
-    final json = parseLegadoExploreCatalog(
+    final json = parseSourceExploreCatalog(
       _source(
         exploreUrl: jsonEncode([
           {'title': '排行', 'url': '/rank?page={{page}}'},
@@ -158,19 +164,19 @@ void main() {
   });
 
   test('discovery scripts do not disable an otherwise runnable source', () {
-    final source = LegadoBookSource.fromJson(
+    final source = ReadingSourceConfig.fromJson(
       _source(exploreUrl: '@js:JSON.stringify([])'),
     );
 
-    expect(const LegadoCompatibilityScanner().scan(source).canRun, isTrue);
+    expect(const SourceCompatibilityScanner().scan(source).canRun, isTrue);
     final registered = source.toRegisteredSource(readingChainVerified: true);
     expect(registered.capabilities, contains('search'));
-    expect(registered.capabilities, isNot(contains('browse')));
-    expect(parseLegadoExploreCatalog(source.raw).canBrowse, isFalse);
+    expect(registered.capabilities, containsAll(['categories', 'browse']));
+    expect(parseSourceExploreCatalog(source.raw).canBrowse, isFalse);
   });
 
   test('declarative discovery adds categories and browse capabilities', () {
-    final registered = LegadoBookSource.fromJson(
+    final registered = ReadingSourceConfig.fromJson(
       _source(exploreUrl: '排行榜::/rank?page={{page}}'),
     ).toRegisteredSource(readingChainVerified: true);
 
@@ -178,7 +184,7 @@ void main() {
   });
 
   test('stored verified sources gain declarative discovery capabilities', () {
-    final source = LegadoBookSource.fromJson(
+    final source = ReadingSourceConfig.fromJson(
       _source(exploreUrl: '排行榜::/rank?page={{page}}'),
     ).toRegisteredSource(readingChainVerified: true);
     final stored = source.toJson()
@@ -192,22 +198,22 @@ void main() {
   test('malformed serialized rules are unsupported instead of crashing', () {
     final raw = _source();
     raw['ruleToc'] = '{not-json';
-    final source = LegadoBookSource.fromJson(raw);
+    final source = ReadingSourceConfig.fromJson(raw);
 
     expect(source.rule('ruleToc'), isEmpty);
     expect(
-      const LegadoCompatibilityScanner().scan(source).level,
-      LegadoCompatibilityLevel.unsupported,
+      const SourceCompatibilityScanner().scan(source).level,
+      SourceCompatibilityLevel.unsupported,
     );
   });
 
   test('registered compatible source round-trips with config', () {
-    final registered = LegadoBookSource.fromJson(
+    final registered = ReadingSourceConfig.fromJson(
       _source(),
     ).toRegisteredSource();
     final restored = RegisteredBookSource.fromJson(registered.toJson());
 
-    expect(restored.sourceProtocol, BookSourceProtocolKind.legado);
+    expect(restored.sourceProtocol, BookSourceProtocolKind.readingSource);
     expect(restored.sourceConfig?['bookSourceName'], 'Declarative source');
     expect(restored.enabled, isTrue);
   });
@@ -215,7 +221,9 @@ void main() {
   test(
     'registry keeps locally assessed imports without live verification',
     () async {
-      final source = LegadoBookSource.fromJson(_source()).toRegisteredSource();
+      final source = ReadingSourceConfig.fromJson(
+        _source(),
+      ).toRegisteredSource();
       SharedPreferences.setMockInitialValues({
         'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
       });
@@ -225,7 +233,7 @@ void main() {
   );
 
   test('registry refreshes local capabilities without reimporting', () async {
-    final source = LegadoBookSource.fromJson(_source()).toRegisteredSource();
+    final source = ReadingSourceConfig.fromJson(_source()).toRegisteredSource();
     final legacy = source.toJson()
       ..['capabilities'] = <String>[]
       ..['enabled'] = false;
@@ -242,13 +250,13 @@ void main() {
     'verified bulk import stays enabled and respects runtime gate',
     () async {
       final registry = BookSourceRegistry();
-      final original = LegadoBookSource.fromJson(
+      final original = ReadingSourceConfig.fromJson(
         _source(),
       ).toRegisteredSource(enabled: true, readingChainVerified: true);
       await registry.upsertAll([original]);
       await registry.setEnabled(original.id, true);
 
-      final updated = LegadoBookSource.fromJson(
+      final updated = ReadingSourceConfig.fromJson(
         _source(name: 'Updated'),
       ).toRegisteredSource(enabled: true, readingChainVerified: true);
       final saved = await registry.upsertAll([updated]);

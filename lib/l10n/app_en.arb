@@ -4354,7 +4354,7 @@
   "replaceRulesDeleteValue": "Remove",
   "replaceRulesCreate": "New rule",
   "replaceRulesEmptyTitle": "No replacement rules",
-  "replaceRulesEmptyBody": "Import a Legado JSON file or create a regular-expression rule.",
+  "replaceRulesEmptyBody": "Import a reading-source JSON file or create a regular-expression rule.",
   "replaceRulesNoSearchResults": "No matching rules",
   "replaceRulesCreateTitle": "New replacement rule",
   "replaceRulesEditTitle": "Edit replacement rule",

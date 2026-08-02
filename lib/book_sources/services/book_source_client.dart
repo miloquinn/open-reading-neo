@@ -5,7 +5,7 @@ import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/core/app_settings_service.dart';
-import '../legado/legado_runtime.dart';
+import '../source_engine/source_runtime.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_download_cancellation.dart';
@@ -26,7 +26,7 @@ class BookSourceClient {
   final Dio _dio;
   final BookSourceChapterCache _chapterCache;
   final BookSourceNetworkPolicy _networkPolicy;
-  LegadoRuntime? _legadoRuntime;
+  SourceRuntime? _sourceRuntime;
 
   /// 单次响应体上限。书源返回的都是 JSON 元数据/章节文本，
   /// 超过该值基本可以判定为异常或恶意响应，中途截断防止 OOM。
@@ -69,7 +69,7 @@ class BookSourceClient {
              ));
 
   void close({bool force = true}) {
-    _legadoRuntime?.close(force: force);
+    _sourceRuntime?.close(force: force);
     _dio.close(force: force);
   }
 
@@ -175,10 +175,17 @@ class BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.search(source, query, page: page, pageSize: pageSize);
+      return _sourceEngine.search(
+        source,
+        query,
+        page: page,
+        pageSize: pageSize,
+        cancellation: cancellation,
+      );
     }
     if (!source.capabilities.contains('search')) {
       throw const BookSourceProtocolException(
@@ -194,7 +201,9 @@ class BookSourceClient {
     );
     try {
       return BookSourceSearchPage.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+        decodeBookSourceJson(
+          await _getBounded(uri, cancellation: cancellation),
+        ),
       );
     } on DioException catch (error) {
       throw BookSourceProtocolException(
@@ -228,9 +237,9 @@ class BookSourceClient {
   Future<List<BookSourceCategory>> getCategories(
     RegisteredBookSource source,
   ) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getExploreCategories(source);
+      return _sourceEngine.getExploreCategories(source);
     }
     if (!source.capabilities.contains('categories')) {
       throw const BookSourceProtocolException(
@@ -266,9 +275,9 @@ class BookSourceClient {
     int page = 1,
     int pageSize = 20,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.browse(
+      return _sourceEngine.browse(
         source,
         category: category,
         page: page,
@@ -305,9 +314,9 @@ class BookSourceClient {
     RegisteredBookSource source,
     String bookId,
   ) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getBook(source, bookId);
+      return _sourceEngine.getBook(source, bookId);
     }
     final uri = _apiUri(
       source.apiBaseUrl,
@@ -335,9 +344,9 @@ class BookSourceClient {
     RegisteredBookSource source,
     String bookId,
   ) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getChapters(source, bookId);
+      return _sourceEngine.getChapters(source, bookId);
     }
     return _chapterCache.getChapterCatalogOrLoad(
       sourceId: source.id,
@@ -360,10 +369,10 @@ class BookSourceClient {
     String bookId, {
     BookDownloadCancellation? cancellation,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       cancellation?.throwIfCancelled();
       await _ensureAdditionalProtocolsEnabled();
-      final chapters = await _legado.getChapters(source, bookId);
+      final chapters = await _sourceEngine.getChapters(source, bookId);
       cancellation?.throwIfCancelled();
       return chapters;
     }
@@ -470,9 +479,9 @@ class BookSourceClient {
     required String bookId,
     required String chapterId,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getChapterContent(
+      return _sourceEngine.getChapterContent(
         source,
         bookId: bookId,
         chapterId: chapterId,
@@ -511,10 +520,10 @@ class BookSourceClient {
     required String chapterId,
     BookDownloadCancellation? cancellation,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       cancellation?.throwIfCancelled();
       await _ensureAdditionalProtocolsEnabled();
-      final content = await _legado.getChapterContent(
+      final content = await _sourceEngine.getChapterContent(
         source,
         bookId: bookId,
         chapterId: chapterId,
@@ -579,7 +588,7 @@ class BookSourceClient {
     }
   }
 
-  LegadoRuntime get _legado => _legadoRuntime ??= LegadoRuntime();
+  SourceRuntime get _sourceEngine => _sourceRuntime ??= SourceRuntime();
 
   Future<void> _ensureAdditionalProtocolsEnabled() async {
     final preferences = await SharedPreferences.getInstance();

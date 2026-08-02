@@ -8022,7 +8022,7 @@ abstract class AppLocalizations {
   /// No description provided for @replaceRulesEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Import a Legado JSON file or create a regular-expression rule.'**
+  /// **'Import a reading-source JSON file or create a regular-expression rule.'**
   String get replaceRulesEmptyBody;
 
   /// No description provided for @replaceRulesNoSearchResults.

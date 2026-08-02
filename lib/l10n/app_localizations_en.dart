@@ -4560,7 +4560,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get replaceRulesEmptyBody =>
-      'Import a Legado JSON file or create a regular-expression rule.';
+      'Import a reading-source JSON file or create a regular-expression rule.';
 
   @override
   String get replaceRulesNoSearchResults => 'No matching rules';

@@ -1977,7 +1977,7 @@
   "replaceRulesDeleteValue": "削除",
   "replaceRulesCreate": "ルールを追加",
   "replaceRulesEmptyTitle": "置換ルールはまだありません",
-  "replaceRulesEmptyBody": "Legado の JSON を読み込むか、正規表現ルールを作成できます。",
+  "replaceRulesEmptyBody": "書籍ソースの JSON を読み込むか、正規表現ルールを作成できます。",
   "replaceRulesNoSearchResults": "一致するルールはありません",
   "replaceRulesCreateTitle": "置換ルールを追加",
   "replaceRulesEditTitle": "置換ルールを編集",

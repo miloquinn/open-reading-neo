@@ -8,32 +8,32 @@ import 'package:flutter/foundation.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import '../services/book_source_network_policy.dart';
-import 'legado_book_source.dart';
+import 'source_config.dart';
 
-class LegadoImportPreview {
-  LegadoImportPreview({
+class SourceImportPreview {
+  SourceImportPreview({
     required this.sources,
     required this.errors,
     this.duplicates = 0,
   }) : _reports = Map.unmodifiable({
          for (final source in sources)
-           source.stableId: const LegadoCompatibilityScanner().scan(source),
+           source.stableId: const SourceCompatibilityScanner().scan(source),
        });
 
-  final List<LegadoBookSource> sources;
+  final List<ReadingSourceConfig> sources;
   final List<String> errors;
   final int duplicates;
-  final Map<String, LegadoCompatibilityReport> _reports;
+  final Map<String, SourceCompatibilityReport> _reports;
 
-  int get supported => _count(LegadoCompatibilityLevel.supported);
-  int get partial => _count(LegadoCompatibilityLevel.partial);
-  int get unsupported => _count(LegadoCompatibilityLevel.unsupported);
+  int get supported => _count(SourceCompatibilityLevel.supported);
+  int get partial => _count(SourceCompatibilityLevel.partial);
+  int get unsupported => _count(SourceCompatibilityLevel.unsupported);
   int get skipped => errors.length + duplicates;
 
-  int _count(LegadoCompatibilityLevel level) =>
+  int _count(SourceCompatibilityLevel level) =>
       _reports.values.where((report) => report.level == level).length;
 
-  LegadoCompatibilityReport reportFor(LegadoBookSource source) =>
+  SourceCompatibilityReport reportFor(ReadingSourceConfig source) =>
       _reports[source.stableId]!;
 
   List<RegisteredBookSource> toRegisteredSources() => sources
@@ -44,8 +44,8 @@ class LegadoImportPreview {
       .toList(growable: false);
 }
 
-class LegadoSourceImportService {
-  LegadoSourceImportService({
+class SourceImportService {
+  SourceImportService({
     Dio? dio,
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
   }) : _networkPolicy = networkPolicy,
@@ -85,17 +85,17 @@ class LegadoSourceImportService {
     return _download(uri);
   }
 
-  LegadoImportPreview parseBytes(Uint8List bytes) {
+  SourceImportPreview parseBytes(Uint8List bytes) {
     return _collect(_parseBytes(bytes));
   }
 
-  Future<LegadoImportPreview> parseBytesAsync(Uint8List bytes) async {
-    return _collect(await compute(_parseLegadoImportBytes, bytes));
+  Future<SourceImportPreview> parseBytesAsync(Uint8List bytes) async {
+    return _collect(await compute(_parseSourceImportBytes, bytes));
   }
 
-  LegadoImportPreview parseDecoded(Object? decoded) {
+  SourceImportPreview parseDecoded(Object? decoded) {
     return _collect(
-      parseLegadoSourcePayload(
+      parseReadingSourcePayload(
         decoded,
         maxSources: maxSources,
         maxNestedUrls: maxNestedUrls,
@@ -103,15 +103,15 @@ class LegadoSourceImportService {
     );
   }
 
-  LegadoSourceImportResult _parseBytes(Uint8List bytes) {
-    return _parseLegadoImportBytes(bytes);
+  SourceImportResult _parseBytes(Uint8List bytes) {
+    return _parseSourceImportBytes(bytes);
   }
 
-  Future<LegadoSourceImportResult> _parseBytesAsync(Uint8List bytes) {
-    return compute(_parseLegadoImportBytes, bytes);
+  Future<SourceImportResult> _parseBytesAsync(Uint8List bytes) {
+    return compute(_parseSourceImportBytes, bytes);
   }
 
-  static LegadoSourceImportResult _parseLegadoImportBytes(Uint8List bytes) {
+  static SourceImportResult _parseSourceImportBytes(Uint8List bytes) {
     if (bytes.length > maxImportBytes) {
       throw const FormatException('Source file exceeds the 64 MiB limit.');
     }
@@ -123,21 +123,21 @@ class LegadoSourceImportService {
         'Source JSON must be valid UTF-8: ${error.message}',
       );
     }
-    return parseLegadoSources(
+    return parseReadingSources(
       text,
       maxSources: maxSources,
       maxNestedUrls: maxNestedUrls,
     );
   }
 
-  Future<LegadoImportPreview> loadUrl(String input) async {
+  Future<SourceImportPreview> loadUrl(String input) async {
     final uri = Uri.tryParse(input.trim());
     if (uri == null ||
         !uri.hasAuthority ||
         (uri.scheme != 'http' && uri.scheme != 'https')) {
       throw const FormatException('Import URL must use HTTP or HTTPS.');
     }
-    final byUrl = <String, LegadoBookSource>{};
+    final byUrl = <String, ReadingSourceConfig>{};
     final errors = <String>[];
     final visited = <String>{};
     await _loadRecursive(
@@ -147,7 +147,7 @@ class LegadoSourceImportService {
       byUrl: byUrl,
       errors: errors,
     );
-    return LegadoImportPreview(
+    return SourceImportPreview(
       sources: List.unmodifiable(byUrl.values),
       errors: List.unmodifiable(errors),
     );
@@ -157,7 +157,7 @@ class LegadoSourceImportService {
     Uri uri, {
     required int depth,
     required Set<String> visited,
-    required Map<String, LegadoBookSource> byUrl,
+    required Map<String, ReadingSourceConfig> byUrl,
     required List<String> errors,
   }) async {
     if (depth > maxNestedDepth) {
@@ -238,8 +238,8 @@ class LegadoSourceImportService {
     throw const BookSourceProtocolException('Source import failed.');
   }
 
-  LegadoImportPreview _collect(LegadoSourceImportResult result) {
-    return LegadoImportPreview(
+  SourceImportPreview _collect(SourceImportResult result) {
+    return SourceImportPreview(
       sources: result.sources,
       errors: result.errors,
       duplicates: result.duplicates,

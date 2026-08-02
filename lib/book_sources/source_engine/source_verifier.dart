@@ -1,15 +1,15 @@
 import '../models/registered_book_source.dart';
-import 'legado_book_source.dart';
-import 'legado_runtime.dart';
-import 'legado_request.dart';
+import 'source_config.dart';
+import 'source_runtime.dart';
+import 'source_request.dart';
 
-typedef LegadoVerificationProgress =
+typedef SourceVerificationProgress =
     void Function(int completed, int total, int available);
-typedef LegadoSourceProbe =
+typedef SourceProbe =
     Future<bool> Function(RegisteredBookSource source, String query);
 
-class LegadoVerificationResult {
-  const LegadoVerificationResult({
+class SourceVerificationResult {
+  const SourceVerificationResult({
     required this.available,
     required this.rejected,
   });
@@ -18,9 +18,9 @@ class LegadoVerificationResult {
   final int rejected;
 }
 
-class LegadoSourceVerifier {
-  LegadoSourceVerifier({
-    LegadoRuntime? runtime,
+class SourceVerifier {
+  SourceVerifier({
+    SourceRuntime? runtime,
     this._sourceProbe,
     this.maxConcurrency = 12,
     this.maxCandidates = 120,
@@ -28,14 +28,14 @@ class LegadoSourceVerifier {
     this.queries = const ['斗破苍穹'],
   }) : _runtime =
            runtime ??
-           LegadoRuntime(
-             transport: LegadoHttpTransport(
+           SourceRuntime(
+             transport: SourceHttpTransport(
                requestTimeout: const Duration(seconds: 4),
              ),
            );
 
-  final LegadoRuntime _runtime;
-  final LegadoSourceProbe? _sourceProbe;
+  final SourceRuntime _runtime;
+  final SourceProbe? _sourceProbe;
   final int maxConcurrency;
   final int maxCandidates;
   final int maxAvailable;
@@ -43,13 +43,13 @@ class LegadoSourceVerifier {
 
   void close() => _runtime.close();
 
-  Future<LegadoVerificationResult> verify(
-    Iterable<LegadoBookSource> imported, {
-    LegadoVerificationProgress? onProgress,
+  Future<SourceVerificationResult> verify(
+    Iterable<ReadingSourceConfig> imported, {
+    SourceVerificationProgress? onProgress,
   }) async {
     final ranked = imported
         .where(
-          (source) => const LegadoCompatibilityScanner().scan(source).canRun,
+          (source) => const SourceCompatibilityScanner().scan(source).canRun,
         )
         .toList();
     ranked.sort((left, right) {
@@ -61,7 +61,7 @@ class LegadoSourceVerifier {
           : right.respondTime;
       return leftResponse.compareTo(rightResponse);
     });
-    final candidates = <LegadoBookSource>[];
+    final candidates = <ReadingSourceConfig>[];
     final hosts = <String>{};
     for (final source in ranked) {
       if (!hosts.add(source.baseUri.host)) continue;
@@ -99,13 +99,13 @@ class LegadoSourceVerifier {
     );
     await Future.wait(workers);
     available.sort((left, right) => left.name.compareTo(right.name));
-    return LegadoVerificationResult(
+    return SourceVerificationResult(
       available: List.unmodifiable(available),
       rejected: imported.length - available.length,
     );
   }
 
-  Future<bool> _hasWorkingSearch(LegadoBookSource source) async {
+  Future<bool> _hasWorkingSearch(ReadingSourceConfig source) async {
     final registered = source.toRegisteredSource();
     for (final query in queries) {
       try {

@@ -4388,7 +4388,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get replaceRulesEmptyTitle => '置換ルールはまだありません';
 
   @override
-  String get replaceRulesEmptyBody => 'Legado の JSON を読み込むか、正規表現ルールを作成できます。';
+  String get replaceRulesEmptyBody => '書籍ソースの JSON を読み込むか、正規表現ルールを作成できます。';
 
   @override
   String get replaceRulesNoSearchResults => '一致するルールはありません';

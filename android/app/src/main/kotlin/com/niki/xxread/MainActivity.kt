@@ -26,6 +26,7 @@ class MainActivity : FlutterActivity() {
     private var appUpdateBridge: AppUpdateBridge? = null
     private var backgroundDownloadBridge: BackgroundDownloadBridge? = null
     private var readerAloudBridge: ReaderAloudBridge? = null
+    private var sourceWebViewBridge: SourceWebViewBridge? = null
     @Volatile private var volumePagingEnabled: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -116,6 +117,10 @@ class MainActivity : FlutterActivity() {
             this,
             flutterEngine.dartExecutor.binaryMessenger,
         )
+        sourceWebViewBridge = SourceWebViewBridge(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
 
     }
 
@@ -162,6 +167,8 @@ class MainActivity : FlutterActivity() {
         safDirectoryBridge = null
         readerAloudBridge?.dispose()
         readerAloudBridge = null
+        sourceWebViewBridge?.dispose()
+        sourceWebViewBridge = null
         super.onDestroy()
     }
 

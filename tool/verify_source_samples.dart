@@ -1,17 +1,17 @@
 import 'dart:io';
 
-import 'package:xxread/book_sources/legado/legado_book_source.dart';
-import 'package:xxread/book_sources/legado/legado_source_verifier.dart';
+import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/source_verifier.dart';
 
 Future<void> main(List<String> paths) async {
-  final verifier = LegadoSourceVerifier(
+  final verifier = SourceVerifier(
     maxCandidates: 120,
     maxAvailable: 5,
     maxConcurrency: 10,
   );
   try {
     for (final path in paths) {
-      final parsed = parseLegadoSources(File(path).readAsStringSync());
+      final parsed = parseReadingSources(File(path).readAsStringSync());
       final result = await verifier.verify(
         parsed.sources,
         onProgress: (completed, total, available) {

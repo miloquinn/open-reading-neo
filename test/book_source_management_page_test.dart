@@ -164,17 +164,17 @@ void main() {
       addedAt: DateTime.utc(2026, 7, 31),
     );
     final additional = RegisteredBookSource(
-      id: 'legado.example',
+      id: 'source.example',
       name: 'Other Example',
       description: '',
       manifestUrl: Uri.parse('https://books.example'),
       apiBaseUrl: Uri.parse('https://books.example'),
-      protocolVersion: 'legado-3',
+      protocolVersion: 'reading-source-1',
       languages: const [],
       capabilities: const {'search', 'detail', 'catalog', 'content'},
       enabled: false,
       addedAt: DateTime.utc(2026, 7, 31),
-      sourceProtocol: BookSourceProtocolKind.legado,
+      sourceProtocol: BookSourceProtocolKind.readingSource,
       sourceConfig: const {
         'bookSourceName': 'Other Example',
         'bookSourceUrl': 'https://books.example',

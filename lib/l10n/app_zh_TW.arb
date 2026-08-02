@@ -1977,7 +1977,7 @@
   "replaceRulesDeleteValue": "刪除",
   "replaceRulesCreate": "新增規則",
   "replaceRulesEmptyTitle": "還沒有替換規則",
-  "replaceRulesEmptyBody": "可以匯入 Legado JSON，或新增一條正則規則。",
+  "replaceRulesEmptyBody": "可以匯入閱讀書源 JSON，或新增一條正則規則。",
   "replaceRulesNoSearchResults": "沒有符合的規則",
   "replaceRulesCreateTitle": "新增替換規則",
   "replaceRulesEditTitle": "編輯替換規則",

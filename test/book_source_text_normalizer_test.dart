@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_text_normalizer.dart';
 
 void main() {
-  test('normalizes Legado-style description markup for display', () {
+  test('normalizes reading source-style description markup for display', () {
     const input =
         '【热血战争】&nbsp;第一段<br><br>正文……\\n下一段&lt;br&gt;末尾  <div>新段落</div>\n\n\n';
 
@@ -23,4 +23,13 @@ void main() {
       );
     },
   );
+
+  test('decodes escaped Unicode markup and removes control characters', () {
+    expect(
+      normalizeBookSourceDescription(
+        r'First\u003cbr\u003eSecond\u0026amp;Third\u0000',
+      ),
+      'First\nSecond&Third',
+    );
+  });
 }

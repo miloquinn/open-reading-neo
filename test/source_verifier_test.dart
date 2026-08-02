@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xxread/book_sources/legado/legado_book_source.dart';
-import 'package:xxread/book_sources/legado/legado_source_verifier.dart';
+import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/source_verifier.dart';
 
-LegadoBookSource _source(String name, String url, {int lastUpdateTime = 0}) {
-  return LegadoBookSource.fromJson({
+ReadingSourceConfig _source(String name, String url, {int lastUpdateTime = 0}) {
+  return ReadingSourceConfig.fromJson({
     'bookSourceName': name,
     'bookSourceUrl': url,
     'lastUpdateTime': lastUpdateTime,
@@ -22,7 +22,7 @@ void main() {
   test(
     'keeps only live-search sources and enables them automatically',
     () async {
-      final verifier = LegadoSourceVerifier(
+      final verifier = SourceVerifier(
         maxConcurrency: 2,
         queries: const ['probe'],
         sourceProbe: (source, _) async => source.name == 'Working',
@@ -51,7 +51,7 @@ void main() {
 
   test('does not exclude newer HTTP candidates solely by scheme', () async {
     final probed = <String>[];
-    final verifier = LegadoSourceVerifier(
+    final verifier = SourceVerifier(
       maxCandidates: 1,
       maxConcurrency: 1,
       sourceProbe: (source, _) async {

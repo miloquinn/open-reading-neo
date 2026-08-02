@@ -5,20 +5,21 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gbk_codec/gbk_codec.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xxread/book_sources/legado/legado_book_source.dart';
-import 'package:xxread/book_sources/legado/legado_request.dart';
-import 'package:xxread/book_sources/legado/legado_rule_engine.dart';
-import 'package:xxread/book_sources/legado/legado_runtime.dart';
+import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/source_request.dart';
+import 'package:xxread/book_sources/source_engine/source_rule_engine.dart';
+import 'package:xxread/book_sources/source_engine/source_runtime.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
+import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_network_policy.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  group('LegadoRequestTemplate', () {
+  group('SourceRequestTemplate', () {
     test('parses variables and limited POST options', () {
-      final request = LegadoRequestTemplate.parse(
+      final request = SourceRequestTemplate.parse(
         '/search,{"method":"POST","body":"q={{key}}&p={{page}}",'
         '"charset":"GBK","headers":{"Referer":"https://books.test/"}}',
         baseUri: Uri.parse('https://books.test/root/'),
@@ -26,10 +27,10 @@ void main() {
       );
 
       expect(request.url, Uri.parse('https://books.test/search'));
-      expect(request.method, LegadoRequestMethod.post);
+      expect(request.method, SourceRequestMethod.post);
       expect(request.body, 'q=%E5%89%91+%E6%9D%A5&p=2');
       expect(request.charset, 'gbk');
-      expect(request.headers['User-Agent'], legadoDefaultUserAgent);
+      expect(request.headers['User-Agent'], sourceDefaultUserAgent);
       expect(request.headers['Referer'], 'https://books.test/');
       expect(
         request.headers['Content-Type'],
@@ -47,10 +48,10 @@ void main() {
       });
       final raw = Map<String, dynamic>.from(_htmlSource().raw)
         ..['header'] = '{"Referer":"{{source.getKey()}}"}';
-      final runtime = LegadoRuntime(transport: transport);
+      final runtime = SourceRuntime(transport: transport);
 
       await runtime.search(
-        LegadoBookSource.fromJson(raw).toRegisteredSource(enabled: true),
+        ReadingSourceConfig.fromJson(raw).toRegisteredSource(enabled: true),
         'test',
       );
 
@@ -60,55 +61,106 @@ void main() {
       );
     });
 
+    test(
+      'replays synchronous script network calls through source transport',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/token': 'abc',
+          'https://books.test/search?q=test&token=abc': '''
+          <div class="book">
+            <a href="/book/1"><span class="name">Network Book</span></a>
+          </div>
+        ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['searchUrl'] =
+              "@js:'/search?q=' + key + '&token=' + java.ajax('/token')";
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final page = await runtime.search(
+          ReadingSourceConfig.fromJson(raw).toRegisteredSource(enabled: true),
+          'test',
+        );
+
+        expect(page.items.single.title, 'Network Book');
+        expect(transport.requests.map((request) => request.url.toString()), [
+          'https://books.test/token',
+          'https://books.test/search?q=test&token=abc',
+        ]);
+      },
+    );
+
     test('accepts non-executable single-quoted legacy options', () {
-      final request = LegadoRequestTemplate.parse(
+      final request = SourceRequestTemplate.parse(
         "/search,{'method':'POST','body':'q={{key}}','charset':'gbk'}",
         baseUri: Uri.parse('https://books.test/'),
         variables: const {'key': '剑来'},
       );
 
-      expect(request.method, LegadoRequestMethod.post);
+      expect(request.method, SourceRequestMethod.post);
       expect(request.charset, 'gbk');
       expect(request.body, 'q=%E5%89%91%E6%9D%A5');
     });
 
+    test('accepts a bare User-Agent in legacy request options', () {
+      final request = SourceRequestTemplate.parse(
+        '/search,{"method":"POST","body":"q={{key}}",'
+        '"headers":"ExampleBrowser/1.0"}',
+        baseUri: Uri.parse('https://books.test/'),
+        variables: const {'key': 'test'},
+      );
+
+      expect(request.headers['User-Agent'], 'ExampleBrowser/1.0');
+    });
+
+    test('preserves background-browser request options', () {
+      final request = SourceRequestTemplate.parse(
+        "/search,{'webView':true,'webJs':'document.body.dataset.ready=1'}",
+        baseUri: Uri.parse('https://books.test/'),
+      );
+
+      expect(request.useWebView, isTrue);
+      expect(request.webJs, 'document.body.dataset.ready=1');
+    });
+
     test('rejects unsupported methods and sensitive headers', () {
       expect(
-        () => LegadoRequestTemplate.parse(
+        () => SourceRequestTemplate.parse(
           '/,{"method":"PUT"}',
           baseUri: Uri.parse('https://books.test'),
         ),
         throwsA(isA<BookSourceProtocolException>()),
       );
       expect(
-        () => LegadoRequestTemplate.parse(
+        SourceRequestTemplate.parse(
           '/search?offset={{(page-1)*20}}',
           baseUri: Uri.parse('https://books.test'),
           variables: const {'page': '2'},
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
+        ).url,
+        Uri.parse('https://books.test/search?offset=20'),
       );
       expect(
-        () => LegadoRequestTemplate.parse(
+        () => SourceRequestTemplate.parse(
           '/,{"headers":{"Content-Length":"123"}}',
           baseUri: Uri.parse('https://books.test'),
         ),
         throwsA(isA<BookSourceProtocolException>()),
       );
-      final withCookie = LegadoRequestTemplate.parse(
+      final withCookie = SourceRequestTemplate.parse(
         '/',
         baseUri: Uri.parse('https://books.test'),
         sourceHeaders: const {'Cookie': 'session=source'},
       );
       expect(withCookie.headers['Cookie'], 'session=source');
-      final virtualHost = LegadoRequestTemplate.parse(
+      final virtualHost = SourceRequestTemplate.parse(
         '/',
         baseUri: Uri.parse('https://203.0.113.8'),
         sourceHeaders: const {'Host': 'books.test'},
       );
       expect(virtualHost.headers['Host'], 'books.test');
       expect(
-        () => LegadoRequestTemplate.parse(
+        () => SourceRequestTemplate.parse(
           '/',
           baseUri: Uri.parse('https://203.0.113.8'),
           sourceHeaders: const {'Host': 'books.test\r\nX-Test: injected'},
@@ -118,13 +170,13 @@ void main() {
     });
   });
 
-  group('LegadoRuleEngine', () {
-    const engine = LegadoRuleEngine();
+  group('SourceRuleEngine', () {
+    const engine = SourceRuleEngine();
 
     test(
       'supports legacy DOM rules, CSS, fallback, concatenate and replace',
       () {
-        final document = LegadoRuleDocument.parse(
+        final document = SourceRuleDocument.parse(
           '<ul class="books">'
           '<li><a href="/1"><b>第一本</b></a><span>甲</span></li>'
           '<li><a href="/2"><b>第二本</b></a><span>乙</span></li>'
@@ -166,8 +218,24 @@ void main() {
       },
     );
 
+    test('supports whitespace-separated legacy class names', () {
+      final document = SourceRuleDocument.parse(
+        '<div class="alpha beta">Matched</div>',
+        Uri.parse('https://books.test/'),
+      );
+
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          'class. alpha beta@text',
+        ),
+        'Matched',
+      );
+    });
+
     test('supports basic JSON properties, indexes, wildcard and templates', () {
-      final document = LegadoRuleDocument.parse(
+      final document = SourceRuleDocument.parse(
         '{"books":[{"id":7,"title":"山海"}]}',
         Uri.parse('https://api.test/'),
       );
@@ -198,10 +266,35 @@ void main() {
       );
     });
 
+    test('supports recursive and filtered reading source JSONPath rules', () {
+      final document = SourceRuleDocument.parse(
+        '{"data":{"books":['
+        '{"title":"旧书","score":5},'
+        '{"title":"好书","score":9}'
+        ']}}',
+        Uri.parse('https://api.test/'),
+      );
+
+      expect(
+        engine
+            .evaluateList(
+              document,
+              document.value,
+              r'$..books[?(@.score >= 8)]',
+            )
+            .map((book) => engine.evaluateString(document, book, r'$.title')),
+        ['好书'],
+      );
+      expect(
+        engine.evaluateString(document, document.value, r'$..title'),
+        '旧书好书',
+      );
+    });
+
     test(
       'supports CSS attributes, text lookup and regex capture replacement',
       () {
-        final document = LegadoRuleDocument.parse(
+        final document = SourceRuleDocument.parse(
           '<meta property="og:novel:author" content="甲">'
           '<p data-author="作者：乙<">正文</p><a href="/next">下一页</a>',
           Uri.parse('https://books.test/chapter'),
@@ -238,8 +331,52 @@ void main() {
       },
     );
 
+    test('supports common XPath attributes, predicates, and sibling axes', () {
+      final document = SourceRuleDocument.parse('''
+        <html><head>
+          <meta property="og:title" content="XPath Book">
+        </head><body>
+          <a class="start" href="/start">Start Reading</a>
+          <ul><li><span>one</span><a href="/c1">One</a></li></ul>
+          <div id="list"><dt>volume</dt><dt>chapters</dt>
+            <dd><a href="/c2">Two</a></dd><dd><a href="/c3">Three</a></dd>
+          </div>
+        </body></html>
+        ''', Uri.parse('https://books.test/book/1'));
+
+      expect(
+        engine.evaluateString(
+          document,
+          null,
+          '//meta[@property="og:title"]/@content',
+        ),
+        'XPath Book',
+      );
+      expect(
+        engine.evaluateString(
+          document,
+          null,
+          '//a[text()="Start Reading"]/@href',
+          resolveUrl: true,
+        ),
+        'https://books.test/start',
+      );
+      final siblingLinks = engine.evaluateList(
+        document,
+        null,
+        '//*[@id="list"]//dt[2]/following-sibling::dd/a',
+      );
+      expect(
+        siblingLinks.map(
+          (item) => engine.evaluateString(document, item, 'text'),
+        ),
+        ['Two', 'Three'],
+      );
+      expect(engine.evaluateList(document, null, '//li[span]/a'), hasLength(1));
+    });
+
     test('accepts explicit and additive CSS prefixes', () {
-      final document = LegadoRuleDocument.parse(
+      final document = SourceRuleDocument.parse(
         '<ul class="librarylist"><li><a class="name">Book</a></li></ul>',
         Uri.parse('https://books.test'),
       );
@@ -252,7 +389,7 @@ void main() {
     });
 
     test('supports staged regex lists and numbered capture fields', () {
-      final document = LegadoRuleDocument.parse(
+      final document = SourceRuleDocument.parse(
         '<h2>章节目录</h2><ul>'
         '<li><a href="/1">第一章</a></li>'
         '<li><a href="/2">第二章</a></li></ul>',
@@ -277,17 +414,47 @@ void main() {
       );
     });
 
-    test('rejects scripts, XPath and complex JSONPath', () {
-      for (final rule in const ['@js:result', '//div', r'$..books[*]']) {
+    test('accepts scripts, complex JSONPath, XPath, and state rules', () {
+      for (final rule in const ['@js:result', r'$..books[*]', '//div']) {
         expect(
-          () => LegadoRuleEngine.ensureSupported(rule, field: 'test'),
-          throwsA(isA<BookSourceProtocolException>()),
+          () => SourceRuleEngine.ensureSupported(rule, field: 'test'),
+          returnsNormally,
         );
       }
+      expect(
+        () =>
+            SourceRuleEngine.ensureSupported(r'@put:{id:$.id}', field: 'test'),
+        returnsNormally,
+      );
+    });
+
+    test('stores and reads source rule state with put/get syntax', () {
+      final document = SourceRuleDocument.parse(
+        '{"id":7,"author":"Alice"}',
+        Uri.parse('https://books.test/'),
+      );
+
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          r'$.author@put:{gid:$.id}',
+        ),
+        'Alice',
+      );
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          '/book/@get:{gid}',
+          resolveUrl: true,
+        ),
+        'https://books.test/book/7',
+      );
     });
   });
 
-  group('LegadoDeclarativeRuntime', () {
+  group('SourceRuntime', () {
     test(
       'normalizes the complete text reading chain to protocol DTOs',
       () async {
@@ -312,7 +479,7 @@ void main() {
         ''',
         });
         final source = _htmlSource().toRegisteredSource(enabled: true);
-        final runtime = LegadoRuntime(transport: transport);
+        final runtime = SourceRuntime(transport: transport);
 
         final search = await runtime.search(source, '剑来');
         expect(search.items.single.id, 'https://books.test/book/1');
@@ -349,7 +516,7 @@ void main() {
         'https://api.test/content/9': '{"body":"第一段\\n第二段"}',
       });
       final source = _jsonSource().toRegisteredSource(enabled: true);
-      final runtime = LegadoRuntime(transport: transport);
+      final runtime = SourceRuntime(transport: transport);
 
       final result = await runtime.search(source, '山海');
       final book = await runtime.getBook(source, result.items.single.id);
@@ -383,10 +550,10 @@ void main() {
             'bookUrl': 'tag.a@href',
           },
         });
-      final source = LegadoBookSource.fromJson(
+      final source = ReadingSourceConfig.fromJson(
         raw,
       ).toRegisteredSource(enabled: true);
-      final runtime = LegadoRuntime(transport: transport);
+      final runtime = SourceRuntime(transport: transport);
 
       final categories = await runtime.getExploreCategories(source);
       expect(categories.single.name, '排行榜');
@@ -403,6 +570,41 @@ void main() {
       expect(page.hasMore, isTrue);
     });
 
+    test('builds discovery channels returned by a source script', () async {
+      final transport = _FakeTransport({
+        'https://books.test/script-rank?page=1': '''
+          <div class="explore-book">
+            <a href="/book/8"><span class="title">Script Book</span></a>
+          </div>
+        ''',
+      });
+      final raw = Map<String, dynamic>.from(_htmlSource().raw)
+        ..addAll({
+          'exploreUrl':
+              "@js:'Script Rank::/script-rank?page={{page}}&&Latest::/latest?page={{page}}'",
+          'ruleExplore': {
+            'bookList': 'class.explore-book',
+            'name': 'class.title@text',
+            'bookUrl': 'tag.a@href',
+          },
+        });
+      final source = ReadingSourceConfig.fromJson(
+        raw,
+      ).toRegisteredSource(enabled: true);
+      final runtime = SourceRuntime(transport: transport);
+      addTearDown(runtime.close);
+
+      final categories = await runtime.getExploreCategories(source);
+      expect(categories.map((category) => category.name), [
+        'Script Rank',
+        'Latest',
+      ]);
+      final page = await runtime.browse(source, category: categories.first.id);
+
+      expect(page.items.single.title, 'Script Book');
+      expect(page.items.single.id, 'https://books.test/book/8');
+    });
+
     test(
       'parses indexed CSS rules used by aggregate discovery sources',
       () async {
@@ -417,7 +619,7 @@ void main() {
           </div>
         ''',
         });
-        final source = LegadoBookSource.fromJson({
+        final source = ReadingSourceConfig.fromJson({
           'bookSourceName': 'Indexed CSS source',
           'bookSourceUrl': 'https://www.123bqg.cc',
           'exploreUrl': '全部分类::https://www.123bqg.cc/0/{{page}}.html',
@@ -431,7 +633,7 @@ void main() {
             'name': 'h2@text',
           },
         }).toRegisteredSource(enabled: true);
-        final runtime = LegadoRuntime(transport: transport);
+        final runtime = SourceRuntime(transport: transport);
 
         final page = await runtime.browse(
           source,
@@ -460,10 +662,10 @@ void main() {
         });
         final raw = Map<String, dynamic>.from(_htmlSource().raw)
           ..['exploreUrl'] = '最新::/latest?page={{page}}';
-        final source = LegadoBookSource.fromJson(
+        final source = ReadingSourceConfig.fromJson(
           raw,
         ).toRegisteredSource(enabled: true);
-        final runtime = LegadoRuntime(transport: transport);
+        final runtime = SourceRuntime(transport: transport);
         final category = (await runtime.getExploreCategories(source)).single;
 
         final page = await runtime.browse(source, category: category.id);
@@ -476,10 +678,10 @@ void main() {
       final transport = _FakeTransport(const {});
       final raw = Map<String, dynamic>.from(_htmlSource().raw)
         ..['exploreUrl'] = '排行::/rank?page={{page}}';
-      final source = LegadoBookSource.fromJson(
+      final source = ReadingSourceConfig.fromJson(
         raw,
       ).toRegisteredSource(enabled: true);
-      final runtime = LegadoRuntime(transport: transport);
+      final runtime = SourceRuntime(transport: transport);
 
       await expectLater(
         runtime.browse(source, category: 'https://attacker.example/books'),
@@ -489,7 +691,7 @@ void main() {
     });
 
     test(
-      'unsupported content does not block search and fails before content request',
+      'scripted content does not block search and executes when requested',
       () async {
         final transport = _FakeTransport({
           'https://books.test/search?q=test&page=1': '''
@@ -498,26 +700,25 @@ void main() {
               <span class="author">作者</span>
             </div>
           ''',
+          'https://books.test/chapter/1': '<article>脚本正文</article>',
         });
         final raw = Map<String, dynamic>.from(_htmlSource().raw);
         raw['ruleContent'] = {'content': '@js:result'};
-        final runtime = LegadoRuntime(transport: transport);
-        final source = LegadoBookSource.fromJson(
+        final runtime = SourceRuntime(transport: transport);
+        final source = ReadingSourceConfig.fromJson(
           raw,
         ).toRegisteredSource(enabled: true);
 
         final page = await runtime.search(source, 'test');
         expect(page.items.single.title, '可搜索');
 
-        await expectLater(
-          runtime.getChapterContent(
-            source,
-            bookId: 'https://books.test/book/1',
-            chapterId: 'https://books.test/chapter/1',
-          ),
-          throwsA(isA<BookSourceProtocolException>()),
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: 'https://books.test/book/1',
+          chapterId: 'https://books.test/chapter/1',
         );
-        expect(transport.requests, hasLength(1));
+        expect(content.content, contains('脚本正文'));
+        expect(transport.requests, hasLength(2));
       },
     );
   });
@@ -538,7 +739,7 @@ void main() {
     );
   });
 
-  group('LegadoHttpTransport', () {
+  group('SourceHttpTransport', () {
     late HttpServer server;
 
     tearDown(() async {
@@ -560,12 +761,12 @@ void main() {
         request.response.add(gbk_bytes.encode('结果'));
         await request.response.close();
       });
-      final transport = LegadoHttpTransport(
+      final transport = SourceHttpTransport(
         networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
       );
       addTearDown(transport.close);
       final response = await transport.send(
-        LegadoRequestTemplate.parse(
+        SourceRequestTemplate.parse(
           'http://${server.address.address}:${server.port}/search,'
           '{"method":"POST","body":"关键词=剑来","charset":"gbk"}',
           baseUri: Uri.parse('https://unused.test'),
@@ -593,13 +794,13 @@ void main() {
         }
         await request.response.close();
       });
-      final transport = LegadoHttpTransport(
+      final transport = SourceHttpTransport(
         networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
       );
       addTearDown(transport.close);
 
       final response = await transport.send(
-        LegadoRequestTemplate.parse(
+        SourceRequestTemplate.parse(
           'http://${server.address.address}:${server.port}/channel',
           baseUri: Uri.parse('https://unused.test'),
           cookieJarKey: 'source-1',
@@ -623,13 +824,13 @@ void main() {
         }
         await request.response.close();
       });
-      final transport = LegadoHttpTransport(
+      final transport = SourceHttpTransport(
         networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
       );
       addTearDown(transport.close);
 
       final response = await transport.send(
-        LegadoRequestTemplate.parse(
+        SourceRequestTemplate.parse(
           'http://${server.address.address}:${server.port}/submit,'
           '{"method":"POST","body":"q=test"}',
           baseUri: Uri.parse('https://unused.test'),
@@ -653,7 +854,7 @@ void main() {
           request.response.add(<int>[0xBD, 0xE1, 0xB9]);
           await request.response.close();
         });
-        final transport = LegadoHttpTransport(
+        final transport = SourceHttpTransport(
           networkPolicy: const BookSourceNetworkPolicy(
             allowPrivateNetwork: true,
           ),
@@ -661,7 +862,7 @@ void main() {
         addTearDown(transport.close);
 
         final response = await transport.send(
-          LegadoRequestTemplate.parse(
+          SourceRequestTemplate.parse(
             'http://${server.address.address}:${server.port}/',
             baseUri: Uri.parse('https://unused.test'),
           ),
@@ -678,7 +879,7 @@ void main() {
         request.response.add(utf8.encode('12345'));
         await request.response.close();
       });
-      final transport = LegadoHttpTransport(
+      final transport = SourceHttpTransport(
         networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
         maxResponseBytes: 4,
       );
@@ -686,7 +887,7 @@ void main() {
 
       expect(
         () => transport.send(
-          LegadoRequestTemplate.parse(
+          SourceRequestTemplate.parse(
             'http://${server.address.address}:${server.port}/',
             baseUri: Uri.parse('https://unused.test'),
           ),
@@ -694,10 +895,46 @@ void main() {
         throwsA(isA<BookSourceProtocolException>()),
       );
     });
+
+    test('cancels an in-flight HTTP request', () async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final started = Completer<void>();
+      final release = Completer<void>();
+      server.listen((request) async {
+        if (!started.isCompleted) started.complete();
+        await release.future;
+        try {
+          request.response.write('late response');
+          await request.response.close();
+        } catch (_) {
+          // The client is expected to close the request before this response.
+        }
+      });
+      final transport = SourceHttpTransport(
+        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
+      );
+      addTearDown(transport.close);
+      final cancellation = BookDownloadCancellation();
+      final request = transport.send(
+        SourceRequestTemplate.parse(
+          'http://${server.address.address}:${server.port}/slow',
+          baseUri: Uri.parse('https://unused.test'),
+        ),
+        cancellation: cancellation,
+      );
+      await started.future;
+
+      cancellation.cancel();
+      await expectLater(
+        request,
+        throwsA(isA<BookDownloadCancelledException>()),
+      );
+      release.complete();
+    });
   });
 }
 
-LegadoBookSource _htmlSource() => LegadoBookSource.fromJson({
+ReadingSourceConfig _htmlSource() => ReadingSourceConfig.fromJson({
   'bookSourceName': 'HTML test',
   'bookSourceUrl': 'https://books.test',
   'searchUrl': '/search?q={{key}}&page={{page}}',
@@ -726,7 +963,7 @@ LegadoBookSource _htmlSource() => LegadoBookSource.fromJson({
   },
 });
 
-LegadoBookSource _jsonSource() => LegadoBookSource.fromJson({
+ReadingSourceConfig _jsonSource() => ReadingSourceConfig.fromJson({
   'bookSourceName': 'JSON test',
   'bookSourceUrl': 'https://api.test',
   'searchUrl': '/search?q={{key}}',
@@ -749,19 +986,22 @@ LegadoBookSource _jsonSource() => LegadoBookSource.fromJson({
   'ruleContent': {'content': r'$.body'},
 });
 
-class _FakeTransport implements LegadoTransport {
+class _FakeTransport implements SourceTransport {
   _FakeTransport(this.responses);
 
   final Map<String, String> responses;
-  final List<LegadoRequestTemplate> requests = [];
+  final List<SourceRequestTemplate> requests = [];
 
   @override
-  Future<LegadoResponse> send(LegadoRequestTemplate request) async {
+  Future<SourceResponse> send(
+    SourceRequestTemplate request, {
+    BookDownloadCancellation? cancellation,
+  }) async {
     requests.add(request);
     final body = responses[request.url.toString()];
     if (body == null) {
       throw StateError('Missing fake response for ${request.url}');
     }
-    return LegadoResponse(body: body, finalUri: request.url);
+    return SourceResponse(body: body, finalUri: request.url);
   }
 }

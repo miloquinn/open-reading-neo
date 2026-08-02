@@ -502,7 +502,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         .toString()
         .replaceFirst(RegExp(r'^[^:]+Exception:\s*'), '')
         .trim();
-    if (raw.contains('Could not connect to the Legado source')) {
+    if (raw.contains('Could not connect to the reading source')) {
       return context.l10n.bookSourceConnectionFailed;
     }
     if (raw.contains('redirected too many times') ||
@@ -513,7 +513,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     if (status != null) {
       return context.l10n.bookSourceHttpFailed(int.parse(status));
     }
-    return raw.replaceAll('Legado source', context.l10n.bookSources);
+    return raw.replaceAll(
+      RegExp('reading source', caseSensitive: false),
+      context.l10n.bookSources,
+    );
   }
 
   Future<void> _loadMoreCategory() async {

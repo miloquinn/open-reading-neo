@@ -27,7 +27,12 @@ double _contrast(Color foreground, Color background) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(() {
+    ReaderThemes.resetSavedPaletteCacheForTesting();
+  });
+
   tearDown(() {
+    ReaderThemes.resetSavedPaletteCacheForTesting();
     ReaderThemes.setCustomThemes(const []);
     ReaderThemes.setThemeOrder(const []);
   });
@@ -86,6 +91,34 @@ void main() {
     final palette = await ReaderThemes.loadSavedPalette();
 
     expect(palette, ReaderThemes.pureBlack);
+  });
+
+  test('saved palette loads once and is reused from memory', () async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.themeKey: ReaderThemes.pureBlack.id,
+    });
+
+    final firstLoad = ReaderThemes.loadSavedPalette();
+    final sharedLoad = ReaderThemes.loadSavedPalette();
+    expect(identical(firstLoad, sharedLoad), isTrue);
+    expect(await firstLoad, ReaderThemes.pureBlack);
+
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.themeKey: ReaderThemes.day.id,
+    });
+    expect(await ReaderThemes.loadSavedPalette(), ReaderThemes.pureBlack);
+  });
+
+  test('remembered palette wins over an older startup read', () async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.themeKey: ReaderThemes.day.id,
+    });
+
+    final startupLoad = ReaderThemes.loadSavedPalette();
+    ReaderThemes.rememberSavedPalette(ReaderThemes.pureBlack);
+
+    expect(await startupLoad, ReaderThemes.pureBlack);
+    expect(await ReaderThemes.loadSavedPalette(), ReaderThemes.pureBlack);
   });
 
   test('custom theme derives the full reader palette and cache identity', () {

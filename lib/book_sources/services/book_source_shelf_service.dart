@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -89,6 +91,37 @@ class BookSourceShelfService {
       readingProgress: totalUnits <= 0 ? 0 : currentUnits / totalUnits,
     );
     await _bookDao.updateBookTotalPages(shelfBookId, totalUnits);
+  }
+
+  Future<Book> replaceOnlineSourceBinding({
+    required Book shelfBook,
+    required RegisteredBookSource source,
+    required BookSourceBook book,
+    required int chapterIndex,
+    required int chapterCount,
+    required double chapterProgress,
+  }) async {
+    if (shelfBook.id == null || !shelfBook.isOnline) {
+      throw const BookSourceProtocolException(
+        'Only an online shelf book can change source.',
+      );
+    }
+    final currentUnits =
+        chapterIndex * unitsPerChapter +
+        (chapterProgress.clamp(0, 1) * unitsPerChapter).round();
+    final totalUnits = chapterCount * unitsPerChapter;
+    final updated = shelfBook.copyWith(
+      currentPage: currentUnits,
+      totalPages: totalUnits,
+      readingProgress: totalUnits <= 0 ? 0 : currentUnits / totalUnits,
+      sourceId: source.id,
+      sourceBookId: book.id,
+      sourceJson: jsonEncode(source.toJson()),
+      sourceBookJson: jsonEncode(book.toJson()),
+    );
+    await _bookDao.updateBook(updated);
+    LibraryEventBus().notifyLibraryChanged();
+    return updated;
   }
 
   Future<Book> downloadToLocal({

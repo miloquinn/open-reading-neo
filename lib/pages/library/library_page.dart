@@ -12,11 +12,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:xxread/book_sources/services/book_source_change_service.dart';
+import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/core/reader/native_reader_service.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
+import 'package:xxread/pages/book_sources/book_source_change_page.dart';
 import 'package:xxread/pages/reader/book_source_reader_page.dart';
 import 'package:xxread/pages/settings/sync/book_file_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
@@ -141,16 +144,18 @@ class _LibraryPageState extends State<LibraryPage> {
   Future<void> _openBook(
     Book book, {
     required LibraryBookOpenAnimation libraryAnimation,
+    required LibraryBookOpenAnimationPace animationPace,
     BookOpenAnimation? animation,
   }) async {
     final openingActivity = BookOpenTransition.beginActivity();
+    final initialThemeFuture = ReaderThemes.loadSavedPalette();
     try {
       final fullBook = await _bookDao.getBookById(book.id!);
       if (fullBook == null || !mounted) return;
+      final initialTheme = await initialThemeFuture;
+      if (!mounted) return;
       if (fullBook.isOnline) {
         try {
-          final initialTheme = await ReaderThemes.loadSavedPalette();
-          if (!mounted) return;
           final source = _sourceShelfService.sourceFrom(fullBook);
           final sourceBook = _sourceShelfService.sourceBookFrom(fullBook);
           final route = BookOpenTransition.createRoute<void>(
@@ -162,8 +167,9 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
             animation: animation,
             libraryAnimation: animation == null ? libraryAnimation : null,
+            animationPace: animationPace,
             readerBackgroundColor: initialTheme.background,
-            waitForReaderReady: animation != null,
+            waitForReaderReady: true,
           );
           await BookOpenTransition.push<void>(context, route);
         } catch (error) {
@@ -181,6 +187,8 @@ class _LibraryPageState extends State<LibraryPage> {
           fullBook,
           animation: animation,
           libraryAnimation: animation == null ? libraryAnimation : null,
+          animationPace: animationPace,
+          initialTheme: initialTheme,
         );
       }
       if (mounted) _loadBooks();
@@ -189,15 +197,14 @@ class _LibraryPageState extends State<LibraryPage> {
     }
   }
 
-  Future<void> _openBookFromCover(
+  Future<void> _openBookWithSelectedAnimation(
     Book book, {
     required GlobalKey coverKey,
     required BorderRadius radius,
     required WidgetBuilder coverBuilder,
   }) {
-    final selected = context
-        .read<AppSettingsNotifier>()
-        .libraryBookOpenAnimation;
+    final settings = context.read<AppSettingsNotifier>();
+    final selected = settings.libraryBookOpenAnimation;
     final animation = selected == LibraryBookOpenAnimation.classicCover
         ? BookOpenAnimation.fromCoverKey(
             coverKey,
@@ -205,7 +212,12 @@ class _LibraryPageState extends State<LibraryPage> {
             coverBuilder: coverBuilder,
           )
         : null;
-    return _openBook(book, libraryAnimation: selected, animation: animation);
+    return _openBook(
+      book,
+      libraryAnimation: selected,
+      animationPace: settings.libraryBookOpenAnimationPace,
+      animation: animation,
+    );
   }
 
   BoxDecoration _panelDecoration({
@@ -1024,7 +1036,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     onTap: () async {
                       await _handleBookTap(
                         book,
-                        openBook: () => _openBookFromCover(
+                        openBook: () => _openBookWithSelectedAnimation(
                           book,
                           coverKey: coverKey,
                           radius: BorderRadius.circular(10),
@@ -1171,7 +1183,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   onTap: () async {
                     await _handleBookTap(
                       book,
-                      openBook: () => _openBookFromCover(
+                      openBook: () => _openBookWithSelectedAnimation(
                         book,
                         coverKey: coverKey,
                         radius: BorderRadius.circular(12),
@@ -1239,7 +1251,7 @@ class _LibraryPageState extends State<LibraryPage> {
               onTap: () async {
                 await _handleBookTap(
                   book,
-                  openBook: () => _openBookFromCover(
+                  openBook: () => _openBookWithSelectedAnimation(
                     book,
                     coverKey: coverKey,
                     radius: BorderRadius.circular(11),
@@ -1395,6 +1407,29 @@ class _LibraryPageState extends State<LibraryPage> {
     );
     if (!mounted) return;
     showSideToast(context, context.l10n.downloadRunningInBackground);
+  }
+
+  Future<void> _changeOnlineBookSource(Book book) async {
+    final source = _sourceShelfService.sourceFrom(book);
+    final sourceBook = _sourceShelfService.sourceBookFrom(book);
+    final result = await Navigator.of(context).push<BookSourceChangeResult>(
+      MaterialPageRoute(
+        builder: (_) => BookSourceChangePage(
+          sourcesFuture: BookSourceRegistry().loadRunnableInBackground(),
+          currentSource: source,
+          currentBook: sourceBook,
+          shelfBook: book,
+          service: BookSourceChangeService(shelfService: _sourceShelfService),
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    await _loadBooks();
+    if (!mounted) return;
+    showSideToast(
+      context,
+      context.l10n.bookSourceChangeSuccess(result.source.name),
+    );
   }
 
   /// 手动 AI 预处理：校验模型可用并确认 token 消耗后加入后台队列，
@@ -1662,16 +1697,31 @@ class _LibraryPageState extends State<LibraryPage> {
                           Navigator.pop(context);
                           final fullBook = await _bookDao.getBookById(book.id!);
                           if (fullBook != null && context.mounted) {
+                            final settings = context
+                                .read<AppSettingsNotifier>();
                             await _openBook(
                               fullBook,
-                              libraryAnimation: context
-                                  .read<AppSettingsNotifier>()
-                                  .libraryBookOpenAnimation,
+                              libraryAnimation:
+                                  settings.libraryBookOpenAnimation,
+                              animationPace:
+                                  settings.libraryBookOpenAnimationPace,
                             );
                             _loadBooks();
                           }
                         },
                       ),
+                      if (book.isOnline)
+                        _buildOptionItem(
+                          context: context,
+                          icon: Icons.swap_horiz_rounded,
+                          iconColor: localScheme.primary,
+                          title: context.l10n.bookSourceChangeSourceTitle,
+                          trailing: _sourceShelfService.sourceFrom(book).name,
+                          onTap: () {
+                            Navigator.pop(context);
+                            unawaited(_changeOnlineBookSource(book));
+                          },
+                        ),
                       if (book.isOnline)
                         _buildOptionItem(
                           context: context,

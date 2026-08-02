@@ -11,9 +11,11 @@ class OnlineFontFile {
     required this.size,
     this.weight,
     this.style = FontStyle.normal,
+    this.expectedSha256,
+    this.zipEntry,
   });
 
-  /// 下载 URL（jsDelivr CDN 或 raw.githubusercontent.com）。
+  /// 下载 URL（受许可的官方源、jsDelivr CDN 或 raw.githubusercontent.com）。
   final String url;
 
   /// 本地保存文件名（含扩展名，存于 `online_fonts/<font_id>/` 下）。
@@ -27,6 +29,29 @@ class OnlineFontFile {
 
   /// 该文件对应的字形（normal/italic）。
   final FontStyle style;
+
+  /// 上游原文件的预期 SHA-256；非空时下载后必须完全匹配。
+  final String? expectedSha256;
+
+  /// 字体位于官方 ZIP 包中时，只下载并解压该条目对应的字节范围。
+  final OnlineFontZipEntry? zipEntry;
+}
+
+/// 官方 ZIP 包内单个 Deflate 条目的定位信息。
+///
+/// 字节范围来自 ZIP 中央目录；服务端必须返回 HTTP 206，避免在只需要一个
+/// 字体文件时误下载整个大型字体包。解压后的字节还会通过 [OnlineFontFile]
+/// 的大小、字体签名和 SHA-256 三重校验。
+class OnlineFontZipEntry {
+  const OnlineFontZipEntry({
+    required this.path,
+    required this.compressedOffset,
+    required this.compressedSize,
+  });
+
+  final String path;
+  final int compressedOffset;
+  final int compressedSize;
 }
 
 /// 已下载字体的单个文件持久化记录。

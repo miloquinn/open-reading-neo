@@ -811,6 +811,61 @@ void main() {
       expect(requests, 2);
     });
 
+    test(
+      'keeps redirect cookies within a request when persistence is disabled',
+      () async {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final receivedCookies = <String, String?>{};
+        server.listen((request) async {
+          final session = request.cookies
+              .where((cookie) => cookie.name == 'session')
+              .firstOrNull;
+          receivedCookies[request.uri.path] = session?.value;
+          if (request.uri.path == '/start') {
+            request.response.cookies.add(
+              Cookie('session', 'redirect-only')..path = '/',
+            );
+            request.response.statusCode = HttpStatus.found;
+            request.response.headers.set(
+              HttpHeaders.locationHeader,
+              '/channel',
+            );
+          } else {
+            request.response.write(
+              request.uri.path == '/channel' ? 'books' : 'clean',
+            );
+          }
+          await request.response.close();
+        });
+        final transport = SourceHttpTransport(
+          networkPolicy: const BookSourceNetworkPolicy(
+            allowPrivateNetwork: true,
+          ),
+        );
+        addTearDown(transport.close);
+
+        final baseUri = Uri.parse('https://unused.test');
+        final response = await transport.send(
+          SourceRequestTemplate.parse(
+            'http://${server.address.address}:${server.port}/start',
+            baseUri: baseUri,
+          ),
+        );
+        final nextResponse = await transport.send(
+          SourceRequestTemplate.parse(
+            'http://${server.address.address}:${server.port}/probe',
+            baseUri: baseUri,
+          ),
+        );
+
+        expect(response.body, 'books');
+        expect(receivedCookies['/start'], isNull);
+        expect(receivedCookies['/channel'], 'redirect-only');
+        expect(nextResponse.body, 'clean');
+        expect(receivedCookies['/probe'], isNull);
+      },
+    );
+
     test('matches browser method semantics for POST redirects', () async {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final methods = <String>[];

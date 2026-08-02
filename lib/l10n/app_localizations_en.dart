@@ -88,6 +88,110 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourceChangeChannel => 'Change';
 
   @override
+  String get bookSourceChangeSourceTitle => 'Change source';
+
+  @override
+  String get bookSourceChangeCurrentSource => 'Current source';
+
+  @override
+  String get bookSourceChangeTargetSource => 'Change to';
+
+  @override
+  String get bookSourceChangeNotSelected => 'Not selected';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return 'Currently at chapter $chapter';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => 'Find this book in other sources';
+
+  @override
+  String get bookSourceChangeSearchAgain => 'Search again';
+
+  @override
+  String get bookSourceChangeSearchRemaining => 'Search all remaining sources';
+
+  @override
+  String get bookSourceChangeCheckAuthor => 'Match author';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return 'Checked $completed of $total';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => 'No other sources available';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint =>
+      'Add and enable another source that supports search first.';
+
+  @override
+  String get bookSourceChangeSearching => 'Finding other sources';
+
+  @override
+  String get bookSourceChangeSearchingHint =>
+      'Matches appear as each source finishes searching.';
+
+  @override
+  String get bookSourceChangeNoMatches => 'No matching sources found';
+
+  @override
+  String get bookSourceChangeNoMatchesHint =>
+      'Edit the title or turn off author matching, then search again.';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count source request(s) failed. You can search again.';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => 'Different author';
+
+  @override
+  String get bookSourceChangeValidating =>
+      'Checking the catalog and current chapter…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return 'Validation failed: $details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => 'Current chapter readable';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count chapters';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate =>
+      'Select to check the catalog and current chapter.';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf =>
+      'This source version is already on the bookshelf.';
+
+  @override
+  String get bookSourceChangeSwitching => 'Changing source…';
+
+  @override
+  String get bookSourceChangeSwitchAction => 'Change to this source';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return 'Changed source to $source';
+  }
+
+  @override
   String bookSourceChannelCount(int count) {
     return '$count channels';
   }
@@ -624,7 +728,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fontDownloadFailed => 'Download failed, tap to retry';
 
   @override
-  String get fontDownloadHint => 'First use requires download from GitHub';
+  String get fontDownloadHint => 'First use requires an online download';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return 'Adjustable weight $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => 'Fixed weight (bold is synthesized)';
 
   @override
   String get fontDeleteDownload => 'Delete download';
@@ -772,6 +884,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fontSizeLabel => 'Font Size';
+
+  @override
+  String get readerFontWeightLabel => 'Font Weight';
+
+  @override
+  String get readerFontWeightLight => 'Light';
+
+  @override
+  String get readerFontWeightRegular => 'Regular';
+
+  @override
+  String get readerFontWeightMedium => 'Medium';
+
+  @override
+  String get readerFontWeightSemiBold => 'Semi-bold';
+
+  @override
+  String get readerFontWeightBold => 'Bold';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return 'Reading controls use five legible steps from 300–700. This font\'s true full range is $min–$max.';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      'Reading controls use five steps from 300–700. This font has no declared variable weight axis, so the system approximates the result and it may differ by platform.';
+
+  @override
+  String get readerFontWeightPreview => 'A quiet page reads farther · 字里行间';
 
   @override
   String get lineSpacingLabel => 'Line Spacing';
@@ -2288,7 +2430,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changelogHistorySubtitle => 'View changes from every release';
 
   @override
-  String get openSourceLicensesTitle => 'Open-source licenses';
+  String get openSourceLicensesTitle => 'Open-source & font licenses';
 
   @override
   String get openSourceLicensesSubtitle =>
@@ -2296,7 +2438,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openSourceLicensesIntro =>
-      'These license texts are available offline in the app. Open Reading, bundled fonts, and third-party software remain subject to their respective licenses.';
+      'These license texts and notices are available offline in the app. Open Reading, on-demand fonts, and third-party software remain subject to their respective licenses.';
 
   @override
   String get openSourceProjectSection => 'Project licenses';
@@ -2305,7 +2447,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSourceLegacyLicenseTitle => 'Earlier releases';
 
   @override
-  String get openSourceFontsSection => 'Bundled fonts';
+  String get openSourceFontsSection => 'Font licenses';
 
   @override
   String get openSourceDependenciesSection => 'Third-party software';

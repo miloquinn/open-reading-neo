@@ -15,6 +15,7 @@ import 'package:xxread/core/reader/reader_margin_settings.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/book_source_reader_page.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_chapter_title_page.dart';
@@ -26,6 +27,7 @@ import 'package:xxread/widgets/reader_top_information_bar.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    ReplaceRuleService.instance.resetForTesting();
     GlassEffectConfig.setDisableAllGlassEffects(false);
   });
 
@@ -56,7 +58,7 @@ void main() {
         ),
       );
 
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 150));
       expect(
         find.byKey(const ValueKey('book-source-reader-loading-placeholder')),
         findsWidgets,
@@ -74,7 +76,7 @@ void main() {
     },
   );
 
-  testWidgets('a genuinely slow cover opening crossfades loader into content', (
+  testWidgets('a genuinely slow opening never overlaps loader and content', (
     tester,
   ) async {
     final client = _DelayedOpeningBookSourceClient();
@@ -97,7 +99,7 @@ void main() {
       ),
     );
 
-    await tester.pump(const Duration(milliseconds: 660));
+    await tester.pump(const Duration(milliseconds: 260));
     await tester.pump();
     expect(find.byType(ReaderOpeningLoader), findsOneWidget);
     expect(find.byKey(const ValueKey('reader-opening-dots')), findsOneWidget);
@@ -129,9 +131,6 @@ void main() {
       find.byKey(const ValueKey('book-source-reader-content')),
       findsOneWidget,
     );
-    expect(find.byType(ReaderOpeningLoader), findsOneWidget);
-
-    await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(ReaderOpeningLoader), findsNothing);
   });
 
@@ -195,6 +194,65 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(client.requestedChapterIds, contains('chapter-2'));
+  });
+
+  testWidgets('replacement rules clean source chapter titles and content', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: BookSourcePageMode.verticalScroll.name,
+      ReplaceRuleService.preferenceKey: '''[
+        {
+          "id":"title-clean",
+          "name":"title-clean",
+          "pattern":"[广告] ",
+          "replacement":"",
+          "enabled":true,
+          "isRegex":false,
+          "scopeTitle":true,
+          "scopeContent":false,
+          "order":0
+        },
+        {
+          "id":"body-clean",
+          "name":"body-clean",
+          "pattern":"广告内容\\n",
+          "replacement":"",
+          "enabled":true,
+          "isRegex":false,
+          "scopeTitle":false,
+          "scopeContent":true,
+          "order":1
+        }
+      ]''',
+    });
+    ReplaceRuleService.instance.resetForTesting();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceReaderPage(
+          source: _testSource(),
+          book: const BookSourceBook(
+            id: 'book-1',
+            title: '测试书籍',
+            author: '作者',
+            description: '',
+            categories: [],
+          ),
+          client: _ReplacementBookSourceClient(),
+          initialTheme: ReaderThemes.day,
+        ),
+      ),
+    );
+
+    await _pumpUntilFound(tester, find.text('第一章'));
+    expect(find.textContaining('[广告]'), findsNothing);
+    final cleanedBody = find.textContaining('正文开头', findRichText: true);
+    await _pumpUntilFound(tester, cleanedBody);
+    expect(cleanedBody, findsWidgets);
+    expect(find.textContaining('广告内容', findRichText: true), findsNothing);
   });
 
   testWidgets('restores the last source chapter on reopen', (tester) async {
@@ -370,6 +428,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       ReaderSettingsStore.pageModeKey: BookSourcePageMode.instantPage.name,
+      ReaderSettingsStore.fontWeightKey: 600,
       ReaderSettingsStore.letterSpacingKey: 0.7,
       ReaderSettingsStore.textAlignmentKey: ReaderTextAlignment.justified.name,
     });
@@ -402,6 +461,7 @@ void main() {
 
     final body = tester.widget<RichText>(bodyFinder);
     expect(body.textAlign, TextAlign.justify);
+    expect(body.text.style?.fontWeight, FontWeight.w600);
     expect(body.text.style?.letterSpacing, 0.7);
   });
 
@@ -1540,6 +1600,29 @@ class _FakeBookSourceClient extends BookSourceClient {
       contentType: 'text/plain',
     );
   }
+}
+
+class _ReplacementBookSourceClient extends BookSourceClient {
+  @override
+  Future<List<BookSourceChapter>> getChapters(
+    RegisteredBookSource source,
+    String bookId,
+  ) async => const [
+    BookSourceChapter(id: 'chapter-1', title: '[广告] 第一章', order: 1),
+  ];
+
+  @override
+  Future<BookSourceChapterContent> getChapterContent(
+    RegisteredBookSource source, {
+    required String bookId,
+    required String chapterId,
+  }) async => BookSourceChapterContent(
+    bookId: bookId,
+    chapterId: chapterId,
+    title: '[广告] 第一章',
+    content: '正文开头\n广告内容\n正文结尾',
+    contentType: 'text/plain',
+  );
 }
 
 class _LongFakeBookSourceClient extends _FakeBookSourceClient {

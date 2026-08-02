@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -93,6 +91,25 @@ class _BurstOnlineFontService extends OnlineFontService {
     _currentProgress = progress;
     onProgress?.call(progress);
   }
+}
+
+Uint8List _customVariableTtfBytes() {
+  final bytes = Uint8List(68);
+  final data = ByteData.sublistView(bytes);
+  bytes.setAll(0, const <int>[0, 1, 0, 0]);
+  data.setUint16(4, 1, Endian.big);
+  bytes.setAll(12, 'fvar'.codeUnits);
+  data.setUint32(20, 32, Endian.big);
+  data.setUint32(24, 36, Endian.big);
+  data.setUint16(32, 1, Endian.big);
+  data.setUint16(36, 16, Endian.big);
+  data.setUint16(40, 1, Endian.big);
+  data.setUint16(42, 20, Endian.big);
+  bytes.setAll(48, 'wght'.codeUnits);
+  data.setInt32(52, 200 << 16, Endian.big);
+  data.setInt32(56, 400 << 16, Endian.big);
+  data.setInt32(60, 900 << 16, Endian.big);
+  return bytes;
 }
 
 Future<AppSettingsNotifier> _loadNotifier({
@@ -300,6 +317,23 @@ void main() {
       FontCatalog.appFonts.map((font) => font.id),
       contains(FontCatalog.instrumentSansId),
     );
+    expect(
+      FontCatalog.appFonts.map((font) => font.id),
+      contains(FontCatalog.harmonyOSSansId),
+    );
+    expect(
+      FontCatalog.readerFonts.map((font) => font.id),
+      contains(FontCatalog.harmonyOSSansId),
+    );
+  });
+
+  test('catalog distinguishes real variable weights from synthesized bold', () {
+    expect(FontCatalog.sourceHanSerif.supportsVariableWeight, isTrue);
+    expect(FontCatalog.sourceHanSans.supportsVariableWeight, isTrue);
+    expect(FontCatalog.instrumentSans.supportsVariableWeight, isTrue);
+    expect(FontCatalog.newsreader.supportsVariableWeight, isTrue);
+    expect(FontCatalog.jetBrainsMono.supportsVariableWeight, isFalse);
+    expect(FontCatalog.harmonyOSSans.supportsVariableWeight, isFalse);
   });
 
   test('PingFang is offered only on Apple reader platforms', () {
@@ -324,7 +358,7 @@ void main() {
         'font-settings-test-',
       );
       addTearDown(() => sandbox.delete(recursive: true));
-      final bytes = Uint8List.fromList(<int>[0, 1, 0, 0, 1, 2, 3, 4]);
+      final bytes = _customVariableTtfBytes();
       final service = CustomFontService(
         supportDirectory: () async => sandbox,
         filePicker: () async => FilePickerResult(<PlatformFile>[
@@ -352,6 +386,12 @@ void main() {
         notifier.readerFontOptions.map((font) => font.id),
         contains(customId),
       );
+      final customOption = notifier.readerFontOptions.singleWhere(
+        (font) => font.id == customId,
+      );
+      expect(customOption.supportsVariableWeight, isTrue);
+      expect(customOption.variableWeightMin, 200);
+      expect(customOption.variableWeightMax, 900);
 
       await notifier.setAppFontId(customId);
       expect(notifier.appFontId, customId);

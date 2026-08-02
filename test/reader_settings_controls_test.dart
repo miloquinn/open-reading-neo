@@ -11,6 +11,7 @@ void main() {
     (tester) async {
       int? changedIndent;
       int? changedSpacing;
+      int? changedFontWeight;
       double? changedLetterSpacing;
       ReaderTextAlignment? changedAlignment;
       bool? pullBookmark;
@@ -42,6 +43,16 @@ void main() {
             tabletTwoPageTitle: 'Tablet two-page layout',
             tabletTwoPageHint: 'Show two pages in landscape',
             fontSizeLabel: 'Font size',
+            fontWeightLabel: 'Font weight',
+            fontWeightValueLabels: const <String>[
+              'Light',
+              'Regular',
+              'Medium',
+              'Semi-bold',
+              'Bold',
+            ],
+            fontWeightHint: 'True variable range 200–900',
+            fontWeightPreviewText: 'A quiet page reads farther',
             lineHeightLabel: 'Line height',
             letterSpacingLabel: 'Letter spacing',
             textAlignmentLabel: 'Alignment',
@@ -56,6 +67,7 @@ void main() {
             txtChapterTitlePageHint: 'Show the title above body text when off',
             themeId: ReaderThemes.day.id,
             fontSize: 19,
+            fontWeight: 400,
             lineHeight: 1.7,
             letterSpacing: 0.3,
             textAlignment: ReaderTextAlignment.natural,
@@ -75,6 +87,7 @@ void main() {
             onTopBarStyleTap: () {},
             onTapZonesTap: () {},
             onFontSizeChanged: (_) {},
+            onFontWeightChanged: (value) => changedFontWeight = value,
             onLineHeightChanged: (_) {},
             onLetterSpacingChanged: (value) => changedLetterSpacing = value,
             onTextAlignmentChanged: (value) => changedAlignment = value,
@@ -94,6 +107,31 @@ void main() {
 
       await tester.tap(find.text('Text tab'));
       await tester.pumpAndSettle();
+      final fontWeightFinder = find.byKey(
+        const ValueKey('reader-font-weight-slider'),
+      );
+      final initialFontWeight = tester.widget<Slider>(fontWeightFinder);
+      expect(initialFontWeight.value, 400);
+      expect(initialFontWeight.min, 300);
+      expect(initialFontWeight.max, 700);
+      expect(initialFontWeight.divisions, 4);
+      expect(find.text('Regular · 400'), findsOneWidget);
+      expect(find.text('A quiet page reads farther'), findsOneWidget);
+      initialFontWeight.onChanged!(600);
+      await tester.pump();
+      expect(tester.widget<Slider>(fontWeightFinder).value, 600);
+      expect(find.text('Semi-bold · 600'), findsOneWidget);
+      final weightPreviewStyle = tester
+          .widget<AnimatedDefaultTextStyle>(
+            find.descendant(
+              of: find.byKey(const ValueKey('reader-font-weight-control')),
+              matching: find.byType(AnimatedDefaultTextStyle),
+            ),
+          )
+          .style;
+      expect(weightPreviewStyle.fontWeight, FontWeight.w600);
+      tester.widget<Slider>(fontWeightFinder).onChangeEnd!(600);
+      expect(changedFontWeight, 600);
       expect(
         find.byKey(const ValueKey('reader-letter-spacing-slider')),
         findsNothing,

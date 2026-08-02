@@ -186,23 +186,55 @@ void main() {
       find.byKey(const ValueKey('settings-library-grid-show-details')),
       findsOneWidget,
     );
-    final spreadOption = find.byKey(
-      const ValueKey('settings-library-open-animation-bookSpread'),
+    final classicOption = find.byKey(
+      const ValueKey('settings-library-open-animation-classicCover'),
     );
-    expect(spreadOption, findsOneWidget);
+    expect(classicOption, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-library-open-animation-minimalFade')),
+      findsOneWidget,
+    );
+    expect(
+      find.byType(RadioListTile<LibraryBookOpenAnimation>),
+      findsNWidgets(4),
+    );
+    expect(
+      find.byKey(const ValueKey('settings-library-open-animation-bookSpread')),
+      findsNothing,
+    );
     expect(
       find.byKey(
-        const ValueKey('settings-library-open-animation-classicCover'),
+        const ValueKey('settings-library-open-animation-pace-minimalFade'),
       ),
       findsOneWidget,
     );
     await tester.drag(find.byType(ListView), const Offset(0, -320));
     await tester.pumpAndSettle();
-    await tester.tap(spreadOption);
+    await tester.ensureVisible(classicOption);
+    await tester.tap(classicOption);
     await tester.pump();
     expect(
       settings.libraryBookOpenAnimation,
-      LibraryBookOpenAnimation.bookSpread,
+      LibraryBookOpenAnimation.classicCover,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('settings-library-open-animation-pace-classicCover'),
+      ),
+      findsOneWidget,
+    );
+    final paceSelector = tester
+        .widget<SegmentedButton<LibraryBookOpenAnimationPace>>(
+          find.byKey(
+            const ValueKey('settings-library-open-animation-pace-selector'),
+          ),
+        );
+    expect(paceSelector.selected, {LibraryBookOpenAnimationPace.fast});
+    paceSelector.onSelectionChanged!({LibraryBookOpenAnimationPace.fast});
+    await tester.pump();
+    expect(
+      settings.libraryBookOpenAnimationPace,
+      LibraryBookOpenAnimationPace.fast,
     );
   });
 }

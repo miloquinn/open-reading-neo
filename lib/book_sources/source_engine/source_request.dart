@@ -373,6 +373,11 @@ class SourceHttpTransport implements SourceTransport {
     var method = request.method;
     var body = request.body;
     var headers = Map<String, String>.from(request.headers);
+    // `enabledCookieJar` controls persistence between top-level source
+    // requests. Cookies set while following one redirect chain still belong
+    // to that HTTP transaction and must be replayed even when persistence is
+    // disabled (for example, CDN/WAF cookies set by an HTTP -> HTTPS redirect).
+    final redirectCookies = <String, _StoredCookie>{};
     final redirectStates = <String>{};
     final connectionRetries = <Uri, int>{};
     CancelToken? activeCancelToken;
@@ -398,14 +403,10 @@ class SourceHttpTransport implements SourceTransport {
         String? redirectState;
         try {
           final requestHeaders = Map<String, String>.from(headers);
-          final cookieHeader = _cookieHeader(request.cookieJarKey, current);
-          redirectState =
-              '${method.name}\u0000$current\u0000${cookieHeader ?? ''}';
-          if (!redirectStates.add(redirectState)) {
-            throw const BookSourceProtocolException(
-              'reading source source entered a redirect loop.',
-            );
-          }
+          final storedCookieHeader = _mergeCookieHeaders(
+            _cookieHeader(request.cookieJarKey, current),
+            _cookieHeaderFromJar(redirectCookies, current),
+          );
           String? configuredCookie;
           requestHeaders.removeWhere((name, value) {
             if (name.toLowerCase() != HttpHeaders.cookieHeader) return false;
@@ -414,10 +415,17 @@ class SourceHttpTransport implements SourceTransport {
           });
           final mergedCookies = _mergeCookieHeaders(
             configuredCookie,
-            cookieHeader,
+            storedCookieHeader,
           );
           if (mergedCookies != null) {
             requestHeaders[HttpHeaders.cookieHeader] = mergedCookies;
+          }
+          redirectState =
+              '${method.name}\u0000$current\u0000${mergedCookies ?? ''}';
+          if (!redirectStates.add(redirectState)) {
+            throw const BookSourceProtocolException(
+              'reading source source entered a redirect loop.',
+            );
           }
           final response = await requestClient.requestUri<List<int>>(
             current,
@@ -440,6 +448,7 @@ class SourceHttpTransport implements SourceTransport {
             },
           );
           final status = response.statusCode ?? 0;
+          _storeCookiesInJar(redirectCookies, current, response.headers);
           _storeCookies(request.cookieJarKey, current, response.headers);
           if (status < 300) {
             final bytes = response.data ?? const <int>[];
@@ -531,7 +540,10 @@ class SourceHttpTransport implements SourceTransport {
 
   String? _cookieHeader(String? jarKey, Uri uri) {
     if (jarKey == null) return null;
-    final jar = _cookieJars[jarKey];
+    return _cookieHeaderFromJar(_cookieJars[jarKey], uri);
+  }
+
+  String? _cookieHeaderFromJar(Map<String, _StoredCookie>? jar, Uri uri) {
     if (jar == null || jar.isEmpty) return null;
     final now = DateTime.now().toUtc();
     jar.removeWhere((_, cookie) => cookie.expiresAt?.isBefore(now) ?? false);
@@ -550,9 +562,16 @@ class SourceHttpTransport implements SourceTransport {
 
   void _storeCookies(String? jarKey, Uri uri, Headers headers) {
     if (jarKey == null) return;
+    _storeCookiesInJar(_cookieJars.putIfAbsent(jarKey, () => {}), uri, headers);
+  }
+
+  void _storeCookiesInJar(
+    Map<String, _StoredCookie> jar,
+    Uri uri,
+    Headers headers,
+  ) {
     final values = headers[HttpHeaders.setCookieHeader];
     if (values == null || values.isEmpty) return;
-    final jar = _cookieJars.putIfAbsent(jarKey, () => {});
     final now = DateTime.now().toUtc();
     for (final value in values) {
       try {

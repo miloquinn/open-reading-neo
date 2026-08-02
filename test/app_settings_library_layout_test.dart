@@ -41,6 +41,10 @@ void main() {
       notifier.libraryBookOpenAnimation,
       LibraryBookOpenAnimation.minimalFade,
     );
+    expect(
+      notifier.libraryBookOpenAnimationPace,
+      LibraryBookOpenAnimationPace.fast,
+    );
     expect(notifier.additionalSourceProtocolsEnabled, isFalse);
   });
 
@@ -65,6 +69,7 @@ void main() {
       'library_grid_columns_v1': 3,
       'library_grid_show_details_v1': false,
       'library_book_open_animation_v1': 'minimalFade',
+      'library_book_open_animation_pace_v1': 'fast',
     });
     final notifier = await _loadNotifier();
     addTearDown(notifier.dispose);
@@ -76,6 +81,10 @@ void main() {
       notifier.libraryBookOpenAnimation,
       LibraryBookOpenAnimation.minimalFade,
     );
+    expect(
+      notifier.libraryBookOpenAnimationPace,
+      LibraryBookOpenAnimationPace.fast,
+    );
 
     await notifier.setLibraryLayoutMode(LibraryLayoutMode.grid);
     await notifier.setLibraryGridColumns(2);
@@ -83,12 +92,16 @@ void main() {
     await notifier.setLibraryBookOpenAnimation(
       LibraryBookOpenAnimation.classicCover,
     );
+    await notifier.setLibraryBookOpenAnimationPace(
+      LibraryBookOpenAnimationPace.elegant,
+    );
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('library_layout_mode_v1'), 'grid');
     expect(prefs.getInt('library_grid_columns_v1'), 2);
     expect(prefs.getBool('library_grid_show_details_v1'), isTrue);
     expect(prefs.getString('library_book_open_animation_v1'), 'classicCover');
+    expect(prefs.getString('library_book_open_animation_pace_v1'), 'elegant');
   });
 
   test(
@@ -109,6 +122,36 @@ void main() {
         notifier.libraryBookOpenAnimation,
         LibraryBookOpenAnimation.minimalFade,
       );
+      expect(
+        notifier.libraryBookOpenAnimationPace,
+        LibraryBookOpenAnimationPace.fast,
+      );
     },
   );
+
+  test('saved elegant animation pace remains opt-in', () async {
+    SharedPreferences.setMockInitialValues({
+      'library_book_open_animation_pace_v1': 'elegant',
+    });
+    final notifier = await _loadNotifier();
+    addTearDown(notifier.dispose);
+
+    expect(
+      notifier.libraryBookOpenAnimationPace,
+      LibraryBookOpenAnimationPace.elegant,
+    );
+  });
+
+  test('removed book spread preference falls back to minimal fade', () async {
+    SharedPreferences.setMockInitialValues({
+      'library_book_open_animation_v1': 'bookSpread',
+    });
+    final notifier = await _loadNotifier();
+    addTearDown(notifier.dispose);
+
+    expect(
+      notifier.libraryBookOpenAnimation,
+      LibraryBookOpenAnimation.minimalFade,
+    );
+  });
 }

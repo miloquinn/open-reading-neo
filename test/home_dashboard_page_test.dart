@@ -15,6 +15,7 @@ import 'package:xxread/pages/home/home_mobile_dashboard_page.dart';
 import 'package:xxread/pages/reader/book_source_reader_page.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
+import 'package:xxread/utils/reader_themes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -215,6 +216,7 @@ void main() {
       book: book,
       client: client,
       shelfService: shelfService,
+      initialTheme: ReaderThemes.pureBlack,
     );
 
     expect(reader, isA<BookSourceReaderPage>());
@@ -222,5 +224,6 @@ void main() {
     expect(sourceReader.source.id, source.id);
     expect(sourceReader.book.id, sourceBook.id);
     expect(sourceReader.client, same(client));
+    expect(sourceReader.initialTheme, ReaderThemes.pureBlack);
   });
 }

@@ -239,6 +239,174 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get bookSourceChangeChannel;
 
+  /// No description provided for @bookSourceChangeSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change source'**
+  String get bookSourceChangeSourceTitle;
+
+  /// No description provided for @bookSourceChangeCurrentSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Current source'**
+  String get bookSourceChangeCurrentSource;
+
+  /// No description provided for @bookSourceChangeTargetSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to'**
+  String get bookSourceChangeTargetSource;
+
+  /// No description provided for @bookSourceChangeNotSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not selected'**
+  String get bookSourceChangeNotSelected;
+
+  /// No description provided for @bookSourceChangeCurrentChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently at chapter {chapter}'**
+  String bookSourceChangeCurrentChapter(int chapter);
+
+  /// No description provided for @bookSourceChangeSearchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Find this book in other sources'**
+  String get bookSourceChangeSearchLabel;
+
+  /// No description provided for @bookSourceChangeSearchAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Search again'**
+  String get bookSourceChangeSearchAgain;
+
+  /// No description provided for @bookSourceChangeSearchRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Search all remaining sources'**
+  String get bookSourceChangeSearchRemaining;
+
+  /// No description provided for @bookSourceChangeCheckAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Match author'**
+  String get bookSourceChangeCheckAuthor;
+
+  /// No description provided for @bookSourceChangeSearchProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {completed} of {total}'**
+  String bookSourceChangeSearchProgress(int completed, int total);
+
+  /// No description provided for @bookSourceChangeNoOtherSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No other sources available'**
+  String get bookSourceChangeNoOtherSources;
+
+  /// No description provided for @bookSourceChangeNoOtherSourcesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add and enable another source that supports search first.'**
+  String get bookSourceChangeNoOtherSourcesHint;
+
+  /// No description provided for @bookSourceChangeSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding other sources'**
+  String get bookSourceChangeSearching;
+
+  /// No description provided for @bookSourceChangeSearchingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Matches appear as each source finishes searching.'**
+  String get bookSourceChangeSearchingHint;
+
+  /// No description provided for @bookSourceChangeNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching sources found'**
+  String get bookSourceChangeNoMatches;
+
+  /// No description provided for @bookSourceChangeNoMatchesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the title or turn off author matching, then search again.'**
+  String get bookSourceChangeNoMatchesHint;
+
+  /// No description provided for @bookSourceChangeFailedSources.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} source request(s) failed. You can search again.'**
+  String bookSourceChangeFailedSources(int count);
+
+  /// No description provided for @bookSourceChangeAuthorDifferent.
+  ///
+  /// In en, this message translates to:
+  /// **'Different author'**
+  String get bookSourceChangeAuthorDifferent;
+
+  /// No description provided for @bookSourceChangeValidating.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the catalog and current chapter…'**
+  String get bookSourceChangeValidating;
+
+  /// No description provided for @bookSourceChangeValidationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Validation failed: {details}'**
+  String bookSourceChangeValidationFailed(String details);
+
+  /// No description provided for @bookSourceChangeReadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Current chapter readable'**
+  String get bookSourceChangeReadable;
+
+  /// No description provided for @bookSourceChangeChapterCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chapters'**
+  String bookSourceChangeChapterCount(int count);
+
+  /// No description provided for @bookSourceChangeResponseTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{milliseconds} ms'**
+  String bookSourceChangeResponseTime(int milliseconds);
+
+  /// No description provided for @bookSourceChangeTapToValidate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select to check the catalog and current chapter.'**
+  String get bookSourceChangeTapToValidate;
+
+  /// No description provided for @bookSourceChangeAlreadyOnShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'This source version is already on the bookshelf.'**
+  String get bookSourceChangeAlreadyOnShelf;
+
+  /// No description provided for @bookSourceChangeSwitching.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing source…'**
+  String get bookSourceChangeSwitching;
+
+  /// No description provided for @bookSourceChangeSwitchAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to this source'**
+  String get bookSourceChangeSwitchAction;
+
+  /// No description provided for @bookSourceChangeSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed source to {source}'**
+  String bookSourceChangeSuccess(String source);
+
   /// No description provided for @bookSourceChannelCount.
   ///
   /// In en, this message translates to:
@@ -1230,8 +1398,20 @@ abstract class AppLocalizations {
   /// No description provided for @fontDownloadHint.
   ///
   /// In en, this message translates to:
-  /// **'First use requires download from GitHub'**
+  /// **'First use requires an online download'**
   String get fontDownloadHint;
+
+  /// No description provided for @fontVariableWeightRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustable weight {min}–{max}'**
+  String fontVariableWeightRange(int min, int max);
+
+  /// No description provided for @fontStaticWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed weight (bold is synthesized)'**
+  String get fontStaticWeight;
 
   /// No description provided for @fontDeleteDownload.
   ///
@@ -1496,6 +1676,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Font Size'**
   String get fontSizeLabel;
+
+  /// No description provided for @readerFontWeightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Font Weight'**
+  String get readerFontWeightLabel;
+
+  /// No description provided for @readerFontWeightLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get readerFontWeightLight;
+
+  /// No description provided for @readerFontWeightRegular.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular'**
+  String get readerFontWeightRegular;
+
+  /// No description provided for @readerFontWeightMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get readerFontWeightMedium;
+
+  /// No description provided for @readerFontWeightSemiBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Semi-bold'**
+  String get readerFontWeightSemiBold;
+
+  /// No description provided for @readerFontWeightBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Bold'**
+  String get readerFontWeightBold;
+
+  /// No description provided for @readerFontWeightVariableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading controls use five legible steps from 300–700. This font\'s true full range is {min}–{max}.'**
+  String readerFontWeightVariableHint(int min, int max);
+
+  /// No description provided for @readerFontWeightSyntheticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading controls use five steps from 300–700. This font has no declared variable weight axis, so the system approximates the result and it may differ by platform.'**
+  String get readerFontWeightSyntheticHint;
+
+  /// No description provided for @readerFontWeightPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'A quiet page reads farther · 字里行间'**
+  String get readerFontWeightPreview;
 
   /// Line spacing label
   ///
@@ -4120,7 +4354,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceLicensesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Open-source licenses'**
+  /// **'Open-source & font licenses'**
   String get openSourceLicensesTitle;
 
   /// No description provided for @openSourceLicensesSubtitle.
@@ -4132,7 +4366,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceLicensesIntro.
   ///
   /// In en, this message translates to:
-  /// **'These license texts are available offline in the app. Open Reading, bundled fonts, and third-party software remain subject to their respective licenses.'**
+  /// **'These license texts and notices are available offline in the app. Open Reading, on-demand fonts, and third-party software remain subject to their respective licenses.'**
   String get openSourceLicensesIntro;
 
   /// No description provided for @openSourceProjectSection.
@@ -4150,7 +4384,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceFontsSection.
   ///
   /// In en, this message translates to:
-  /// **'Bundled fonts'**
+  /// **'Font licenses'**
   String get openSourceFontsSection;
 
   /// No description provided for @openSourceDependenciesSection.

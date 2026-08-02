@@ -10,6 +10,7 @@ void main() {
     final settings = await const ReaderSettingsStore().load();
 
     expect(settings.pageMode, ReaderPageMode.horizontalSlide);
+    expect(settings.fontWeight, ReaderSettings.defaultFontWeight);
     expect(settings.letterSpacing, ReaderSettings.defaultLetterSpacing);
     expect(settings.textAlignment, ReaderTextAlignment.natural);
     expect(
@@ -55,6 +56,7 @@ void main() {
     const store = ReaderSettingsStore();
     const settings = ReaderSettings(
       fontSize: 22,
+      fontWeight: 600,
       lineHeight: 1.8,
       letterSpacing: 0.6,
       textAlignment: ReaderTextAlignment.justified,
@@ -76,6 +78,7 @@ void main() {
     );
 
     expect(restored.fontSize, 22);
+    expect(restored.fontWeight, 600);
     expect(restored.letterSpacing, 0.6);
     expect(restored.textAlignment, ReaderTextAlignment.justified);
     expect(restored.topMargin, 7);
@@ -123,6 +126,7 @@ void main() {
       ReaderSettingsStore.firstLineIndentKey: 20,
       ReaderSettingsStore.paragraphSpacingKey: -3,
       ReaderSettingsStore.letterSpacingKey: 9.0,
+      ReaderSettingsStore.fontWeightKey: 999,
       ReaderSettingsStore.textAlignmentKey: 'unknown',
       'native_reader_page_turn_style': 'cylinder',
     });
@@ -132,6 +136,7 @@ void main() {
     );
 
     expect(restored.firstLineIndent, 4);
+    expect(restored.fontWeight, ReaderSettings.maxFontWeight);
     expect(restored.paragraphSpacing, 0);
     expect(restored.letterSpacing, ReaderSettings.maxLetterSpacing);
     expect(restored.textAlignment, ReaderTextAlignment.natural);
@@ -140,6 +145,8 @@ void main() {
     expect(restored.tabletTwoPageEnabled, isTrue);
     expect(restored.copyWith(firstLineIndent: -1).firstLineIndent, 0);
     expect(restored.copyWith(paragraphSpacing: 9).paragraphSpacing, 2);
+    expect(restored.copyWith(fontWeight: 349).fontWeight, 300);
+    expect(restored.copyWith(fontWeight: 351).fontWeight, 400);
     expect(
       restored.copyWith(letterSpacing: -1).letterSpacing,
       ReaderSettings.minLetterSpacing,

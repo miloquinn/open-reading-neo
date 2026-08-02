@@ -32,6 +32,10 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.tabletTwoPageTitle,
     required this.tabletTwoPageHint,
     required this.fontSizeLabel,
+    required this.fontWeightLabel,
+    required this.fontWeightValueLabels,
+    required this.fontWeightHint,
+    required this.fontWeightPreviewText,
     required this.lineHeightLabel,
     required this.letterSpacingLabel,
     required this.textAlignmentLabel,
@@ -46,6 +50,9 @@ class ReaderSettingsSheet extends StatefulWidget {
     this.txtChapterTitlePageHint,
     required this.themeId,
     required this.fontSize,
+    required this.fontWeight,
+    this.fontFamily,
+    this.fontFamilyFallback = const <String>[],
     required this.lineHeight,
     required this.letterSpacing,
     required this.textAlignment,
@@ -65,6 +72,7 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.onTopBarStyleTap,
     required this.onTapZonesTap,
     required this.onFontSizeChanged,
+    required this.onFontWeightChanged,
     required this.onLineHeightChanged,
     required this.onLetterSpacingChanged,
     required this.onTextAlignmentChanged,
@@ -100,6 +108,10 @@ class ReaderSettingsSheet extends StatefulWidget {
   final String tabletTwoPageTitle;
   final String tabletTwoPageHint;
   final String fontSizeLabel;
+  final String fontWeightLabel;
+  final List<String> fontWeightValueLabels;
+  final String fontWeightHint;
+  final String fontWeightPreviewText;
   final String lineHeightLabel;
   final String letterSpacingLabel;
   final String textAlignmentLabel;
@@ -114,6 +126,9 @@ class ReaderSettingsSheet extends StatefulWidget {
   final String? txtChapterTitlePageHint;
   final String themeId;
   final double fontSize;
+  final int fontWeight;
+  final String? fontFamily;
+  final List<String> fontFamilyFallback;
   final double lineHeight;
   final double letterSpacing;
   final ReaderTextAlignment textAlignment;
@@ -133,6 +148,7 @@ class ReaderSettingsSheet extends StatefulWidget {
   final VoidCallback onTopBarStyleTap;
   final VoidCallback onTapZonesTap;
   final ValueChanged<double> onFontSizeChanged;
+  final ValueChanged<int> onFontWeightChanged;
   final ValueChanged<double> onLineHeightChanged;
   final ValueChanged<double> onLetterSpacingChanged;
   final ValueChanged<ReaderTextAlignment> onTextAlignmentChanged;
@@ -153,6 +169,7 @@ class ReaderSettingsSheet extends StatefulWidget {
 class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
   late String _themeId = widget.themeId;
   late double _fontSize = widget.fontSize;
+  late int _fontWeight = normalizeReaderFontWeight(widget.fontWeight);
   late double _lineHeight = widget.lineHeight;
   late double _letterSpacing = widget.letterSpacing;
   late ReaderTextAlignment _textAlignment = widget.textAlignment;
@@ -230,6 +247,17 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
       divisions: 18,
       onChanged: (value) => setState(() => _fontSize = value),
       onChangeEnd: widget.onFontSizeChanged,
+    ),
+    ReaderFontWeightControl(
+      label: widget.fontWeightLabel,
+      valueLabels: widget.fontWeightValueLabels,
+      hint: widget.fontWeightHint,
+      previewText: widget.fontWeightPreviewText,
+      fontFamily: widget.fontFamily,
+      fontFamilyFallback: widget.fontFamilyFallback,
+      value: _fontWeight,
+      onChanged: (value) => setState(() => _fontWeight = value),
+      onChangeEnd: widget.onFontWeightChanged,
     ),
     ReaderSettingSlider(
       label: widget.lineHeightLabel,
@@ -1018,6 +1046,161 @@ class _ReaderThemeCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class ReaderFontWeightControl extends StatelessWidget {
+  const ReaderFontWeightControl({
+    super.key,
+    required this.label,
+    required this.valueLabels,
+    required this.hint,
+    required this.previewText,
+    required this.value,
+    required this.onChanged,
+    required this.onChangeEnd,
+    this.fontFamily,
+    this.fontFamilyFallback = const <String>[],
+  }) : assert(valueLabels.length == 5);
+
+  final String label;
+  final List<String> valueLabels;
+  final String hint;
+  final String previewText;
+  final int value;
+  final ValueChanged<int> onChanged;
+  final ValueChanged<int> onChangeEnd;
+  final String? fontFamily;
+  final List<String> fontFamilyFallback;
+
+  int get _normalizedValue => normalizeReaderFontWeight(value);
+
+  String get _valueLabel {
+    final index = (_normalizedValue - ReaderSettings.minFontWeight) ~/ 100;
+    return '${valueLabels[index]} · $_normalizedValue';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final previewStyle = TextStyle(
+      inherit: false,
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFamilyFallback.isEmpty
+          ? null
+          : fontFamilyFallback,
+      color: colors.onSurface,
+      fontSize: 18,
+      height: 1.3,
+      fontWeight: readerFontWeightFromValue(_normalizedValue),
+    );
+    return Padding(
+      key: const ValueKey('reader-font-weight-control'),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Container(
+                constraints: const BoxConstraints(minWidth: 86),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  _valueLabel,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: colors.onPrimaryContainer,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withValues(alpha: 0.52),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutCubic,
+              style: previewStyle,
+              child: Text(
+                previewText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          SliderTheme(
+            data: Theme.of(context).sliderTheme.copyWith(
+              trackHeight: 4,
+              activeTrackColor: colors.primary,
+              inactiveTrackColor: colors.outlineVariant,
+              thumbColor: colors.primary,
+              overlayColor: colors.primary.withValues(alpha: 0.12),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+              showValueIndicator: ShowValueIndicator.never,
+            ),
+            child: Slider(
+              key: const ValueKey('reader-font-weight-slider'),
+              value: _normalizedValue.toDouble(),
+              min: ReaderSettings.minFontWeight.toDouble(),
+              max: ReaderSettings.maxFontWeight.toDouble(),
+              divisions:
+                  (ReaderSettings.maxFontWeight -
+                      ReaderSettings.minFontWeight) ~/
+                  100,
+              semanticFormatterCallback: (_) => _valueLabel,
+              onChanged: (next) => onChanged(normalizeReaderFontWeight(next)),
+              onChangeEnd: (next) =>
+                  onChangeEnd(normalizeReaderFontWeight(next)),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 15,
+                color: colors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  hint,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

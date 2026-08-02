@@ -132,9 +132,9 @@ flutter:
   # example:
   #
   # 字体不内置打包：所有非系统字体由 OnlineFontService 在用户首次选择时从
-  # GitHub 上游仓库（jsDelivr CDN 或 raw.githubusercontent.com）下载到 app 私有
-  # 目录，校验 SHA-256 后通过 FontLoader 运行时注册。License 文本仍打包在
-  # assets/fonts/licenses/ 以便离线展示。
+  # 受许可的官方源或 GitHub 上游仓库（jsDelivr CDN/raw.githubusercontent.com）
+  # 下载到 app 私有目录，校验签名与 SHA-256 后通过 FontLoader 运行时注册。
+  # License 文本仍打包在 assets/fonts/licenses/ 以便离线展示。
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

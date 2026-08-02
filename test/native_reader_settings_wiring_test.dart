@@ -27,6 +27,7 @@ void main() {
       ReaderSettingsStore.pageModeKey: ReaderPageMode.pageCurl.name,
       ReaderSettingsStore.firstLineIndentKey: 3,
       ReaderSettingsStore.paragraphSpacingKey: 1,
+      ReaderSettingsStore.fontWeightKey: 500,
       ReaderSettingsStore.letterSpacingKey: 0.4,
       ReaderSettingsStore.textAlignmentKey: ReaderTextAlignment.justified.name,
     });
@@ -92,6 +93,13 @@ void main() {
 
         await tester.tap(find.text('Text'));
         await tester.pumpAndSettle();
+        final fontWeightFinder = find.byKey(
+          const ValueKey('reader-font-weight-slider'),
+        );
+        expect(tester.widget<Slider>(fontWeightFinder).value, 500);
+        tester.widget<Slider>(fontWeightFinder).onChanged!(600);
+        await tester.pump();
+        tester.widget<Slider>(fontWeightFinder).onChangeEnd!(600);
         await tester.ensureVisible(
           find.byKey(const ValueKey('reader-advanced-typography-tile')),
         );
@@ -142,6 +150,7 @@ void main() {
         final prefs = await SharedPreferences.getInstance();
         expect(prefs.getInt(ReaderSettingsStore.firstLineIndentKey), 4);
         expect(prefs.getInt(ReaderSettingsStore.paragraphSpacingKey), 2);
+        expect(prefs.getInt(ReaderSettingsStore.fontWeightKey), 600);
         expect(prefs.getDouble(ReaderSettingsStore.letterSpacingKey), 0.8);
         expect(
           prefs.getString(ReaderSettingsStore.textAlignmentKey),

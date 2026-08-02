@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/reader/reader_custom_theme.dart';
@@ -144,6 +145,8 @@ class ReaderThemes {
 
   static List<ReaderCustomTheme> _customThemes = const [];
   static List<String> _themeOrder = const [];
+  static ReaderThemePalette? _savedPaletteCache;
+  static Future<ReaderThemePalette>? _savedPaletteLoad;
 
   static List<ReaderCustomTheme> get customThemes =>
       List<ReaderCustomTheme>.unmodifiable(_customThemes);
@@ -195,7 +198,31 @@ class ReaderThemes {
   /// while the book-opening transition needs the saved canvas color before it
   /// starts. Resolve custom themes here as well so the transition never falls
   /// back to the day palette on a cold open.
-  static Future<ReaderThemePalette> loadSavedPalette() async {
+  static ReaderThemePalette? get cachedSavedPalette {
+    final palette = _savedPaletteCache;
+    return palette?.id == systemId ? systemPalette() : palette;
+  }
+
+  static Future<ReaderThemePalette> loadSavedPalette() {
+    final cached = cachedSavedPalette;
+    if (cached != null) return SynchronousFuture(cached);
+    final pending = _savedPaletteLoad;
+    if (pending != null) return pending;
+
+    late final Future<ReaderThemePalette> load;
+    load = _readSavedPalette().then((palette) {
+      if (identical(_savedPaletteLoad, load)) {
+        _savedPaletteCache = palette;
+        _savedPaletteLoad = null;
+        return palette;
+      }
+      return cachedSavedPalette ?? palette;
+    });
+    _savedPaletteLoad = load;
+    return load;
+  }
+
+  static Future<ReaderThemePalette> _readSavedPalette() async {
     try {
       final results = await Future.wait<Object>([
         const ReaderSettingsStore().loadThemeId(),
@@ -217,9 +244,31 @@ class ReaderThemes {
     }
   }
 
+  static void rememberSavedPalette(ReaderThemePalette palette) {
+    _savedPaletteCache = palette;
+    // A theme change wins over any startup read that was already in flight.
+    // Clearing the token also prevents that stale request from writing back.
+    _savedPaletteLoad = null;
+  }
+
+  @visibleForTesting
+  static void resetSavedPaletteCacheForTesting() {
+    _savedPaletteCache = null;
+    _savedPaletteLoad = null;
+  }
+
   static void setCustomThemes(List<ReaderCustomTheme> themes) {
     _customThemes = List<ReaderCustomTheme>.unmodifiable(themes);
     _themeOrder = _resolvedThemeOrder();
+    final cached = _savedPaletteCache;
+    if (cached != null && ReaderCustomTheme.isCustomThemeId(cached.id)) {
+      for (final theme in themes) {
+        if (theme.id == cached.id) {
+          _savedPaletteCache = fromCustomTheme(theme);
+          return;
+        }
+      }
+    }
   }
 
   static void setCustomTheme(ReaderCustomTheme? theme) {

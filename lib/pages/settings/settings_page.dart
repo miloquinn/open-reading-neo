@@ -22,6 +22,7 @@ import 'package:xxread/pages/settings/ai_settings_page.dart';
 import 'package:xxread/pages/settings/cache_management_page.dart';
 import 'package:xxread/pages/settings/floating_navigation_settings_page.dart';
 import 'package:xxread/pages/settings/library_layout_settings_page.dart';
+import 'package:xxread/pages/settings/replace_rules_page.dart';
 import 'package:xxread/pages/settings/sync/webdav_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/core/core_services.dart';
@@ -564,6 +565,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.travel_explore_outlined,
               ),
               _buildActionSetting(
+                title: l10n.replaceRulesTitle,
+                subtitle: l10n.replaceRulesSettingsSubtitle,
+                onTap: _openReplaceRules,
+                icon: Icons.find_replace_outlined,
+              ),
+              _buildActionSetting(
                 title: l10n.settingsWebDavSyncTitle,
                 badge: l10n.webDavBetaBadge,
                 subtitle: _webDavSyncSubtitle(webDavSync),
@@ -709,6 +716,12 @@ class _SettingsPageState extends State<SettingsPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const BookSourceManagementPage()),
     );
+  }
+
+  void _openReplaceRules() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ReplaceRulesPage()));
   }
 
   Widget _buildSettingsTopRow(AppLocalizations l10n, bool useRailNavigation) {
@@ -1414,21 +1427,33 @@ class _SettingsPageState extends State<SettingsPage> {
             progress.status == OnlineFontDownloadStatus.verifying ||
             progress.status == OnlineFontDownloadStatus.registering);
     final isFailed = progress?.status == OnlineFontDownloadStatus.failed;
+    final weightDescription = option.supportsVariableWeight
+        ? l10n.fontVariableWeightRange(
+            option.variableWeightMin!,
+            option.variableWeightMax!,
+          )
+        : isOnline || option.isCustom
+        ? l10n.fontStaticWeight
+        : null;
 
     String description;
     if (option.isCustom) {
       description =
-          '${option.sourceFileName} · ${_formatFileSize(option.fileSize ?? 0)}';
+          '${option.sourceFileName} · ${_formatFileSize(option.fileSize ?? 0)}'
+          '${weightDescription == null ? '' : ' · $weightDescription'}';
     } else if (isOnline && !isDownloaded && !isDownloading) {
       description =
-          '${l10n.fontDownloadHint} · ${_formatFileSize(option.onlineTotalBytes)}';
+          '${l10n.fontDownloadHint} · ${_formatFileSize(option.onlineTotalBytes)}'
+          '${weightDescription == null ? '' : ' · $weightDescription'}';
     } else if (isOnline && isDownloading) {
       final percent = (progress.fraction * 100).round();
       description = '${l10n.fontDownloading} $percent%';
     } else if (isOnline && isFailed) {
       description = l10n.fontDownloadFailed;
     } else {
-      description = FontCatalog.descriptionFor(l10n, option);
+      description =
+          '${FontCatalog.descriptionFor(l10n, option)}'
+          '${weightDescription == null ? '' : ' · $weightDescription'}';
     }
 
     Future<void> handleTap() async {
@@ -1503,7 +1528,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(height: 3),
                 Text(
                   description,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,

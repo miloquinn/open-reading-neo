@@ -417,18 +417,25 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       _scopedSourcesFor(_DiscoverSection.categories),
       (source) async {
         final categories = await _client.getCategories(source);
-        return categories
-            .map(
-              (category) => _SourcedCategory(
-                source: source,
-                id: category.id,
-                name: category.name,
-              ),
-            )
-            .toList(growable: false);
+        return _uniqueSourcedCategories(source, categories);
       },
     );
     return batches.expand((items) => items).toList(growable: false);
+  }
+
+  List<_SourcedCategory> _uniqueSourcedCategories(
+    RegisteredBookSource source,
+    Iterable<BookSourceCategory> categories,
+  ) {
+    final seenIds = <String>{};
+    final uniqueCategories = <_SourcedCategory>[];
+    for (final category in categories) {
+      if (!seenIds.add(category.id)) continue;
+      uniqueCategories.add(
+        _SourcedCategory(source: source, id: category.id, name: category.name),
+      );
+    }
+    return uniqueCategories;
   }
 
   Future<List<SourcedBook>> _fetchLatest() async {
@@ -1317,15 +1324,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       final channels = await _client.getCategories(group.source);
       if (!mounted || revision != _sourceLoadRevision) return;
       setState(() {
-        _listChannelsBySource[group.source.id] = channels
-            .map(
-              (channel) => _SourcedCategory(
-                source: group.source,
-                id: channel.id,
-                name: channel.name,
-              ),
-            )
-            .toList(growable: false);
+        _listChannelsBySource[group.source.id] = _uniqueSourcedCategories(
+          group.source,
+          channels,
+        );
         _loadingListChannelSources.remove(group.source.id);
         _listChannelErrors.remove(group.source.id);
         _cache[_DiscoverSection.categories] = _SectionCache.categories(

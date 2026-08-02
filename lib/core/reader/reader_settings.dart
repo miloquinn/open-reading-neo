@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'reader_layout.dart';
@@ -7,9 +8,20 @@ import 'reader_tap_zones.dart';
 
 enum ReaderTextAlignment { natural, justified }
 
+int normalizeReaderFontWeight(num value) => ((value / 100).round() * 100).clamp(
+  ReaderSettings.minFontWeight,
+  ReaderSettings.maxFontWeight,
+);
+
+FontWeight readerFontWeightFromValue(int value) =>
+    FontWeight.values[(normalizeReaderFontWeight(value) ~/ 100) - 1];
+
 @immutable
 class ReaderSettings {
   static const double defaultFontSize = 19;
+  static const int minFontWeight = 300;
+  static const int maxFontWeight = 700;
+  static const int defaultFontWeight = 400;
   static const double defaultLineHeight = 1.75;
   static const double minLetterSpacing = 0;
   static const double maxLetterSpacing = 1.2;
@@ -25,6 +37,7 @@ class ReaderSettings {
 
   const ReaderSettings({
     required this.fontSize,
+    this.fontWeight = defaultFontWeight,
     required this.lineHeight,
     this.letterSpacing = defaultLetterSpacing,
     this.textAlignment = defaultTextAlignment,
@@ -41,6 +54,7 @@ class ReaderSettings {
   });
 
   final double fontSize;
+  final int fontWeight;
   final double lineHeight;
   final double letterSpacing;
   final ReaderTextAlignment textAlignment;
@@ -57,6 +71,7 @@ class ReaderSettings {
 
   ReaderSettings copyWith({
     double? fontSize,
+    int? fontWeight,
     double? lineHeight,
     double? letterSpacing,
     ReaderTextAlignment? textAlignment,
@@ -73,6 +88,7 @@ class ReaderSettings {
   }) {
     return ReaderSettings(
       fontSize: (fontSize ?? this.fontSize).clamp(14, 32),
+      fontWeight: normalizeReaderFontWeight(fontWeight ?? this.fontWeight),
       lineHeight: (lineHeight ?? this.lineHeight).clamp(1.4, 2.1),
       letterSpacing: (letterSpacing ?? this.letterSpacing).clamp(
         minLetterSpacing,
@@ -105,6 +121,7 @@ class ReaderSettings {
 
 class ReaderSettingsStore {
   static const fontSizeKey = 'native_reader_font_size';
+  static const fontWeightKey = 'native_reader_font_weight';
   static const lineHeightKey = 'native_reader_line_height';
   static const letterSpacingKey = 'native_reader_letter_spacing';
   static const textAlignmentKey = 'native_reader_text_alignment';
@@ -157,6 +174,9 @@ class ReaderSettingsStore {
     return ReaderSettings(
       fontSize: (prefs.getDouble(fontSizeKey) ?? ReaderSettings.defaultFontSize)
           .clamp(14, 32),
+      fontWeight: normalizeReaderFontWeight(
+        prefs.getInt(fontWeightKey) ?? ReaderSettings.defaultFontWeight,
+      ),
       lineHeight:
           (prefs.getDouble(lineHeightKey) ??
                   prefs.getDouble(legacyBookSourceLineHeightKey) ??
@@ -207,6 +227,7 @@ class ReaderSettingsStore {
     final prefs = await SharedPreferences.getInstance();
     await Future.wait([
       prefs.setDouble(fontSizeKey, settings.fontSize),
+      prefs.setInt(fontWeightKey, settings.fontWeight),
       prefs.setDouble(lineHeightKey, settings.lineHeight),
       prefs.setDouble(letterSpacingKey, settings.letterSpacing),
       prefs.setString(textAlignmentKey, settings.textAlignment.name),

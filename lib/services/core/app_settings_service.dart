@@ -43,6 +43,8 @@ class AppSettingsNotifier extends ChangeNotifier {
       'library_grid_show_details_v1';
   static const String _keyLibraryBookOpenAnimation =
       'library_book_open_animation_v1';
+  static const String _keyLibraryBookOpenAnimationPace =
+      'library_book_open_animation_pace_v1';
 
   Locale? _locale;
   String _localeCode = 'system';
@@ -61,6 +63,8 @@ class AppSettingsNotifier extends ChangeNotifier {
   bool _libraryGridShowDetails = true;
   LibraryBookOpenAnimation _libraryBookOpenAnimation =
       LibraryBookOpenAnimation.minimalFade;
+  LibraryBookOpenAnimationPace _libraryBookOpenAnimationPace =
+      LibraryBookOpenAnimationPace.fast;
   bool _additionalSourceProtocolsEnabled = false;
   bool _isInitialized = false;
   final CustomFontService _customFontService;
@@ -109,6 +113,8 @@ class AppSettingsNotifier extends ChangeNotifier {
   bool get libraryGridShowDetails => _libraryGridShowDetails;
   LibraryBookOpenAnimation get libraryBookOpenAnimation =>
       _libraryBookOpenAnimation;
+  LibraryBookOpenAnimationPace get libraryBookOpenAnimationPace =>
+      _libraryBookOpenAnimationPace;
   bool get additionalSourceProtocolsEnabled =>
       _additionalSourceProtocolsEnabled;
 
@@ -125,6 +131,8 @@ class AppSettingsNotifier extends ChangeNotifier {
           fileSize: font.fileSize,
           isCustom: true,
           isAvailable: font.available,
+          variableWeightMin: font.variableWeightMin,
+          variableWeightMax: font.variableWeightMax,
         ),
       )
       .toList(growable: false);
@@ -326,10 +334,21 @@ class AppSettingsNotifier extends ChangeNotifier {
       _ => 2,
     };
     _libraryGridShowDetails = prefs.getBool(_keyLibraryGridShowDetails) ?? true;
-    _libraryBookOpenAnimation = LibraryBookOpenAnimation.values.firstWhere(
-      (mode) => mode.name == prefs.getString(_keyLibraryBookOpenAnimation),
-      orElse: () => LibraryBookOpenAnimation.minimalFade,
-    );
+    _libraryBookOpenAnimation = switch (prefs.getString(
+      _keyLibraryBookOpenAnimation,
+    )) {
+      'classicCover' => LibraryBookOpenAnimation.classicCover,
+      'paperRise' => LibraryBookOpenAnimation.paperRise,
+      'pageSlide' => LibraryBookOpenAnimation.pageSlide,
+      _ => LibraryBookOpenAnimation.minimalFade,
+    };
+    _libraryBookOpenAnimationPace = switch (prefs.getString(
+      _keyLibraryBookOpenAnimationPace,
+    )) {
+      'fast' => LibraryBookOpenAnimationPace.fast,
+      'elegant' => LibraryBookOpenAnimationPace.elegant,
+      _ => LibraryBookOpenAnimationPace.fast,
+    };
     _additionalSourceProtocolsEnabled =
         prefs.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
     await _restoreSelectedFonts(prefs);
@@ -577,6 +596,16 @@ class AppSettingsNotifier extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLibraryBookOpenAnimation, animation.name);
+  }
+
+  Future<void> setLibraryBookOpenAnimationPace(
+    LibraryBookOpenAnimationPace pace,
+  ) async {
+    if (_libraryBookOpenAnimationPace == pace) return;
+    _libraryBookOpenAnimationPace = pace;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLibraryBookOpenAnimationPace, pace.name);
   }
 
   Future<void> setAdditionalSourceProtocolsEnabled(bool value) async {

@@ -14,22 +14,32 @@ class OpenSourceLicensesPage extends StatelessWidget {
     _BundledLicense(
       name: 'Noto Serif SC / Source Han Serif',
       assetPath: 'assets/fonts/licenses/NotoSerifSC-OFL.txt',
+      subtitle: 'SIL Open Font License 1.1',
     ),
     _BundledLicense(
       name: 'Source Han Sans CN',
       assetPath: 'assets/fonts/licenses/SourceHanSans-OFL.txt',
+      subtitle: 'SIL Open Font License 1.1',
     ),
     _BundledLicense(
       name: 'Instrument Sans',
       assetPath: 'assets/fonts/licenses/InstrumentSans-OFL.txt',
+      subtitle: 'SIL Open Font License 1.1',
     ),
     _BundledLicense(
       name: 'Newsreader',
       assetPath: 'assets/fonts/licenses/Newsreader-OFL.txt',
+      subtitle: 'SIL Open Font License 1.1',
     ),
     _BundledLicense(
       name: 'JetBrains Mono',
       assetPath: 'assets/fonts/licenses/JetBrainsMono-OFL.txt',
+      subtitle: 'SIL Open Font License 1.1',
+    ),
+    _BundledLicense(
+      name: 'HarmonyOS Sans',
+      assetPath: 'assets/fonts/licenses/HarmonyOSSans-License.txt',
+      subtitle: 'HarmonyOS Sans Fonts License Agreement',
     ),
   ];
 
@@ -83,7 +93,7 @@ class OpenSourceLicensesPage extends StatelessWidget {
                 _LicenseEntryCard(
                   key: ValueKey('font-license-${_fontLicenses[index].name}'),
                   title: _fontLicenses[index].name,
-                  subtitle: 'SIL Open Font License 1.1',
+                  subtitle: _fontLicenses[index].subtitle,
                   icon: Icons.font_download_outlined,
                   onTap: () => _openBundledLicense(
                     context,
@@ -329,8 +339,13 @@ class _LicenseTextPageState extends State<_LicenseTextPage> {
 }
 
 class _BundledLicense {
-  const _BundledLicense({required this.name, required this.assetPath});
+  const _BundledLicense({
+    required this.name,
+    required this.assetPath,
+    required this.subtitle,
+  });
 
   final String name;
   final String assetPath;
+  final String subtitle;
 }

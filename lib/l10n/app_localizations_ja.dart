@@ -86,6 +86,104 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourceChangeChannel => '変更';
 
   @override
+  String get bookSourceChangeSourceTitle => 'ソースを変更';
+
+  @override
+  String get bookSourceChangeCurrentSource => '現在のソース';
+
+  @override
+  String get bookSourceChangeTargetSource => '変更先';
+
+  @override
+  String get bookSourceChangeNotSelected => '未選択';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return '現在第 $chapter 章';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => 'ほかのソースから同じ本を探す';
+
+  @override
+  String get bookSourceChangeSearchAgain => '再検索';
+
+  @override
+  String get bookSourceChangeSearchRemaining => '残りのソースをすべて検索';
+
+  @override
+  String get bookSourceChangeCheckAuthor => '著者を照合';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return '$completed / $total 件を確認';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => '利用できるほかのソースがありません';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint => '検索対応のソースを追加して有効にしてください。';
+
+  @override
+  String get bookSourceChangeSearching => 'ほかのソースを検索中';
+
+  @override
+  String get bookSourceChangeSearchingHint => '各ソースの検索が完了すると候補が表示されます。';
+
+  @override
+  String get bookSourceChangeNoMatches => '一致するソースが見つかりません';
+
+  @override
+  String get bookSourceChangeNoMatchesHint => '書名を変更するか、著者照合をオフにして再検索してください。';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count 件のソース要求が失敗しました。再検索できます。';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => '著者が異なります';
+
+  @override
+  String get bookSourceChangeValidating => '目次と現在の章を確認中…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return '確認に失敗しました: $details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => '現在の章を読めます';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count 章';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate => '選択すると目次と現在の章を確認します。';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf => 'このソース版はすでに本棚にあります。';
+
+  @override
+  String get bookSourceChangeSwitching => 'ソースを変更中…';
+
+  @override
+  String get bookSourceChangeSwitchAction => 'このソースに変更';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return '$source に変更しました';
+  }
+
+  @override
   String bookSourceChannelCount(int count) {
     return '$count チャンネル';
   }
@@ -604,7 +702,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fontDownloadFailed => 'Download failed, tap to retry';
 
   @override
-  String get fontDownloadHint => 'First use requires download from GitHub';
+  String get fontDownloadHint => '初回使用時にオンラインでダウンロードします';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return '可変ウェイト $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => '固定ウェイト（太字はシステム合成）';
 
   @override
   String get fontDeleteDownload => 'Delete download';
@@ -745,6 +851,36 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get fontSizeLabel => '文字サイズ';
+
+  @override
+  String get readerFontWeightLabel => '文字の太さ';
+
+  @override
+  String get readerFontWeightLight => '細め';
+
+  @override
+  String get readerFontWeightRegular => '標準';
+
+  @override
+  String get readerFontWeightMedium => '中間';
+
+  @override
+  String get readerFontWeightSemiBold => 'やや太め';
+
+  @override
+  String get readerFontWeightBold => '太字';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return '読書用には 300–700 の5段階を使用します。現在のフォントの実際の全範囲は $min–$max です。';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      '読書用には 300–700 の5段階を使用します。現在のフォントは可変ウェイトを宣言していないため、システムによる近似結果はプラットフォームごとに異なる場合があります。';
+
+  @override
+  String get readerFontWeightPreview => '静かなページを、もう少し先へ · Reading';
 
   @override
   String get lineSpacingLabel => '行間';
@@ -2207,14 +2343,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get changelogHistorySubtitle => '各バージョンの変更内容を表示';
 
   @override
-  String get openSourceLicensesTitle => 'オープンソースライセンス';
+  String get openSourceLicensesTitle => 'オープンソースとフォントのライセンス';
 
   @override
   String get openSourceLicensesSubtitle => 'アプリ、内蔵フォント、サードパーティ製品のライセンスを表示';
 
   @override
   String get openSourceLicensesIntro =>
-      '以下のライセンス文はアプリ内でオフライン表示できます。Open Reading、内蔵フォント、サードパーティソフトウェアには、それぞれのライセンスが適用されます。';
+      '以下のライセンス文と告知はアプリ内でオフライン表示できます。Open Reading、オンラインフォント、サードパーティソフトウェアには、それぞれのライセンスが適用されます。';
 
   @override
   String get openSourceProjectSection => 'プロジェクト';
@@ -2223,7 +2359,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get openSourceLegacyLicenseTitle => '旧バージョン';
 
   @override
-  String get openSourceFontsSection => '内蔵フォント';
+  String get openSourceFontsSection => 'フォントライセンス';
 
   @override
   String get openSourceDependenciesSection => 'サードパーティソフトウェア';

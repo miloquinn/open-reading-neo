@@ -84,6 +84,104 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourceChangeChannel => '更换';
 
   @override
+  String get bookSourceChangeSourceTitle => '换源';
+
+  @override
+  String get bookSourceChangeCurrentSource => '当前来源';
+
+  @override
+  String get bookSourceChangeTargetSource => '切换到';
+
+  @override
+  String get bookSourceChangeNotSelected => '尚未选择';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return '当前读到第 $chapter 章';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => '按书名查找其他来源';
+
+  @override
+  String get bookSourceChangeSearchAgain => '重新搜索';
+
+  @override
+  String get bookSourceChangeSearchRemaining => '继续查找全部来源';
+
+  @override
+  String get bookSourceChangeCheckAuthor => '校验作者';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return '已检查 $completed / $total';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => '没有其他可用书源';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint => '请先添加并启用至少一个支持搜索的其他书源。';
+
+  @override
+  String get bookSourceChangeSearching => '正在查找其他来源';
+
+  @override
+  String get bookSourceChangeSearchingHint => '匹配结果会在各书源完成搜索后逐个出现。';
+
+  @override
+  String get bookSourceChangeNoMatches => '没有找到匹配来源';
+
+  @override
+  String get bookSourceChangeNoMatchesHint => '可以修改书名，或关闭作者校验后重新搜索。';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count 个书源请求失败，可以重新搜索。';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => '作者不同';
+
+  @override
+  String get bookSourceChangeValidating => '正在验证目录和当前章节…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return '验证失败：$details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => '当前章节可读';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count 章';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate => '选择后将验证目录和当前章节。';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf => '该来源版本已经在书架中。';
+
+  @override
+  String get bookSourceChangeSwitching => '正在换源…';
+
+  @override
+  String get bookSourceChangeSwitchAction => '切换到此来源';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return '已切换到 $source';
+  }
+
+  @override
   String bookSourceChannelCount(int count) {
     return '$count 个频道';
   }
@@ -600,7 +698,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fontDownloadFailed => '下载失败，点此重试';
 
   @override
-  String get fontDownloadHint => '首次使用需从 GitHub 下载';
+  String get fontDownloadHint => '首次使用需在线下载';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return '可调字重 $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => '固定字重（加粗为系统合成）';
 
   @override
   String get fontDeleteDownload => '删除下载';
@@ -739,6 +845,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fontSizeLabel => '字体大小';
+
+  @override
+  String get readerFontWeightLabel => '字体粗细';
+
+  @override
+  String get readerFontWeightLight => '较细';
+
+  @override
+  String get readerFontWeightRegular => '标准';
+
+  @override
+  String get readerFontWeightMedium => '中等';
+
+  @override
+  String get readerFontWeightSemiBold => '半粗';
+
+  @override
+  String get readerFontWeightBold => '粗';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return '阅读调节提供 300–700 五档；当前字体的真实完整范围为 $min–$max。';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      '阅读调节提供 300–700 五档；当前字体未声明可变字重，由系统近似合成，效果可能因平台而异。';
+
+  @override
+  String get readerFontWeightPreview => '春风又绿江南岸 · Reading';
 
   @override
   String get lineSpacingLabel => '行距';
@@ -2186,14 +2322,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get changelogHistorySubtitle => '查看各版本更新内容';
 
   @override
-  String get openSourceLicensesTitle => '开源许可';
+  String get openSourceLicensesTitle => '开源与字体许可';
 
   @override
   String get openSourceLicensesSubtitle => '查看应用、内置字体与第三方组件的许可';
 
   @override
   String get openSourceLicensesIntro =>
-      '以下许可文本随应用离线提供。Open Reading、内置字体及第三方软件分别遵循各自的许可条款。';
+      '以下许可文本及声明随应用离线提供。Open Reading、在线字体及第三方软件分别遵循各自的许可条款。';
 
   @override
   String get openSourceProjectSection => '项目许可';
@@ -2202,7 +2338,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSourceLegacyLicenseTitle => '历史版本';
 
   @override
-  String get openSourceFontsSection => '内置字体';
+  String get openSourceFontsSection => '字体许可';
 
   @override
   String get openSourceDependenciesSection => '第三方软件';
@@ -4509,6 +4645,104 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourceChangeChannel => '更換';
 
   @override
+  String get bookSourceChangeSourceTitle => '更換來源';
+
+  @override
+  String get bookSourceChangeCurrentSource => '目前來源';
+
+  @override
+  String get bookSourceChangeTargetSource => '切換到';
+
+  @override
+  String get bookSourceChangeNotSelected => '尚未選擇';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return '目前讀到第 $chapter 章';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => '依書名尋找其他來源';
+
+  @override
+  String get bookSourceChangeSearchAgain => '重新搜尋';
+
+  @override
+  String get bookSourceChangeSearchRemaining => '繼續搜尋全部來源';
+
+  @override
+  String get bookSourceChangeCheckAuthor => '核對作者';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return '已檢查 $completed / $total';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => '沒有其他可用書源';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint => '請先新增並啟用至少一個支援搜尋的其他書源。';
+
+  @override
+  String get bookSourceChangeSearching => '正在尋找其他來源';
+
+  @override
+  String get bookSourceChangeSearchingHint => '符合的結果會在各書源完成搜尋後逐一出現。';
+
+  @override
+  String get bookSourceChangeNoMatches => '找不到相符來源';
+
+  @override
+  String get bookSourceChangeNoMatchesHint => '可以修改書名，或關閉作者核對後重新搜尋。';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count 個書源請求失敗，可以重新搜尋。';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => '作者不同';
+
+  @override
+  String get bookSourceChangeValidating => '正在驗證目錄與目前章節…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return '驗證失敗：$details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => '目前章節可讀';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count 章';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate => '選擇後將驗證目錄與目前章節。';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf => '此來源版本已在書架中。';
+
+  @override
+  String get bookSourceChangeSwitching => '正在更換來源…';
+
+  @override
+  String get bookSourceChangeSwitchAction => '切換到此來源';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return '已切換到 $source';
+  }
+
+  @override
   String bookSourceChannelCount(int count) {
     return '$count 個頻道';
   }
@@ -5010,6 +5244,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get builtInFonts => '內建字體';
 
   @override
+  String get fontDownloadHint => '首次使用需線上下載';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return '可調字重 $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => '固定字重（粗體由系統合成）';
+
+  @override
   String get importFont => '匯入字體';
 
   @override
@@ -5121,6 +5366,36 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get fontSizeLabel => '字體大小';
+
+  @override
+  String get readerFontWeightLabel => '字體粗細';
+
+  @override
+  String get readerFontWeightLight => '較細';
+
+  @override
+  String get readerFontWeightRegular => '標準';
+
+  @override
+  String get readerFontWeightMedium => '中等';
+
+  @override
+  String get readerFontWeightSemiBold => '半粗';
+
+  @override
+  String get readerFontWeightBold => '粗';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return '閱讀調整提供 300–700 五檔；目前字型的真正完整範圍為 $min–$max。';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      '閱讀調整提供 300–700 五檔；目前字型未宣告可變字重，由系統近似合成，效果可能因平台而異。';
+
+  @override
+  String get readerFontWeightPreview => '春風又綠江南岸 · Reading';
 
   @override
   String get lineSpacingLabel => '行距';
@@ -6568,14 +6843,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get changelogHistorySubtitle => '查看各版本更新內容';
 
   @override
-  String get openSourceLicensesTitle => '開源授權';
+  String get openSourceLicensesTitle => '開源與字型授權';
 
   @override
   String get openSourceLicensesSubtitle => '查看應用程式、內建字型與第三方元件的授權';
 
   @override
   String get openSourceLicensesIntro =>
-      '以下授權文字隨應用程式離線提供。Open Reading、內建字型及第三方軟體分別適用各自的授權條款。';
+      '以下授權文字及聲明隨應用程式離線提供。Open Reading、線上字型及第三方軟體分別適用各自的授權條款。';
 
   @override
   String get openSourceProjectSection => '專案授權';
@@ -6584,7 +6859,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get openSourceLegacyLicenseTitle => '歷史版本';
 
   @override
-  String get openSourceFontsSection => '內建字型';
+  String get openSourceFontsSection => '字型授權';
 
   @override
   String get openSourceDependenciesSection => '第三方軟體';

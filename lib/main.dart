@@ -38,6 +38,7 @@ import 'package:path_provider/path_provider.dart';
 import 'utils/glass_config.dart';
 import 'utils/localization_extension.dart';
 import 'utils/font_catalog_helper.dart';
+import 'utils/reader_themes.dart';
 import 'utils/ui_style.dart';
 import 'widgets/app_brand_icon.dart';
 import 'widgets/side_toast.dart';
@@ -46,6 +47,9 @@ import 'widgets/update_check_gate.dart';
 void main(List<String> arguments) async {
   // 确保可以在 runApp 前安全调用 SystemChrome
   WidgetsFlutterBinding.ensureInitialized();
+  // Warm the reader palette while the app shell is starting so tapping a book
+  // does not have to wait for SharedPreferences and custom-theme decoding.
+  unawaited(ReaderThemes.loadSavedPalette());
 
   // 🚀 启用高刷新率支持
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {

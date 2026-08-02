@@ -50,9 +50,15 @@ class NativeReaderService {
     Book book, {
     BookOpenAnimation? animation,
     LibraryBookOpenAnimation? libraryAnimation,
+    LibraryBookOpenAnimationPace animationPace =
+        LibraryBookOpenAnimationPace.fast,
+    ReaderThemePalette? initialTheme,
     ReaderPageTransitionOrigin origin = ReaderPageTransitionOrigin.standard,
     bool waitForReaderClose = true,
   }) async {
+    final initialThemeFuture = initialTheme == null
+        ? ReaderThemes.loadSavedPalette()
+        : SynchronousFuture(initialTheme);
     final repaired = kIsWeb
         ? book
         : await BookStorageRepairService().repairSingleBookIfNeeded(book);
@@ -72,12 +78,15 @@ class NativeReaderService {
     }
     final format = repaired.format.toLowerCase();
     if (_comicFormats.contains(format)) {
+      final resolvedInitialTheme = await initialThemeFuture;
       if (!context.mounted) return;
       await ComicReaderPage.open(
         context,
         repaired,
+        initialTheme: resolvedInitialTheme,
         animation: animation,
         libraryAnimation: libraryAnimation,
+        animationPace: animationPace,
         waitForReaderClose: waitForReaderClose,
       );
       return;
@@ -93,11 +102,15 @@ class NativeReaderService {
         );
         return;
       }
+      final resolvedInitialTheme = await initialThemeFuture;
+      if (!context.mounted) return;
       await PdfReaderPage.open(
         context,
         repaired,
+        initialTheme: resolvedInitialTheme,
         animation: animation,
         libraryAnimation: libraryAnimation,
+        animationPace: animationPace,
         waitForReaderClose: waitForReaderClose,
       );
       return;
@@ -113,15 +126,17 @@ class NativeReaderService {
       return;
     }
     if (!context.mounted) return;
-    final initialTheme = animation == null && libraryAnimation == null
-        ? null
-        : await ReaderThemes.loadSavedPalette();
+    // Resolve the reader palette before pushing the route so its very first
+    // opaque frame already matches the saved reading theme. Letting the reader
+    // load it after navigation produces a visible white flash for dark themes.
+    final resolvedInitialTheme = await initialThemeFuture;
     if (!context.mounted) return;
     final route = BookOpenTransition.createRoute<void>(
-      NativeReaderPage(book: repaired, initialTheme: initialTheme),
+      NativeReaderPage(book: repaired, initialTheme: resolvedInitialTheme),
       animation: animation,
       libraryAnimation: libraryAnimation,
-      readerBackgroundColor: initialTheme?.background,
+      animationPace: animationPace,
+      readerBackgroundColor: resolvedInitialTheme.background,
       origin: origin,
       waitForReaderReady: true,
     );

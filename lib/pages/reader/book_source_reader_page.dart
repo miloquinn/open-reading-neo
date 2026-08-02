@@ -9,8 +9,10 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/book_sources/services/book_source_change_service.dart';
 import 'package:xxread/book_sources/services/book_source_chapter_text.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
+import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/book_sources/services/book_source_text_paginator.dart';
 import 'package:xxread/core/reader/canonical_locator.dart';
@@ -34,6 +36,8 @@ import 'package:xxread/core/reader/reader_volume_key_controller.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/models/bookmark.dart';
 import 'package:xxread/models/book_note.dart';
+import 'package:xxread/pages/book_sources/book_source_change_page.dart';
+import 'package:xxread/pages/settings/replace_rules_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/books/book_note_dao.dart';
 import 'package:xxread/services/books/bookmark_dao.dart';
@@ -42,6 +46,7 @@ import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/services/tts_service.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
 import 'package:xxread/utils/glass_config.dart';
@@ -98,8 +103,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     with WidgetsBindingObserver {
   static const double _spreadGutter = 24;
   static const int _readableChapterTextLimit = 8;
-  static const _openingLoaderDelay = Duration(milliseconds: 650);
-  static const _openingContentSettleDelay = Duration(milliseconds: 360);
+  static const _openingLoaderDelay = Duration(milliseconds: 220);
 
   late final BookSourceClient _client = widget.client ?? BookSourceClient();
   late final BookSourceShelfService _shelfService =
@@ -129,6 +133,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   final ReaderLeafStatusController _leafStatusController =
       ReaderLeafStatusController();
 
+  List<BookSourceChapter> _rawChapters = const [];
   List<BookSourceChapter> _chapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
   BookSourceChapterContent? _content;
@@ -138,6 +143,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   bool _controlsVisible = false;
   Object? _error;
   double _fontSize = 19;
+  int _fontWeight = ReaderSettings.defaultFontWeight;
   double _lineHeight = 1.75;
   double _letterSpacing = ReaderSettings.defaultLetterSpacing;
   ReaderTextAlignment _textAlignment = ReaderSettings.defaultTextAlignment;
@@ -211,7 +217,6 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   bool _showOpeningLoader = false;
   bool _openingContentReadyScheduled = false;
   Timer? _openingLoaderTimer;
-  Timer? _openingContentReadyTimer;
   ReaderTopBarStyle _topBarStyle = ReaderTopBarStyle.reader;
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
@@ -229,6 +234,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
 
   ReaderSettings get _readerSettings => ReaderSettings(
     fontSize: _fontSize,
+    fontWeight: _fontWeight,
     lineHeight: _lineHeight,
     letterSpacing: _letterSpacing,
     textAlignment: _textAlignment,
@@ -307,6 +313,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   @override
   void initState() {
     super.initState();
+    unawaited(ReplaceRuleService.instance.load());
     _showOpeningLoader = widget.initialTheme == null;
     if (!_showOpeningLoader) {
       _openingLoaderTimer = Timer(_openingLoaderDelay, () {
@@ -418,7 +425,6 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _openingLoaderTimer?.cancel();
-    _openingContentReadyTimer?.cancel();
     _progressSaveTimer?.cancel();
     _controlsTimer?.cancel();
     _pagedLayoutWarmTimer?.cancel();
@@ -465,6 +471,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       _error = null;
     });
     try {
+      await ReplaceRuleService.instance.load();
       final results = await Future.wait<Object?>([
         _client.getChapters(widget.source, widget.book.id),
         widget.progressStore.load(
@@ -477,17 +484,10 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         _themeOrderStore.load(),
         _readerSettingsStore.loadTapZones(),
       ]);
-      final chapters = [...results[0]! as List<BookSourceChapter>]
+      final rawChapters = [...results[0]! as List<BookSourceChapter>]
         ..sort((a, b) => a.order.compareTo(b.order));
-      final navigationChapters = List<ReaderNavigationChapter>.generate(
-        chapters.length,
-        (index) => ReaderNavigationChapter(
-          title: chapters[index].title,
-          index: index,
-          id: chapters[index].id,
-        ),
-        growable: false,
-      );
+      final chapters = _withReplacedChapterTitles(rawChapters);
+      final navigationChapters = _navigationFor(chapters);
       final saved = results[1] as BookSourceReadingProgress?;
       final settings = results[2]! as ReaderSettings;
       final scrollByChapter = results[3]! as bool;
@@ -508,10 +508,12 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       ReaderThemes.setCustomThemes(customThemes);
       ReaderThemes.setThemeOrder(themeOrder);
       setState(() {
+        _rawChapters = rawChapters;
         _chapters = chapters;
         _navigationChapters = navigationChapters;
         _chapterIndex = initialIndex;
         _fontSize = settings.fontSize;
+        _fontWeight = settings.fontWeight;
         _horizontalMargin = settings.horizontalMargin;
         _topMargin = settings.topMargin;
         _bottomMargin = settings.bottomMargin;
@@ -547,6 +549,41 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       });
     }
   }
+
+  String _cleanChapterTitle(String title) {
+    final cleaned = ReplaceRuleService.instance.apply(
+      title,
+      bookTitle: widget.book.title,
+      sourceName: widget.source.name,
+      title: true,
+    );
+    return cleaned.trim().isEmpty ? title : cleaned;
+  }
+
+  List<BookSourceChapter> _withReplacedChapterTitles(
+    List<BookSourceChapter> chapters,
+  ) => chapters
+      .map(
+        (chapter) => BookSourceChapter(
+          id: chapter.id,
+          title: _cleanChapterTitle(chapter.title),
+          order: chapter.order,
+          updatedAt: chapter.updatedAt,
+        ),
+      )
+      .toList(growable: false);
+
+  List<ReaderNavigationChapter> _navigationFor(
+    List<BookSourceChapter> chapters,
+  ) => List<ReaderNavigationChapter>.generate(
+    chapters.length,
+    (index) => ReaderNavigationChapter(
+      title: chapters[index].title,
+      index: index,
+      id: chapters[index].id,
+    ),
+    growable: false,
+  );
 
   Future<void> _syncVolumeKeyPaging() => ReaderVolumeKeyController.activate(
     owner: this,
@@ -928,11 +965,16 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     future = contentFuture
         .then((content) async {
           _readableChapterText.remove(index);
-          _readableChapterText[index] =
-              await readableBookSourceChapterTextAsync(
-                content,
-                fallbackTitle: _chapters[index].title,
-              );
+          final readable = await readableBookSourceChapterTextAsync(
+            content,
+            fallbackTitle: _chapters[index].title,
+          );
+          await ReplaceRuleService.instance.load();
+          _readableChapterText[index] = ReplaceRuleService.instance.apply(
+            readable,
+            bookTitle: widget.book.title,
+            sourceName: widget.source.name,
+          );
           while (_readableChapterText.length > _readableChapterTextLimit) {
             _readableChapterText.remove(_readableChapterText.keys.first);
           }
@@ -1575,6 +1617,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
 
   Future<void> _updateReadingSettings({
     double? fontSize,
+    int? fontWeight,
     double? lineHeight,
     double? letterSpacing,
     ReaderTextAlignment? textAlignment,
@@ -1591,6 +1634,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   }) async {
     final repaginate =
         fontSize != null ||
+        fontWeight != null ||
         lineHeight != null ||
         letterSpacing != null ||
         textAlignment != null ||
@@ -1606,6 +1650,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     final currentTextOffset = _currentTextOffset;
     setState(() {
       _fontSize = fontSize ?? _fontSize;
+      _fontWeight = normalizeReaderFontWeight(fontWeight ?? _fontWeight);
       _lineHeight = (lineHeight ?? _lineHeight).clamp(1.4, 2.1);
       _letterSpacing = (letterSpacing ?? _letterSpacing).clamp(
         ReaderSettings.minLetterSpacing,
@@ -1643,6 +1688,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         _restoreTextOffset = currentTextOffset;
       }
     });
+    if (themeId != null) ReaderThemes.rememberSavedPalette(_readerTheme);
     unawaited(_syncVolumeKeyPaging());
     await _readerSettingsStore.save(_readerSettings);
     if (themeId != null && _readerSystemUiApplied) {
@@ -1979,6 +2025,21 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         tabletTwoPageTitle: context.l10n.readerTabletTwoPageTitle,
         tabletTwoPageHint: context.l10n.readerTabletTwoPageHint,
         fontSizeLabel: context.l10n.fontSizeLabel,
+        fontWeightLabel: context.l10n.readerFontWeightLabel,
+        fontWeightValueLabels: <String>[
+          context.l10n.readerFontWeightLight,
+          context.l10n.readerFontWeightRegular,
+          context.l10n.readerFontWeightMedium,
+          context.l10n.readerFontWeightSemiBold,
+          context.l10n.readerFontWeightBold,
+        ],
+        fontWeightHint: _readerFont.supportsVariableWeight
+            ? context.l10n.readerFontWeightVariableHint(
+                _readerFont.variableWeightMin!,
+                _readerFont.variableWeightMax!,
+              )
+            : context.l10n.readerFontWeightSyntheticHint,
+        fontWeightPreviewText: context.l10n.readerFontWeightPreview,
         lineHeightLabel: context.l10n.lineSpacingLabel,
         letterSpacingLabel: context.l10n.letterSpacingLabel,
         textAlignmentLabel: context.l10n.textAlignmentLabel,
@@ -1991,6 +2052,15 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         bottomMarginLabel: context.l10n.readerBottomMarginLabel,
         themeId: _readerThemeId,
         fontSize: _fontSize,
+        fontWeight: _fontWeight,
+        fontFamily: _readerFont.family,
+        fontFamilyFallback:
+            readerFontFamilyFallbacks(
+              fontFamily: _readerFont.family,
+              configuredFallbacks: _readerFont.fallbackFamilies,
+              locale: Localizations.maybeLocaleOf(context),
+            ) ??
+            const <String>[],
         lineHeight: _lineHeight,
         letterSpacing: _letterSpacing,
         textAlignment: _textAlignment,
@@ -2011,6 +2081,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         onTapZonesTap: () => unawaited(_showTapZoneSettings()),
         onFontSizeChanged: (value) =>
             unawaited(_updateReadingSettings(fontSize: value)),
+        onFontWeightChanged: (value) =>
+            unawaited(_updateReadingSettings(fontWeight: value)),
         onLineHeightChanged: (value) =>
             unawaited(_updateReadingSettings(lineHeight: value)),
         onLetterSpacingChanged: (value) =>
@@ -2043,6 +2115,73 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     await _updateReadingSettings(pageMode: selectedMode);
+  }
+
+  Future<void> _showReplaceRules() async {
+    final restoreProgress = _currentReadingProgress;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ReplaceRulesPage()));
+    if (!mounted) return;
+    final chapters = _withReplacedChapterTitles(_rawChapters);
+    setState(() {
+      _chapters = chapters;
+      _navigationChapters = _navigationFor(chapters);
+      _readableChapterText.clear();
+      _pagedLayouts.clear();
+      _verticalLayouts.clear();
+    });
+    await _loadChapter(
+      _chapterIndex,
+      restoreProgress: restoreProgress,
+      saveCurrent: false,
+    );
+  }
+
+  Future<void> _changeBookSource() async {
+    await _saveProgress();
+    final shelfBook = await _shelfService.findShelfBook(
+      sourceId: widget.source.id,
+      sourceBookId: widget.book.id,
+    );
+    if (!mounted) return;
+    final result = await Navigator.of(context).push<BookSourceChangeResult>(
+      MaterialPageRoute(
+        builder: (_) => BookSourceChangePage(
+          sourcesFuture: BookSourceRegistry().loadRunnableInBackground(),
+          currentSource: widget.source,
+          currentBook: widget.book,
+          shelfBook: shelfBook,
+          service: BookSourceChangeService(
+            client: _client,
+            shelfService: _shelfService,
+            progressStore: widget.progressStore,
+          ),
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    showSideToast(
+      context,
+      context.l10n.bookSourceChangeSuccess(result.source.name),
+    );
+    unawaited(_flushReadingSession());
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BookSourceReaderPage(
+          source: result.source,
+          book: result.book,
+          client: _client,
+          progressStore: widget.progressStore,
+          shelfService: _shelfService,
+          initialTheme: _readerTheme,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    BookOpenTransition.beginExit();
+    setState(() => _allowPop = true);
+    Navigator.of(context).pop();
   }
 
   Future<void> _showCustomThemeEditor() async {
@@ -2182,7 +2321,10 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
                         onTap: _handleReaderTap,
                         child: Semantics(
                           label: widget.book.title,
-                          child: _buildBodyCrossfade(),
+                          child: KeyedSubtree(
+                            key: ValueKey('book-source-reader-$_bodyStateName'),
+                            child: _buildTransitionAwareBody(),
+                          ),
                         ),
                       ),
                     ),
@@ -2238,6 +2380,11 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
                           ? null
                           : () => unawaited(_showAskAiPanel()),
                       askAiTooltip: context.l10n.readerAskAi,
+                      onReplaceRules: () => unawaited(_showReplaceRules()),
+                      replaceRulesTooltip: context.l10n.replaceRulesTitle,
+                      onChangeSource: () => unawaited(_changeBookSource()),
+                      changeSourceTooltip:
+                          context.l10n.bookSourceChangeSourceTitle,
                       onSettings: _showReadingSettings,
                       backTooltip: MaterialLocalizations.of(
                         context,
@@ -2273,7 +2420,16 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     );
   }
 
-  String get _bodyTransitionKey {
+  void _scheduleOpeningContentReady() {
+    if (_openingContentReadyScheduled) return;
+    _openingContentReadyScheduled = true;
+    _openingLoaderTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) BookOpenTransition.markReaderContentReady(context);
+    });
+  }
+
+  String get _bodyStateName {
     if (!_readerFontReady ||
         _loadingCatalog ||
         (_loadingContent && _content == null)) {
@@ -2284,35 +2440,11 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     return 'content';
   }
 
-  Widget _buildBodyCrossfade() {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 360),
-      reverseDuration: const Duration(milliseconds: 280),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      layoutBuilder: (currentChild, previousChildren) => Stack(
-        fit: StackFit.expand,
-        children: [...previousChildren, ?currentChild],
-      ),
-      transitionBuilder: (child, animation) =>
-          FadeTransition(opacity: animation, child: child),
-      child: KeyedSubtree(
-        key: ValueKey('book-source-reader-$_bodyTransitionKey'),
-        child: _buildBody(),
-      ),
-    );
-  }
-
-  void _scheduleOpeningContentReady() {
-    if (_openingContentReadyScheduled) return;
-    _openingContentReadyScheduled = true;
-    _openingLoaderTimer?.cancel();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _openingContentReadyTimer = Timer(_openingContentSettleDelay, () {
-        if (mounted) BookOpenTransition.markReaderContentReady(context);
-      });
-    });
+  Widget _buildTransitionAwareBody() {
+    final bodyState = _bodyStateName;
+    final body = _buildBody();
+    if (bodyState != 'content') return body;
+    return BookOpenTransition.buildReaderContentReveal(context, child: body);
   }
 
   /// 打开动画封面仍在飞行时，把整章排版（`_applyLoadedChapter` 内同步执行，
@@ -2441,6 +2573,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     ),
     color: _readerTheme.text,
     fontSize: _fontSize,
+    fontWeight: readerFontWeightFromValue(_fontWeight),
     height: _lineHeight,
     letterSpacing: _letterSpacing,
   );
@@ -2590,6 +2723,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       contentKey: _chapters[chapterIndex].id,
       viewport: Size(width, height),
       fontSize: _fontSize,
+      fontWeight: _fontWeight,
       lineHeight: _lineHeight,
       letterSpacing: _letterSpacing,
       textAlign: _bodyTextAlign,
@@ -2813,7 +2947,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   }) {
     final chapterTitle = content.title.isEmpty
         ? _chapters[chapterIndex].title
-        : content.title;
+        : _cleanChapterTitle(content.title);
     final sourceText =
         _readableChapterText[chapterIndex] ??
         readableBookSourceChapterText(
@@ -2878,7 +3012,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
                 ReaderInlineChapterTitle(
                   title: content.title.isEmpty
                       ? _chapters[chapterIndex].title
-                      : content.title,
+                      : _cleanChapterTitle(content.title),
                   bodyStyle: _bodyTextStyle,
                 ),
                 const SizedBox(height: ReaderInlineChapterTitle.spacingAfter),
@@ -3016,7 +3150,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         key: ValueKey(
           'source-vertical-book:${viewport.width.toStringAsFixed(1)}:'
           '${viewport.height.toStringAsFixed(1)}:'
-          '${_fontSize.toStringAsFixed(1)}:${_lineHeight.toStringAsFixed(2)}:'
+          '${_fontSize.toStringAsFixed(1)}:$_fontWeight:'
+          '${_lineHeight.toStringAsFixed(2)}:'
           '${_letterSpacing.toStringAsFixed(1)}:${_textAlignment.name}:'
           '$_firstLineIndent:$_paragraphSpacing:${_readerFont.id}:'
           '${_verticalChrome.paginationSignature}',
@@ -3050,6 +3185,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       contentKey: _chapters[chapterIndex].id,
       viewport: Size(width, height),
       fontSize: _fontSize,
+      fontWeight: _fontWeight,
       lineHeight: _lineHeight,
       letterSpacing: _letterSpacing,
       textAlign: _bodyTextAlign,
@@ -3154,7 +3290,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     final resolvedContent = chapterContent ?? _content!;
     final chapterTitle = resolvedContent.title.isEmpty
         ? _chapters[resolvedIndex].title
-        : resolvedContent.title;
+        : _cleanChapterTitle(resolvedContent.title);
     final metadata = ReaderPaperPageMetadata(
       pageIdentity:
           'source:${widget.source.id}:${widget.book.id}:'
@@ -4027,7 +4163,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   ) {
     return ValueListenableBuilder<double>(
       valueListenable: _scrollProgress,
-      builder: (context, _, __) => Text(
+      builder: (context, _, _) => Text(
         _chapters.isEmpty ? widget.book.title : _readerStatus(),
         key: key,
         textAlign: TextAlign.center,

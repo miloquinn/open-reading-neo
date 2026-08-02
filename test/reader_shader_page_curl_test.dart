@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/core/reader/reader_page_turn_geometry.dart';
+import 'package:xxread/core/reader/reader_transition_work_scope.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
@@ -157,16 +158,21 @@ void main() {
     navigatorKey.currentState!.push<void>(
       BookOpenTransition.createRoute<void>(
         Scaffold(
-          body: ReaderShaderPageCurl(
-            currentPage: _snapshot('current'),
-            forwardPage: _snapshot('next'),
-            backwardPage: _snapshot('previous'),
-            preparePages: () async {
-              preparationCalls++;
-            },
-            onTurnForward: () {},
-            onTurnBackward: () {},
-            paperColor: Colors.white,
+          body: Builder(
+            builder: (context) => BookOpenTransition.buildReaderContentReveal(
+              context,
+              child: ReaderShaderPageCurl(
+                currentPage: _snapshot('current'),
+                forwardPage: _snapshot('next'),
+                backwardPage: _snapshot('previous'),
+                preparePages: () async {
+                  preparationCalls++;
+                },
+                onTurnForward: () {},
+                onTurnBackward: () {},
+                paperColor: Colors.white,
+              ),
+            ),
           ),
         ),
         animation: BookOpenAnimation(
@@ -180,7 +186,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    final workMode = tester.widget<TickerMode>(
+    final workMode = tester.widget<ReaderTransitionWorkScope>(
       find.byKey(const ValueKey('book-open-transition-reader-work-mode')),
     );
     expect(workMode.enabled, isFalse);

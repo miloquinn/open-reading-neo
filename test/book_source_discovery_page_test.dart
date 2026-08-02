@@ -183,6 +183,43 @@ void main() {
     );
   });
 
+  testWidgets('list layout ignores duplicate channel ids from a source', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: _DuplicateCategoryDiscoveryClient()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bookSourceListSource-source-a')));
+    await tester.pumpAndSettle();
+
+    const categoryId = '/store/98-a-0-5-a-20-p-{{page}}-98';
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-a-$categoryId')),
+      findsOneWidget,
+    );
+    expect(find.text('First channel'), findsOneWidget);
+    expect(find.text('Duplicate channel'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('list layout searches sources and expands the first match', (
     tester,
   ) async {
@@ -913,6 +950,19 @@ class _LargeCategoryDiscoveryClient extends _DiscoveryClient {
   }) async {
     lastCategoryId = category;
     return _page([_book('selected-book', 'Selected category book')]);
+  }
+}
+
+class _DuplicateCategoryDiscoveryClient extends _DiscoveryClient {
+  @override
+  Future<List<BookSourceCategory>> getCategories(
+    RegisteredBookSource source,
+  ) async {
+    const categoryId = '/store/98-a-0-5-a-20-p-{{page}}-98';
+    return const [
+      BookSourceCategory(id: categoryId, name: 'First channel'),
+      BookSourceCategory(id: categoryId, name: 'Duplicate channel'),
+    ];
   }
 }
 

@@ -7,9 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/services/core/online_font_service.dart';
 
 class _ChunkedHttpClientAdapter implements HttpClientAdapter {
-  _ChunkedHttpClientAdapter(this.bytes);
+  _ChunkedHttpClientAdapter(this.bytes, {this.statusCode = HttpStatus.ok});
 
   final Uint8List bytes;
+  final int statusCode;
   static const int _chunkSize = 1024;
 
   @override
@@ -25,7 +26,7 @@ class _ChunkedHttpClientAdapter implements HttpClientAdapter {
     }
     return ResponseBody(
       Stream<Uint8List>.fromIterable(chunks),
-      HttpStatus.ok,
+      statusCode,
       headers: <String, List<String>>{
         Headers.contentLengthHeader: <String>['${bytes.length}'],
       },
@@ -76,6 +77,100 @@ void main() {
       expect(record.files.single.sha256, sha256.convert(fontBytes).toString());
       expect(record.files.single.size, fontBytes.length);
       expect(service.isDownloaded('test_font'), isTrue);
+    },
+  );
+
+  test(
+    'downloads and inflates one verified font from an official ZIP range',
+    () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'online-font-zip-service-test-',
+      );
+      addTearDown(() => sandbox.delete(recursive: true));
+      final fontBytes = Uint8List(96 * 1024)
+        ..setAll(0, const <int>[0, 1, 0, 0]);
+      final compressed = Uint8List.fromList(
+        ZLibCodec(raw: true).encode(fontBytes),
+      );
+      final dio = Dio()
+        ..httpClientAdapter = _ChunkedHttpClientAdapter(
+          compressed,
+          statusCode: HttpStatus.partialContent,
+        );
+      Uint8List? registeredBytes;
+      final service = OnlineFontService(
+        supportDirectory: () async => sandbox,
+        dio: dio,
+        registrar: (family, bytes, style) async {
+          registeredBytes = bytes;
+        },
+      );
+      await service.initialize();
+
+      final record = await service.download(
+        fontId: 'official_zip_font',
+        family: 'OfficialZipFont',
+        files: <OnlineFontFile>[
+          OnlineFontFile(
+            url: 'https://developer.huawei.com/fonts.zip',
+            fileName: 'official_zip_font.ttf',
+            size: fontBytes.length,
+            expectedSha256: sha256.convert(fontBytes).toString(),
+            zipEntry: OnlineFontZipEntry(
+              path: 'fonts/official_zip_font.ttf',
+              compressedOffset: 1234,
+              compressedSize: compressed.length,
+            ),
+          ),
+        ],
+      );
+
+      expect(registeredBytes, fontBytes);
+      expect(record.files.single.sha256, sha256.convert(fontBytes).toString());
+      expect(record.files.single.size, fontBytes.length);
+    },
+  );
+
+  test(
+    'rejects an upstream font whose pinned SHA-256 no longer matches',
+    () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'online-font-hash-service-test-',
+      );
+      addTearDown(() => sandbox.delete(recursive: true));
+      final fontBytes = Uint8List(4096)..setAll(0, const <int>[0, 1, 0, 0]);
+      final dio = Dio()
+        ..httpClientAdapter = _ChunkedHttpClientAdapter(fontBytes);
+      final service = OnlineFontService(
+        supportDirectory: () async => sandbox,
+        dio: dio,
+        registrar: (family, bytes, style) async {},
+      );
+      await service.initialize();
+
+      await expectLater(
+        service.download(
+          fontId: 'changed_upstream_font',
+          family: 'ChangedUpstreamFont',
+          files: <OnlineFontFile>[
+            OnlineFontFile(
+              url: 'https://cdn.jsdelivr.net/changed-font.ttf',
+              fileName: 'changed_font.ttf',
+              size: fontBytes.length,
+              expectedSha256:
+                  '0000000000000000000000000000000000000000000000000000000000000000',
+            ),
+          ],
+        ),
+        throwsA(
+          isA<OnlineFontException>().having(
+            (error) => error.code,
+            'code',
+            OnlineFontErrorCode.fileSignatureInvalid,
+          ),
+        ),
+      );
+      expect(service.isDownloaded('changed_upstream_font'), isFalse);
     },
   );
 }

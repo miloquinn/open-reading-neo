@@ -39,6 +39,13 @@ jobs:
       - name: Install locked dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Prepare QuickJS runtime for tests
+        shell: bash
+        run: |
+          quickjs_dir="${PUB_CACHE}/hosted/pub.dev/flutter_js-0.8.7/linux/shared"
+          test -f "${quickjs_dir}/libquickjs_c_bridge_plugin.so"
+          echo "LD_LIBRARY_PATH=${quickjs_dir}:${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
+
       - name: Generate localizations
         run: flutter gen-l10n
 

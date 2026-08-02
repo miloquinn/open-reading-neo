@@ -22,6 +22,9 @@
     }
   },
   "discoverCategoryEmpty": "このカテゴリには表示できる書籍がまだありません。",
+  "bookSourceChannelLoadFailed": "チャンネルを読み込めませんでした",
+  "bookSourceChannelLoadFailedMessage": "ソースから利用可能な書籍が返されませんでした: {details}",
+  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
   "bookSourceStandardLayout": "標準レイアウト",
   "bookSourceListLayout": "リストレイアウト",
   "bookSourceChangeChannel": "変更",

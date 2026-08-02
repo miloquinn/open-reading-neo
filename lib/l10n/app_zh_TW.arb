@@ -22,6 +22,9 @@
     }
   },
   "discoverCategoryEmpty": "這個分類暫時沒有可顯示的書籍。",
+  "bookSourceChannelLoadFailed": "頻道載入失敗",
+  "bookSourceChannelLoadFailedMessage": "書源沒有傳回可用書籍：{details}",
+  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
   "bookSourceStandardLayout": "標準版面",
   "bookSourceListLayout": "清單版面",
   "bookSourceChangeChannel": "更換",

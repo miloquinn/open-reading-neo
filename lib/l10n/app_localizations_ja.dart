@@ -56,6 +56,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get discoverCategoryEmpty => 'このカテゴリには表示できる書籍がまだありません。';
 
   @override
+  String get bookSourceChannelLoadFailed => 'チャンネルを読み込めませんでした';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return 'ソースから利用可能な書籍が返されませんでした: $details';
+  }
+
+  @override
   String get bookSourceStandardLayout => '標準レイアウト';
 
   @override

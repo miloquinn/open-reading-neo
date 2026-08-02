@@ -34,6 +34,9 @@
     }
   },
   "discoverCategoryEmpty": "There are no books to show in this category yet.",
+  "bookSourceChannelLoadFailed": "Could not load channel",
+  "bookSourceChannelLoadFailedMessage": "The source returned no usable books: {details}",
+  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
   "bookSourceStandardLayout": "Standard layout",
   "bookSourceListLayout": "List layout",
   "bookSourceChangeChannel": "Change",

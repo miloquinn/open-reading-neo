@@ -44,10 +44,22 @@ class LegadoRuntime {
       null,
       _requiredRule(rule, 'bookList'),
     );
+    if (page == 1 && contexts.isEmpty) {
+      throw const BookSourceProtocolException(
+        'The channel page opened, but its bookList rule matched no items. '
+        'The source rule may be outdated.',
+      );
+    }
     final books = <BookSourceBook>[];
     for (final context in contexts.take(_maxSearchItems)) {
       final book = _bookFromRules(document, context, rule);
       if (book != null) books.add(book);
+    }
+    if (page == 1 && books.isEmpty) {
+      throw const BookSourceProtocolException(
+        'The channel list matched elements, but none contained both a book '
+        'name and URL. The source rule may be outdated.',
+      );
     }
     return BookSourceSearchPage(
       items: books.take(pageSize).toList(growable: false),

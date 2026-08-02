@@ -34,6 +34,9 @@
     }
   },
   "discoverCategoryEmpty": "这个分类暂时没有可展示的书籍。",
+  "bookSourceChannelLoadFailed": "频道加载失败",
+  "bookSourceChannelLoadFailedMessage": "书源没有返回可用书籍：{details}",
+  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
   "bookSourceStandardLayout": "标准布局",
   "bookSourceListLayout": "列表布局",
   "bookSourceChangeChannel": "更换",

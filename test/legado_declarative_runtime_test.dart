@@ -29,6 +29,7 @@ void main() {
       expect(request.method, LegadoRequestMethod.post);
       expect(request.body, 'q=%E5%89%91+%E6%9D%A5&p=2');
       expect(request.charset, 'gbk');
+      expect(request.headers['User-Agent'], legadoDefaultUserAgent);
       expect(request.headers['Referer'], 'https://books.test/');
       expect(
         request.headers['Content-Type'],
@@ -48,7 +49,7 @@ void main() {
       expect(request.body, 'q=%E5%89%91%E6%9D%A5');
     });
 
-    test('rejects unsupported methods and controlled headers', () {
+    test('rejects unsupported methods and sensitive headers', () {
       expect(
         () => LegadoRequestTemplate.parse(
           '/,{"method":"PUT"}',
@@ -71,11 +72,17 @@ void main() {
         ),
         throwsA(isA<BookSourceProtocolException>()),
       );
+      final virtualHost = LegadoRequestTemplate.parse(
+        '/',
+        baseUri: Uri.parse('https://203.0.113.8'),
+        sourceHeaders: const {'Host': 'books.test'},
+      );
+      expect(virtualHost.headers['Host'], 'books.test');
       expect(
         () => LegadoRequestTemplate.parse(
           '/',
-          baseUri: Uri.parse('https://books.test'),
-          sourceHeaders: const {'Host': 'internal.test'},
+          baseUri: Uri.parse('https://203.0.113.8'),
+          sourceHeaders: const {'Host': 'books.test\r\nX-Test: injected'},
         ),
         throwsA(isA<BookSourceProtocolException>()),
       );
@@ -366,6 +373,51 @@ void main() {
       expect(page.items.single.id, 'https://books.test/book/2');
       expect(page.hasMore, isTrue);
     });
+
+    test(
+      'parses indexed CSS rules used by aggregate discovery sources',
+      () async {
+        final transport = _FakeTransport({
+          'https://www.123bqg.cc/0/1.html': '''
+          <div class="lst-item">
+            <img _src="/cover/1.jpg">
+            <h2>频道书籍</h2>
+            <a href="/ignored">忽略</a>
+            <a href="/book/1">简介</a>
+            <span>作者甲</span><span>玄幻</span>
+          </div>
+        ''',
+        });
+        final source = LegadoBookSource.fromJson({
+          'bookSourceName': 'Indexed CSS source',
+          'bookSourceUrl': 'https://www.123bqg.cc',
+          'exploreUrl': '全部分类::https://www.123bqg.cc/0/{{page}}.html',
+          'ruleExplore': {
+            'author': 'span.0@text',
+            'bookList': '.lst-item',
+            'bookUrl': 'a.1@href',
+            'coverUrl': 'img@_src',
+            'intro': 'a.1@text',
+            'kind': 'span.1@text',
+            'name': 'h2@text',
+          },
+        }).toRegisteredSource(enabled: true);
+        final runtime = LegadoRuntime(transport: transport);
+
+        final page = await runtime.browse(
+          source,
+          category: 'https://www.123bqg.cc/0/{{page}}.html',
+        );
+
+        expect(page.items.single.title, '频道书籍');
+        expect(page.items.single.author, '作者甲');
+        expect(page.items.single.id, 'https://www.123bqg.cc/book/1');
+        expect(
+          page.items.single.coverUrl,
+          Uri.parse('https://www.123bqg.cc/cover/1.jpg'),
+        );
+      },
+    );
 
     test(
       'discovery falls back to search rules when ruleExplore is empty',

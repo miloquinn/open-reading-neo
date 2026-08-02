@@ -12,6 +12,11 @@ import '../services/book_source_network_policy.dart';
 
 enum LegadoRequestMethod { get, post }
 
+const legadoDefaultUserAgent =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/124.0.0.0 Safari/537.36';
+
 class LegadoRequestTemplate {
   const LegadoRequestTemplate({
     required this.url,
@@ -135,6 +140,25 @@ class LegadoRequestTemplate {
           );
         }
         headers[name] = value;
+      }
+    }
+    if (!headers.keys.any((name) => name.toLowerCase() == 'user-agent')) {
+      // Legado always supplies a browser User-Agent. Dart's default agent is
+      // rejected by many book sites before their HTML rules can run.
+      headers['User-Agent'] = legadoDefaultUserAgent;
+    }
+    for (final entry in headers.entries) {
+      if (entry.key.contains(RegExp(r'[\r\n]')) ||
+          entry.value.contains(RegExp(r'[\r\n]'))) {
+        throw const BookSourceProtocolException(
+          'Legado request headers cannot contain line breaks.',
+        );
+      }
+      if (entry.key.toLowerCase() == 'host' &&
+          !_staticHostHeader.hasMatch(entry.value.trim())) {
+        throw const BookSourceProtocolException(
+          'Legado Host headers must contain a static host name.',
+        );
       }
     }
     final charset = '${options['charset'] ?? 'utf-8'}'.trim().toLowerCase();
@@ -326,12 +350,10 @@ final _unsupportedRequestSyntax = RegExp(
   r'@js:|<js>|@put:|@get:',
   caseSensitive: false,
 );
-const _forbiddenHeaders = {
-  'host',
-  'content-length',
-  'transfer-encoding',
-  'cookie',
-};
+final _staticHostHeader = RegExp(
+  r'^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::\d{1,5})?$',
+);
+const _forbiddenHeaders = {'content-length', 'transfer-encoding', 'cookie'};
 
 String _expandVariables(String input, Map<String, String> variables) {
   return input.replaceAllMapped(RegExp(r'\{\{\s*([^{}]+?)\s*\}\}'), (match) {

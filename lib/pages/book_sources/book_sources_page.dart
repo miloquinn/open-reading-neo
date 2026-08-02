@@ -153,6 +153,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   bool _loadingCategoryBooks = false;
   bool _loadingMoreCategoryBooks = false;
   bool _categoryLoadMoreFailed = false;
+  String? _categoryLoadError;
   bool _categoryHasMore = false;
   int _categoryPage = 1;
   String? _expandedListSourceId;
@@ -222,6 +223,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _loadingCategoryBooks = false;
     _loadingMoreCategoryBooks = false;
     _categoryLoadMoreFailed = false;
+    _categoryLoadError = null;
     _categoryHasMore = false;
     _categoryPage = 1;
     await _loadSources();
@@ -402,6 +404,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _loadingCategoryBooks = false;
     _loadingMoreCategoryBooks = false;
     _categoryLoadMoreFailed = false;
+    _categoryLoadError = null;
     _categoryHasMore = false;
     _categoryPage = 1;
   }
@@ -441,6 +444,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       _loadingCategoryBooks = category.source.capabilities.contains('browse');
       _loadingMoreCategoryBooks = false;
       _categoryLoadMoreFailed = false;
+      _categoryLoadError = null;
       _categoryHasMore = false;
       _categoryPage = 1;
     });
@@ -460,9 +464,15 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         _categoryPage = page.page;
         _categoryHasMore = page.hasMore && page.items.isNotEmpty;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted || _selectedCategory != category) return;
-      setState(() => _loadingCategoryBooks = false);
+      setState(() {
+        _loadingCategoryBooks = false;
+        _categoryLoadError = error
+            .toString()
+            .replaceFirst(RegExp(r'^[^:]+Exception:\s*'), '')
+            .trim();
+      });
     }
   }
 
@@ -918,6 +928,22 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 36),
             child: Center(child: CircularProgressIndicator()),
+          ),
+          topPadding: 0,
+          bottomPadding: bottomPadding,
+        ),
+      );
+    } else if (_categoryLoadError != null) {
+      slivers.add(
+        _paddedSectionSliver(
+          _buildMessageCard(
+            icon: Icons.cloud_off_outlined,
+            title: context.l10n.bookSourceChannelLoadFailed,
+            message: context.l10n.bookSourceChannelLoadFailedMessage(
+              _categoryLoadError!,
+            ),
+            actionLabel: context.l10n.retry,
+            onAction: () => _selectCategory(selectedCategory),
           ),
           topPadding: 0,
           bottomPadding: bottomPadding,

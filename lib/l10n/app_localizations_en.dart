@@ -58,6 +58,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'There are no books to show in this category yet.';
 
   @override
+  String get bookSourceChannelLoadFailed => 'Could not load channel';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return 'The source returned no usable books: $details';
+  }
+
+  @override
   String get bookSourceStandardLayout => 'Standard layout';
 
   @override

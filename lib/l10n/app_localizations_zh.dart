@@ -56,6 +56,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverCategoryEmpty => '这个分类暂时没有可展示的书籍。';
 
   @override
+  String get bookSourceChannelLoadFailed => '频道加载失败';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return '书源没有返回可用书籍：$details';
+  }
+
+  @override
   String get bookSourceStandardLayout => '标准布局';
 
   @override
@@ -4460,6 +4468,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get discoverCategoryEmpty => '這個分類暫時沒有可顯示的書籍。';
+
+  @override
+  String get bookSourceChannelLoadFailed => '頻道載入失敗';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return '書源沒有傳回可用書籍：$details';
+  }
 
   @override
   String get bookSourceStandardLayout => '標準版面';

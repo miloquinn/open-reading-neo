@@ -191,6 +191,18 @@ abstract class AppLocalizations {
   /// **'There are no books to show in this category yet.'**
   String get discoverCategoryEmpty;
 
+  /// No description provided for @bookSourceChannelLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load channel'**
+  String get bookSourceChannelLoadFailed;
+
+  /// No description provided for @bookSourceChannelLoadFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The source returned no usable books: {details}'**
+  String bookSourceChannelLoadFailedMessage(String details);
+
   /// No description provided for @bookSourceStandardLayout.
   ///
   /// In en, this message translates to:

@@ -228,6 +228,32 @@ void main() {
     );
   });
 
+  testWidgets('channel request failures stay visible and can be retried', (
+    tester,
+  ) async {
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: _CategoryFailingDiscoveryClient()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Categories'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load channel'), findsOneWidget);
+    expect(find.textContaining('Channel endpoint failed.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+  });
+
   testWidgets('an empty capable source shows an empty state', (tester) async {
     final source = _source('source-a', 'Source A');
     SharedPreferences.setMockInitialValues({
@@ -784,6 +810,19 @@ class _FailingDiscoveryClient extends BookSourceClient {
     int pageSize = 20,
   }) {
     throw const BookSourceProtocolException('Source request timed out.');
+  }
+}
+
+class _CategoryFailingDiscoveryClient extends _DiscoveryClient {
+  @override
+  Future<BookSourceSearchPage> browse(
+    RegisteredBookSource source, {
+    String? category,
+    String sort = 'latest',
+    int page = 1,
+    int pageSize = 20,
+  }) {
+    throw const BookSourceProtocolException('Channel endpoint failed.');
   }
 }
 

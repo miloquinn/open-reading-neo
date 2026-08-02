@@ -1088,3 +1088,4 @@
 - 后续源码、验证和发布 Tag 迁移到私有仓库 `miloquinn/open-reading-internal`；公开仓库 `miloquinn/open-reading` 保留截至 `v2.4.5` 的公开源码和历史版本。
 - 发布流水线从私有 Tag 构建、签名并部署，使用审批保护且限于公开仓库的 `PUBLIC_RELEASE_TOKEN` 写入公开 Release；Release Notes 必须由版本文件显式提供，不再从私有提交自动生成，避免泄露内部提交信息。
 - 公开仓库原有 Release workflow 必须保持禁用，避免镜像 Tag 触发旧源码重复构建；本地默认上游切到私有仓库，公开远程禁止 Git push。
+- 当前 GitHub 套餐不支持私有仓库 Environment required reviewer；`release` Environment 已建立但没有审批保护。发布前置 job 会在任何平台构建前验证跨仓库 Token，macOS 凭据迁入前保持 `MACOS_RELEASE_ENABLED=false`。

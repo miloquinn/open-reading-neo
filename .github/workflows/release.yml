@@ -55,9 +55,35 @@ jobs:
       - name: Continue directly to release builds
         run: echo "Release source validation was explicitly skipped for this release."
 
+  verify-public-release:
+    name: Verify public release access
+    needs: verify-release
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check public release repository access
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
+          GH_REPO: ${{ env.PUBLIC_RELEASE_REPOSITORY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::PUBLIC_RELEASE_TOKEN is missing from the release Environment."
+            exit 1
+          fi
+          if [[ "$(gh api "repos/${GH_REPO}" --jq '.permissions.push')" != "true" ]]; then
+            echo "::error::PUBLIC_RELEASE_TOKEN cannot write to ${GH_REPO}."
+            exit 1
+          fi
+          gh api "repos/${GH_REPO}/git/ref/heads/${PUBLIC_RELEASE_TARGET}" >/dev/null
+
   web:
     name: Flutter Web
-    needs: verify-release
+    needs: verify-public-release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -129,7 +155,7 @@ jobs:
 
   android:
     name: Android APKs
-    needs: verify-release
+    needs: verify-public-release
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 45
@@ -260,7 +286,7 @@ jobs:
 
   windows:
     name: Windows x64
-    needs: verify-release
+    needs: verify-public-release
     # pdfx's PDFium downloader is not compatible with CMake 4 on windows-latest.
     runs-on: windows-2022
     timeout-minutes: 45
@@ -312,7 +338,7 @@ jobs:
 
   linux:
     name: Linux x64
-    needs: verify-release
+    needs: verify-public-release
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -362,7 +388,7 @@ jobs:
 
   macos:
     name: macOS universal (signed and notarized)
-    needs: verify-release
+    needs: verify-public-release
     if: vars.MACOS_RELEASE_ENABLED == 'true'
     runs-on: macos-15
     environment: release
@@ -588,7 +614,7 @@ jobs:
 
   ios:
     name: iOS IPA (unsigned)
-    needs: verify-release
+    needs: verify-public-release
     runs-on: macos-15
     timeout-minutes: 55
     steps:

@@ -181,6 +181,69 @@ void main() {
     );
   });
 
+  testWidgets('list layout searches sources and expands the first match', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final sourceA = _source('source-a', 'Source A');
+    final sourceB = _source('source-b', 'Source B');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        [sourceA, sourceB].map((source) => source.toJson()).toList(),
+      ),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+    final controller = BookSourcesPageController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(
+            client: _DiscoveryClient(),
+            controller: controller,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final search = find.byKey(const Key('bookSourceListSourceSearch'));
+    expect(search, findsOneWidget);
+    await tester.enterText(search, 'source-b');
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('bookSourceListSource-source-a')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('bookSourceListSource-source-b')),
+      findsOneWidget,
+    );
+    expect(find.text('1/2'), findsOneWidget);
+
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('bookSourceListSourceSearchClear')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListSource-source-a')),
+      findsOneWidget,
+    );
+    expect(find.text('2/2'), findsOneWidget);
+  });
+
   testWidgets('request failures are not reported as unsupported capabilities', (
     tester,
   ) async {

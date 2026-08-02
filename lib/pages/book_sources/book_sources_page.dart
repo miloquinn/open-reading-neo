@@ -81,6 +81,26 @@ class BookSourcesPage extends StatefulWidget {
     String? selectedSourceId,
   ) => SourceSearchPage.searchTargets(sources, selectedSourceId);
 
+  @visibleForTesting
+  static bool listSourceMatchesQuery(
+    RegisteredBookSource source,
+    String query,
+  ) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return true;
+    final group = source.sourceConfig?['bookSourceGroup'];
+    final searchable = [
+      source.name,
+      source.description,
+      source.id,
+      source.manifestUrl.toString(),
+      source.apiBaseUrl.toString(),
+      if (source.websiteUrl != null) source.websiteUrl.toString(),
+      if (group is String) group,
+    ];
+    return searchable.any((value) => value.toLowerCase().contains(normalized));
+  }
+
   /// 保留每个书源自己的 latest 顺序，再按来源轮流穿插。
   ///
   /// 首轮优先展示头部更新时间较新的书源；随后每轮每源最多贡献一本，
@@ -128,6 +148,8 @@ class BookSourcesPage extends StatefulWidget {
 
 class _BookSourcesPageState extends State<BookSourcesPage> {
   final BookSourceRegistry _registry = BookSourceRegistry();
+  final TextEditingController _listSourceSearchController =
+      TextEditingController();
   late final BookSourceClient _client;
   late final BookSourceShelfService _shelfService = BookSourceShelfService(
     client: _client,
@@ -157,6 +179,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   bool _categoryHasMore = false;
   int _categoryPage = 1;
   String? _expandedListSourceId;
+  String _listSourceQuery = '';
   bool _showListDirectory = true;
 
   @override
@@ -176,6 +199,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _registrySubscription?.cancel();
     _layoutController.layout.removeListener(_handleLayoutChanged);
     if (_ownsLayoutController) _layoutController.dispose();
+    _listSourceSearchController.dispose();
     super.dispose();
   }
 
@@ -1054,17 +1078,41 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
             ),
           )
           .toList(growable: false);
+      final filteredGroups = groups
+          .where(
+            (group) => BookSourcesPage.listSourceMatchesQuery(
+              group.source,
+              _listSourceQuery,
+            ),
+          )
+          .toList(growable: false);
       return [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-          sliver: SliverList.separated(
-            key: const Key('bookSourceListLayoutDirectory'),
-            itemCount: groups.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) =>
-                _centerSectionChild(_buildListSourceEntry(groups[index])),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          sliver: SliverToBoxAdapter(
+            child: _centerSectionChild(
+              _buildListSourceSearch(groups, filteredGroups),
+            ),
           ),
         ),
+        if (filteredGroups.isEmpty)
+          _paddedSectionSliver(
+            _buildListSourceSearchEmpty(),
+            bottomPadding: bottomPadding,
+            topPadding: 0,
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+            sliver: SliverList.separated(
+              key: const Key('bookSourceListLayoutDirectory'),
+              itemCount: filteredGroups.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) => _centerSectionChild(
+                _buildListSourceEntry(filteredGroups[index]),
+              ),
+            ),
+          ),
       ];
     }
 
@@ -1075,6 +1123,92 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       ),
       ..._buildCategoriesSlivers(cache, bottomPadding, showChannelStrip: false),
     ];
+  }
+
+  Widget _buildListSourceSearch(
+    List<_ListSourceChannels> groups,
+    List<_ListSourceChannels> filteredGroups,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      key: const Key('bookSourceListSourceSearch'),
+      controller: _listSourceSearchController,
+      textInputAction: TextInputAction.search,
+      onChanged: (value) => setState(() => _listSourceQuery = value),
+      onSubmitted: (_) {
+        if (filteredGroups.isEmpty) return;
+        setState(() => _expandedListSourceId = filteredGroups.first.source.id);
+      },
+      decoration: InputDecoration(
+        hintText: context.l10n.bookSourcesManagementSearchHint,
+        prefixIcon: const Icon(Icons.manage_search_rounded),
+        suffixIconConstraints: const BoxConstraints(minHeight: 48),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${filteredGroups.length}/${groups.length}',
+              key: const Key('bookSourceListSearchCount'),
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (_listSourceQuery.isNotEmpty)
+              IconButton(
+                key: const Key('bookSourceListSourceSearchClear'),
+                tooltip: context.l10n.bookSourcesClearSearch,
+                onPressed: _clearListSourceSearch,
+                icon: const Icon(Icons.close_rounded, size: 20),
+              )
+            else
+              const SizedBox(width: 16),
+          ],
+        ),
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListSourceSearchEmpty() {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('bookSourceListSourceSearchEmpty'),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      decoration: bookSourcePanelDecoration(context, radius: 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off_rounded, size: 34, color: scheme.primary),
+          const SizedBox(height: 10),
+          Text(
+            context.l10n.bookSourcesNoMatchingSources,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _clearListSourceSearch,
+            child: Text(context.l10n.bookSourcesResetFilters),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _clearListSourceSearch() {
+    _listSourceSearchController.clear();
+    setState(() => _listSourceQuery = '');
   }
 
   Widget _buildListSourceEntry(_ListSourceChannels group) {

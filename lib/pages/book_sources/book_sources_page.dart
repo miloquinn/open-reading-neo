@@ -147,6 +147,9 @@ class BookSourcesPage extends StatefulWidget {
 }
 
 class _BookSourcesPageState extends State<BookSourcesPage> {
+  static const int _maxConcurrentSourceFetches = 8;
+  static const int _largeSourceLibraryThreshold = 40;
+
   final BookSourceRegistry _registry = BookSourceRegistry();
   final TextEditingController _listSourceSearchController =
       TextEditingController();
@@ -164,7 +167,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   late final bool _ownsLayoutController;
 
   List<RegisteredBookSource> _sources = const [];
+  Map<_DiscoverSection, List<RegisteredBookSource>> _sectionSources = const {};
+  List<RegisteredBookSource> _discoverySourcesCache = const [];
   bool _loadingSources = true;
+  int _sourceLoadRevision = 0;
+  int _sectionLoadRevision = 0;
   _DiscoverSection _section = _DiscoverSection.recommended;
   String? _selectedSourceId;
 
@@ -181,6 +188,9 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   String? _expandedListSourceId;
   String _listSourceQuery = '';
   bool _showListDirectory = true;
+  final Map<String, List<_SourcedCategory>> _listChannelsBySource = {};
+  final Set<String> _loadingListChannelSources = {};
+  final Map<String, String> _listChannelErrors = {};
 
   @override
   void initState() {
@@ -209,10 +219,16 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         _layoutController.layout.value == BookSourceDiscoverLayout.list;
     setState(() {
       if (listLayout) {
+        _sectionLoadRevision++;
         _section = _DiscoverSection.categories;
         _selectedSourceId = null;
         _expandedListSourceId = null;
         _showListDirectory = true;
+        _cache[_DiscoverSection.categories] = _SectionCache.categories(
+          _listChannelsBySource.values
+              .expand((items) => items)
+              .toList(growable: false),
+        );
         _resetCategorySelection();
       }
     });
@@ -226,10 +242,30 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   }
 
   Future<void> _loadSources() async {
-    final sources = await _registry.loadRunnable();
-    if (!mounted) return;
+    final revision = ++_sourceLoadRevision;
+    final sources = await _registry.loadRunnableInBackground();
+    if (!mounted || revision != _sourceLoadRevision) return;
+    final sectionSources = _buildSectionSourceIndex(sources);
+    final discoveryIds = sectionSources.values
+        .expand((items) => items)
+        .map((source) => source.id)
+        .toSet();
+    final discoverySources = sources
+        .where((source) => discoveryIds.contains(source.id))
+        .toList(growable: false);
     setState(() {
       _sources = sources;
+      _sectionSources = sectionSources;
+      _discoverySourcesCache = discoverySources;
+      if (_layoutController.layout.value == BookSourceDiscoverLayout.standard &&
+          discoverySources.length > _largeSourceLibraryThreshold &&
+          (_selectedSourceId == null ||
+              !discoveryIds.contains(_selectedSourceId))) {
+        // Aggregating thousands of third-party sources on page entry would
+        // create a request storm. Large libraries start scoped to one source;
+        // the source strip remains lazy and lets the user switch instantly.
+        _selectedSourceId = discoverySources.firstOrNull?.id;
+      }
       _loadingSources = false;
     });
     final availableSections = _availableSections;
@@ -240,6 +276,8 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   }
 
   Future<void> _reloadAll() async {
+    _sourceLoadRevision++;
+    _sectionLoadRevision++;
     _cache.clear();
     _selectedSourceId = null;
     _selectedCategory = null;
@@ -250,13 +288,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _categoryLoadError = null;
     _categoryHasMore = false;
     _categoryPage = 1;
+    _listChannelsBySource.clear();
+    _loadingListChannelSources.clear();
+    _listChannelErrors.clear();
     await _loadSources();
   }
-
-  List<RegisteredBookSource> _targets(String capability) => _sources
-      .where((source) => source.enabled)
-      .where((source) => source.capabilities.contains(capability))
-      .toList(growable: false);
 
   String _capabilityFor(_DiscoverSection section) => switch (section) {
     _DiscoverSection.recommended => 'discover',
@@ -264,28 +300,37 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _DiscoverSection.latest => 'browse',
   };
 
-  List<RegisteredBookSource> _sourcesFor(_DiscoverSection section) {
-    final sources = _targets(_capabilityFor(section));
-    if (section == _DiscoverSection.latest) {
-      return sources
+  Map<_DiscoverSection, List<RegisteredBookSource>> _buildSectionSourceIndex(
+    List<RegisteredBookSource> sources,
+  ) {
+    final result = <_DiscoverSection, List<RegisteredBookSource>>{};
+    for (final section in _DiscoverSection.values) {
+      final capability = _capabilityFor(section);
+      result[section] = sources
+          .where((source) => source.enabled)
+          .where((source) => source.capabilities.contains(capability))
           .where(
-            (source) => source.sourceProtocol == BookSourceProtocolKind.orsp,
+            (source) =>
+                section != _DiscoverSection.latest ||
+                source.sourceProtocol == BookSourceProtocolKind.orsp,
           )
           .toList(growable: false);
     }
-    return sources;
+    return Map.unmodifiable(result);
   }
 
-  List<RegisteredBookSource> get _discoverySources => _sources
-      .where((source) => source.enabled)
-      .where(
-        (source) => _DiscoverSection.values.any(
-          (section) => _sourcesFor(
-            section,
-          ).any((candidate) => candidate.id == source.id),
-        ),
-      )
-      .toList(growable: false);
+  List<RegisteredBookSource> _sourcesFor(_DiscoverSection section) =>
+      _sectionSources[section] ?? const [];
+
+  List<RegisteredBookSource> _scopedSourcesFor(_DiscoverSection section) =>
+      _sourcesFor(
+        section,
+      ).where(_matchesSelectedSource).toList(growable: false);
+
+  List<RegisteredBookSource> get _discoverySources => _discoverySourcesCache;
+
+  bool get _requiresScopedDiscovery =>
+      _discoverySourcesCache.length > _largeSourceLibraryThreshold;
 
   List<_DiscoverSection> get _availableSections => _DiscoverSection.values
       .where(
@@ -302,7 +347,22 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _DiscoverSection section, {
     bool force = false,
   }) async {
+    final revision = ++_sectionLoadRevision;
     if (!force && _cache[section] != null) return;
+    final listDirectory =
+        section == _DiscoverSection.categories &&
+        _layoutController.layout.value == BookSourceDiscoverLayout.list &&
+        _showListDirectory;
+    if (listDirectory) {
+      setState(
+        () => _cache[section] = _SectionCache.categories(
+          _listChannelsBySource.values
+              .expand((items) => items)
+              .toList(growable: false),
+        ),
+      );
+      return;
+    }
     setState(() {
       _cache[section] = const _SectionCache.loading();
       if (force && section == _DiscoverSection.categories) {
@@ -323,7 +383,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     } catch (error) {
       next = _SectionCache.error(error.toString());
     }
-    if (!mounted) return;
+    if (!mounted || revision != _sectionLoadRevision) return;
     setState(() => _cache[section] = next);
     if (section == _DiscoverSection.categories &&
         !(_layoutController.layout.value == BookSourceDiscoverLayout.list &&
@@ -334,7 +394,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
 
   Future<List<_DiscoveryShelf>> _fetchShelves() async {
     final batches = await _fetchSourceBatches(
-      _sourcesFor(_DiscoverSection.recommended),
+      _scopedSourcesFor(_DiscoverSection.recommended),
       (source) async {
         final page = await _client.getDiscovery(source);
         return page.sections
@@ -354,7 +414,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
 
   Future<List<_SourcedCategory>> _fetchCategories() async {
     final batches = await _fetchSourceBatches(
-      _sourcesFor(_DiscoverSection.categories),
+      _scopedSourcesFor(_DiscoverSection.categories),
       (source) async {
         final categories = await _client.getCategories(source);
         return categories
@@ -373,7 +433,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
 
   Future<List<SourcedBook>> _fetchLatest() async {
     final batches = await _fetchSourceBatches(
-      _sourcesFor(_DiscoverSection.latest),
+      _scopedSourcesFor(_DiscoverSection.latest),
       (source) async {
         final page = await _client.browse(source, sort: 'latest');
         return page.items
@@ -388,21 +448,39 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     List<RegisteredBookSource> sources,
     Future<List<T>> Function(RegisteredBookSource source) fetch,
   ) async {
-    final results = await Future.wait(
-      sources.map((source) async {
+    if (sources.isEmpty) return const [];
+    final results = List<_SourceFetchResult<T>?>.filled(sources.length, null);
+    var nextIndex = 0;
+    Future<void> worker() async {
+      while (nextIndex < sources.length) {
+        final index = nextIndex++;
+        final source = sources[index];
         try {
-          return _SourceFetchResult<T>.success(source, await fetch(source));
+          results[index] = _SourceFetchResult<T>.success(
+            source,
+            await fetch(source),
+          );
         } catch (error) {
-          return _SourceFetchResult<T>.failure(source, error);
+          results[index] = _SourceFetchResult<T>.failure(source, error);
         }
-      }),
+      }
+    }
+
+    await Future.wait(
+      List.generate(
+        sources.length.clamp(1, _maxConcurrentSourceFetches),
+        (_) => worker(),
+      ),
     );
-    final batches = results
+    final completed = results.whereType<_SourceFetchResult<T>>().toList(
+      growable: false,
+    );
+    final batches = completed
         .where((result) => result.error == null)
         .map((result) => result.items)
         .toList(growable: false);
     final hasContent = batches.any((items) => items.isNotEmpty);
-    final failures = results.where((result) => result.error != null).toList();
+    final failures = completed.where((result) => result.error != null).toList();
     if (!hasContent && failures.isNotEmpty) {
       throw BookSourceProtocolException(
         failures
@@ -437,6 +515,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     if (_selectedSourceId == sourceId) return;
     setState(() {
       _selectedSourceId = sourceId;
+      _cache.clear();
       _resetCategorySelection();
       final availableSections = _availableSections;
       if (availableSections.isNotEmpty &&
@@ -649,6 +728,8 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         : mobileChrome.pageBottomPadding;
     final listLayout =
         _layoutController.layout.value == BookSourceDiscoverLayout.list;
+    final discoverySources = _discoverySources;
+    final availableSections = _availableSections;
 
     return Container(
       decoration: BoxDecoration(
@@ -678,14 +759,14 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (useRailNavigation) _buildRailHeader(),
-                          if (!listLayout && _discoverySources.isNotEmpty)
-                            _buildSourceScope(_discoverySources),
+                          if (!listLayout && discoverySources.isNotEmpty)
+                            _buildSourceScope(discoverySources),
                           if (!listLayout &&
-                              _discoverySources.isNotEmpty &&
-                              _availableSections.length > 1)
+                              discoverySources.isNotEmpty &&
+                              availableSections.length > 1)
                             const SizedBox(height: 8),
-                          if (!listLayout && _availableSections.length > 1)
-                            _buildSectionTabs(_availableSections),
+                          if (!listLayout && availableSections.length > 1)
+                            _buildSectionTabs(availableSections),
                           const SizedBox(height: 4),
                         ],
                       ),
@@ -787,29 +868,32 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       };
 
   Widget _buildSourceScope(List<RegisteredBookSource> sources) {
+    final includeAll = !_requiresScopedDiscovery;
+    final itemCount = sources.length + (includeAll ? 1 : 0);
     return SizedBox(
       key: const Key('bookSourceDiscoverScopeControl'),
       height: 42,
-      child: ListView(
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        children: [
-          ChoiceChip(
-            key: const Key('bookSourceDiscoverScopeAll'),
-            selected: _selectedSourceId == null,
-            label: Text(context.l10n.statsRangeAll),
-            onSelected: (_) => unawaited(_changeSourceScope(null)),
-          ),
-          const SizedBox(width: 8),
-          for (final source in sources) ...[
-            ChoiceChip(
-              key: Key('bookSourceDiscoverScope-${source.id}'),
-              selected: _selectedSourceId == source.id,
-              label: Text(source.name),
-              onSelected: (_) => unawaited(_changeSourceScope(source.id)),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ],
+        itemCount: itemCount,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          if (includeAll && index == 0) {
+            return ChoiceChip(
+              key: const Key('bookSourceDiscoverScopeAll'),
+              selected: _selectedSourceId == null,
+              label: Text(context.l10n.statsRangeAll),
+              onSelected: (_) => unawaited(_changeSourceScope(null)),
+            );
+          }
+          final source = sources[index - (includeAll ? 1 : 0)];
+          return ChoiceChip(
+            key: Key('bookSourceDiscoverScope-${source.id}'),
+            selected: _selectedSourceId == source.id,
+            label: Text(source.name),
+            onSelected: (_) => unawaited(_changeSourceScope(source.id)),
+          );
+        },
       ),
     );
   }
@@ -1052,8 +1136,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _SectionCache cache,
     double bottomPadding,
   ) {
-    final categories = cache.categories ?? const <_SourcedCategory>[];
-    if (categories.isEmpty) {
+    final categories = _listChannelsBySource.values
+        .expand((items) => items)
+        .toList(growable: false);
+    if (!_showListDirectory && categories.isEmpty) {
       return [
         _paddedSectionSliver(
           _sourcesFor(_DiscoverSection.categories).isEmpty
@@ -1065,19 +1151,13 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     }
 
     if (_showListDirectory || _selectedCategory == null) {
-      final channelsBySource = <String, List<_SourcedCategory>>{};
-      final sourceById = <String, RegisteredBookSource>{};
-      for (final category in categories) {
-        sourceById.putIfAbsent(category.source.id, () => category.source);
-        channelsBySource
-            .putIfAbsent(category.source.id, () => [])
-            .add(category);
-      }
-      final groups = channelsBySource.entries
+      final groups = _sourcesFor(_DiscoverSection.categories)
           .map(
-            (entry) => _ListSourceChannels(
-              source: sourceById[entry.key]!,
-              channels: entry.value,
+            (source) => _ListSourceChannels(
+              source: source,
+              channels:
+                  _listChannelsBySource[source.id] ??
+                  const <_SourcedCategory>[],
             ),
           )
           .toList(growable: false);
@@ -1140,7 +1220,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       onChanged: (value) => setState(() => _listSourceQuery = value),
       onSubmitted: (_) {
         if (filteredGroups.isEmpty) return;
-        setState(() => _expandedListSourceId = filteredGroups.first.source.id);
+        unawaited(_expandListSource(filteredGroups.first));
       },
       decoration: InputDecoration(
         hintText: context.l10n.bookSourcesManagementSearchHint,
@@ -1214,8 +1294,60 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     setState(() => _listSourceQuery = '');
   }
 
+  Future<void> _toggleListSource(_ListSourceChannels group) async {
+    if (_expandedListSourceId == group.source.id) {
+      setState(() => _expandedListSourceId = null);
+      return;
+    }
+    await _expandListSource(group);
+  }
+
+  Future<void> _expandListSource(_ListSourceChannels group) async {
+    setState(() => _expandedListSourceId = group.source.id);
+    if (_listChannelsBySource.containsKey(group.source.id) ||
+        _loadingListChannelSources.contains(group.source.id)) {
+      return;
+    }
+    final revision = _sourceLoadRevision;
+    setState(() {
+      _loadingListChannelSources.add(group.source.id);
+      _listChannelErrors.remove(group.source.id);
+    });
+    try {
+      final channels = await _client.getCategories(group.source);
+      if (!mounted || revision != _sourceLoadRevision) return;
+      setState(() {
+        _listChannelsBySource[group.source.id] = channels
+            .map(
+              (channel) => _SourcedCategory(
+                source: group.source,
+                id: channel.id,
+                name: channel.name,
+              ),
+            )
+            .toList(growable: false);
+        _loadingListChannelSources.remove(group.source.id);
+        _listChannelErrors.remove(group.source.id);
+        _cache[_DiscoverSection.categories] = _SectionCache.categories(
+          _listChannelsBySource.values
+              .expand((items) => items)
+              .toList(growable: false),
+        );
+      });
+    } catch (error) {
+      if (!mounted || revision != _sourceLoadRevision) return;
+      setState(() {
+        _loadingListChannelSources.remove(group.source.id);
+        _listChannelErrors[group.source.id] = _categoryErrorMessage(error);
+      });
+    }
+  }
+
   Widget _buildListSourceEntry(_ListSourceChannels group) {
     final expanded = _expandedListSourceId == group.source.id;
+    final loading = _loadingListChannelSources.contains(group.source.id);
+    final error = _listChannelErrors[group.source.id];
+    final loaded = _listChannelsBySource.containsKey(group.source.id);
     final scheme = Theme.of(context).colorScheme;
     return AnimatedSize(
       duration: const Duration(milliseconds: 180),
@@ -1231,10 +1363,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(18),
-                onTap: () => setState(
-                  () =>
-                      _expandedListSourceId = expanded ? null : group.source.id,
-                ),
+                onTap: () => unawaited(_toggleListSource(group)),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -1259,9 +1388,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              context.l10n.bookSourceChannelCount(
-                                group.channels.length,
-                              ),
+                              loaded
+                                  ? context.l10n.bookSourceChannelCount(
+                                      group.channels.length,
+                                    )
+                                  : group.source.apiBaseUrl.host,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: scheme.onSurfaceVariant,
@@ -1283,24 +1414,56 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
             ),
             if (expanded) ...[
               Divider(height: 1, color: scheme.outlineVariant),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final channel in group.channels)
-                      ActionChip(
-                        key: Key(
-                          'bookSourceListChannel-${channel.source.id}-${channel.id}',
-                        ),
-                        label: Text(channel.name),
-                        onPressed: () =>
-                            unawaited(_selectListCategory(channel)),
+              if (loading)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    ),
+                  ),
+                )
+              else if (error != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        error,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: scheme.error, fontSize: 12),
                       ),
-                  ],
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: () => unawaited(_expandListSource(group)),
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: Text(context.l10n.retry),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final channel in group.channels)
+                        ActionChip(
+                          key: Key(
+                            'bookSourceListChannel-${channel.source.id}-${channel.id}',
+                          ),
+                          label: Text(channel.name),
+                          onPressed: () =>
+                              unawaited(_selectListCategory(channel)),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ],
         ),

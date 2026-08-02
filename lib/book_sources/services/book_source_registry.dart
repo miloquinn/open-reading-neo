@@ -12,6 +12,7 @@ import '../../services/core/app_settings_service.dart';
 
 class BookSourceRegistry {
   static const String _storageKey = 'open_reading_book_sources_v1';
+  static const int _backgroundDecodeThreshold = 256 * 1024;
   static final StreamController<void> _changesController =
       StreamController<void>.broadcast();
   static Future<void> _mutationTail = Future<void>.value();
@@ -76,10 +77,16 @@ class BookSourceRegistry {
     if (raw == null || raw.trim().isEmpty) return const [];
     final additionalEnabled =
         preferences.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
-    final maps = await compute(_decodeRunnableSourceMaps, <String, Object>{
+    final arguments = <String, Object>{
       'raw': raw,
       'additionalEnabled': additionalEnabled,
-    });
+    };
+    // Spawning an isolate costs more than a direct parse for small source
+    // lists and does not advance inside Flutter widget-test fake async. Large
+    // imported registries still stay completely off the UI isolate.
+    final maps = raw.length < _backgroundDecodeThreshold
+        ? _decodeRunnableSourceMaps(arguments)
+        : await compute(_decodeRunnableSourceMaps, arguments);
     return maps.map(RegisteredBookSource.fromJson).toList(growable: false);
   }
 

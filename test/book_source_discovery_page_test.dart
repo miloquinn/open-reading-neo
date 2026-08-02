@@ -149,6 +149,7 @@ void main() {
       findsNothing,
     );
     expect(client.categoryBrowseSourceIds, isEmpty);
+    expect(client.categoryLoadSourceIds, isEmpty);
 
     await tester.tap(find.byKey(const Key('bookSourceListSource-source-b')));
     await tester.pumpAndSettle();
@@ -160,6 +161,7 @@ void main() {
       find.byKey(const Key('bookSourceListChannel-source-a-source-a-fiction')),
       findsNothing,
     );
+    expect(client.categoryLoadSourceIds, ['source-b']);
 
     await tester.tap(
       find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
@@ -242,6 +244,81 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('2/2'), findsOneWidget);
+  });
+
+  testWidgets(
+    'large source libraries start scoped and build source chips lazily',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 1100);
+      addTearDown(tester.view.reset);
+
+      final sources = List.generate(
+        80,
+        (index) => _source(
+          'source-${index.toString().padLeft(3, '0')}',
+          'Source ${index.toString().padLeft(3, '0')}',
+        ),
+        growable: false,
+      );
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode(
+          sources.map((source) => source.toJson()).toList(),
+        ),
+      });
+      final client = _DiscoveryClient();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(client.discoverySourceIds, ['source-000']);
+      expect(find.byKey(const Key('bookSourceDiscoverScopeAll')), findsNothing);
+      expect(
+        find.byKey(const Key('bookSourceDiscoverScope-source-000')),
+        findsOneWidget,
+      );
+      expect(find.byType(ChoiceChip).evaluate().length, lessThan(20));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('cross-source discovery uses bounded concurrency', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final sources = List.generate(
+      20,
+      (index) => _source('bounded-$index', 'Bounded $index'),
+      growable: false,
+    );
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        sources.map((source) => source.toJson()).toList(),
+      ),
+    });
+    final client = _BoundedDiscoveryClient();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: BookSourcesPage(client: client)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(client.discoverySourceIds, hasLength(20));
+    expect(client.maxActive, lessThanOrEqualTo(8));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('request failures are not reported as unsupported capabilities', (
@@ -751,11 +828,14 @@ class _FakeShelfService extends BookSourceShelfService {
 
 class _DiscoveryClient extends BookSourceClient {
   final List<String> categoryBrowseSourceIds = [];
+  final List<String> categoryLoadSourceIds = [];
+  final List<String> discoverySourceIds = [];
 
   @override
   Future<BookSourceDiscoveryPage> getDiscovery(
     RegisteredBookSource source,
   ) async {
+    discoverySourceIds.add(source.id);
     return BookSourceDiscoveryPage(
       sections: [
         BookSourceDiscoverySection(
@@ -771,6 +851,7 @@ class _DiscoveryClient extends BookSourceClient {
   Future<List<BookSourceCategory>> getCategories(
     RegisteredBookSource source,
   ) async {
+    categoryLoadSourceIds.add(source.id);
     return [BookSourceCategory(id: '${source.id}-fiction', name: 'Fiction')];
   }
 
@@ -850,6 +931,26 @@ class _ManyShelfDiscoveryClient extends _DiscoveryClient {
         ),
       ),
     );
+  }
+}
+
+class _BoundedDiscoveryClient extends _DiscoveryClient {
+  int active = 0;
+  int maxActive = 0;
+
+  @override
+  Future<BookSourceDiscoveryPage> getDiscovery(
+    RegisteredBookSource source,
+  ) async {
+    active++;
+    if (active > maxActive) maxActive = active;
+    try {
+      final result = await super.getDiscovery(source);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      return result;
+    } finally {
+      active--;
+    }
   }
 }
 

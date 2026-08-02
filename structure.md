@@ -58,7 +58,7 @@ open-reading/
 - `.github/workflows/pr-checks.yml`：对 Pull Request、`main` 推送和手动运行执行锁定依赖解析、国际化生成一致性、格式检查、静态分析、带覆盖率测试，以及 Android debug 和 Web release 冒烟构建；官网服务使用独立 Python 3.12 job 执行 Ruff 和 Pytest；Pull Request 额外执行依赖安全审查。Web 构建当前为提示性检查，不阻塞合并。
 - `.github/workflows/platform-smoke.yml`：在相关源码或平台工程变更、每周计划任务和手动运行时，构建 Linux、Windows、macOS release 以及不签名的 iOS release，用于尽早发现平台工程漂移。OpenHarmony 仍依赖专用 SDK，不在 GitHub 托管运行器中构建。
 - `.github/workflows/release.yml`：所有版本 Tag 共用同一发布并发锁；Tag 发布前验证客户端与官网服务，并在写入 GitHub Latest 前拒绝低于或等于当前 Latest 的其他 Tag，同 Tag 重跑保持幂等。随后构建 Android、未签名 iOS IPA、Windows、Linux 发布包；仓库变量启用后还会构建 macOS universal 包，使用 Developer ID、Hardened Runtime 和 Apple 公证签名。未签名 IPA 只供开发者自行签名或重新打包，不能直接安装。全部资产生成校验和并发布 GitHub Release，随后通过固定 `known_hosts` 和受控导入 wrapper 原子镜像到官网。macOS 凭据和官网启用顺序记录在 `docs/macos-release-signing.md`。
-- 私有仓库 `miloquinn/open-reading-internal` 是后续源码、验证和发布 Tag 的权威位置；发布工作流使用审批保护的 `PUBLIC_RELEASE_TOKEN`，仅把公开安装包、校验清单和人工维护的 Release Notes 写入 `miloquinn/open-reading`。公开仓库的 `main` 保留最后公开源码，不能作为后续构建输入；跨仓库发布 Tag 只用于承载 GitHub Release，不代表公开源码快照。
+- 私有仓库 `miloquinn/open-reading-neo` 是后续源码、验证和发布 Tag 的权威位置；发布工作流使用审批保护的 `PUBLIC_RELEASE_TOKEN`，仅把公开安装包、校验清单和人工维护的 Release Notes 写入 `miloquinn/open-reading`。公开仓库的 `main` 保留最后公开源码，不能作为后续构建输入；跨仓库发布 Tag 只用于承载 GitHub Release，不代表公开源码快照。
 - GitHub `release` Environment 同时保护 Android/macOS 签名 job 和官网镜像 job，并应配置 required reviewers。Android 签名、macOS Developer ID/Notary API Key 与 `OFFICIAL_SITE_SSH_HOST`、`OFFICIAL_SITE_SSH_PORT`、`OFFICIAL_SITE_SSH_USER`、`OFFICIAL_SITE_SSH_PRIVATE_KEY`、`OFFICIAL_SITE_SSH_KNOWN_HOSTS` 均只保存在该 Environment，不保留仓库级副本。
 - `pubspec.lock` 纳入版本控制，CI 和发布流程均使用 `--enforce-lockfile` 保证依赖解析可复现。
 

@@ -37,6 +37,29 @@ void main() {
       );
     });
 
+    test('expands native source header variables before requests', () async {
+      final transport = _FakeTransport({
+        'https://books.test/search?q=test&page=1': '''
+          <div class="book">
+            <a href="/book/1"><span class="name">书名</span></a>
+          </div>
+        ''',
+      });
+      final raw = Map<String, dynamic>.from(_htmlSource().raw)
+        ..['header'] = '{"Referer":"{{source.getKey()}}"}';
+      final runtime = LegadoRuntime(transport: transport);
+
+      await runtime.search(
+        LegadoBookSource.fromJson(raw).toRegisteredSource(enabled: true),
+        'test',
+      );
+
+      expect(
+        transport.requests.single.headers['Referer'],
+        'https://books.test',
+      );
+    });
+
     test('accepts non-executable single-quoted legacy options', () {
       final request = LegadoRequestTemplate.parse(
         "/search,{'method':'POST','body':'q={{key}}','charset':'gbk'}",
@@ -67,11 +90,17 @@ void main() {
       );
       expect(
         () => LegadoRequestTemplate.parse(
-          '/,{"headers":{"Cookie":"session=secret"}}',
+          '/,{"headers":{"Content-Length":"123"}}',
           baseUri: Uri.parse('https://books.test'),
         ),
         throwsA(isA<BookSourceProtocolException>()),
       );
+      final withCookie = LegadoRequestTemplate.parse(
+        '/',
+        baseUri: Uri.parse('https://books.test'),
+        sourceHeaders: const {'Cookie': 'session=source'},
+      );
+      expect(withCookie.headers['Cookie'], 'session=source');
       final virtualHost = LegadoRequestTemplate.parse(
         '/',
         baseUri: Uri.parse('https://203.0.113.8'),
@@ -545,6 +574,70 @@ void main() {
 
       expect(response.body, '结果');
       expect(await received.future, gbk_bytes.encode('关键词=剑来'));
+    });
+
+    test('keeps source cookies across same-URL redirects', () async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requests = 0;
+      server.listen((request) async {
+        requests++;
+        final hasSession = request.cookies.any(
+          (cookie) => cookie.name == 'session' && cookie.value == 'ready',
+        );
+        if (!hasSession) {
+          request.response.cookies.add(Cookie('session', 'ready')..path = '/');
+          request.response.statusCode = HttpStatus.found;
+          request.response.headers.set(HttpHeaders.locationHeader, '/channel');
+        } else {
+          request.response.write('books');
+        }
+        await request.response.close();
+      });
+      final transport = LegadoHttpTransport(
+        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
+      );
+      addTearDown(transport.close);
+
+      final response = await transport.send(
+        LegadoRequestTemplate.parse(
+          'http://${server.address.address}:${server.port}/channel',
+          baseUri: Uri.parse('https://unused.test'),
+          cookieJarKey: 'source-1',
+        ),
+      );
+
+      expect(response.body, 'books');
+      expect(requests, 2);
+    });
+
+    test('matches browser method semantics for POST redirects', () async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final methods = <String>[];
+      server.listen((request) async {
+        methods.add(request.method);
+        if (request.uri.path == '/submit') {
+          request.response.statusCode = HttpStatus.found;
+          request.response.headers.set(HttpHeaders.locationHeader, '/result');
+        } else {
+          request.response.write('ok');
+        }
+        await request.response.close();
+      });
+      final transport = LegadoHttpTransport(
+        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
+      );
+      addTearDown(transport.close);
+
+      final response = await transport.send(
+        LegadoRequestTemplate.parse(
+          'http://${server.address.address}:${server.port}/submit,'
+          '{"method":"POST","body":"q=test"}',
+          baseUri: Uri.parse('https://unused.test'),
+        ),
+      );
+
+      expect(response.body, 'ok');
+      expect(methods, ['POST', 'GET']);
     });
 
     test(

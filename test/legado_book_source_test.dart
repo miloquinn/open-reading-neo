@@ -97,10 +97,17 @@ void main() {
     );
     expect(cookieJar.level, LegadoCompatibilityLevel.supported);
 
+    final cookieHeader = scanner.scan(
+      LegadoBookSource.fromJson({
+        ..._source(name: 'Cookie header'),
+        'header': '{"Cookie":"sid=1"}',
+      }),
+    );
+    expect(cookieHeader.level, LegadoCompatibilityLevel.supported);
+
     for (final raw in [
       _source(type: 1, name: 'Audio'),
       _source(type: 4, name: 'Video'),
-      {..._source(name: 'Cookie header'), 'header': '{"Cookie":"sid=1"}'},
       _source(contentRule: '@js:result', name: 'Script'),
     ]) {
       expect(
@@ -248,10 +255,12 @@ void main() {
       expect(saved.single.name, 'Updated');
       expect(saved.single.enabled, isTrue);
       expect(await registry.loadRunnable(), isEmpty);
+      expect(await registry.loadRunnableInBackground(), isEmpty);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(additionalSourceProtocolsPreferenceKey, true);
       expect(await registry.loadRunnable(), hasLength(1));
+      expect(await registry.loadRunnableInBackground(), hasLength(1));
     },
   );
 }

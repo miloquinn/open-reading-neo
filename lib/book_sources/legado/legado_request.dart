@@ -24,6 +24,7 @@ class LegadoRequestTemplate {
     required this.headers,
     required this.charset,
     this.body,
+    this.cookieJarKey,
   });
 
   final Uri url;
@@ -31,12 +32,14 @@ class LegadoRequestTemplate {
   final Map<String, String> headers;
   final String charset;
   final String? body;
+  final String? cookieJarKey;
 
   static LegadoRequestTemplate parse(
     String template, {
     required Uri baseUri,
     Map<String, String> variables = const {},
     Map<String, String> sourceHeaders = const {},
+    String? cookieJarKey,
   }) {
     final expanded = _expandVariables(template.trim(), variables);
     if (_unresolvedVariables.hasMatch(expanded)) {
@@ -178,6 +181,7 @@ class LegadoRequestTemplate {
       headers: Map.unmodifiable(headers),
       charset: charset,
       body: body as String?,
+      cookieJarKey: cookieJarKey,
     );
   }
 }
@@ -258,6 +262,7 @@ class LegadoHttpTransport implements LegadoTransport {
   final BookSourceNetworkPolicy _networkPolicy;
   final int maxResponseBytes;
   final Duration requestTimeout;
+  final Map<String, Map<String, _StoredCookie>> _cookieJars = {};
 
   static Dio _createDio(
     BookSourceNetworkPolicy policy,
@@ -276,23 +281,55 @@ class LegadoHttpTransport implements LegadoTransport {
     return dio;
   }
 
-  void close({bool force = true}) => _dio.close(force: force);
+  void close({bool force = true}) {
+    _cookieJars.clear();
+    _dio.close(force: force);
+  }
 
   @override
   Future<LegadoResponse> send(LegadoRequestTemplate request) async {
+    const maxRedirects = 20;
     var current = request.url;
-    for (var redirects = 0; redirects <= 5; redirects++) {
+    var method = request.method;
+    var body = request.body;
+    var headers = Map<String, String>.from(request.headers);
+    final redirectStates = <String>{};
+    final connectionRetries = <Uri, int>{};
+    for (var redirects = 0; redirects <= maxRedirects; redirects++) {
       await _networkPolicy.validate(current);
       final cancelToken = CancelToken();
+      String? redirectState;
       try {
+        final requestHeaders = Map<String, String>.from(headers);
+        final cookieHeader = _cookieHeader(request.cookieJarKey, current);
+        redirectState =
+            '${method.name}\u0000$current\u0000${cookieHeader ?? ''}';
+        if (!redirectStates.add(redirectState)) {
+          throw const BookSourceProtocolException(
+            'Legado source entered a redirect loop.',
+          );
+        }
+        String? configuredCookie;
+        requestHeaders.removeWhere((name, value) {
+          if (name.toLowerCase() != HttpHeaders.cookieHeader) return false;
+          configuredCookie = value;
+          return true;
+        });
+        final mergedCookies = _mergeCookieHeaders(
+          configuredCookie,
+          cookieHeader,
+        );
+        if (mergedCookies != null) {
+          requestHeaders[HttpHeaders.cookieHeader] = mergedCookies;
+        }
         final response = await _dio.requestUri<List<int>>(
           current,
-          data: request.method == LegadoRequestMethod.post
-              ? Uint8List.fromList(_encode(request.body ?? '', request.charset))
+          data: method == LegadoRequestMethod.post
+              ? Uint8List.fromList(_encode(body ?? '', request.charset))
               : null,
           options: Options(
-            method: request.method == LegadoRequestMethod.post ? 'POST' : 'GET',
-            headers: request.headers,
+            method: method == LegadoRequestMethod.post ? 'POST' : 'GET',
+            headers: requestHeaders,
             responseType: ResponseType.bytes,
             followRedirects: false,
             validateStatus: (status) =>
@@ -306,6 +343,7 @@ class LegadoHttpTransport implements LegadoTransport {
           },
         );
         final status = response.statusCode ?? 0;
+        _storeCookies(request.cookieJarKey, current, response.headers);
         if (status < 300) {
           final bytes = response.data ?? const <int>[];
           if (bytes.length > maxResponseBytes) {
@@ -318,20 +356,65 @@ class LegadoHttpTransport implements LegadoTransport {
             finalUri: current,
           );
         }
-        if (redirects == 5) {
+        const redirectStatuses = {
+          HttpStatus.movedPermanently,
+          HttpStatus.found,
+          HttpStatus.seeOther,
+          HttpStatus.temporaryRedirect,
+          HttpStatus.permanentRedirect,
+        };
+        if (!redirectStatuses.contains(status)) {
+          throw BookSourceProtocolException(
+            'Legado source returned HTTP $status.',
+          );
+        }
+        if (redirects == maxRedirects) {
           throw const BookSourceProtocolException(
             'Legado source redirected too many times.',
           );
         }
-        current = BookSourceNetworkPolicy.redirectTarget(
+        final next = BookSourceNetworkPolicy.redirectTarget(
           current,
           response.headers.value(HttpHeaders.locationHeader),
         );
+        if (current.authority != next.authority) {
+          headers.removeWhere(
+            (name, _) =>
+                name.toLowerCase() == 'host' ||
+                name.toLowerCase() == 'authorization' ||
+                name.toLowerCase() == HttpHeaders.cookieHeader,
+          );
+        }
+        if (status == HttpStatus.seeOther ||
+            ((status == HttpStatus.movedPermanently ||
+                    status == HttpStatus.found) &&
+                method == LegadoRequestMethod.post)) {
+          method = LegadoRequestMethod.get;
+          body = null;
+          headers.removeWhere(
+            (name, _) => name.toLowerCase() == HttpHeaders.contentTypeHeader,
+          );
+        }
+        current = next;
       } on DioException catch (error) {
         if (CancelToken.isCancel(error)) {
           throw BookSourceProtocolException(
             error.message ?? 'Legado request was cancelled.',
           );
+        }
+        final retries = connectionRetries[current] ?? 0;
+        if (error.response == null &&
+            method == LegadoRequestMethod.get &&
+            retries < 2) {
+          connectionRetries[current] = retries + 1;
+          if (redirectState != null) {
+            redirectStates.remove(redirectState);
+          }
+          redirects--;
+          await Future<void>.delayed(
+            Duration(milliseconds: 150 * (retries + 1)),
+          );
+          continue;
         }
         throw BookSourceProtocolException(
           error.response?.statusCode == null
@@ -342,6 +425,126 @@ class LegadoHttpTransport implements LegadoTransport {
     }
     throw const BookSourceProtocolException('Legado source request failed.');
   }
+
+  String? _cookieHeader(String? jarKey, Uri uri) {
+    if (jarKey == null) return null;
+    final jar = _cookieJars[jarKey];
+    if (jar == null || jar.isEmpty) return null;
+    final now = DateTime.now().toUtc();
+    jar.removeWhere((_, cookie) => cookie.expiresAt?.isBefore(now) ?? false);
+    final matching =
+        jar.values
+            .where((cookie) => cookie.matches(uri))
+            .toList(growable: false)
+          ..sort(
+            (left, right) => right.path.length.compareTo(left.path.length),
+          );
+    if (matching.isEmpty) return null;
+    return matching
+        .map((cookie) => '${cookie.cookie.name}=${cookie.cookie.value}')
+        .join('; ');
+  }
+
+  void _storeCookies(String? jarKey, Uri uri, Headers headers) {
+    if (jarKey == null) return;
+    final values = headers[HttpHeaders.setCookieHeader];
+    if (values == null || values.isEmpty) return;
+    final jar = _cookieJars.putIfAbsent(jarKey, () => {});
+    final now = DateTime.now().toUtc();
+    for (final value in values) {
+      try {
+        final cookie = Cookie.fromSetCookieValue(value);
+        final configuredDomain = cookie.domain?.trim().toLowerCase();
+        final domain = (configuredDomain == null || configuredDomain.isEmpty)
+            ? uri.host.toLowerCase()
+            : configuredDomain.replaceFirst(RegExp(r'^\.'), '');
+        final hostOnly = configuredDomain == null || configuredDomain.isEmpty;
+        if (!_cookieDomainMatches(uri.host, domain, hostOnly: hostOnly)) {
+          continue;
+        }
+        final path = cookie.path?.isNotEmpty == true
+            ? cookie.path!
+            : _defaultCookiePath(uri.path);
+        final id = '$domain\u0000$path\u0000${cookie.name}';
+        final expiresAt = cookie.maxAge == null
+            ? cookie.expires?.toUtc()
+            : now.add(Duration(seconds: cookie.maxAge!));
+        if ((cookie.maxAge != null && cookie.maxAge! <= 0) ||
+            (expiresAt?.isBefore(now) ?? false)) {
+          jar.remove(id);
+          continue;
+        }
+        jar[id] = _StoredCookie(
+          cookie: cookie,
+          domain: domain,
+          path: path,
+          hostOnly: hostOnly,
+          expiresAt: expiresAt,
+        );
+      } on FormatException {
+        // Ignore one malformed Set-Cookie without discarding the response.
+      }
+    }
+  }
+}
+
+class _StoredCookie {
+  const _StoredCookie({
+    required this.cookie,
+    required this.domain,
+    required this.path,
+    required this.hostOnly,
+    required this.expiresAt,
+  });
+
+  final Cookie cookie;
+  final String domain;
+  final String path;
+  final bool hostOnly;
+  final DateTime? expiresAt;
+
+  bool matches(Uri uri) {
+    if (cookie.secure && uri.scheme != 'https') return false;
+    if (!_cookieDomainMatches(uri.host, domain, hostOnly: hostOnly)) {
+      return false;
+    }
+    final requestPath = uri.path.isEmpty ? '/' : uri.path;
+    return requestPath.startsWith(path);
+  }
+}
+
+bool _cookieDomainMatches(
+  String host,
+  String domain, {
+  required bool hostOnly,
+}) {
+  final normalizedHost = host.toLowerCase();
+  if (normalizedHost == domain) return true;
+  return !hostOnly && normalizedHost.endsWith('.$domain');
+}
+
+String _defaultCookiePath(String requestPath) {
+  if (!requestPath.startsWith('/') || requestPath == '/') return '/';
+  final lastSlash = requestPath.lastIndexOf('/');
+  return lastSlash <= 0 ? '/' : requestPath.substring(0, lastSlash + 1);
+}
+
+String? _mergeCookieHeaders(String? configured, String? stored) {
+  final values = <String, String>{};
+  for (final header in [configured, stored]) {
+    if (header == null) continue;
+    for (final part in header.split(';')) {
+      final separator = part.indexOf('=');
+      if (separator <= 0) continue;
+      final name = part.substring(0, separator).trim();
+      if (name.isEmpty) continue;
+      values[name] = part.substring(separator + 1).trim();
+    }
+  }
+  if (values.isEmpty) return null;
+  return values.entries
+      .map((entry) => '${entry.key}=${entry.value}')
+      .join('; ');
 }
 
 const _supportedCharsets = {'utf-8', 'utf8', 'gbk', 'gb2312', 'gb18030'};
@@ -353,7 +556,7 @@ final _unsupportedRequestSyntax = RegExp(
 final _staticHostHeader = RegExp(
   r'^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::\d{1,5})?$',
 );
-const _forbiddenHeaders = {'content-length', 'transfer-encoding', 'cookie'};
+const _forbiddenHeaders = {'content-length', 'transfer-encoding'};
 
 String _expandVariables(String input, Map<String, String> variables) {
   return input.replaceAllMapped(RegExp(r'\{\{\s*([^{}]+?)\s*\}\}'), (match) {

@@ -468,12 +468,28 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       if (!mounted || _selectedCategory != category) return;
       setState(() {
         _loadingCategoryBooks = false;
-        _categoryLoadError = error
-            .toString()
-            .replaceFirst(RegExp(r'^[^:]+Exception:\s*'), '')
-            .trim();
+        _categoryLoadError = _categoryErrorMessage(error);
       });
     }
+  }
+
+  String _categoryErrorMessage(Object error) {
+    final raw = error
+        .toString()
+        .replaceFirst(RegExp(r'^[^:]+Exception:\s*'), '')
+        .trim();
+    if (raw.contains('Could not connect to the Legado source')) {
+      return context.l10n.bookSourceConnectionFailed;
+    }
+    if (raw.contains('redirected too many times') ||
+        raw.contains('entered a redirect loop')) {
+      return context.l10n.bookSourceRedirectFailed;
+    }
+    final status = RegExp(r'HTTP (\d{3})').firstMatch(raw)?.group(1);
+    if (status != null) {
+      return context.l10n.bookSourceHttpFailed(int.parse(status));
+    }
+    return raw.replaceAll('Legado source', context.l10n.bookSources);
   }
 
   Future<void> _loadMoreCategory() async {

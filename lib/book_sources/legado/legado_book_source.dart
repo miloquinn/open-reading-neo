@@ -188,11 +188,6 @@ class LegadoCompatibilityScanner {
     if (source.rule('ruleToc').isEmpty || source.rule('ruleContent').isEmpty) {
       issues.add(LegadoCompatibilityIssue.missingReadingRules);
     }
-    final configuredHeaders = _staticJsonObject(source.raw['header']);
-    if (configuredHeaders.keys.any((key) => '$key'.toLowerCase() == 'cookie')) {
-      issues.add(LegadoCompatibilityIssue.cookies);
-    }
-
     final coreConfiguration = Map<String, dynamic>.from(source.raw)
       ..remove('enabledExplore')
       ..remove('exploreUrl')
@@ -402,19 +397,6 @@ bool _isStaticJsonObject(String value) {
   } on FormatException {
     return false;
   }
-}
-
-Map<Object?, Object?> _staticJsonObject(Object? value) {
-  Object? decoded = value;
-  if (value is String) {
-    if (value.trim().isEmpty) return const {};
-    try {
-      decoded = jsonDecode(value);
-    } on FormatException {
-      return const {};
-    }
-  }
-  return decoded is Map ? decoded : const {};
 }
 
 bool _isRuleField(String field) => const {

@@ -66,6 +66,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookSourceConnectionFailed =>
+      'Could not connect to the source server after trying its available network addresses. Try again later.';
+
+  @override
+  String get bookSourceRedirectFailed =>
+      'The source site kept redirecting. Site cookies were retained, but the address still returned no content.';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return 'The source site returned HTTP $status. The channel address may be stale or blocked by the site.';
+  }
+
+  @override
   String get bookSourceStandardLayout => 'Standard layout';
 
   @override
@@ -142,7 +155,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesRunnable => 'Ready to use';
 
   @override
-  String get bookSourcesPendingCompatibility => 'Compatibility pending';
+  String get bookSourcesPendingCompatibility => 'No runnable rules';
 
   @override
   String get bookSourcesManagementSearchHint =>
@@ -2081,7 +2094,7 @@ class AppLocalizationsEn extends AppLocalizations {
     int unsupported,
     int skipped,
   ) {
-    return '$supported ready, $partial partially supported, $unsupported compatibility pending, $skipped skipped';
+    return '$supported standard-rule, $partial extended-rule, $unsupported advanced-rule, $skipped skipped';
   }
 
   @override

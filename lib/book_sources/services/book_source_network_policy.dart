@@ -54,7 +54,49 @@ class BookSourceNetworkPolicy {
           ? uri
           : Uri(scheme: 'http', host: targetHost, port: targetPort);
       final addresses = await resolve(targetUri);
-      return Socket.startConnect(addresses.first, targetPort);
+      // Prefer IPv4 on mobile networks, then fall back through every validated
+      // address. Pinning only the first DNS answer made a single unreachable
+      // IPv6/CDN node fail the whole source, unlike OkHttp's address fallback.
+      final ordered = [
+        ...addresses.where(
+          (address) => address.type == InternetAddressType.IPv4,
+        ),
+        ...addresses.where(
+          (address) => address.type == InternetAddressType.IPv6,
+        ),
+      ];
+      ConnectionTask<Socket>? activeTask;
+      var cancelled = false;
+      final socket = () async {
+        Object? lastError;
+        for (final address in ordered) {
+          if (cancelled) {
+            throw const SocketException('Connection attempt was cancelled.');
+          }
+          try {
+            activeTask = await Socket.startConnect(address, targetPort);
+            return await activeTask!.socket.timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                activeTask?.cancel();
+                throw SocketException(
+                  'Timed out connecting to ${address.address}:$targetPort.',
+                );
+              },
+            );
+          } on Object catch (error) {
+            lastError = error;
+          }
+        }
+        if (lastError is SocketException) throw lastError;
+        throw SocketException(
+          'Could not connect to any validated address for $targetHost.',
+        );
+      }();
+      return ConnectionTask.fromSocket(socket, () {
+        cancelled = true;
+        activeTask?.cancel();
+      });
     };
     return client;
   }

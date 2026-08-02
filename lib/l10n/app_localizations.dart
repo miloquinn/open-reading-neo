@@ -203,6 +203,24 @@ abstract class AppLocalizations {
   /// **'The source returned no usable books: {details}'**
   String bookSourceChannelLoadFailedMessage(String details);
 
+  /// No description provided for @bookSourceConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect to the source server after trying its available network addresses. Try again later.'**
+  String get bookSourceConnectionFailed;
+
+  /// No description provided for @bookSourceRedirectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The source site kept redirecting. Site cookies were retained, but the address still returned no content.'**
+  String get bookSourceRedirectFailed;
+
+  /// No description provided for @bookSourceHttpFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The source site returned HTTP {status}. The channel address may be stale or blocked by the site.'**
+  String bookSourceHttpFailed(int status);
+
   /// No description provided for @bookSourceStandardLayout.
   ///
   /// In en, this message translates to:
@@ -338,7 +356,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesPendingCompatibility.
   ///
   /// In en, this message translates to:
-  /// **'Compatibility pending'**
+  /// **'No runnable rules'**
   String get bookSourcesPendingCompatibility;
 
   /// No description provided for @bookSourcesManagementSearchHint.
@@ -3755,7 +3773,7 @@ abstract class AppLocalizations {
   /// No description provided for @additionalSourcesPreviewDetails.
   ///
   /// In en, this message translates to:
-  /// **'{supported} ready, {partial} partially supported, {unsupported} compatibility pending, {skipped} skipped'**
+  /// **'{supported} standard-rule, {partial} extended-rule, {unsupported} advanced-rule, {skipped} skipped'**
   String additionalSourcesPreviewDetails(
     int supported,
     int partial,

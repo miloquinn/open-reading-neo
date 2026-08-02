@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -45,6 +46,33 @@ void main() {
       policy.validate(Uri.parse('http://127.0.0.1/api')),
       completes,
     );
+  });
+
+  test('pinned client falls back when the first DNS address fails', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      request.response.write('ok');
+      await request.response.close();
+    });
+    final policy = BookSourceNetworkPolicy(
+      allowPrivateNetwork: true,
+      lookup: (_) async => [
+        InternetAddress('127.0.0.2'),
+        InternetAddress.loopbackIPv4,
+      ],
+    );
+    final client = policy.createPinnedHttpClient();
+    addTearDown(() => client.close(force: true));
+
+    final request = await client.getUrl(
+      Uri.parse('http://fallback.test:${server.port}/'),
+    );
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+
+    expect(response.statusCode, HttpStatus.ok);
+    expect(body, 'ok');
   });
 
   test('synthetic DNS range is separately opt-in', () {

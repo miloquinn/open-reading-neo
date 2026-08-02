@@ -64,6 +64,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get bookSourceConnectionFailed => '无法连接书源服务器，已自动尝试其他网络地址，请稍后重试。';
+
+  @override
+  String get bookSourceRedirectFailed => '书源网站反复跳转；客户端已保留站点 Cookie，但该地址仍未返回内容。';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return '书源网站返回 HTTP $status，频道地址可能已经失效或被站点拦截。';
+  }
+
+  @override
   String get bookSourceStandardLayout => '标准布局';
 
   @override
@@ -135,7 +146,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesRunnable => '可直接使用';
 
   @override
-  String get bookSourcesPendingCompatibility => '待兼容';
+  String get bookSourcesPendingCompatibility => '缺少可执行规则';
 
   @override
   String get bookSourcesManagementSearchHint => '搜索名称、网址、备注或分组';
@@ -1994,7 +2005,7 @@ class AppLocalizationsZh extends AppLocalizations {
     int unsupported,
     int skipped,
   ) {
-    return '可直接使用 $supported 个，部分支持 $partial 个，待兼容 $unsupported 个，跳过 $skipped 条';
+    return '标准规则 $supported 个，扩展规则 $partial 个，高级规则 $unsupported 个，跳过 $skipped 条';
   }
 
   @override
@@ -4478,6 +4489,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get bookSourceConnectionFailed => '無法連線書源伺服器，已自動嘗試其他網路位址，請稍後重試。';
+
+  @override
+  String get bookSourceRedirectFailed => '書源網站反覆跳轉；用戶端已保留網站 Cookie，但該位址仍未傳回內容。';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return '書源網站傳回 HTTP $status，頻道位址可能已失效或被網站阻擋。';
+  }
+
+  @override
   String get bookSourceStandardLayout => '標準版面';
 
   @override
@@ -4549,7 +4571,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesRunnable => '可直接使用';
 
   @override
-  String get bookSourcesPendingCompatibility => '待相容';
+  String get bookSourcesPendingCompatibility => '缺少可執行規則';
 
   @override
   String get bookSourcesManagementSearchHint => '搜尋名稱、網址、備註或群組';
@@ -6365,7 +6387,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
     int unsupported,
     int skipped,
   ) {
-    return '可直接使用 $supported 個，部分支援 $partial 個，待相容 $unsupported 個，略過 $skipped 條';
+    return '標準規則 $supported 個，擴充規則 $partial 個，進階規則 $unsupported 個，略過 $skipped 條';
   }
 
   @override

@@ -64,6 +64,19 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get bookSourceConnectionFailed =>
+      '利用可能なネットワークアドレスを試しましたが、ソースサーバーに接続できませんでした。後でもう一度お試しください。';
+
+  @override
+  String get bookSourceRedirectFailed =>
+      'ソースサイトがリダイレクトを繰り返しました。Cookie は保持しましたが、コンテンツが返されませんでした。';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return 'ソースサイトが HTTP $status を返しました。チャンネルのアドレスが古いか、サイトに拒否された可能性があります。';
+  }
+
+  @override
   String get bookSourceStandardLayout => '標準レイアウト';
 
   @override
@@ -136,7 +149,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesRunnable => 'すぐに使用可能';
 
   @override
-  String get bookSourcesPendingCompatibility => '互換対応待ち';
+  String get bookSourcesPendingCompatibility => '実行可能なルールなし';
 
   @override
   String get bookSourcesManagementSearchHint => '名前、URL、メモ、グループを検索';
@@ -2008,7 +2021,7 @@ class AppLocalizationsJa extends AppLocalizations {
     int unsupported,
     int skipped,
   ) {
-    return 'すぐに使用可能 $supported、一部対応 $partial、互換対応待ち $unsupported、スキップ $skipped';
+    return '標準ルール $supported、拡張ルール $partial、高度なルール $unsupported、スキップ $skipped';
   }
 
   @override

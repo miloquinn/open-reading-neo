@@ -303,6 +303,7 @@ class LegadoRuntime {
         baseUri: source.baseUri,
         variables: variables,
         sourceHeaders: _sourceHeaders(source),
+        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
       ),
     );
   }
@@ -338,9 +339,26 @@ class LegadoRuntime {
           'Compatible source headers must contain text values.',
         );
       }
-      headers[name] = entry.value as String;
+      headers[name] = _expandSourceHeaderValue(entry.value as String, source);
     }
     return headers;
+  }
+
+  String _expandSourceHeaderValue(String value, LegadoBookSource source) {
+    final key = source.url;
+    final baseKey = key.split('#').first;
+    return value
+        .replaceAll('{{source.getKey()}}', key)
+        .replaceAll('{{source.bookSourceUrl}}', key)
+        .replaceAll('{{bookSourceUrl}}', key)
+        .replaceAllMapped(
+          RegExp(r'\{\{source\.getKey\(\)\.match\([^}]+\}\}'),
+          (_) => baseKey,
+        )
+        .replaceAllMapped(
+          RegExp(r'\{\{source\.getVariable\(\).*?\}\}', dotAll: true),
+          (_) => key,
+        );
   }
 
   LegadoBookSource _source(RegisteredBookSource registered) {

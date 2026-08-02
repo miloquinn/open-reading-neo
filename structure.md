@@ -23,7 +23,7 @@
 - iOS App 级隐私清单位于 `ios/Runner/PrivacyInfo.xcprivacy`，声明 Runner 原生文件导入、iCloud Documents 与用户授权文件所使用的 required reason API；第三方 Flutter 插件继续各自在 bundle 内携带其隐私清单。
 - 本地结构化数据使用 SQLite，移动端通过 `sqflite`，桌面端通过 `sqflite_common_ffi`。
 - 轻量设置使用 `SharedPreferences`。
-- 在线书源使用 Open Reading Source Protocol，不包含 Legado 兼容层。
+- 在线书源同时支持 Open Reading Source Protocol 与阅读书源 JSON；阅读书源由应用内置运行时直接执行，不依赖外部阅读器。
 - 官网、发行 API、安装包镜像和下载统计已拆分到独立仓库 `miloquinn/open-reading-web`；本仓库只保留客户端集成和发布后的官网下载校验工具。
 
 ## 顶层目录
@@ -117,7 +117,7 @@ lib/
 - `pages/reader/book_source_reader_page.dart`：在线书源章节内容适配器；与本地阅读器共享字体就绪门禁、字间距和自然/两端对齐设置，目录或正文先返回时也不会提前使用临时字体绘制。
 - `book_sources/services/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
 - `pages/book_sources/source_search_page.dart`：在线书源搜索与发现。
-- `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型 Legado 聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和兼容标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/兼容状态、分组筛选和针对当前结果的批量操作。
+- `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型阅读书源聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和能力标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/可执行状态、分组筛选和针对当前结果的批量操作。
 - `pages/settings/settings_page.dart`：应用设置、版本与维护入口，按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”五个分区组织；重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
 - `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片的添加/编辑/删除/激活与 AI 预处理开关从主设置页整体迁入，存储键（`reader_ai_quick_models_v1` 等）保持不变。
 - `pages/settings/sync/`：WebDAV 概览、独立连接配置、即时保存的同步内容开关和书籍文件管理页；书源、书架信息、阅读进度等元数据自动同步，原文件需先开启上传权限，再按书选择上传或下载。新导入书籍提供“每次询问（默认）/ 自动上传 / 始终手动”三种策略；自动上传只处理符合安全限制的真正新增本地文件。
@@ -289,13 +289,14 @@ EPUB 图片块与其后的正文共用同一个显示投影：携带图片的第
 
 - `BookSourceRegistry`：注册和启用状态。所有结构合法的导入记录都会保留；`loadRunnable()` 才按全局协议开关和本地运行能力缩小运行集合。注册表目前以单份 SharedPreferences JSON 持久化，批量导入只序列化和写入一次且直接返回内存结果，单项/批量变更通过全局异步尾队列串行，避免并发覆盖。
 - `BookSourceClient`：协议请求。
-- `LegadoSourceImportService` / `BookSourceImportAnalyzer`：64 MiB、最多 10,000 条的聚合导入边界；单次 UTF-8/JSON 解码，按 `bookSourceUrl` 保留最后一条，分别统计无效项和重复项。文件解析使用后台 isolate；URL 输入只在直接内容不是有效书源且声明嵌套 URL 时递归加载。兼容扫描只判断当前声明式运行时能力，不执行站点可用性探测。
+- `LegadoSourceImportService` / `BookSourceImportAnalyzer`：64 MiB、最多 10,000 条的聚合导入边界；单次 UTF-8/JSON 解码，按 `bookSourceUrl` 保留最后一条，分别统计无效项和重复项。文件解析使用后台 isolate；URL 输入只在直接内容不是有效书源且声明嵌套 URL 时递归加载。能力扫描只生成本地摘要，不执行站点可用性探测，也不作为保存书源的前置条件。
+- `LegadoRuntime` / `LegadoHttpTransport`：阅读书源的应用内执行链路。请求按书源维持独立 Cookie 会话，接收并校验 `Set-Cookie` 的域、路径、Secure 与过期属性，支持配置中的静态 Cookie；重定向按浏览器语义处理 301/302/303/307/308，跨站时移除 Host、Authorization 和静态 Cookie。源级请求头支持 `source.getKey()`、`source.bookSourceUrl` 等常见取值表达式。DNS 解析后优先 IPv4 并逐个回退全部已校验地址，单个 CDN/IPv6 地址不可达时不会直接判定整个书源失败。
 - `BookSourceChapterText`：仅把 HTML/纯文本响应转换为 canonical chapter text，并清理重复远端页码；HTML 和 64 KiB 以上正文通过后台 isolate 规范化，短纯文本保留直接路径以避免 isolate 开销。若正文最前面的首行/首段与接口标题或目录标题规范化后完全相同，则像本地 TXT 章节解析一样剥离该重复标题。不注入首行缩进、段间距或章节标题，这些展示语义全部交给共享文字阅读内核。
 - `BookSourceChapterCache`：章节正文的内存/磁盘缓存和并发去重；网络结果进入内存后立即返回，目录与正文 JSON 持久化在后台完成，磁盘失败不阻断阅读。同一缓存键的后台写入严格串行并通过临时文件替换；缓存清理递增写入代次，使清理前尚未完成的任务不能重新创建旧缓存。在线阅读器的 canonical 正文只保留最近 8 章，优先预取下一章并在正文首帧后生成分页布局，再机会式准备上一章与更远的后一章。水平滑动到相邻章节时，真实预览页先在当前 `PageView` 内完成整段动画，只有 `ScrollEnd` 确认停在边界页后才提交章节状态；提交后复用已预热布局，并让新控制器直接挂接目标页，避免停稳后的可见重置。中途回滑会取消待提交切章，进度持久化不阻塞跨章提交。
 - `SourceCoverCache`：书源封面 URL 级请求去重、最多 4 路并发、瞬态失败单次退避重试、压缩字节内存 LRU 和应用缓存目录磁盘缓存；单 URL 驱逐使用独立 epoch，旧请求完成时不能覆盖或移除新请求。
 - `BookSourceShelfService`：在线书籍加入本地书架；完整下载以最多 3 章为一批并发抓取，按目录顺序持续写入同目录 `.part` 文件，每批 flush 后释放正文对象，完成后再改名为正式 TXT，内存占用不随整书篇幅线性增长。任务级取消会停止目录/章节请求并删除未完成的 `.part`；书源提供远程封面时下载到文档目录的 `covers/` 作为书架持久封面，缺失时生成统一封面。
 - `BookSourceReadingProgressStore`：在线章节阅读进度。
-- `legado/legado_explore.dart`：兼容书源发现适配边界；只把旧式 `标题::URL` 和 JSON `type=url` 入口转换为静态频道。导入阶段只解析、去重并按已有规则组声明可尝试能力，不逐源联网或因其他高级规则整体禁用；请求模板与规则语法在实际调用对应搜索、详情、目录、正文或发现能力时按需校验。
+- `legado/legado_explore.dart`：阅读书源发现入口；把旧式 `标题::URL` 和 JSON `type=url` 入口转换为静态频道。导入阶段只解析、去重并按已有规则组声明可尝试能力，不逐源联网或因其他高级规则整体禁用；请求模板与规则语法在实际调用对应搜索、详情、目录、正文或发现能力时按需校验。
 
 发现页提供共享同一缓存、分页、详情和阅读链路的两种视图，并通过 `book_source_discover_layout_v1` 记忆选择：标准布局先展示可发现书源，再展示当前范围可用的推荐/分类/最新栏目；列表布局以 Sliver 惰性列出书源，单项展开本地频道，选择频道后收起目录并进入该频道书单，通过“更换”返回目录。只有一个栏目时标准布局自动省略栏目切换。
 Legado 的安全发现入口映射为分类频道，频道书单通过 `ruleExplore` 解析并在缺失时回退

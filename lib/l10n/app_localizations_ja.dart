@@ -56,6 +56,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get discoverCategoryEmpty => 'このカテゴリには表示できる書籍がまだありません。';
 
   @override
+  String get bookSourceStandardLayout => '標準レイアウト';
+
+  @override
+  String get bookSourceListLayout => 'リストレイアウト';
+
+  @override
+  String get bookSourceChangeChannel => '変更';
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count チャンネル';
+  }
+
+  @override
   String get bookSourceManagementTitle => 'ソース管理';
 
   @override
@@ -1963,7 +1977,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      'インポート時はローカルで解析・重複除去・互換性マークのみを行い、各ソースへの通信確認はしません。実行可能なソースは元の有効状態を維持し、未対応ソースも無効のまま保存します。';
+      'インポート時はローカルで解析と重複除去のみを行い、各ソースへの通信確認はしません。呼び出せるルールを持つソースは元の有効状態を維持し、各機能は使用時に確認します。';
 
   @override
   String get additionalSourcesChooseFile => 'JSON ファイルから追加';
@@ -1987,6 +2001,11 @@ class AppLocalizationsJa extends AppLocalizations {
     int skipped,
   ) {
     return 'すぐに使用可能 $supported、一部対応 $partial、互換対応待ち $unsupported、スキップ $skipped';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count 件をインポート可能、$skipped 件をスキップ';
   }
 
   @override

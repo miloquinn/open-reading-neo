@@ -52,7 +52,7 @@ void main() {
     expect(imported.single.capabilities, contains('search'));
   });
 
-  test('keeps unsupported sources stored but disabled', () {
+  test('imports advanced sources optimistically without live probing', () {
     final result = BookSourceImportAnalyzer().analyzeBytes(
       _bytes([
         {
@@ -68,8 +68,11 @@ void main() {
 
     final imported = result.additionalPreview!.toRegisteredSources();
     expect(imported, hasLength(1));
-    expect(imported.single.enabled, isFalse);
-    expect(imported.single.capabilities, isEmpty);
+    expect(imported.single.enabled, isTrue);
+    expect(
+      imported.single.capabilities,
+      containsAll(['search', 'catalog', 'content']),
+    );
     expect(
       imported.single.sourceConfig?['_openReadingCompatibilityLevel'],
       'unsupported',

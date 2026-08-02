@@ -31,7 +31,7 @@ class LegadoRuntime {
     int pageSize = 20,
   }) async {
     final source = _source(registered);
-    _ensureRunnable(source);
+    _ensureRulesSupported(source, const ['ruleSearch']);
     final response = await _request(
       source,
       source.searchUrl,
@@ -61,7 +61,6 @@ class LegadoRuntime {
     RegisteredBookSource registered,
   ) async {
     final source = _source(registered);
-    _ensureRunnable(source);
     final catalog = source.exploreCatalog;
     if (!catalog.canBrowse) {
       throw BookSourceProtocolException(
@@ -80,7 +79,6 @@ class LegadoRuntime {
     int pageSize = 20,
   }) async {
     final source = _source(registered);
-    _ensureRunnable(source);
     final catalog = source.exploreCatalog;
     if (!catalog.canBrowse) {
       throw BookSourceProtocolException(
@@ -105,6 +103,12 @@ class LegadoRuntime {
     final rule = _optionalRule(exploreRule, 'bookList').isEmpty
         ? source.rule('ruleSearch')
         : exploreRule;
+    _ensureRulesSupported(
+      source,
+      _optionalRule(exploreRule, 'bookList').isEmpty
+          ? const ['ruleSearch']
+          : const ['ruleExplore'],
+    );
     final contexts = _rules.evaluateList(
       document,
       null,
@@ -131,7 +135,7 @@ class LegadoRuntime {
     String bookId,
   ) async {
     final source = _source(registered);
-    _ensureRunnable(source);
+    _ensureRulesSupported(source, const ['ruleBookInfo']);
     final response = await _request(source, bookId);
     final document = LegadoRuleDocument.parse(response.body, response.finalUri);
     final rule = source.rule('ruleBookInfo');
@@ -162,7 +166,7 @@ class LegadoRuntime {
     String bookId,
   ) async {
     final source = _source(registered);
-    _ensureRunnable(source);
+    _ensureRulesSupported(source, const ['ruleBookInfo', 'ruleToc']);
     final tocUrl = await _tocUrl(source, bookId);
     final rule = source.rule('ruleToc');
     final chapters = <BookSourceChapter>[];
@@ -210,7 +214,7 @@ class LegadoRuntime {
     required String chapterId,
   }) async {
     final source = _source(registered);
-    _ensureRunnable(source);
+    _ensureRulesSupported(source, const ['ruleContent']);
     final rule = source.rule('ruleContent');
     final parts = <String>[];
     final seenPages = <String>{};
@@ -337,26 +341,11 @@ class LegadoRuntime {
     return LegadoBookSource.fromJson(registered.sourceConfig!);
   }
 
-  void _ensureRunnable(LegadoBookSource source) {
-    final report = const LegadoCompatibilityScanner().scan(source);
-    if (!report.canRun) {
-      throw const BookSourceProtocolException(
-        'This compatible source uses features that are not supported yet.',
-      );
-    }
-    final headers = _sourceHeaders(source);
-    LegadoRequestTemplate.parse(
-      source.searchUrl,
-      baseUri: source.baseUri,
-      variables: const {'key': 'preflight', 'page': '1'},
-      sourceHeaders: headers,
-    );
-    for (final groupName in const [
-      'ruleSearch',
-      'ruleBookInfo',
-      'ruleToc',
-      'ruleContent',
-    ]) {
+  void _ensureRulesSupported(
+    LegadoBookSource source,
+    Iterable<String> groupNames,
+  ) {
+    for (final groupName in groupNames) {
       for (final entry in source.rule(groupName).entries) {
         if (entry.value is String) {
           LegadoRuleEngine.ensureSupported(

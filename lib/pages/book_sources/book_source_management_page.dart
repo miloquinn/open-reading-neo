@@ -1667,10 +1667,8 @@ class _DetectedSourceSummary extends StatelessWidget {
             Text(analysis.sources.single.name)
           else if (preview != null)
             Text(
-              context.l10n.additionalSourcesPreviewDetails(
-                preview.supported,
-                preview.partial,
-                preview.unsupported,
+              context.l10n.additionalSourcesQuickPreview(
+                preview.sources.length,
                 preview.skipped,
               ),
             ),

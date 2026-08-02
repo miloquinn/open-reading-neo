@@ -598,6 +598,20 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
       trailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ValueListenableBuilder<BookSourceDiscoverLayout>(
+            key: const Key('bookSourceDiscoverLayoutToggle'),
+            valueListenable: _bookSourcesController.layout,
+            builder: (context, layout, _) => _buildTopBarActionButton(
+              icon: layout == BookSourceDiscoverLayout.standard
+                  ? Icons.view_list_rounded
+                  : Icons.dashboard_outlined,
+              tooltip: layout == BookSourceDiscoverLayout.standard
+                  ? context.l10n.bookSourceListLayout
+                  : context.l10n.bookSourceStandardLayout,
+              onTap: () => unawaited(_bookSourcesController.toggleLayout()),
+            ),
+          ),
+          const SizedBox(width: 8),
           _buildTopBarActionButton(
             icon: Icons.search_rounded,
             tooltip: context.l10n.bookSourcesSearch,

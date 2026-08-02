@@ -56,6 +56,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverCategoryEmpty => '这个分类暂时没有可展示的书籍。';
 
   @override
+  String get bookSourceStandardLayout => '标准布局';
+
+  @override
+  String get bookSourceListLayout => '列表布局';
+
+  @override
+  String get bookSourceChangeChannel => '更换';
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count 个频道';
+  }
+
+  @override
   String get bookSourceManagementTitle => '书源管理';
 
   @override
@@ -1949,7 +1963,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      '导入只做本地解析、去重和兼容性标记，不会逐条联网检测；可运行的书源按原配置启用，待兼容书源会保留但保持停用。';
+      '导入只做本地解析和去重，不会逐条联网检测；具备可调用规则的书源按原配置启用，具体能力在实际使用时判断。';
 
   @override
   String get additionalSourcesChooseFile => '从 JSON 文件添加';
@@ -1973,6 +1987,11 @@ class AppLocalizationsZh extends AppLocalizations {
     int skipped,
   ) {
     return '可直接使用 $supported 个，部分支持 $partial 个，待兼容 $unsupported 个，跳过 $skipped 条';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count 个书源可导入，跳过 $skipped 个';
   }
 
   @override
@@ -4443,6 +4462,20 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get discoverCategoryEmpty => '這個分類暫時沒有可顯示的書籍。';
 
   @override
+  String get bookSourceStandardLayout => '標準版面';
+
+  @override
+  String get bookSourceListLayout => '清單版面';
+
+  @override
+  String get bookSourceChangeChannel => '更換';
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count 個頻道';
+  }
+
+  @override
   String get bookSourceManagementTitle => '書源管理';
 
   @override
@@ -6293,7 +6326,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get additionalSourcesImportNotice =>
-      '匯入只做本機解析、去重和相容性標記，不會逐一連線檢測；可執行書源依原設定啟用，待相容書源會保留但保持停用。';
+      '匯入只做本機解析和去重，不會逐一連線檢測；具備可呼叫規則的書源依原設定啟用，具體能力在實際使用時判斷。';
 
   @override
   String get additionalSourcesChooseFile => '從 JSON 檔案新增';
@@ -6317,6 +6350,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
     int skipped,
   ) {
     return '可直接使用 $supported 個，部分支援 $partial 個，待相容 $unsupported 個，略過 $skipped 條';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count 個書源可匯入，略過 $skipped 個';
   }
 
   @override

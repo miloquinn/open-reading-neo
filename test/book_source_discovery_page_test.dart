@@ -99,6 +99,88 @@ void main() {
     expect(merged.map((result) => result.book.title), ['B1', 'A1', 'B2', 'A2']);
   });
 
+  test('discover layout preference is restored by a new controller', () async {
+    final first = BookSourcesPageController();
+    await first.setLayout(BookSourceDiscoverLayout.list);
+    first.dispose();
+
+    final restored = BookSourcesPageController();
+    await restored.initialize();
+    expect(restored.layout.value, BookSourceDiscoverLayout.list);
+    restored.dispose();
+  });
+
+  testWidgets('list layout expands one source and focuses the chosen channel', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final sourceA = _source('source-a', 'Source A');
+    final sourceB = _source('source-b', 'Source B');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        [sourceA, sourceB].map((source) => source.toJson()).toList(),
+      ),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+    final controller = BookSourcesPageController();
+    final client = _DiscoveryClient();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: client, controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('bookSourceListLayoutDirectory')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('bookSourceDiscoverScopeControl')),
+      findsNothing,
+    );
+    expect(client.categoryBrowseSourceIds, isEmpty);
+
+    await tester.tap(find.byKey(const Key('bookSourceListSource-source-b')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-a-source-a-fiction')),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('bookSourceListSelectionHeader')),
+      findsOneWidget,
+    );
+    expect(find.text('Source B category book'), findsOneWidget);
+    expect(client.categoryBrowseSourceIds, ['source-b']);
+
+    await tester.tap(find.byKey(const Key('bookSourceListChangeChannel')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListLayoutDirectory')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('request failures are not reported as unsupported capabilities', (
     tester,
   ) async {

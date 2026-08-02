@@ -58,6 +58,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'There are no books to show in this category yet.';
 
   @override
+  String get bookSourceStandardLayout => 'Standard layout';
+
+  @override
+  String get bookSourceListLayout => 'List layout';
+
+  @override
+  String get bookSourceChangeChannel => 'Change';
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count channels';
+  }
+
+  @override
   String get bookSourceManagementTitle => 'Manage sources';
 
   @override
@@ -2036,7 +2050,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      'Import only parses, deduplicates, and marks compatibility locally. It does not probe every source online. Runnable sources keep their imported enabled state; incompatible sources remain stored but disabled.';
+      'Import only parses and deduplicates locally; it does not probe every source online. Sources with callable rules keep their imported enabled state, and each capability is checked when used.';
 
   @override
   String get additionalSourcesChooseFile => 'Add from JSON file';
@@ -2060,6 +2074,11 @@ class AppLocalizationsEn extends AppLocalizations {
     int skipped,
   ) {
     return '$supported ready, $partial partially supported, $unsupported compatibility pending, $skipped skipped';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count sources ready to import, $skipped skipped';
   }
 
   @override

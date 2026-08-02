@@ -191,6 +191,30 @@ abstract class AppLocalizations {
   /// **'There are no books to show in this category yet.'**
   String get discoverCategoryEmpty;
 
+  /// No description provided for @bookSourceStandardLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard layout'**
+  String get bookSourceStandardLayout;
+
+  /// No description provided for @bookSourceListLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'List layout'**
+  String get bookSourceListLayout;
+
+  /// No description provided for @bookSourceChangeChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get bookSourceChangeChannel;
+
+  /// No description provided for @bookSourceChannelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} channels'**
+  String bookSourceChannelCount(int count);
+
   /// No description provided for @bookSourceManagementTitle.
   ///
   /// In en, this message translates to:
@@ -3689,7 +3713,7 @@ abstract class AppLocalizations {
   /// No description provided for @additionalSourcesImportNotice.
   ///
   /// In en, this message translates to:
-  /// **'Import only parses, deduplicates, and marks compatibility locally. It does not probe every source online. Runnable sources keep their imported enabled state; incompatible sources remain stored but disabled.'**
+  /// **'Import only parses and deduplicates locally; it does not probe every source online. Sources with callable rules keep their imported enabled state, and each capability is checked when used.'**
   String get additionalSourcesImportNotice;
 
   /// No description provided for @additionalSourcesChooseFile.
@@ -3726,6 +3750,12 @@ abstract class AppLocalizations {
     int unsupported,
     int skipped,
   );
+
+  /// No description provided for @additionalSourcesQuickPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sources ready to import, {skipped} skipped'**
+  String additionalSourcesQuickPreview(int count, int skipped);
 
   /// No description provided for @additionalSourcesAvailable.
   ///

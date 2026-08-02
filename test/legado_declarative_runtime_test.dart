@@ -407,20 +407,38 @@ void main() {
       expect(transport.requests, isEmpty);
     });
 
-    test('rejects unsupported behavior before sending a request', () async {
-      final transport = _FakeTransport(const {});
-      final raw = Map<String, dynamic>.from(_htmlSource().raw);
-      raw['ruleContent'] = {'content': '@js:result'};
+    test(
+      'unsupported content does not block search and fails before content request',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/search?q=test&page=1': '''
+            <div class="book">
+              <a href="/book/1"><span class="name">可搜索</span></a>
+              <span class="author">作者</span>
+            </div>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw);
+        raw['ruleContent'] = {'content': '@js:result'};
+        final runtime = LegadoRuntime(transport: transport);
+        final source = LegadoBookSource.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
 
-      await expectLater(
-        LegadoRuntime(transport: transport).search(
-          LegadoBookSource.fromJson(raw).toRegisteredSource(enabled: true),
-          'test',
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
-      );
-      expect(transport.requests, isEmpty);
-    });
+        final page = await runtime.search(source, 'test');
+        expect(page.items.single.title, '可搜索');
+
+        await expectLater(
+          runtime.getChapterContent(
+            source,
+            bookId: 'https://books.test/book/1',
+            chapterId: 'https://books.test/chapter/1',
+          ),
+          throwsA(isA<BookSourceProtocolException>()),
+        );
+        expect(transport.requests, hasLength(1));
+      },
+    );
   });
 
   test('unified client blocks compatible requests while the toggle is off', () {

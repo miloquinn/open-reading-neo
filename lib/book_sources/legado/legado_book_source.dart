@@ -112,8 +112,14 @@ class LegadoBookSource {
   }) {
     final report =
         compatibilityReport ?? const LegadoCompatibilityScanner().scan(this);
-    final canEnable = report.canRun;
     final shouldEnable = enabled ?? this.enabled;
+    final capabilities = <String>{
+      if (searchUrl.isNotEmpty && rule('ruleSearch').isNotEmpty) 'search',
+      if (rule('ruleBookInfo').isNotEmpty) 'detail',
+      if (rule('ruleToc').isNotEmpty) 'catalog',
+      if (rule('ruleContent').isNotEmpty) 'content',
+      if (exploreCatalog.canBrowse) ...{'categories', 'browse'},
+    };
     return RegisteredBookSource(
       id: stableId,
       name: name,
@@ -123,16 +129,12 @@ class LegadoBookSource {
       websiteUrl: baseUri,
       protocolVersion: 'legado-3',
       languages: const [],
-      capabilities: canEnable
-          ? {
-              'search',
-              'detail',
-              'catalog',
-              'content',
-              if (exploreCatalog.canBrowse) ...{'categories', 'browse'},
-            }
-          : const {},
-      enabled: shouldEnable && canEnable,
+      // Import is deliberately optimistic: available rule groups decide which
+      // actions may be attempted. Unsupported syntax is reported only when the
+      // user invokes that action, so one advanced rule does not disable an
+      // otherwise usable source at import time.
+      capabilities: capabilities,
+      enabled: shouldEnable && capabilities.isNotEmpty,
       addedAt: addedAt ?? DateTime.now(),
       sourceProtocol: BookSourceProtocolKind.legado,
       sourceConfig: {

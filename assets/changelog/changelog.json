@@ -2,6 +2,35 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.4.6",
+            "notes": {
+                "en": [
+                    "Import and manage large source libraries much faster with local parsing, deduplication, and batched writes instead of checking every source online during import",
+                    "Native source execution now covers more search, discovery, detail, catalog, and content rules, including common scripts, CSS, XPath, JSONPath, cookies, GBK, redirects, and dynamic pages",
+                    "Discovery now offers Standard and List layouts with sources and channels loaded on demand to stay responsive with thousands of sources",
+                    "Search for a source directly in Discovery or Source management, with improved filtering, expansion, retry feedback, and cleaner source descriptions"
+                ],
+                "zh": [
+                    "大型书源库导入改为本地解析、去重和批量写入，不再逐条联网检测，数千个书源也能快速完成导入与管理",
+                    "原生书源执行扩展到更多搜索、发现、详情、目录和正文规则，并支持常用脚本、CSS、XPath、JSONPath、Cookie、GBK、重定向与动态网页处理",
+                    "发现页新增标准布局与列表布局，书源和频道按需加载，大型书源库下仍保持流畅",
+                    "发现页和书源管理页支持直接搜索书源，并改进筛选、展开、错误重试和简介文本清理"
+                ],
+                "zh-TW": [
+                    "大型書源庫匯入改為本機解析、去重與批次寫入，不再逐條連線檢測，數千個書源也能快速完成匯入與管理",
+                    "原生書源執行擴充到更多搜尋、發現、詳情、目錄與正文規則，並支援常用腳本、CSS、XPath、JSONPath、Cookie、GBK、重新導向與動態網頁處理",
+                    "發現頁新增標準版面與列表版面，書源和頻道依需要載入，大型書源庫下仍保持流暢",
+                    "發現頁和書源管理頁支援直接搜尋書源，並改善篩選、展開、錯誤重試與簡介文字清理"
+                ],
+                "ja": [
+                    "大規模な書籍ソースライブラリの取り込みをローカル解析・重複排除・一括保存に変更し、取り込み時の個別オンライン検査をなくして数千件でも高速に管理できるようにしました",
+                    "検索・発見・詳細・目次・本文のより多くのルールをネイティブ実行し、一般的なスクリプト、CSS、XPath、JSONPath、Cookie、GBK、リダイレクト、動的ページ処理に対応しました",
+                    "発見ページに標準レイアウトとリストレイアウトを追加し、ソースとチャンネルを必要時に読み込むことで数千件でも滑らかに操作できます",
+                    "発見ページとソース管理でソースを直接検索でき、絞り込み、展開、エラー再試行、説明文の整形を改善しました"
+                ]
+            }
+        },
+        {
             "version": "2.4.4",
             "notes": {
                 "en": [

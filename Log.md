@@ -1194,3 +1194,4 @@
 
 - EPUB 目录在多个小节共用同一正文章节索引时，现结合当前章节文本与阅读偏移定位真正活动的小节，只为对应目录项显示当前状态；文字选择工具栏改为复用阅读器毛玻璃控制栏；iOS Xcode 工程移除残留的固定 `MARKETING_VERSION`，统一跟随 Flutter 版本。
 - 版本更新为 `2.5.1+260803004`，基础构建号已按 Asia/Shanghai 日期规则占用；计划生成单一 arm64-v8a Origo 签名自测 APK。目录和文字选择工具栏 10 项定向测试通过，触达 Dart 文件静态分析无 error/warning、保留本地阅读器 7 条既有 info，格式检查零变更；构建与签名验证结果待回写。
+- 已生成单一 arm64-v8a Origo 签名自测包 `output/releases/v2.5.1/OpenReading-Android-arm64-v8a-2.5.1-260803004.apk`：包名 `com.niki.xxread`、versionName `2.5.1`、实际 versionCode `260805004`，仅含 arm64-v8a 原生库，APK V2 签名及 Origo 证书身份一致；文件大小 `37499395` 字节，SHA-256 `00794CF2B96B85EB1C49AB1FE95933F399767722A77CCE512BB2B6CE6382C3DF`。未做真机安装与视觉复核。

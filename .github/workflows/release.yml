@@ -10,6 +10,11 @@ on:
         description: "Existing version tag to build and release (for example v0.9.1)"
         required: true
         type: string
+      deployment_only:
+        description: "Deploy Web and mirror an already-published immutable Release"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -156,6 +161,7 @@ jobs:
   android:
     name: Android APKs
     needs: verify-public-release
+    if: inputs.deployment_only != true
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 45
@@ -287,6 +293,7 @@ jobs:
   windows:
     name: Windows x64
     needs: verify-public-release
+    if: inputs.deployment_only != true
     # pdfx's PDFium downloader is not compatible with CMake 4 on windows-latest.
     runs-on: windows-2022
     timeout-minutes: 45
@@ -339,6 +346,7 @@ jobs:
   linux:
     name: Linux x64
     needs: verify-public-release
+    if: inputs.deployment_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -389,7 +397,7 @@ jobs:
   macos:
     name: macOS universal (signed and notarized)
     needs: verify-public-release
-    if: vars.MACOS_RELEASE_ENABLED == 'true'
+    if: inputs.deployment_only != true && vars.MACOS_RELEASE_ENABLED == 'true'
     runs-on: macos-15
     environment: release
     timeout-minutes: 60
@@ -615,6 +623,7 @@ jobs:
   ios:
     name: iOS IPA (unsigned)
     needs: verify-public-release
+    if: inputs.deployment_only != true
     runs-on: macos-15
     timeout-minutes: 55
     steps:
@@ -699,7 +708,7 @@ jobs:
     name: Publish GitHub Release
     needs: [android, windows, linux, macos, ios]
     if: >-
-      always() &&
+      always() && inputs.deployment_only != true &&
       needs.android.result == 'success' &&
       needs.windows.result == 'success' &&
       needs.linux.result == 'success' &&
@@ -1057,6 +1066,10 @@ jobs:
   deploy-web:
     name: Deploy Flutter Web
     needs: [publish, web]
+    if: >-
+      always() &&
+      needs.web.result == 'success' &&
+      (needs.publish.result == 'success' || inputs.deployment_only == true)
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 20
@@ -1209,6 +1222,9 @@ jobs:
   mirror-official-site:
     name: Mirror release to official site
     needs: publish
+    if: >-
+      always() &&
+      (needs.publish.result == 'success' || inputs.deployment_only == true)
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 20

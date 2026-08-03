@@ -12,6 +12,7 @@ import 'package:xxread/core/reader/reader_text_pagination.dart';
 import 'package:xxread/models/book_note.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/reader_themes.dart';
+import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_text_page_content.dart';
 
 typedef ReaderTextAnnotationSaveCallback =
@@ -299,27 +300,13 @@ class ReaderSelectionToolbar extends StatelessWidget {
     return TextSelectionToolbar(
       anchorAbove: anchors.primaryAnchor,
       anchorBelow: anchors.secondaryAnchor ?? anchors.primaryAnchor,
-      toolbarBuilder: (context, child) => Material(
-        key: const ValueKey('reader-selection-toolbar'),
-        color: palette.controlBar,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: palette.border.withValues(alpha: 0.72)),
-            boxShadow: [
-              BoxShadow(
-                color: palette.shadow.withValues(
-                  alpha: palette.brightness == Brightness.dark ? 0.42 : 0.16,
-                ),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
+      toolbarBuilder: (context, child) => ReaderControlBar(
+        palette: palette,
+        isTopBar: true,
+        child: Material(
+          key: const ValueKey('reader-selection-toolbar'),
+          color: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
           child: child,
         ),
       ),

@@ -88,7 +88,14 @@ void main() {
       final toolbar = tester.widget<Material>(
         find.byKey(const ValueKey('reader-selection-toolbar')),
       );
-      expect(toolbar.color, ReaderThemes.green.controlBar);
+      expect(toolbar.color, Colors.transparent);
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('reader-selection-toolbar')),
+          matching: find.byType(BackdropFilter),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('高亮'), findsOneWidget);
       expect(find.text('批注'), findsNothing);
       expect(find.text('笔记'), findsOneWidget);

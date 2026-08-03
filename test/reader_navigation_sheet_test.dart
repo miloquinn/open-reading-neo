@@ -150,6 +150,63 @@ void main() {
     expect(find.text('序章 远方的灯火\n       '), findsNothing);
   });
 
+  testWidgets('only the active subheading is marked within one EPUB chapter', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const chapterText =
+        '学习就是调整心理模型的参数\n\n正文一。\n\n'
+        '学习是在利用组合爆炸\n\n正文二。\n\n'
+        '学习就是将错误降到最低\n\n正文三。';
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ReaderNavigationSheet(
+            palette: ReaderThemes.day,
+            chapters: const [
+              ReaderNavigationChapter(title: '第1章 学习的7个定义', index: 10),
+              ReaderNavigationChapter(
+                title: '学习就是调整心理模型的参数',
+                index: 10,
+                depth: 1,
+              ),
+              ReaderNavigationChapter(title: '学习是在利用组合爆炸', index: 10, depth: 1),
+              ReaderNavigationChapter(
+                title: '学习就是将错误降到最低',
+                index: 10,
+                depth: 1,
+              ),
+            ],
+            currentChapterIndex: 10,
+            currentChapterOffset: chapterText.indexOf('学习就是将错误降到最低') + 2,
+            currentChapterText: chapterText,
+            bookmarks: const [],
+            onChapterSelected: (_) {},
+            onBookmarkSelected: (_) {},
+            onBookmarkDeleted: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OpenReadingCurrentIcon), findsOneWidget);
+    expect(find.text('当前'), findsNWidgets(2));
+    expect(
+      tester.widget<Text>(find.text('学习就是将错误降到最低')).style?.color,
+      ReaderThemes.day.accent,
+    );
+    expect(
+      tester.widget<Text>(find.text('学习是在利用组合爆炸')).style?.color,
+      ReaderThemes.day.text,
+    );
+  });
+
   testWidgets('navigation sheet collapses nested chapter branches', (
     tester,
   ) async {

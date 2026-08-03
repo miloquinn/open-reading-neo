@@ -35,6 +35,8 @@ class ReaderNavigationSheet extends StatefulWidget {
     this.onAnnotationSelected,
     this.onAnnotationDeleted,
     this.currentAnchorKey,
+    this.currentChapterOffset,
+    this.currentChapterText,
   });
 
   final ReaderThemePalette palette;
@@ -43,6 +45,8 @@ class ReaderNavigationSheet extends StatefulWidget {
   final List<Bookmark> bookmarks;
   final List<BookNote> annotations;
   final String? currentAnchorKey;
+  final int? currentChapterOffset;
+  final String? currentChapterText;
   final ValueChanged<int> onChapterSelected;
   final ValueChanged<Bookmark> onBookmarkSelected;
   final ValueChanged<Bookmark> onBookmarkDeleted;
@@ -189,6 +193,38 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     return visible;
   }
 
+  int get _currentChapterPosition {
+    final matchingPositions = <int>[
+      for (final entry in _treeEntries)
+        if (entry.chapter.index == widget.currentChapterIndex) entry.position,
+    ];
+    if (matchingPositions.length <= 1) {
+      return matchingPositions.isEmpty ? -1 : matchingPositions.single;
+    }
+
+    final text = widget.currentChapterText;
+    final offset = widget.currentChapterOffset;
+    if (text == null || offset == null || text.isEmpty) {
+      return matchingPositions.first;
+    }
+
+    final safeOffset = offset.clamp(0, text.length);
+    var selectedPosition = matchingPositions.first;
+    var searchFrom = 0;
+    for (final position in matchingPositions) {
+      final title = _treeEntries[position].chapter.title
+          .replaceAll(_chapterTitleWhitespace, ' ')
+          .trim();
+      if (title.isEmpty) continue;
+      final titleOffset = text.indexOf(title, searchFrom);
+      if (titleOffset < 0) continue;
+      searchFrom = titleOffset + title.length;
+      if (titleOffset > safeOffset) break;
+      selectedPosition = position;
+    }
+    return selectedPosition;
+  }
+
   void _toggleChapter(_ReaderNavigationTreeEntry entry) {
     setState(() {
       if (!_collapsedChapterPositions.remove(entry.position)) {
@@ -212,9 +248,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       return;
     }
     final entries = _treeEntries;
-    final currentPosition = entries.indexWhere(
-      (entry) => entry.chapter.index == widget.currentChapterIndex,
-    );
+    final currentPosition = _currentChapterPosition;
     if (currentPosition < 0) return;
     var expandedAncestor = false;
     var ancestorPosition = entries[currentPosition].parentPosition;
@@ -391,6 +425,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
 
   Widget _buildCatalog(BuildContext context) {
     final chapters = _visibleChapters;
+    final currentPosition = _currentChapterPosition;
     return Column(
       children: [
         Padding(
@@ -471,8 +506,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     itemCount: chapters.length,
                     itemBuilder: (context, visibleIndex) {
                       final entry = chapters[visibleIndex];
-                      final selected =
-                          entry.chapter.index == widget.currentChapterIndex;
+                      final selected = entry.position == currentPosition;
                       return _buildChapterTile(context, entry, selected);
                     },
                   ),

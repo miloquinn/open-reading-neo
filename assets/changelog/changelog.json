@@ -2,6 +2,31 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.5.1",
+            "notes": {
+                "en": [
+                    "EPUB catalogs now use the current reading offset to highlight only the active subheading when several catalog entries belong to the same content chapter",
+                    "The text-selection toolbar now uses the same glass control-bar styling as the rest of the reader",
+                    "iOS builds now inherit the current Flutter version instead of an obsolete fixed Xcode marketing version"
+                ],
+                "zh": [
+                    "EPUB 同一正文章节包含多个目录小节时，目录面板会结合当前阅读位置，只高亮正在阅读的小节",
+                    "选中文字后的高亮、笔记工具栏改用与阅读器控制栏一致的毛玻璃样式",
+                    "iOS 构建改为跟随当前 Flutter 版本，不再被 Xcode 工程中残留的固定旧版本号覆盖"
+                ],
+                "zh-TW": [
+                    "EPUB 同一正文書章包含多個目錄小節時，目錄面板會結合目前閱讀位置，只醒目顯示正在閱讀的小節",
+                    "選取文字後的醒目標示、筆記工具列改用與閱讀器控制列一致的毛玻璃樣式",
+                    "iOS 建置改為跟隨目前 Flutter 版本，不再被 Xcode 專案中殘留的固定舊版本號覆蓋"
+                ],
+                "ja": [
+                    "同じ EPUB 本文章に複数の目次小見出しがある場合、現在の読書位置に対応する小見出しだけを強調表示するようにしました",
+                    "文字選択時のハイライト・メモ用ツールバーを、リーダーの操作バーと同じガラス調デザインに統一しました",
+                    "iOS ビルドが Xcode に残っていた古い固定バージョンではなく、現在の Flutter バージョンを使用するようにしました"
+                ]
+            }
+        },
+        {
             "version": "2.5.0",
             "notes": {
                 "en": [

@@ -2629,6 +2629,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
             palette: _readerTheme,
             chapters: navigationChapters,
             currentChapterIndex: _chapterIndex,
+            currentChapterOffset: _anchorOffset,
+            currentChapterText: chapters[_chapterIndex].plainText,
             bookmarks: _bookmarks,
             annotations: _annotations,
             currentAnchorKey: currentAnchorKey,

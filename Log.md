@@ -1189,3 +1189,8 @@
 - 公共 Latest Release `https://github.com/miloquinn/open-reading/releases/tag/v2.5.0` 为非 Draft、非 Prerelease，共包含六个安装包及 `SHA256SUMS.txt`；全部产物重新下载后 SHA-256 复算 6/6 通过。Android 三个 APK 的包名 `com.niki.xxread`、versionName `2.5.0`、ABI 偏移 versionCode、V2 签名与 Origo 证书身份全部一致；iOS IPA ZIP、版本元数据和 Runner.app 未签名状态通过。
 - 官网 Android 三 ABI、Windows x64、Linux x64、iOS universal 六个平台槽位的版本、构建号、大小与 SHA-256 均和 GitHub Release 一致，Range 请求全部返回 206。`read.xxread.top/version.json` 已为 `2.5.0+260803003`，Web 首页、官网首页及下载页均返回 200。未做 Android/iOS 真机安装与视觉复核。
 - `v2.5.0` 发布后核对发现，公开仓库 `release` Environment 原有的五个 macOS Developer ID/Notary Secret 在迁移私库时遗漏，导致本版本 macOS job 按 `MACOS_RELEASE_ENABLED=false` 跳过。现已从 `/Users/xiaoyuan/certs/APPLE` 的 Developer ID P12 和 App Store Connect API Key 重建私库五个 Secret，使用 `notarytool history` 验证 Key ID、Issuer ID 与私钥组合有效，并将私库变量 `MACOS_RELEASE_ENABLED` 开启为 `true`。该配置只用于后续新版本 Tag；不向已发布且资产不可变的 `v2.5.0` 追加 macOS 包。
+
+### v2.5.1 用户自测包准备
+
+- EPUB 目录在多个小节共用同一正文章节索引时，现结合当前章节文本与阅读偏移定位真正活动的小节，只为对应目录项显示当前状态；文字选择工具栏改为复用阅读器毛玻璃控制栏；iOS Xcode 工程移除残留的固定 `MARKETING_VERSION`，统一跟随 Flutter 版本。
+- 版本更新为 `2.5.1+260803004`，基础构建号已按 Asia/Shanghai 日期规则占用；计划生成单一 arm64-v8a Origo 签名自测 APK。目录和文字选择工具栏 10 项定向测试通过，触达 Dart 文件静态分析无 error/warning、保留本地阅读器 7 条既有 info，格式检查零变更；构建与签名验证结果待回写。

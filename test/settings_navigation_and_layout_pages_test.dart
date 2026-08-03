@@ -74,7 +74,6 @@ void main() {
       find.byKey(const ValueKey('floating-navigation-size-mode')),
       findsOneWidget,
     );
-
     final sizeMode = tester.widget<SegmentedButton<bool>>(
       find.byKey(const ValueKey('floating-navigation-size-mode')),
     );
@@ -113,6 +112,19 @@ void main() {
     expect(
       find.descendant(of: preview, matching: find.text('Home')),
       findsOneWidget,
+    );
+
+    final aiVisibilityFinder = find.byKey(
+      const ValueKey('floating-navigation-visible-ai'),
+    );
+    await tester.scrollUntilVisible(aiVisibilityFinder, 300);
+    final aiVisibilitySwitch = tester.widget<Switch>(aiVisibilityFinder);
+    expect(aiVisibilitySwitch.value, isFalse);
+    aiVisibilitySwitch.onChanged!(true);
+    await tester.pump();
+    expect(
+      settings.isHomeNavigationDestinationVisible(HomeNavigationDestination.ai),
+      isTrue,
     );
 
     final orderList = tester.widget<ReorderableListView>(

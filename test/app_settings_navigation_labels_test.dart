@@ -36,6 +36,13 @@ void main() {
 
     expect(notifier.hideNavigationLabels, isTrue);
     expect(notifier.homeNavigationOrder, HomeNavigationDestination.values);
+    expect(notifier.hiddenHomeNavigationDestinations, {
+      HomeNavigationDestination.ai,
+    });
+    expect(
+      notifier.visibleHomeNavigationOrder,
+      isNot(contains(HomeNavigationDestination.ai)),
+    );
   });
 
   test('navigation label visibility restores and persists', () async {
@@ -125,7 +132,21 @@ void main() {
     final notifier = await _loadNotifier();
     addTearDown(notifier.dispose);
 
-    expect(notifier.visibleHomeNavigationOrder, defaultHomeNavigationOrder);
+    expect(notifier.visibleHomeNavigationOrder, [
+      HomeNavigationDestination.home,
+      HomeNavigationDestination.library,
+      HomeNavigationDestination.discover,
+      HomeNavigationDestination.settings,
+    ]);
+
+    await notifier.setHomeNavigationDestinationVisible(
+      HomeNavigationDestination.ai,
+      true,
+    );
+    expect(
+      notifier.visibleHomeNavigationOrder,
+      contains(HomeNavigationDestination.ai),
+    );
 
     await notifier.setHomeNavigationDestinationVisible(
       HomeNavigationDestination.home,
@@ -148,9 +169,30 @@ void main() {
       contains(HomeNavigationDestination.settings),
     );
 
-    // 恢复默认同时清空隐藏集合。
+    // 恢复默认时 AI 页重新关闭。
     await notifier.resetHomeNavigationOrder();
-    expect(notifier.visibleHomeNavigationOrder, defaultHomeNavigationOrder);
+    expect(notifier.hiddenHomeNavigationDestinations, {
+      HomeNavigationDestination.ai,
+    });
+    expect(prefs.getStringList('home_navigation_hidden_v1'), ['ai']);
+  });
+
+  test('explicitly enabled AI page stays enabled after reload', () async {
+    final notifier = await _loadNotifier();
+    await notifier.setHomeNavigationDestinationVisible(
+      HomeNavigationDestination.ai,
+      true,
+    );
+    notifier.dispose();
+
+    final reloaded = await _loadNotifier();
+    addTearDown(reloaded.dispose);
+
+    expect(
+      reloaded.isHomeNavigationDestinationVisible(HomeNavigationDestination.ai),
+      isTrue,
+    );
+    final prefs = await SharedPreferences.getInstance();
     expect(prefs.getStringList('home_navigation_hidden_v1'), isEmpty);
   });
 

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 
 import 'package:xxread/book_sources/services/book_source_chapter_cache.dart';
+import 'package:xxread/book_sources/services/book_source_response_cache.dart';
 import 'package:xxread/book_sources/services/source_cover_cache.dart';
 import 'package:xxread/services/core/cache_management_service.dart';
 
@@ -19,6 +20,9 @@ void main() {
     final nativeReader = Directory(
       path.join(root.path, AppCacheManager.nativeReaderDirectoryName),
     );
+    final responses = Directory(
+      path.join(root.path, BookSourceResponseCache.directoryName),
+    );
     final updates = Directory(
       path.join(root.path, AppCacheManager.updateDirectoryName),
     );
@@ -27,6 +31,7 @@ void main() {
       covers,
       chapters,
       nativeReader,
+      responses,
       updates,
       userDocuments,
     ]) {
@@ -42,6 +47,9 @@ void main() {
       path.join(nativeReader.path, 'epub-index.json'),
     ).writeAsBytes(List.filled(11, 1));
     await File(
+      path.join(responses.path, 'response.json'),
+    ).writeAsBytes(List.filled(3, 1));
+    await File(
       path.join(updates.path, 'update.part'),
     ).writeAsBytes(List.filled(13, 1));
     final book = File(path.join(userDocuments.path, 'book.epub'));
@@ -54,6 +62,7 @@ void main() {
     await coverCache.load(Uri.parse('https://example.org/cover.jpg'));
     final manager = AppCacheManager(
       sourceCoverCache: coverCache,
+      sourceResponseCache: BookSourceResponseCache(cacheDirectory: responses),
       temporaryDirectory: root,
       clearFlutterImageCache: () async => imageCacheClears++,
       imageCacheBytesReader: () => 19,
@@ -61,9 +70,9 @@ void main() {
 
     final usage = await manager.usage();
     expect(usage.bytesFor(AppCacheCategory.sourceCovers), 30);
-    expect(usage.bytesFor(AppCacheCategory.sourceData), 18);
+    expect(usage.bytesFor(AppCacheCategory.sourceData), 21);
     expect(usage.bytesFor(AppCacheCategory.temporaryFiles), 13);
-    expect(usage.totalBytes, 61);
+    expect(usage.totalBytes, 64);
 
     await manager.clear(AppCacheCategory.sourceCovers);
     expect(await covers.exists(), isFalse);
@@ -74,6 +83,7 @@ void main() {
     await manager.clearAll();
     expect(await chapters.exists(), isFalse);
     expect(await nativeReader.exists(), isFalse);
+    expect(await responses.exists(), isFalse);
     expect(await updates.exists(), isFalse);
     expect(await book.exists(), isTrue);
   });

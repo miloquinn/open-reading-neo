@@ -196,7 +196,9 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
         _recentBooks = recentBooks;
         _isInitialLoading = false;
       });
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('首页数据加载失败: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted || loadGeneration != _loadGeneration) return;
       setState(() => _isInitialLoading = false);
     }
@@ -205,29 +207,13 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
   Future<List<Book>> _loadRecentBooks() async {
     try {
       final orderedBookIds = await _statsDao.getRecentBookIds(limit: 6);
-      final books = <Book>[];
-      final seen = <int>{};
-
-      for (final id in orderedBookIds) {
-        final book = await _bookDao.getBookById(id);
-        if (book == null) continue;
-        books.add(book);
-        seen.add(id);
-      }
+      final books = await _bookDao.getBooksByIds(orderedBookIds);
 
       if (books.isNotEmpty) {
         return books.take(6).toList(growable: false);
       }
 
-      final allBooks = await _bookDao.getAllBooks();
-      final fallback = allBooks.where((book) => book.currentPage > 0).toList()
-        ..sort((a, b) {
-          final progressComparison = b.currentPage.compareTo(a.currentPage);
-          return progressComparison != 0
-              ? progressComparison
-              : b.importDate.compareTo(a.importDate);
-        });
-      return fallback.take(6).toList(growable: false);
+      return _bookDao.getRecentlyReadBooks(limit: 6);
     } catch (_) {
       return const [];
     }

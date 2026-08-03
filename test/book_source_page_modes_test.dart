@@ -571,8 +571,9 @@ class _PageModeClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => const [
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
     BookSourceChapter(id: 'chapter-1', title: '第一章', order: 1),
     BookSourceChapter(id: 'chapter-2', title: '第二章', order: 2),
   ];
@@ -582,6 +583,7 @@ class _PageModeClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async => BookSourceChapterContent(
     bookId: bookId,
     chapterId: chapterId,
@@ -602,12 +604,14 @@ class _TrackingPageModeClient extends _PageModeClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     requested.add(chapterId);
     return super.getChapterContent(
       source,
       bookId: bookId,
       chapterId: chapterId,
+      sourceVariables: sourceVariables,
     );
   }
 }

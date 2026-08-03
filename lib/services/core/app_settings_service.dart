@@ -3,7 +3,7 @@
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +11,7 @@ import '../../models/home_navigation_destination.dart';
 import '../../utils/font_catalog_helper.dart';
 import '../../utils/page_transitions.dart';
 import 'custom_font_service.dart';
+import 'display_refresh_rate_controller.dart';
 import 'online_font_service.dart';
 
 const String additionalSourceProtocolsPreferenceKey =
@@ -54,7 +55,7 @@ class AppSettingsNotifier extends ChangeNotifier {
   List<HomeNavigationDestination> _homeNavigationOrder =
       defaultHomeNavigationOrder;
   Set<HomeNavigationDestination> _hiddenHomeNavigationDestinations =
-      const <HomeNavigationDestination>{};
+      defaultHiddenHomeNavigationDestinations;
   bool _customizeFloatingNavigationSize = false;
   double _floatingNavigationHeight = 60;
   double _floatingNavigationHorizontalMargin = 24;
@@ -66,9 +67,11 @@ class AppSettingsNotifier extends ChangeNotifier {
   LibraryBookOpenAnimationPace _libraryBookOpenAnimationPace =
       LibraryBookOpenAnimationPace.fast;
   bool _additionalSourceProtocolsEnabled = false;
+  bool _powerSavingMode = false;
   bool _isInitialized = false;
   final CustomFontService _customFontService;
   final OnlineFontService _onlineFontService;
+  final DisplayRefreshRateController _displayRefreshRateController;
   final ChangeNotifier _onlineFontProgressNotifier = ChangeNotifier();
   Timer? _onlineFontProgressTimer;
   bool _isDisposed = false;
@@ -76,8 +79,11 @@ class AppSettingsNotifier extends ChangeNotifier {
   AppSettingsNotifier({
     CustomFontService? customFontService,
     OnlineFontService? onlineFontService,
+    DisplayRefreshRateController? displayRefreshRateController,
   }) : _customFontService = customFontService ?? CustomFontService(),
-       _onlineFontService = onlineFontService ?? OnlineFontService() {
+       _onlineFontService = onlineFontService ?? OnlineFontService(),
+       _displayRefreshRateController =
+           displayRefreshRateController ?? DisplayRefreshRateController() {
     _loadSettings();
   }
 
@@ -117,6 +123,7 @@ class AppSettingsNotifier extends ChangeNotifier {
       _libraryBookOpenAnimationPace;
   bool get additionalSourceProtocolsEnabled =>
       _additionalSourceProtocolsEnabled;
+  bool get powerSavingMode => _powerSavingMode;
 
   /// 用户自定义导入的字体列表（在线字体不在此列）。
   List<FontOption> get customFonts => _customFontService.fonts
@@ -351,6 +358,8 @@ class AppSettingsNotifier extends ChangeNotifier {
     };
     _additionalSourceProtocolsEnabled =
         prefs.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
+    _powerSavingMode =
+        prefs.getBool(DisplayRefreshRateController.preferenceKey) ?? false;
     await _restoreSelectedFonts(prefs);
     _isInitialized = true;
     notifyListeners();
@@ -555,11 +564,20 @@ class AppSettingsNotifier extends ChangeNotifier {
 
   Future<void> resetHomeNavigationOrder() async {
     await setHomeNavigationOrder(defaultHomeNavigationOrder);
-    if (_hiddenHomeNavigationDestinations.isNotEmpty) {
-      _hiddenHomeNavigationDestinations = const <HomeNavigationDestination>{};
+    if (!setEquals(
+      _hiddenHomeNavigationDestinations,
+      defaultHiddenHomeNavigationDestinations,
+    )) {
+      _hiddenHomeNavigationDestinations =
+          defaultHiddenHomeNavigationDestinations;
       notifyListeners();
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_keyHomeNavigationHidden, const <String>[]);
+      await prefs.setStringList(
+        _keyHomeNavigationHidden,
+        defaultHiddenHomeNavigationDestinations
+            .map((destination) => destination.storageId)
+            .toList(growable: false),
+      );
     }
   }
 
@@ -614,6 +632,15 @@ class AppSettingsNotifier extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(additionalSourceProtocolsPreferenceKey, value);
+  }
+
+  Future<void> setPowerSavingMode(bool value) async {
+    if (_powerSavingMode == value) return;
+    _powerSavingMode = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(DisplayRefreshRateController.preferenceKey, value);
+    await _displayRefreshRateController.apply(value);
   }
 
   Future<void> prepareCustomFontPreviews() async {

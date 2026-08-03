@@ -30,8 +30,13 @@ class BookSourceManagementPage extends StatefulWidget {
 }
 
 class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
+  static const int _initialSourceBatchSize = 24;
+  static const int _sourceBatchSize = 24;
+  static const double _loadMoreExtent = 800;
+
   final BookSourceRegistry _registry = BookSourceRegistry();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   BookSourceClient? _client;
   SourceImportService? _importService;
   BookSourceImportAnalyzer? _importAnalyzer;
@@ -48,24 +53,52 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   String _searchQuery = '';
   _BookSourceFilter _filter = _BookSourceFilter.all;
   String? _selectedGroup;
+  int _sourceDisplayLimit = _initialSourceBatchSize;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_loadMoreSourcesIfNeeded);
     unawaited(_loadSources());
   }
 
   Future<void> _loadSources() async {
-    final sources = await _registry.load();
+    final sources = await _registry.loadInBackground();
     if (!mounted) return;
     setState(() {
       _sources = sources;
       _loading = false;
+      _sourceDisplayLimit = _initialSourceBatchSize;
     });
+  }
+
+  void _loadMoreSourcesIfNeeded() {
+    if (_loading || !_scrollController.hasClients) return;
+    if (!_scrollController.position.isScrollingNotifier.value) return;
+    if (_scrollController.position.extentAfter > _loadMoreExtent) return;
+    final sourceCount = _visibleSources.length;
+    if (_sourceDisplayLimit >= sourceCount) return;
+    setState(() {
+      final nextLimit = _sourceDisplayLimit + _sourceBatchSize;
+      _sourceDisplayLimit = nextLimit < sourceCount ? nextLimit : sourceCount;
+    });
+  }
+
+  void _updateSourceView(VoidCallback update) {
+    setState(() {
+      update();
+      _sourceDisplayLimit = _initialSourceBatchSize;
+    });
+    if (_scrollController.hasClients && _scrollController.offset != 0) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   @override
   void dispose() {
+    _scrollController
+      ..removeListener(_loadMoreSourcesIfNeeded)
+      ..dispose();
     _searchController.dispose();
     _client?.close();
     _importService?.close();
@@ -115,69 +148,100 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
 
   Widget _buildSourceList(bool additionalProtocolsEnabled, ColorScheme scheme) {
     final visibleSources = _visibleSources;
-    final orsp = visibleSources
+    final allOrspSources = visibleSources
         .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
         .toList(growable: false);
-    final additional = visibleSources
+    final allAdditionalSources = visibleSources
         .where((source) => source.sourceProtocol != BookSourceProtocolKind.orsp)
         .toList(growable: false);
-    return CustomScrollView(
-      key: const Key('bookSourceManagementList'),
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  context.l10n.bookSourceManagementSubtitle,
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    height: 1.45,
+    final orsp = allOrspSources
+        .take(_sourceDisplayLimit)
+        .toList(growable: false);
+    final remainingLimit = _sourceDisplayLimit - orsp.length;
+    final additional = allAdditionalSources
+        .take(remainingLimit > 0 ? remainingLimit : 0)
+        .toList(growable: false);
+    final displayedSourceCount = orsp.length + additional.length;
+    return Scrollbar(
+      key: const Key('bookSourceManagementScrollbar'),
+      controller: _scrollController,
+      thumbVisibility: true,
+      interactive: true,
+      child: CustomScrollView(
+        key: const Key('bookSourceManagementList'),
+        controller: _scrollController,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    context.l10n.bookSourceManagementSubtitle,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                _buildManagementHeader(visibleSources.length),
-                const SizedBox(height: 12),
-                _buildSearchAndFilters(),
-                if (_selectionMode) ...[
+                  const SizedBox(height: 18),
+                  _buildManagementHeader(visibleSources.length),
                   const SizedBox(height: 12),
-                  _buildBulkActions(additionalProtocolsEnabled),
+                  _buildSearchAndFilters(),
+                  if (_selectionMode) ...[
+                    const SizedBox(height: 12),
+                    _buildBulkActions(additionalProtocolsEnabled),
+                  ],
+                  const SizedBox(height: 12),
                 ],
-                const SizedBox(height: 12),
-              ],
+              ),
             ),
           ),
-        ),
-        if (_loading)
-          const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (_sources.isEmpty)
-          _paddedSliver(_buildNoSourcesCard())
-        else if (visibleSources.isEmpty)
-          _paddedSliver(_buildNoMatchingSourcesCard())
-        else ...[
-          if (orsp.isNotEmpty)
-            ..._buildSourceGroupSlivers(
-              title: context.l10n.bookSourcesProtocolGroupOrsp,
-              sources: orsp,
-              additionalProtocolsEnabled: additionalProtocolsEnabled,
-            ),
-          if (additional.isNotEmpty)
-            ..._buildSourceGroupSlivers(
-              title: context.l10n.bookSourcesProtocolGroupAdditional,
-              sources: additional,
-              additionalProtocolsEnabled: additionalProtocolsEnabled,
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_sources.isEmpty)
+            _paddedSliver(_buildNoSourcesCard())
+          else if (visibleSources.isEmpty)
+            _paddedSliver(_buildNoMatchingSourcesCard())
+          else ...[
+            if (orsp.isNotEmpty)
+              ..._buildSourceGroupSlivers(
+                title: context.l10n.bookSourcesProtocolGroupOrsp,
+                sources: orsp,
+                totalCount: allOrspSources.length,
+                additionalProtocolsEnabled: additionalProtocolsEnabled,
+              ),
+            if (additional.isNotEmpty)
+              ..._buildSourceGroupSlivers(
+                title: context.l10n.bookSourcesProtocolGroupAdditional,
+                sources: additional,
+                totalCount: allAdditionalSources.length,
+                additionalProtocolsEnabled: additionalProtocolsEnabled,
+              ),
+            if (displayedSourceCount < visibleSources.length)
+              const SliverPadding(
+                key: Key('bookSourceManagementLoadingMore'),
+                padding: EdgeInsets.symmetric(vertical: 12),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          if (_loading || displayedSourceCount >= visibleSources.length)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
+              sliver: SliverToBoxAdapter(child: _buildProtocolCard()),
             ),
         ],
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
-          sliver: SliverToBoxAdapter(child: _buildProtocolCard()),
-        ),
-      ],
+      ),
     );
   }
 
@@ -320,7 +384,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                     tooltip: context.l10n.bookSourcesClearSearch,
                     onPressed: () {
                       _searchController.clear();
-                      setState(() => _searchQuery = '');
+                      _updateSourceView(() => _searchQuery = '');
                     },
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -331,7 +395,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
               borderSide: BorderSide.none,
             ),
           ),
-          onChanged: (value) => setState(() => _searchQuery = value),
+          onChanged: (value) => _updateSourceView(() => _searchQuery = value),
         ),
         const SizedBox(height: 10),
         SizedBox(
@@ -344,7 +408,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                   key: Key('bookSourceFilter-${filter.name}'),
                   selected: _filter == filter,
                   label: Text(_filterLabel(filter)),
-                  onSelected: (_) => setState(() => _filter = filter),
+                  onSelected: (_) => _updateSourceView(() => _filter = filter),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -384,7 +448,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     if (!mounted || selected == null) return;
     final normalized = selected.isEmpty ? null : selected;
     if (normalized == _selectedGroup) return;
-    setState(() => _selectedGroup = normalized);
+    _updateSourceView(() => _selectedGroup = normalized);
   }
 
   Widget _paddedSliver(Widget child) {
@@ -406,7 +470,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           TextButton(
             onPressed: () {
               _searchController.clear();
-              setState(() {
+              _updateSourceView(() {
                 _searchQuery = '';
                 _filter = _BookSourceFilter.all;
                 _selectedGroup = null;
@@ -536,6 +600,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   List<Widget> _buildSourceGroupSlivers({
     required String title,
     required List<RegisteredBookSource> sources,
+    required int totalCount,
     required bool additionalProtocolsEnabled,
   }) {
     return [
@@ -553,7 +618,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 ),
               ),
               Text(
-                '${sources.length}',
+                '$totalCount',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w700,

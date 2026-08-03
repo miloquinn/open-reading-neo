@@ -17,6 +17,7 @@ final class _Candidate {
 Future<void> main(List<String> arguments) async {
   final paths = arguments.where((value) => !value.startsWith('--')).toList();
   final perKind = _integerOption(arguments, '--per-kind=', fallback: 3);
+  final staticOnly = arguments.contains('--static-only');
   final stageSeconds = _integerOption(
     arguments,
     '--stage-seconds=',
@@ -33,11 +34,26 @@ Future<void> main(List<String> arguments) async {
 
   final candidates = <_Candidate>[];
   final seen = <String>{};
+  final runnableUrls = <String>{};
+  var parsedTotal = 0;
+  var errorTotal = 0;
+  var duplicateTotal = 0;
+  const scanner = SourceCompatibilityScanner();
   for (final path in paths) {
     final parsed = parseReadingSources(File(path).readAsStringSync());
+    parsedTotal += parsed.sources.length;
+    errorTotal += parsed.errors.length;
+    duplicateTotal += parsed.duplicates;
+    final levels = <SourceCompatibilityLevel, int>{};
+    final issues = <SourceCompatibilityIssue, int>{};
     for (final source in parsed.sources) {
-      if (!seen.add(source.url) ||
-          !const SourceCompatibilityScanner().scan(source).canRun) {
+      final report = scanner.scan(source);
+      levels[report.level] = (levels[report.level] ?? 0) + 1;
+      for (final issue in report.issues) {
+        issues[issue] = (issues[issue] ?? 0) + 1;
+      }
+      if (report.canRun) runnableUrls.add(source.url);
+      if (!seen.add(source.url) || !report.canRun) {
         continue;
       }
       candidates.add(_Candidate(source, _executionKind(source), path));
@@ -45,9 +61,25 @@ Future<void> main(List<String> arguments) async {
     stdout.writeln(
       'IMPORT ${File(path).uri.pathSegments.last}: '
       'sources=${parsed.sources.length} errors=${parsed.errors.length} '
-      'duplicates=${parsed.duplicates}',
+      'duplicates=${parsed.duplicates} '
+      'supported=${levels[SourceCompatibilityLevel.supported] ?? 0} '
+      'partial=${levels[SourceCompatibilityLevel.partial] ?? 0} '
+      'unsupported=${levels[SourceCompatibilityLevel.unsupported] ?? 0}',
     );
+    if (issues.isNotEmpty) {
+      final entries = issues.entries.toList()
+        ..sort((left, right) => right.value.compareTo(left.value));
+      stdout.writeln(
+        'ISSUES ${File(path).uri.pathSegments.last}: '
+        '${entries.map((entry) => '${entry.key.name}=${entry.value}').join(' ')}',
+      );
+    }
   }
+  stdout.writeln(
+    'TOTAL sources=$parsedTotal errors=$errorTotal duplicates=$duplicateTotal '
+    'unique=${seen.length} runnableUnique=${runnableUrls.length}',
+  );
+  if (staticOnly) return;
   candidates.sort(
     (left, right) =>
         right.source.lastUpdateTime.compareTo(left.source.lastUpdateTime),

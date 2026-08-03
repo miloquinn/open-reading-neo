@@ -153,6 +153,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   final BookSourceRegistry _registry = BookSourceRegistry();
   final TextEditingController _listSourceSearchController =
       TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   late final BookSourceClient _client;
   late final BookSourceShelfService _shelfService = BookSourceShelfService(
     client: _client,
@@ -210,6 +211,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     _layoutController.layout.removeListener(_handleLayoutChanged);
     if (_ownsLayoutController) _layoutController.dispose();
     _listSourceSearchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -349,6 +351,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   }) async {
     final revision = ++_sectionLoadRevision;
     if (!force && _cache[section] != null) return;
+    if (force) {
+      await _client.invalidateResponseCaches(_scopedSourcesFor(section));
+      if (!mounted || revision != _sectionLoadRevision) return;
+    }
     final listDirectory =
         section == _DiscoverSection.categories &&
         _layoutController.layout.value == BookSourceDiscoverLayout.list &&
@@ -709,7 +715,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       setState(() {
         _section = _DiscoverSection.categories;
         _selectedSourceId = null;
+        _expandedListSourceId = null;
         _showListDirectory = true;
+        _listChannelsBySource.clear();
+        _loadingListChannelSources.clear();
+        _listChannelErrors.clear();
         _resetCategorySelection();
       });
       await _loadSection(_DiscoverSection.categories, force: true);
@@ -737,6 +747,44 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         _layoutController.layout.value == BookSourceDiscoverLayout.list;
     final discoverySources = _discoverySources;
     final availableSections = _availableSections;
+    final scrollView = CustomScrollView(
+      key: const Key('bookSourceDiscoverScrollView'),
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  useRailNavigation ? 16 : mobileChrome.pageTopPadding,
+                  16,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (useRailNavigation) _buildRailHeader(),
+                    if (!listLayout && discoverySources.isNotEmpty)
+                      _buildSourceScope(discoverySources),
+                    if (!listLayout &&
+                        discoverySources.isNotEmpty &&
+                        availableSections.length > 1)
+                      const SizedBox(height: 8),
+                    if (!listLayout && availableSections.length > 1)
+                      _buildSectionTabs(availableSections),
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        ..._buildSectionSlivers(bottomPadding),
+      ],
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -748,42 +796,15 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         child: RefreshIndicator(
           edgeOffset: useRailNavigation ? 90 : mobileChrome.topBarHeight,
           onRefresh: _refreshCurrentLayout,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1080),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        useRailNavigation ? 16 : mobileChrome.pageTopPadding,
-                        16,
-                        0,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (useRailNavigation) _buildRailHeader(),
-                          if (!listLayout && discoverySources.isNotEmpty)
-                            _buildSourceScope(discoverySources),
-                          if (!listLayout &&
-                              discoverySources.isNotEmpty &&
-                              availableSections.length > 1)
-                            const SizedBox(height: 8),
-                          if (!listLayout && availableSections.length > 1)
-                            _buildSectionTabs(availableSections),
-                          const SizedBox(height: 4),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              ..._buildSectionSlivers(bottomPadding),
-            ],
-          ),
+          child: listLayout
+              ? Scrollbar(
+                  key: const Key('bookSourceDiscoverListScrollbar'),
+                  controller: _scrollController,
+                  thumbVisibility: true,
+                  interactive: true,
+                  child: scrollView,
+                )
+              : scrollView,
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:json_path/json_path.dart';
 
 import '../protocol/book_source_protocol.dart';
+import 'source_request.dart';
 import 'source_script_engine.dart';
 
 class SourceRuleDocument {
@@ -198,13 +199,14 @@ class SourceRuleEngine {
     }
     result = result.trim();
     if (resolveUrl && result.isNotEmpty) {
-      final uri = document.baseUri.resolve(result);
+      final resolved = resolveSourceRequestUrl(document.baseUri, result);
+      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
       if (uri.scheme != 'http' && uri.scheme != 'https') {
         throw const BookSourceProtocolException(
           'reading source rule produced a non-HTTP URL.',
         );
       }
-      return uri.toString();
+      return resolved;
     }
     return result;
   }
@@ -214,6 +216,8 @@ class SourceRuleEngine {
     Object? context,
     String rule, {
     bool resolveUrl = false,
+    String joinSeparator = '',
+    bool regexDotAll = true,
   }) async {
     ensureSupported(rule, field: 'value rule');
     final putRule = _splitPutRule(rule);
@@ -223,6 +227,8 @@ class SourceRuleEngine {
         context,
         putRule,
         resolveUrl: resolveUrl,
+        joinSeparator: joinSeparator,
+        regexDotAll: regexDotAll,
       );
     }
     final scripted = _splitScriptRule(rule);
@@ -232,6 +238,8 @@ class SourceRuleEngine {
         context,
         scripted,
         resolveUrl: resolveUrl,
+        joinSeparator: joinSeparator,
+        regexDotAll: regexDotAll,
       );
     }
     final transformed = _splitTransform(rule);
@@ -247,13 +255,13 @@ class SourceRuleEngine {
         .map(_stringValue)
         .where((value) => value.isNotEmpty)
         .toList();
-    var result = values.join();
+    var result = values.join(joinSeparator);
     if (transformed.pattern != null) {
       try {
         final pattern = RegExp(
           transformed.pattern!,
           multiLine: true,
-          dotAll: true,
+          dotAll: regexDotAll,
         );
         result =
             transformed.selector.trim().isEmpty &&
@@ -268,13 +276,14 @@ class SourceRuleEngine {
     }
     result = result.trim();
     if (resolveUrl && result.isNotEmpty) {
-      final uri = document.baseUri.resolve(result);
+      final resolved = resolveSourceRequestUrl(document.baseUri, result);
+      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
       if (uri.scheme != 'http' && uri.scheme != 'https') {
         throw const BookSourceProtocolException(
           'Source rule produced a non-HTTP URL.',
         );
       }
-      return uri.toString();
+      return resolved;
     }
     return result;
   }
@@ -326,6 +335,8 @@ class SourceRuleEngine {
     Object? context,
     _PutRule putRule, {
     required bool resolveUrl,
+    required String joinSeparator,
+    required bool regexDotAll,
   }) async {
     final value = putRule.selector.trim().isEmpty
         ? _stringValue(context ?? document.value)
@@ -334,6 +345,8 @@ class SourceRuleEngine {
             context,
             putRule.selector,
             resolveUrl: resolveUrl,
+            joinSeparator: joinSeparator,
+            regexDotAll: regexDotAll,
           );
     await _storePutMappingsAsync(document, context, putRule.mappings);
     return value;
@@ -426,13 +439,14 @@ class SourceRuleEngine {
     }
     value = value.trim();
     if (resolveUrl && value.isNotEmpty) {
-      final uri = document.baseUri.resolve(value);
+      final resolved = resolveSourceRequestUrl(document.baseUri, value);
+      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
       if (uri.scheme != 'http' && uri.scheme != 'https') {
         throw const BookSourceProtocolException(
           'reading source script produced a non-HTTP URL.',
         );
       }
-      return uri.toString();
+      return resolved;
     }
     return value;
   }
@@ -442,10 +456,18 @@ class SourceRuleEngine {
     Object? context,
     _ScriptRule scripted, {
     required bool resolveUrl,
+    required String joinSeparator,
+    required bool regexDotAll,
   }) async {
     final input = scripted.selector.trim().isEmpty
         ? context ?? document.value
-        : await evaluateStringAsync(document, context, scripted.selector);
+        : await evaluateStringAsync(
+            document,
+            context,
+            scripted.selector,
+            joinSeparator: joinSeparator,
+            regexDotAll: regexDotAll,
+          );
     final output = await _evaluateScriptAsync(document, input, scripted.script);
     var value = '';
     if (scripted.suffix.trim().isNotEmpty) {
@@ -454,21 +476,24 @@ class SourceRuleEngine {
         nextDocument,
         nextDocument.value,
         scripted.suffix,
+        joinSeparator: joinSeparator,
+        regexDotAll: regexDotAll,
       );
     } else if (output is Iterable && output is! String) {
-      value = output.map(_stringValue).join();
+      value = output.map(_stringValue).join(joinSeparator);
     } else {
       value = _stringValue(output);
     }
     value = value.trim();
     if (resolveUrl && value.isNotEmpty) {
-      final uri = document.baseUri.resolve(value);
+      final resolved = resolveSourceRequestUrl(document.baseUri, value);
+      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
       if (uri.scheme != 'http' && uri.scheme != 'https') {
         throw const BookSourceProtocolException(
           'Source script produced a non-HTTP URL.',
         );
       }
-      return uri.toString();
+      return resolved;
     }
     return value;
   }
@@ -821,6 +846,15 @@ class SourceRuleEngine {
           if (includeRoots && _matches(root, parsed.css)) selected.add(root);
           selected.addAll(root.querySelectorAll(parsed.css));
         } on FormatException {
+          final compatible = _selectWithJsoupAttributeRegex(
+            root,
+            parsed.css,
+            includeRoot: includeRoots,
+          );
+          if (compatible != null) {
+            selected.addAll(compatible);
+            continue;
+          }
           throw BookSourceProtocolException(
             'Unsupported reading source CSS selector: ${parsed.css}.',
           );
@@ -840,6 +874,63 @@ class SourceRuleEngine {
         .where((value) => value >= 0 && value < deduped.length)
         .map((value) => deduped[value])
         .toList();
+  }
+
+  List<Element>? _selectWithJsoupAttributeRegex(
+    Element root,
+    String selector, {
+    required bool includeRoot,
+  }) {
+    // Jsoup-based reading sources use [attr~=pattern] for regex matching.
+    // Mark matching elements temporarily so package:html can evaluate the rest.
+    final matches = _jsoupAttributeRegexSelector.allMatches(selector).toList();
+    if (matches.isEmpty) return null;
+
+    final candidates = <Element>[root, ...root.querySelectorAll('*')];
+    final markers = <String>[];
+    var rewritten = selector;
+    var markerSuffix = 0;
+    try {
+      for (final match in matches.reversed) {
+        final attribute = match.group(1)!.toLowerCase();
+        var patternSource = match.group(2)!.trim();
+        if (patternSource.length >= 2 &&
+            ((patternSource.startsWith('"') && patternSource.endsWith('"')) ||
+                (patternSource.startsWith("'") &&
+                    patternSource.endsWith("'")))) {
+          patternSource = patternSource.substring(1, patternSource.length - 1);
+        }
+        final pattern = _jsoupAttributeRegExp(patternSource);
+        late String marker;
+        do {
+          marker = 'data-open-reading-regex-${markerSuffix++}';
+        } while (markers.contains(marker) ||
+            candidates.any(
+              (candidate) => candidate.attributes.containsKey(marker),
+            ));
+        markers.add(marker);
+        for (final candidate in candidates) {
+          final value = candidate.attributes[attribute];
+          if (value != null && pattern.hasMatch(value)) {
+            candidate.attributes[marker] = '';
+          }
+        }
+        rewritten = rewritten.replaceRange(match.start, match.end, '[$marker]');
+      }
+
+      return <Element>[
+        if (includeRoot && _matches(root, rewritten)) root,
+        ...root.querySelectorAll(rewritten),
+      ];
+    } on FormatException {
+      return null;
+    } finally {
+      for (final candidate in candidates) {
+        for (final marker in markers) {
+          candidate.attributes.remove(marker);
+        }
+      }
+    }
   }
 
   _LegacySelector _legacySelector(String input) {
@@ -1020,6 +1111,31 @@ class _RuleTransform {
   final String? pattern;
   final String replacement;
 }
+
+RegExp _jsoupAttributeRegExp(String source) {
+  var pattern = source;
+  var caseSensitive = true;
+  var multiLine = false;
+  var dotAll = false;
+  final flags = RegExp(r'^\(\?([ims]+)\)').firstMatch(pattern);
+  if (flags != null) {
+    final enabled = flags.group(1)!;
+    caseSensitive = !enabled.contains('i');
+    multiLine = enabled.contains('m');
+    dotAll = enabled.contains('s');
+    pattern = pattern.substring(flags.end);
+  }
+  return RegExp(
+    pattern,
+    caseSensitive: caseSensitive,
+    multiLine: multiLine,
+    dotAll: dotAll,
+  );
+}
+
+final _jsoupAttributeRegexSelector = RegExp(
+  r'\[\s*([A-Za-z_][A-Za-z0-9_.:-]*)\s*~=\s*([^\]\r\n]+?)\s*\]',
+);
 
 class _ScriptRule {
   const _ScriptRule({

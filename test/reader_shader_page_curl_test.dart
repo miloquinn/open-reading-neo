@@ -1057,51 +1057,60 @@ void main() {
     },
   );
 
-  testWidgets('committed diagonal turn snaps to the exact shader endpoint', (
-    tester,
-  ) async {
-    final controller = ReaderPageCurlController();
-    final callbackGate = Completer<void>();
-    var callbackStarted = false;
+  testWidgets(
+    'committed diagonal turn settles naturally at the exact shader endpoint',
+    (tester) async {
+      final controller = ReaderPageCurlController();
+      final callbackGate = Completer<void>();
+      var callbackStarted = false;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SizedBox(
-          width: 400,
-          height: 700,
-          child: ReaderShaderPageCurl(
-            controller: controller,
-            currentPage: _snapshot('current'),
-            forwardPage: _snapshot('next'),
-            onTurnForward: () {
-              callbackStarted = true;
-              return callbackGate.future;
-            },
-            onTurnBackward: () {},
-            paperColor: Colors.white,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            width: 400,
+            height: 700,
+            child: ReaderShaderPageCurl(
+              controller: controller,
+              currentPage: _snapshot('current'),
+              forwardPage: _snapshot('next'),
+              onTurnForward: () {
+                callbackStarted = true;
+                return callbackGate.future;
+              },
+              onTurnBackward: () {},
+              paperColor: Colors.white,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final rect = tester.getRect(find.byType(ReaderShaderPageCurl));
-    final gesture = await tester.startGesture(
-      Offset(rect.right - 2, rect.top + rect.height * 0.72),
-    );
-    await gesture.moveBy(Offset(-rect.width * 0.72, -160));
-    await gesture.up();
-    for (var frame = 0; frame < 30 && !callbackStarted; frame++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+      final rect = tester.getRect(find.byType(ReaderShaderPageCurl));
+      final gesture = await tester.startGesture(
+        Offset(rect.right - 2, rect.top + rect.height * 0.72),
+      );
+      await gesture.moveBy(Offset(-rect.width * 0.72, -160));
+      await gesture.up();
+      var sawGentleTerminalApproach = false;
+      for (var frame = 0; frame < 80 && !callbackStarted; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final lineA = controller.debugShaderLineA;
+        if (lineA != null && lineA.dx > 0 && lineA.dx < 1.5) {
+          sawGentleTerminalApproach = true;
+        }
+      }
 
-    expect(callbackStarted, isTrue);
-    expect(controller.debugShaderLineA, Offset.zero);
-    expect(controller.debugShaderLineB, Offset(0, rect.height));
+      expect(callbackStarted, isTrue);
+      expect(sawGentleTerminalApproach, isTrue);
+      expect(controller.debugShaderLineA, Offset.zero);
+      expect(controller.debugShaderLineB, Offset(0, rect.height));
 
-    callbackGate.complete();
-    await tester.pumpAndSettle();
-  });
+      callbackGate.complete();
+      await tester.idle();
+      expect(controller.debugAnimationReady, isTrue);
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('tablet spread paints the active leaf above its sibling', (
     tester,
@@ -1285,6 +1294,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await Future.wait([forwardTurn, backwardTurn]);
+    await tester.pump();
 
     expect(backwardCallbacks, 1);
     expect(coordinator.debugIsBusy, isFalse);

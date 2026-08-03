@@ -12,6 +12,33 @@ import 'package:xxread/services/books/web_book_file_store.dart';
 class BookDao implements BookImportStore {
   final _dbService = DatabaseService();
 
+  static const List<String> _bookSummaryColumns = [
+    'id',
+    'title',
+    'author',
+    'filePath',
+    'format',
+    'currentPage',
+    'totalPages',
+    'reading_progress',
+    'importDate',
+    'file_modified_time',
+    'content_hash',
+    'cover_image_path',
+    'text_encoding',
+    'last_canonical_locator',
+    'last_rendered_locator',
+    'layout_signature',
+    'storage_type',
+    'source_id',
+    'source_book_id',
+    'source_json',
+    'source_book_json',
+    'source_kind',
+    'source_locator',
+    'source_modified_time',
+  ];
+
   Future<int> insertBook(Book book) async {
     try {
       final db = await _dbService.database;
@@ -26,38 +53,66 @@ class BookDao implements BookImportStore {
       final db = await _dbService.database;
       final List<Map<String, dynamic>> maps = await db.query(
         'books',
-        columns: [
-          'id',
-          'title',
-          'author',
-          'filePath',
-          'format',
-          'currentPage',
-          'totalPages',
-          'reading_progress',
-          'importDate',
-          'file_modified_time',
-          'content_hash',
-          'cover_image_path',
-          'text_encoding',
-          'last_canonical_locator',
-          'last_rendered_locator',
-          'layout_signature',
-          'storage_type',
-          'source_id',
-          'source_book_id',
-          'source_json',
-          'source_book_json',
-          'source_kind',
-          'source_locator',
-          'source_modified_time',
-        ],
+        columns: _bookSummaryColumns,
         orderBy: 'importDate DESC',
       );
       return List.generate(maps.length, (i) => Book.fromMap(maps[i]));
     } catch (e) {
       throw Exception('获取书籍列表失败: $e');
     }
+  }
+
+  /// 批量读取书籍摘要，并保持调用方给出的 ID 顺序。
+  ///
+  /// 首页最近阅读等列表不需要正文、目录和分页缓存字段；一次批量查询可避免
+  /// 对每本书单独往返数据库，也避免把大型缓存列载入内存。
+  Future<List<Book>> getBooksByIds(Iterable<int> bookIds) async {
+    final orderedIds = <int>[];
+    final seen = <int>{};
+    for (final id in bookIds) {
+      if (id > 0 && seen.add(id)) orderedIds.add(id);
+    }
+    if (orderedIds.isEmpty) return const [];
+
+    final db = await _dbService.database;
+    final booksById = <int, Book>{};
+    const chunkSize = 500;
+    for (var start = 0; start < orderedIds.length; start += chunkSize) {
+      final end = start + chunkSize < orderedIds.length
+          ? start + chunkSize
+          : orderedIds.length;
+      final chunk = orderedIds.sublist(start, end);
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final rows = await db.query(
+        'books',
+        columns: _bookSummaryColumns,
+        where: 'id IN ($placeholders)',
+        whereArgs: chunk,
+      );
+      for (final row in rows) {
+        final book = Book.fromMap(row);
+        final id = book.id;
+        if (id != null) booksById[id] = book;
+      }
+    }
+    return orderedIds
+        .map((id) => booksById[id])
+        .whereType<Book>()
+        .toList(growable: false);
+  }
+
+  /// 直接由 SQLite 返回有限的继续阅读候选，避免加载并排序整个书库。
+  Future<List<Book>> getRecentlyReadBooks({int limit = 6}) async {
+    final db = await _dbService.database;
+    final safeLimit = limit.clamp(1, 100);
+    final rows = await db.query(
+      'books',
+      columns: _bookSummaryColumns,
+      where: 'currentPage > 0',
+      orderBy: 'currentPage DESC, importDate DESC',
+      limit: safeLimit,
+    );
+    return rows.map(Book.fromMap).toList(growable: false);
   }
 
   Future<void> updateBookProgress(

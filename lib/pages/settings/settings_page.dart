@@ -2,6 +2,7 @@
 // 技术要点：Flutter UI、Icons Plus、Package Info、Provider、SharedPreferences、URL Launcher。
 
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -617,6 +618,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: _setKeepScreenOn,
                 icon: Icons.stay_current_portrait,
               ),
+              if (!kIsWeb &&
+                  (Theme.of(context).platform == TargetPlatform.android ||
+                      Theme.of(context).platform == TargetPlatform.iOS))
+                _buildSwitchSetting(
+                  key: const ValueKey('settings-power-saving-mode'),
+                  title: l10n.settingsPowerSavingModeTitle,
+                  subtitle: l10n.settingsPowerSavingModeSubtitle,
+                  value: appSettings.powerSavingMode,
+                  onChanged: appSettings.setPowerSavingMode,
+                  icon: Icons.battery_saver_outlined,
+                  persistPageSettings: false,
+                ),
               _buildSwitchSetting(
                 title: l10n.settingsAutoSaveTitle,
                 subtitle: l10n.settingsAutoSaveSubtitle,
@@ -1822,6 +1835,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSwitchSetting({
+    Key? key,
     required String title,
     required String subtitle,
     required bool value,
@@ -1831,6 +1845,7 @@ class _SettingsPageState extends State<SettingsPage> {
     bool persistPageSettings = true,
   }) {
     return Container(
+      key: key,
       margin: const EdgeInsets.only(bottom: 1),
       child: Material(
         color: Colors.transparent,

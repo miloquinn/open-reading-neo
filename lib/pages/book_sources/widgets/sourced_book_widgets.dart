@@ -325,6 +325,7 @@ class _SourcedBookDetailsLoaderState extends State<_SourcedBookDetailsLoader> {
       final book = await widget.client.getBook(
         widget.result.source,
         widget.result.book.id,
+        sourceVariables: widget.result.book.sourceVariables,
       );
       if (mounted) setState(() => _book = book);
     } catch (_) {

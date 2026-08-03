@@ -68,7 +68,7 @@ class SourceRequestTemplate {
 
     var urlText = expanded;
     var options = const <String, dynamic>{};
-    final optionsStart = expanded.lastIndexOf(',{');
+    final optionsStart = _requestOptionsStart(expanded);
     if (optionsStart >= 0) {
       final candidate = expanded.substring(optionsStart + 1).trim();
       try {
@@ -210,6 +210,23 @@ class SourceRequestTemplate {
       cookieJarKey: cookieJarKey,
     );
   }
+}
+
+String resolveSourceRequestUrl(Uri baseUri, String value) {
+  final optionsStart = _requestOptionsStart(value);
+  final urlText = (optionsStart < 0 ? value : value.substring(0, optionsStart))
+      .trim();
+  final resolved = baseUri.resolve(urlText).toString();
+  if (optionsStart < 0) return resolved;
+  return '$resolved${value.substring(optionsStart)}';
+}
+
+int _requestOptionsStart(String value) {
+  RegExpMatch? last;
+  for (final match in RegExp(r',\s*\{').allMatches(value)) {
+    last = match;
+  }
+  return last?.start ?? -1;
 }
 
 Object? _decodeOptions(String input) {

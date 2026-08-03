@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,6 +58,83 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'starts source search before current reading position finishes loading',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 900);
+      addTearDown(tester.view.reset);
+      final service = _DeferredPreparationService();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: BookSourceChangePage(
+            sources: [_oldSource, _newSource],
+            currentSource: _oldSource,
+            currentBook: _oldBook,
+            service: service,
+          ),
+        ),
+      );
+
+      expect(find.text('Finding other sources'), findsOneWidget);
+      await tester.pump();
+      await tester.pump();
+
+      expect(service.searchCount, 1);
+      expect(service.positionCompleted, isFalse);
+      expect(find.text('Finding other sources'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      service.completePosition();
+      service.completeSearch();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('candidate validation waits for deferred reading position', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 900);
+    addTearDown(tester.view.reset);
+    final service = _DeferredCandidateService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceChangePage(
+          sources: [_oldSource, _newSource],
+          currentSource: _oldSource,
+          currentBook: _oldBook,
+          service: service,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+
+    await tester.tap(
+      find.byKey(const ValueKey('bookSourceChangeCandidate-new-source')),
+    );
+    await tester.pump();
+    expect(service.validateCount, 0);
+
+    service.completePosition();
+    await tester.pumpAndSettle();
+
+    expect(service.validateCount, 1);
+    final commit = tester.widget<FilledButton>(
+      find.byKey(const Key('bookSourceChangeCommit')),
+    );
+    expect(commit.onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('quick search pauses before scanning every source', (
     tester,
@@ -217,8 +296,117 @@ class _FastEmptyClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => const [
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
     BookSourceChapter(id: 'chapter-1', title: 'Chapter 1', order: 0),
   ];
+}
+
+class _DeferredPreparationService extends BookSourceChangeService {
+  final Completer<BookSourceChangePosition> _position = Completer();
+  final Completer<void> _search = Completer();
+  int searchCount = 0;
+
+  bool get positionCompleted => _position.isCompleted;
+
+  void completePosition() {
+    _position.complete(
+      const BookSourceChangePosition(
+        chapterIndex: 0,
+        chapterProgress: 0,
+        chapterTitle: 'Chapter 1',
+        chapterCount: 1,
+      ),
+    );
+  }
+
+  void completeSearch() => _search.complete();
+
+  @override
+  Future<BookSourceChangePosition> loadPosition({
+    required RegisteredBookSource source,
+    required BookSourceBook book,
+    Book? shelfBook,
+  }) => _position.future;
+
+  @override
+  Stream<BookSourceChangeSearchEvent> search({
+    required Iterable<RegisteredBookSource> sources,
+    required String title,
+    required String author,
+    required bool checkAuthor,
+    String? currentSourceId,
+    Set<String> excludedSourceIds = const {},
+    int? sourceLimit,
+    int? candidateLimit,
+  }) async* {
+    searchCount++;
+    await _search.future;
+  }
+}
+
+class _DeferredCandidateService extends BookSourceChangeService {
+  final Completer<BookSourceChangePosition> _position = Completer();
+  int validateCount = 0;
+
+  void completePosition() {
+    _position.complete(
+      const BookSourceChangePosition(
+        chapterIndex: 4,
+        chapterProgress: 0.5,
+        chapterTitle: 'Chapter 5',
+        chapterCount: 10,
+      ),
+    );
+  }
+
+  @override
+  Future<BookSourceChangePosition> loadPosition({
+    required RegisteredBookSource source,
+    required BookSourceBook book,
+    Book? shelfBook,
+  }) => _position.future;
+
+  @override
+  Stream<BookSourceChangeSearchEvent> search({
+    required Iterable<RegisteredBookSource> sources,
+    required String title,
+    required String author,
+    required bool checkAuthor,
+    String? currentSourceId,
+    Set<String> excludedSourceIds = const {},
+    int? sourceLimit,
+    int? candidateLimit,
+  }) async* {
+    yield BookSourceChangeSearchEvent(
+      source: _newSource,
+      completed: 1,
+      candidates: [
+        BookSourceChangeCandidate(
+          source: _newSource,
+          book: _newBook,
+          authorMatches: true,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<ValidatedBookSourceChange> validate({
+    required BookSourceChangeCandidate candidate,
+    required BookSourceChangePosition position,
+  }) async {
+    validateCount++;
+    return ValidatedBookSourceChange(
+      candidate: candidate,
+      book: _newBook,
+      chapters: const [
+        BookSourceChapter(id: 'chapter-5', title: 'Chapter 5', order: 4),
+      ],
+      chapterIndex: 0,
+      chapterProgress: position.chapterProgress,
+      responseTime: const Duration(milliseconds: 120),
+    );
+  }
 }

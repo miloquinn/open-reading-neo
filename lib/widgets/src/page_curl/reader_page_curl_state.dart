@@ -1056,17 +1056,6 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         target: target,
       );
     }
-    final terminalSnapDistance = math.max(
-      2.0,
-      math.min(8.0, _viewportSize.width * 0.012),
-    );
-    final snapsToExactTerminal =
-        target != null &&
-        (isIncoming
-            ? (touch.dx - target.dx).abs() <= terminalSnapDistance
-            : channel.commits &&
-                  (touch - target).distance <= terminalSnapDistance);
-    if (snapsToExactTerminal) renderedTouch = target;
     if (mounted) {
       setState(() {
         _geometry = ReaderPageTurnGeometry.fromCanonicalTouch(
@@ -1080,11 +1069,9 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         );
       });
     }
-    final visuallySettled =
-        snapsToExactTerminal ||
-        (isIncoming
-            ? simulationX.isDone(seconds)
-            : simulationX.isDone(seconds) && simulationY.isDone(seconds));
+    final visuallySettled = isIncoming
+        ? simulationX.isDone(seconds)
+        : simulationX.isDone(seconds) && simulationY.isDone(seconds);
     if (visuallySettled) {
       _stopSpringTicker(channelDirection);
       if (target != null && mounted) {
@@ -1119,7 +1106,14 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
       debugPrint('Reader page turn callback failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
-      if (mounted) _completeTurn();
+      if (mounted) {
+        // Keep the exact terminal pose through the frame that applies the
+        // host's page update. Clearing the curl in the same microtask can
+        // briefly expose a mismatched live leaf and look like a final-frame
+        // jump even though the spring itself has already settled.
+        await WidgetsBinding.instance.endOfFrame;
+        if (mounted) _completeTurn();
+      }
     }
   }
 

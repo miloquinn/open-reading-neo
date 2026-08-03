@@ -473,7 +473,11 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     try {
       await ReplaceRuleService.instance.load();
       final results = await Future.wait<Object?>([
-        _client.getChapters(widget.source, widget.book.id),
+        _client.getChapters(
+          widget.source,
+          widget.book.id,
+          sourceVariables: widget.book.sourceVariables,
+        ),
         widget.progressStore.load(
           sourceId: widget.source.id,
           bookId: widget.book.id,
@@ -961,6 +965,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
             widget.source,
             bookId: widget.book.id,
             chapterId: _chapters[index].id,
+            sourceVariables: widget.book.sourceVariables,
           );
     future = contentFuture
         .then((content) async {
@@ -4113,22 +4118,10 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     final colors = _readerThemeData.colorScheme;
     return SizedBox(
       width: _spreadGutter,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.shadow.withValues(alpha: 0),
-              colors.shadow.withValues(alpha: 0.09),
-              colors.shadow.withValues(alpha: 0),
-            ],
-          ),
-        ),
-        child: Center(
-          child: Container(
-            width: 1,
-            color: colors.outlineVariant.withValues(alpha: 0.48),
-          ),
-        ),
+      child: VerticalDivider(
+        width: 1,
+        thickness: 1,
+        color: colors.outlineVariant.withValues(alpha: 0.24),
       ),
     );
   }

@@ -58,6 +58,11 @@ class MainActivity : FlutterActivity() {
                     enableHighRefreshRate()
                     result.success(null)
                 }
+                "setPowerSavingMode" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    setPowerSavingMode(enabled)
+                    result.success(null)
+                }
                 "setKeepScreenOn" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     setKeepScreenOn(enabled)
@@ -277,6 +282,10 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun enableHighRefreshRate() {
+        setPowerSavingMode(false)
+    }
+
+    private fun setPowerSavingMode(enabled: Boolean) {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
             return
         }
@@ -288,10 +297,14 @@ class MainActivity : FlutterActivity() {
             }
 
             val currentMode = display.mode
-            val bestMode = modes
+            val matchingModes = modes
                 .filter { it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight }
-                .maxByOrNull { it.refreshRate }
-                ?: modes.maxByOrNull { it.refreshRate }
+                .ifEmpty { modes.toList() }
+            val bestMode = if (enabled) {
+                matchingModes.minByOrNull { kotlin.math.abs(it.refreshRate - 60f) }
+            } else {
+                matchingModes.maxByOrNull { it.refreshRate }
+            }
                 ?: return
 
             val attrs = window.attributes
@@ -300,7 +313,7 @@ class MainActivity : FlutterActivity() {
                 window.attributes = attrs
             }
         } catch (e: Exception) {
-            Log.w("xxread", "enableHighRefreshRate failed: ${e.message}")
+            Log.w("xxread", "setPowerSavingMode failed: ${e.message}")
         }
     }
 

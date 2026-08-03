@@ -120,6 +120,73 @@ void main() {
     expect(await File(second.filePath).exists(), isTrue);
   });
 
+  test(
+    'converts encoded online progress before opening the downloaded TXT',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'source-progress-download-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final dao = _MemoryBookDao()
+        ..stored = Book(
+          id: 7,
+          title: _sourceBook.title,
+          author: _sourceBook.author,
+          filePath: '',
+          format: 'source',
+          currentPage: 3456,
+          totalPages: 7000,
+          readingProgress: 0.4937,
+          storageType: 'online',
+          sourceId: _source.id,
+          sourceBookId: _sourceBook.id,
+          sourceJson: '{}',
+          sourceBookJson: '{}',
+        );
+      final service = BookSourceShelfService(
+        bookDao: dao,
+        client: _DownloadClient(),
+        downloadDirectory: directory,
+      );
+
+      final downloaded = await service.downloadToLocal(
+        source: _source,
+        book: _sourceBook,
+      );
+
+      expect(downloaded.isOnline, isFalse);
+      expect(downloaded.currentPage, 3);
+      expect(downloaded.totalPages, 7);
+      expect(downloaded.readingProgress, closeTo(0.4937, 0.0001));
+      expect(dao.stored?.currentPage, 3);
+    },
+  );
+
+  test('repairs already-downloaded legacy chapter units once', () {
+    final legacy = Book(
+      id: 7,
+      title: 'Legacy download',
+      filePath: '/books/legacy.txt',
+      format: 'txt',
+      currentPage: 68000,
+      totalPages: 485,
+      readingProgress: 0.14020618556701031,
+      storageType: 'local',
+      sourceId: 'source-id',
+      sourceBookId: 'source-book-id',
+    );
+
+    final repaired = BookSourceShelfService.repairLegacyDownloadedProgress(
+      legacy,
+    );
+    final alreadyLocal = BookSourceShelfService.repairLegacyDownloadedProgress(
+      repaired,
+    );
+
+    expect(repaired.currentPage, 68);
+    expect(alreadyLocal.currentPage, 68);
+  });
+
   test('streams completed batches before the whole book finishes', () async {
     final directory = await Directory.systemTemp.createTemp('source-stream-');
     addTearDown(() => directory.delete(recursive: true));
@@ -281,6 +348,11 @@ class _MemoryBookDao extends BookDao {
     stored = book.copyWith(id: 7);
     return 7;
   }
+
+  @override
+  Future<void> updateBook(Book book) async {
+    stored = book;
+  }
 }
 
 class _DownloadClient extends BookSourceClient {
@@ -291,6 +363,7 @@ class _DownloadClient extends BookSourceClient {
   Future<List<BookSourceChapter>> getChaptersForDownload(
     RegisteredBookSource source,
     String bookId, {
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async => List.generate(
     7,
@@ -306,6 +379,7 @@ class _DownloadClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
     active++;
@@ -333,6 +407,7 @@ class _StreamingDownloadClient extends BookSourceClient {
   Future<List<BookSourceChapter>> getChaptersForDownload(
     RegisteredBookSource source,
     String bookId, {
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async => List.generate(
     6,
@@ -348,6 +423,7 @@ class _StreamingDownloadClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
     active++;

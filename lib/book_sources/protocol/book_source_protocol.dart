@@ -231,6 +231,7 @@ class BookSourceBook {
   final String? status;
   final String? latestChapter;
   final DateTime? updatedAt;
+  final Map<String, String> sourceVariables;
 
   const BookSourceBook({
     required this.id,
@@ -242,6 +243,7 @@ class BookSourceBook {
     this.status,
     this.latestChapter,
     this.updatedAt,
+    this.sourceVariables = const {},
   });
 
   factory BookSourceBook.fromJson(Map<String, dynamic> json) {
@@ -258,6 +260,7 @@ class BookSourceBook {
       updatedAt: updatedAtValue == null
           ? null
           : DateTime.tryParse(updatedAtValue),
+      sourceVariables: _stringMap(json['sourceVariables']),
     );
   }
 
@@ -271,6 +274,7 @@ class BookSourceBook {
     if (status != null) 'status': status,
     if (latestChapter != null) 'latestChapter': latestChapter,
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    if (sourceVariables.isNotEmpty) 'sourceVariables': sourceVariables,
   };
 }
 
@@ -404,6 +408,17 @@ List<String> _stringList(Object? value) {
       .map((item) => item.trim())
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
+}
+
+Map<String, String> _stringMap(Object? value) {
+  if (value is! Map) return const {};
+  final result = <String, String>{};
+  for (final entry in value.entries) {
+    final key = '${entry.key}'.trim();
+    final item = entry.value;
+    if (key.isNotEmpty && item is String) result[key] = item;
+  }
+  return Map.unmodifiable(result);
 }
 
 Uri _httpUri(String value) {

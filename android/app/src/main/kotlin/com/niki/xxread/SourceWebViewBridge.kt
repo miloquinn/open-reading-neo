@@ -64,6 +64,8 @@ class SourceWebViewBridge(
     ) {
         val completed = AtomicBoolean(false)
         val webView = WebView(context)
+        var navigationGeneration = 0
+        var pendingCapture: Runnable? = null
         activeViews.add(webView)
         webView.settings.apply {
             javaScriptEnabled = true
@@ -81,6 +83,8 @@ class SourceWebViewBridge(
 
         fun cleanup() {
             handler.post {
+                pendingCapture?.let(handler::removeCallbacks)
+                pendingCapture = null
                 activeViews.remove(webView)
                 webView.stopLoading()
                 webView.webViewClient = WebViewClient()
@@ -125,10 +129,21 @@ class SourceWebViewBridge(
         }
 
         webView.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView, startedUrl: String, favicon: android.graphics.Bitmap?) {
+                navigationGeneration++
+                pendingCapture?.let(handler::removeCallbacks)
+                pendingCapture = null
+            }
+
             override fun onPageFinished(view: WebView, finishedUrl: String) {
                 if (completed.get() || finishedUrl == "about:blank") return
-                handler.postDelayed({
-                    if (completed.get()) return@postDelayed
+                val finishedGeneration = navigationGeneration
+                pendingCapture?.let(handler::removeCallbacks)
+                pendingCapture = Runnable {
+                    if (completed.get()) return@Runnable
+                    if (finishedGeneration != navigationGeneration || view.progress < 100) {
+                        return@Runnable
+                    }
                     if (webJs.isNullOrBlank()) {
                         capture()
                     } else {
@@ -136,7 +151,8 @@ class SourceWebViewBridge(
                             handler.postDelayed({ capture() }, 250L)
                         }
                     }
-                }, 500L)
+                }
+                handler.postDelayed(pendingCapture!!, 750L)
             }
 
             override fun onReceivedError(

@@ -14,7 +14,9 @@ import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 class AiSettingsPage extends StatefulWidget {
-  const AiSettingsPage({super.key});
+  const AiSettingsPage({super.key, this.aiService});
+
+  final ReaderHttpAIService? aiService;
 
   @override
   State<AiSettingsPage> createState() => _AiSettingsPageState();
@@ -24,7 +26,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   static const _aiQuickModelsKey = 'reader_ai_quick_models_v1';
   static const _activeAiQuickModelKey = 'reader_ai_active_quick_model_v1';
 
-  final ReaderHttpAIService _aiService = ReaderHttpAIService();
+  late final ReaderHttpAIService _aiService;
 
   final Map<AIProviderType, AIProviderSettings> _aiDraftByProvider =
       <AIProviderType, AIProviderSettings>{};
@@ -38,6 +40,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   @override
   void initState() {
     super.initState();
+    _aiService = widget.aiService ?? ReaderHttpAIService();
     unawaited(_loadSettings());
   }
 
@@ -145,10 +148,22 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     }
   }
 
-  String _knownAiApiKey(AIProviderType provider, String baseUrl) {
-    final normalizedBase = normalizeAIBaseUrl(provider, baseUrl);
+  String _knownAiApiKey(
+    AIProviderType provider,
+    String baseUrl, {
+    AIProtocolType? protocol,
+  }) {
+    final effectiveProtocol = provider == AIProviderType.custom
+        ? protocol ?? provider.defaultProtocol
+        : provider.defaultProtocol;
+    final normalizedBase = normalizeAIBaseUrl(
+      provider,
+      baseUrl,
+      protocol: effectiveProtocol,
+    );
     for (final item in _aiQuickModels) {
       if (item.settings.provider == provider &&
+          item.settings.effectiveProtocol == effectiveProtocol &&
           item.settings.baseUrl == normalizedBase &&
           item.settings.apiKey.isNotEmpty) {
         return item.settings.apiKey;
@@ -156,6 +171,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     }
     final draft = _aiDraftByProvider[provider];
     if (draft != null &&
+        draft.effectiveProtocol == effectiveProtocol &&
         draft.baseUrl == normalizedBase &&
         draft.apiKey.isNotEmpty) {
       return draft.apiKey;
@@ -320,8 +336,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     final selected = item.id == _activeAiQuickModelId;
     final configured = item.settings.isConfigured;
     final host = Uri.tryParse(item.settings.baseUrl)?.host ?? '';
+    final providerName = item.settings.provider == AIProviderType.custom
+        ? l10n.settingsAiCustomProvider
+        : item.settings.provider.displayName;
+    final protocolName = switch (item.settings.effectiveProtocol) {
+      AIProtocolType.openai => l10n.settingsAiProtocolOpenAi,
+      AIProtocolType.anthropic => l10n.settingsAiProtocolAnthropic,
+      AIProtocolType.gemini => 'Gemini',
+    };
     final subtitle = configured
-        ? '${item.settings.provider.displayName} · '
+        ? '$providerName${item.settings.provider == AIProviderType.custom ? ' · $protocolName' : ''} · '
               '${host.isNotEmpty ? host : item.settings.baseUrl}'
         : l10n.settingsAiApiKeyTapToConfigure;
     return Material(
@@ -522,14 +546,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   Future<void> _showAiModelSheet({_AiQuickModel? editing}) async {
     final initial =
         editing?.settings ??
-        AIModelPresets.defaultForProvider(_selectedAiProvider).toSettings(
+        AIProviderSettings.defaults(_selectedAiProvider).copyWith(
           apiKey: _aiDraftByProvider[_selectedAiProvider]?.apiKey ?? '',
         );
     var provider = initial.provider;
-    var customMode = editing?.isCustom ?? false;
+    var protocol = initial.effectiveProtocol;
+    var customMode = editing?.isCustom ?? provider == AIProviderType.custom;
     var selectedPreset =
         AIModelPresets.match(initial) ??
-        AIModelPresets.defaultForProvider(provider);
+        AIModelPresets.defaultForProvider(
+          provider == AIProviderType.custom ? AIProviderType.openai : provider,
+        );
     final apiKeyController = TextEditingController(text: initial.apiKey);
     final baseUrlController = TextEditingController(text: initial.baseUrl);
     final modelController = TextEditingController(text: initial.model);
@@ -551,6 +578,31 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           final scheme = Theme.of(sheetContext).colorScheme;
           final presets = AIModelPresets.byProvider(provider);
 
+          String protocolLabel(AIProtocolType value) => switch (value) {
+            AIProtocolType.openai => l10n.settingsAiProtocolOpenAi,
+            AIProtocolType.anthropic => l10n.settingsAiProtocolAnthropic,
+            AIProtocolType.gemini => 'Gemini',
+          };
+
+          String? baseUrlHint() {
+            if (!customMode) return null;
+            return switch (protocol) {
+              AIProtocolType.openai => l10n.settingsAiBaseUrlHintOpenAi,
+              AIProtocolType.anthropic => l10n.settingsAiBaseUrlHintAnthropic,
+              AIProtocolType.gemini => null,
+            };
+          }
+
+          void applySettings(AIProviderSettings settings) {
+            protocol = settings.effectiveProtocol;
+            baseUrlController.text = settings.baseUrl;
+            modelController.text = settings.model;
+            temperatureController.text = settings.temperature.toStringAsFixed(
+              2,
+            );
+            apiKeyController.text = settings.apiKey;
+          }
+
           void applyPreset(AIModelPreset preset) {
             selectedPreset = preset;
             baseUrlController.text = preset.baseUrl;
@@ -559,6 +611,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             apiKeyController.text = _knownAiApiKey(
               preset.provider,
               preset.baseUrl,
+              protocol: preset.provider.defaultProtocol,
             );
           }
 
@@ -579,6 +632,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
               final models = await _aiService.fetchAvailableModels(
                 AIProviderSettings(
                   provider: provider,
+                  protocol: protocol,
                   apiKey: apiKey,
                   baseUrl: baseUrl,
                   model: modelController.text.trim(),
@@ -606,6 +660,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             );
             final settings = AIProviderSettings(
               provider: provider,
+              protocol: protocol,
               apiKey: apiKeyController.text.trim(),
               baseUrl: baseUrlController.text.trim(),
               model: modelController.text.trim(),
@@ -718,7 +773,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                                 customMode = selection.first;
                                 errorText = null;
                                 fetchedModels = [];
-                                if (!customMode) applyPreset(selectedPreset);
+                                if (!customMode) {
+                                  if (provider == AIProviderType.custom) {
+                                    provider = AIProviderType.openai;
+                                    protocol = provider.defaultProtocol;
+                                    selectedPreset =
+                                        AIModelPresets.defaultForProvider(
+                                          provider,
+                                        );
+                                  }
+                                  applyPreset(selectedPreset);
+                                }
                               });
                             },
                           ),
@@ -734,7 +799,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                                 .map(
                                   (item) => DropdownMenuItem(
                                     value: item,
-                                    child: Text(item.displayName),
+                                    child: Text(
+                                      item == AIProviderType.custom
+                                          ? l10n.settingsAiCustomProvider
+                                          : item.displayName,
+                                    ),
                                   ),
                                 )
                                 .toList(),
@@ -742,21 +811,67 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                               if (value == null) return;
                               setSheetState(() {
                                 provider = value;
-                                selectedPreset =
-                                    AIModelPresets.defaultForProvider(value);
+                                protocol = value.defaultProtocol;
                                 fetchedModels = [];
                                 errorText = null;
-                                if (!customMode) {
+                                if (value == AIProviderType.custom) {
+                                  customMode = true;
+                                  applySettings(
+                                    _aiDraftByProvider[value] ??
+                                        AIProviderSettings.defaults(value),
+                                  );
+                                } else if (!customMode) {
+                                  selectedPreset =
+                                      AIModelPresets.defaultForProvider(value);
                                   applyPreset(selectedPreset);
                                 } else {
                                   apiKeyController.text = _knownAiApiKey(
                                     value,
                                     baseUrlController.text,
+                                    protocol: protocol,
                                   );
                                 }
                               });
                             },
                           ),
+                          if (provider == AIProviderType.custom) ...[
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<AIProtocolType>(
+                              initialValue: protocol,
+                              decoration: InputDecoration(
+                                labelText: l10n.settingsAiProtocolLabel,
+                                prefixIcon: const Icon(
+                                  Icons.swap_calls_rounded,
+                                ),
+                                border: const OutlineInputBorder(),
+                              ),
+                              items:
+                                  const [
+                                        AIProtocolType.openai,
+                                        AIProtocolType.anthropic,
+                                      ]
+                                      .map(
+                                        (item) => DropdownMenuItem(
+                                          value: item,
+                                          child: Text(protocolLabel(item)),
+                                        ),
+                                      )
+                                      .toList(),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setSheetState(() {
+                                  protocol = value;
+                                  fetchedModels = [];
+                                  errorText = null;
+                                  apiKeyController.text = _knownAiApiKey(
+                                    provider,
+                                    baseUrlController.text,
+                                    protocol: protocol,
+                                  );
+                                });
+                              },
+                            ),
+                          ],
                           if (!customMode) ...[
                             const SizedBox(height: 16),
                             DropdownButtonFormField<AIModelPreset>(
@@ -793,6 +908,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                             enabled: customMode,
                             decoration: InputDecoration(
                               labelText: l10n.settingsAiBaseUrlLabel,
+                              helperText: baseUrlHint(),
+                              helperMaxLines: 3,
                               prefixIcon: const Icon(Icons.link_rounded),
                               border: const OutlineInputBorder(),
                             ),
@@ -1010,13 +1127,14 @@ class _AiQuickModel {
 
   static String idFor(AIProviderSettings settings) {
     final source =
-        '${settings.provider.value}|${settings.baseUrl}|${settings.model}';
+        '${settings.provider.value}|${settings.effectiveProtocol.value}|${settings.baseUrl}|${settings.model}';
     return 'model-${base64Url.encode(utf8.encode(source)).replaceAll('=', '')}';
   }
 
   bool matches(AIProviderSettings other) {
     final normalized = other.normalized();
     return settings.provider == normalized.provider &&
+        settings.effectiveProtocol == normalized.effectiveProtocol &&
         settings.baseUrl == normalized.baseUrl &&
         settings.model == normalized.model;
   }
@@ -1024,6 +1142,7 @@ class _AiQuickModel {
   Map<String, dynamic> toJson() => {
     'id': id,
     'provider': settings.provider.value,
+    'protocol': settings.effectiveProtocol.value,
     'apiKey': settings.apiKey,
     'baseUrl': settings.baseUrl,
     'model': settings.model,
@@ -1038,6 +1157,12 @@ class _AiQuickModel {
     if (id.isEmpty || model.isEmpty || baseUrl.isEmpty) return null;
     final settings = AIProviderSettings(
       provider: AIProviderTypeX.fromValue(json['provider']?.toString()),
+      protocol: AIProtocolTypeX.fromValue(
+        json['protocol']?.toString(),
+        fallback: AIProviderTypeX.fromValue(
+          json['provider']?.toString(),
+        ).defaultProtocol,
+      ),
       apiKey: json['apiKey']?.toString() ?? '',
       baseUrl: baseUrl,
       model: model,

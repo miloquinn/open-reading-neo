@@ -118,13 +118,22 @@ class SourceVerifier {
         final match = result.items.firstWhere(
           (book) => book.id.trim().isNotEmpty && book.title.trim().isNotEmpty,
         );
-        final book = await _runtime.getBook(registered, match.id);
-        final chapters = await _runtime.getChapters(registered, book.id);
+        final book = await _runtime.getBook(
+          registered,
+          match.id,
+          sourceVariables: match.sourceVariables,
+        );
+        final chapters = await _runtime.getChapters(
+          registered,
+          book.id,
+          sourceVariables: book.sourceVariables,
+        );
         if (chapters.isEmpty) continue;
         final content = await _runtime.getChapterContent(
           registered,
           bookId: book.id,
           chapterId: chapters.first.id,
+          sourceVariables: book.sourceVariables,
         );
         if (content.content.trim().isNotEmpty) return true;
       } catch (_) {

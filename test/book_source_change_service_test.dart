@@ -194,6 +194,31 @@ void main() {
     expect(client.sourceOrder, ['fast', 'slow']);
   });
 
+  test('limited search keeps only the highest-priority sources', () async {
+    final client = _OrderTrackingClient();
+    final service = BookSourceChangeService(
+      client: client,
+      maxConcurrentSearches: 1,
+    );
+    final slowSources = List.generate(
+      1000,
+      (index) => _readingSource('slow-$index', 180000),
+    );
+    final fast = _readingSource('fast', 180);
+
+    await service
+        .search(
+          sources: [...slowSources, fast],
+          title: _oldBook.title,
+          author: _oldBook.author,
+          checkAuthor: true,
+          sourceLimit: 1,
+        )
+        .drain<void>();
+
+    expect(client.sourceOrder, ['fast']);
+  });
+
   test('a timed-out source releases its worker for the next source', () async {
     final client = _TimeoutAwareClient();
     final service = BookSourceChangeService(
@@ -303,14 +328,16 @@ class _ChangeClient extends BookSourceClient {
   @override
   Future<BookSourceBook> getBook(
     RegisteredBookSource source,
-    String bookId,
-  ) async => _newBook;
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => _newBook;
 
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => List.generate(
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => List.generate(
     source.id == _oldSource.id ? 10 : 12,
     (index) => BookSourceChapter(
       id: '${source.id}-$index',
@@ -324,6 +351,7 @@ class _ChangeClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     contentRequests++;
     return BookSourceChapterContent(

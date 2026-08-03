@@ -2272,6 +2272,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Prevent the screen from turning off while reading';
 
   @override
+  String get settingsPowerSavingModeTitle => 'Power saving mode';
+
+  @override
+  String get settingsPowerSavingModeSubtitle =>
+      'Limit the app to 60 fps instead of using a high refresh rate';
+
+  @override
   String get settingsAutoSaveTitle => 'Auto save';
 
   @override
@@ -2308,6 +2315,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAiProviderLabel => 'Provider';
+
+  @override
+  String get settingsAiCustomProvider => 'Custom';
+
+  @override
+  String get settingsAiProtocolLabel => 'API protocol';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI Compatible';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic';
 
   @override
   String get settingsAiPresetHint => 'Select a preset model';
@@ -3589,6 +3608,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI Compatible: the Base URL usually needs to include /v1 (for example, https://example.com/v1). The app appends /chat/completions.';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic: the Base URL may include /v1 or omit it. The app avoids duplicating /v1 and appends /messages.';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';

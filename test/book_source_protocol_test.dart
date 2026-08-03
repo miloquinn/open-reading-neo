@@ -132,6 +132,21 @@ void main() {
       expect(page.hasMore, isFalse);
     });
 
+    test('preserves source variables with book metadata', () {
+      const book = BookSourceBook(
+        id: 'https://books.example/book/7',
+        title: 'Variable Book',
+        author: '',
+        description: '',
+        categories: [],
+        sourceVariables: {'book': '7'},
+      );
+
+      final restored = BookSourceBook.fromJson(book.toJson());
+
+      expect(restored.sourceVariables, {'book': '7'});
+    });
+
     test('parses optional discovery and category responses', () {
       final discovery = BookSourceDiscoveryPage.fromJson({
         'sections': [

@@ -296,6 +296,10 @@ void main() {
       () {
         final document = SourceRuleDocument.parse(
           '<meta property="og:novel:author" content="甲">'
+          '<meta property="og:novel:category" content="玄幻">'
+          '<meta property="og:novel:status" content="连载中">'
+          '<meta property="og:novel:update_time" content="今天">'
+          '<meta property="og:novel:title" content="书名">'
           '<p data-author="作者：乙<">正文</p><a href="/next">下一页</a>',
           Uri.parse('https://books.test/chapter'),
         );
@@ -307,6 +311,14 @@ void main() {
             '[property="og:novel:author"]@content',
           ),
           '甲',
+        );
+        expect(
+          engine.evaluateList(
+            document,
+            document.value,
+            r'[property~=category|status|time]@content',
+          ),
+          ['玄幻', '连载中', '今天'],
         );
         expect(
           engine.evaluateString(
@@ -386,6 +398,36 @@ void main() {
         hasLength(1),
       );
       expect(engine.evaluateString(document, null, '@css:.name@text'), 'Book');
+    });
+
+    test('joins content nodes by line before applying cleanup rules', () async {
+      final document = SourceRuleDocument.parse(
+        '<section id="Context"><article>'
+        '<p>Chapter One</p><p>Readable body</p>'
+        '</article></section>',
+        Uri.parse('https://books.test/chapter/1'),
+      );
+
+      expect(
+        await engine.evaluateStringAsync(
+          document,
+          null,
+          'id.Context@article@p@html##Chapter.*',
+          joinSeparator: '\n',
+          regexDotAll: false,
+        ),
+        'Readable body',
+      );
+      expect(
+        await engine.evaluateStringAsync(
+          document,
+          null,
+          r'id.Context@article@p@html##Chapter[\s\S]*',
+          joinSeparator: '\n',
+          regexDotAll: false,
+        ),
+        isEmpty,
+      );
     });
 
     test('supports staged regex lists and numbered capture fields', () {
@@ -530,6 +572,103 @@ void main() {
       expect(chapters.single.title, '开篇');
       expect(content.content, '第一段\n第二段');
     });
+
+    test(
+      'carries book variables into catalog URLs and preserves request options',
+      () async {
+        final transport = _FakeTransport({
+          'https://api.test/search?q=variable':
+              '{"books":[{"id":7,"title":"Variable Book"}]}',
+          'https://api.test/books/7':
+              '{"data":[{"id":7,"title":"Variable Book"}]}',
+          'https://api.test/books/7/chapters':
+              '{"chapters":[{"id":9,"title":"Chapter One"}]}',
+          'https://reader.test/chapter/7/9.html':
+              '<section id="Context"><article>'
+              '<p>Chapter One</p><p>Readable body</p>'
+              '</article></section>',
+        });
+        final source = ReadingSourceConfig.fromJson({
+          'bookSourceName': 'Variable source',
+          'bookSourceUrl': 'https://api.test',
+          'searchUrl': '/search?q={{key}}',
+          'ruleSearch': {
+            'bookList': r'$.books[*]',
+            'name': r'$.title@put:{book:$.id}',
+            'bookUrl': r'/books/{{$.id}}',
+          },
+          'ruleBookInfo': {
+            'init': r'$.data[0]',
+            'name': r'$.title',
+            'tocUrl': '/books/@get:{book}/chapters',
+          },
+          'ruleToc': {
+            'chapterList': r'$.chapters[*]',
+            'chapterName': r'$.title',
+            'chapterUrl':
+                "https://reader.test/chapter/@get:{book}/{{\$.id}}.html,{'webView': true}",
+          },
+          'ruleContent': {'content': 'id.Context@article@p@html##Chapter.*'},
+        }).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+
+        final summary = (await runtime.search(source, 'variable')).items.single;
+        final book = await runtime.getBook(
+          source,
+          summary.id,
+          sourceVariables: summary.sourceVariables,
+        );
+        final chapters = await runtime.getChapters(
+          source,
+          book.id,
+          sourceVariables: book.sourceVariables,
+        );
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: book.id,
+          chapterId: chapters.single.id,
+          sourceVariables: book.sourceVariables,
+        );
+
+        expect(summary.sourceVariables, {'book': '7'});
+        expect(book.sourceVariables, {'book': '7'});
+        expect(
+          chapters.single.id,
+          "https://reader.test/chapter/7/9.html,{'webView': true}",
+        );
+        expect(
+          transport.requests.last.url.toString(),
+          'https://reader.test/chapter/7/9.html',
+        );
+        expect(transport.requests.last.useWebView, isTrue);
+        expect(content.content, 'Readable body');
+
+        final reopenedTransport = _FakeTransport({
+          'https://api.test/books/7':
+              '{"data":[{"id":7,"title":"Variable Book"}]}',
+          'https://api.test/books/7/chapters':
+              '{"chapters":[{"id":9,"title":"Chapter One"}]}',
+          'https://reader.test/chapter/7/9.html':
+              '<section id="Context"><article>'
+              '<p>Chapter One</p><p>Readable after reopen</p>'
+              '</article></section>',
+        });
+        final reopenedRuntime = SourceRuntime(transport: reopenedTransport);
+        final reopenedChapters = await reopenedRuntime.getChapters(
+          source,
+          book.id,
+        );
+        final reopenedContent = await reopenedRuntime.getChapterContent(
+          source,
+          bookId: book.id,
+          chapterId: reopenedChapters.single.id,
+        );
+
+        expect(reopenedChapters.single.id, chapters.single.id);
+        expect(reopenedTransport.requests.last.useWebView, isTrue);
+        expect(reopenedContent.content, 'Readable after reopen');
+      },
+    );
 
     test('loads declarative discovery channels and paged books', () async {
       final transport = _FakeTransport({

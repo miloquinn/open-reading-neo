@@ -115,6 +115,11 @@ class LibraryPage extends StatefulWidget {
 
 class _LibraryPageState extends State<LibraryPage> {
   List<Book> _books = [];
+  int _booksRevision = 0;
+  int _visibleBooksCacheRevision = -1;
+  _LibraryFilter? _visibleBooksCacheFilter;
+  String _visibleBooksCacheQuery = '';
+  List<Book> _visibleBooksCache = const [];
   bool _isInitialLoading = true;
   final _bookDao = BookDao();
   final _sourceShelfService = BookSourceShelfService();
@@ -444,6 +449,7 @@ class _LibraryPageState extends State<LibraryPage> {
       if (mounted) {
         setState(() {
           _books = books;
+          _booksRevision++;
           _selection.retainOnly(books.map((book) => book.id).nonNulls.toSet());
           _isInitialLoading = false;
         });
@@ -577,15 +583,26 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   List<Book> get _visibleBooks {
+    final query = _searchQuery.trim().toLowerCase();
+    if (_visibleBooksCacheRevision == _booksRevision &&
+        _visibleBooksCacheFilter == _selectedFilter &&
+        _visibleBooksCacheQuery == query) {
+      return _visibleBooksCache;
+    }
     final filteredByStatus = _books
         .where((book) => _matchesSelectedFilter(book))
         .toList();
-    final query = _searchQuery.trim().toLowerCase();
-    if (query.isEmpty) return filteredByStatus;
-    return filteredByStatus.where((book) {
-      return book.title.toLowerCase().contains(query) ||
-          book.author.toLowerCase().contains(query);
-    }).toList();
+    final result = query.isEmpty
+        ? filteredByStatus
+        : filteredByStatus.where((book) {
+            return book.title.toLowerCase().contains(query) ||
+                book.author.toLowerCase().contains(query);
+          }).toList();
+    _visibleBooksCacheRevision = _booksRevision;
+    _visibleBooksCacheFilter = _selectedFilter;
+    _visibleBooksCacheQuery = query;
+    _visibleBooksCache = result;
+    return result;
   }
 
   bool _matchesSelectedFilter(Book book) {
@@ -2321,6 +2338,7 @@ class _LibraryPageState extends State<LibraryPage> {
     progress.dispose();
     setState(() {
       _books.removeWhere((book) => deletedIds.contains(book.id));
+      _booksRevision++;
       if (failedIds.isEmpty) {
         _selection.exit();
       } else {

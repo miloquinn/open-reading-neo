@@ -413,9 +413,7 @@ void main() {
     },
   );
 
-  testWidgets('tablet page curl keeps two leaves around a fixed center spine', (
-    tester,
-  ) async {
+  testWidgets('tablet page curl uses a subtle center divider', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     final tabletBook = File(
@@ -445,6 +443,9 @@ void main() {
         find.byType(ReaderPageCurlSpread),
       );
       expect(spread.coordinator.gutterWidth, 24);
+      final gutter = spread.gutter as SizedBox;
+      expect(gutter.child, isA<VerticalDivider>());
+      expect((gutter.child! as VerticalDivider).thickness, 1);
       final curls = tester
           .widgetList<ReaderShaderPageCurl>(curlFinder)
           .toList();

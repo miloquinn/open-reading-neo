@@ -11,6 +11,7 @@ import '../protocol/book_source_protocol.dart';
 import 'book_download_cancellation.dart';
 import 'book_source_chapter_cache.dart';
 import 'book_source_network_policy.dart';
+import 'book_source_response_cache.dart';
 
 class DiscoveredBookSource {
   final Uri manifestUrl;
@@ -25,6 +26,7 @@ class DiscoveredBookSource {
 class BookSourceClient {
   final Dio _dio;
   final BookSourceChapterCache _chapterCache;
+  final BookSourceResponseCache _responseCache;
   final BookSourceNetworkPolicy _networkPolicy;
   SourceRuntime? _sourceRuntime;
 
@@ -33,6 +35,11 @@ class BookSourceClient {
   static const int maxResponseBytes = 8 * 1024 * 1024;
   static const int maxDownloadResponseBytes = 24 * 1024 * 1024;
   static const Duration downloadReceiveTimeout = Duration(seconds: 90);
+  static const Duration discoveryCacheTtl = Duration(hours: 1);
+  static const Duration categoriesCacheTtl = Duration(minutes: 30);
+  static const Duration browseCacheTtl = Duration(minutes: 5);
+  static const Duration searchCacheTtl = Duration(minutes: 2);
+  static const Duration bookDetailCacheTtl = Duration(minutes: 10);
 
   /// ORSP §11 章节目录默认页大小；书源未声明 maxCatalogPageSize 时使用。
   static const int _defaultChapterPageSize = 100;
@@ -48,8 +55,10 @@ class BookSourceClient {
   BookSourceClient({
     Dio? dio,
     BookSourceChapterCache? chapterCache,
+    BookSourceResponseCache? responseCache,
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
   }) : _chapterCache = chapterCache ?? const BookSourceChapterCache(),
+       _responseCache = responseCache ?? BookSourceResponseCache.instance,
        _networkPolicy = networkPolicy,
        _dio =
            dio ??
@@ -158,9 +167,14 @@ class BookSourceClient {
   Future<DiscoveredBookSource> discover(String input) async {
     final manifestUrl = normalizeManifestUri(input);
     try {
-      final manifest = BookSourceManifest.fromJson(
-        decodeBookSourceJson(await _getBounded(manifestUrl)),
+      final key = _discoveryCacheKey(manifestUrl);
+      final json = await _cachedOrspJson(
+        key: key,
+        ttl: discoveryCacheTtl,
+        uri: manifestUrl,
+        validate: BookSourceManifest.fromJson,
       );
+      final manifest = BookSourceManifest.fromJson(json);
       return DiscoveredBookSource(manifestUrl: manifestUrl, manifest: manifest);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
@@ -200,11 +214,22 @@ class BookSourceClient {
       },
     );
     try {
-      return BookSourceSearchPage.fromJson(
-        decodeBookSourceJson(
-          await _getBounded(uri, cancellation: cancellation),
-        ),
+      cancellation?.throwIfCancelled();
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'search', [
+          query.trim(),
+          '$page',
+          '$pageSize',
+        ]),
+        ttl: searchCacheTtl,
+        uri: uri,
+        cancellation: cancellation,
+        deduplicateInFlight: cancellation == null,
+        persistToDisk: false,
+        validate: BookSourceSearchPage.fromJson,
       );
+      cancellation?.throwIfCancelled();
+      return BookSourceSearchPage.fromJson(json);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -223,9 +248,13 @@ class BookSourceClient {
     }
     final uri = _apiUri(source.apiBaseUrl, 'v1/discover');
     try {
-      return BookSourceDiscoveryPage.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'discovery'),
+        ttl: discoveryCacheTtl,
+        uri: uri,
+        validate: BookSourceDiscoveryPage.fromJson,
       );
+      return BookSourceDiscoveryPage.fromJson(json);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -248,7 +277,12 @@ class BookSourceClient {
     }
     final uri = _apiUri(source.apiBaseUrl, 'v1/categories');
     try {
-      final json = decodeBookSourceJson(await _getBounded(uri));
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'categories'),
+        ttl: categoriesCacheTtl,
+        uri: uri,
+        validate: _validateCategoriesJson,
+      );
       final items = json['items'];
       if (items is! List) {
         throw const BookSourceProtocolException(
@@ -299,9 +333,18 @@ class BookSourceClient {
       },
     );
     try {
-      return BookSourceSearchPage.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'browse', [
+          category?.trim() ?? '',
+          sort.trim(),
+          '$page',
+          '$pageSize',
+        ]),
+        ttl: browseCacheTtl,
+        uri: uri,
+        validate: BookSourceSearchPage.fromJson,
       );
+      return BookSourceSearchPage.fromJson(json);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -312,20 +355,38 @@ class BookSourceClient {
 
   Future<BookSourceBook> getBook(
     RegisteredBookSource source,
-    String bookId,
-  ) async {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
     if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _sourceEngine.getBook(source, bookId);
+      return _sourceEngine.getBook(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      );
     }
     final uri = _apiUri(
       source.apiBaseUrl,
       'v1/books/${Uri.encodeComponent(bookId)}',
     );
     try {
-      final book = BookSourceBook.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      final key = _orspCacheKey(source, 'book', [bookId]);
+      final json = await _cachedOrspJson(
+        key: key,
+        ttl: bookDetailCacheTtl,
+        uri: uri,
+        validate: (json) {
+          final book = BookSourceBook.fromJson(json);
+          if (book.id != bookId) {
+            throw const BookSourceProtocolException(
+              'Book detail response does not match the requested book.',
+            );
+          }
+          return book;
+        },
       );
+      final book = BookSourceBook.fromJson(json);
       if (book.id != bookId) {
         throw const BookSourceProtocolException(
           'Book detail response does not match the requested book.',
@@ -342,11 +403,16 @@ class BookSourceClient {
 
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
     if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _sourceEngine.getChapters(source, bookId);
+      return _sourceEngine.getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      );
     }
     return _chapterCache.getChapterCatalogOrLoad(
       sourceId: source.id,
@@ -367,12 +433,17 @@ class BookSourceClient {
   Future<List<BookSourceChapter>> getChaptersForDownload(
     RegisteredBookSource source,
     String bookId, {
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
     if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       cancellation?.throwIfCancelled();
       await _ensureAdditionalProtocolsEnabled();
-      final chapters = await _sourceEngine.getChapters(source, bookId);
+      final chapters = await _sourceEngine.getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      );
       cancellation?.throwIfCancelled();
       return chapters;
     }
@@ -478,6 +549,7 @@ class BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
@@ -485,6 +557,7 @@ class BookSourceClient {
         source,
         bookId: bookId,
         chapterId: chapterId,
+        sourceVariables: sourceVariables,
       );
     }
     return _chapterCache.getOrLoad(
@@ -518,6 +591,7 @@ class BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
     if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
@@ -527,6 +601,7 @@ class BookSourceClient {
         source,
         bookId: bookId,
         chapterId: chapterId,
+        sourceVariables: sourceVariables,
       );
       cancellation?.throwIfCancelled();
       return content;
@@ -580,13 +655,109 @@ class BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     try {
-      await getChapterContent(source, bookId: bookId, chapterId: chapterId);
+      await getChapterContent(
+        source,
+        bookId: bookId,
+        chapterId: chapterId,
+        sourceVariables: sourceVariables,
+      );
     } catch (_) {
       // Prefetching is opportunistic and must not surface reader errors.
     }
   }
+
+  /// Invalidates cached ORSP metadata for a source before a manual refresh.
+  /// Reading-source responses are deliberately not cached by this first phase.
+  Future<void> invalidateResponseCache(RegisteredBookSource source) {
+    if (source.sourceProtocol != BookSourceProtocolKind.orsp) {
+      return Future<void>.value();
+    }
+    return _responseCache.invalidatePrefix(_orspSourceCachePrefix(source));
+  }
+
+  /// Invalidates multiple source prefixes with one persistent-directory scan.
+  Future<void> invalidateResponseCaches(
+    Iterable<RegisteredBookSource> sources,
+  ) {
+    return _responseCache.invalidatePrefixes(
+      sources
+          .where(
+            (source) => source.sourceProtocol == BookSourceProtocolKind.orsp,
+          )
+          .map(_orspSourceCachePrefix),
+    );
+  }
+
+  /// Invalidates a cached ORSP manifest discovery request.
+  Future<void> invalidateDiscoveryResponseCache(String input) {
+    return _responseCache.invalidate(
+      _discoveryCacheKey(normalizeManifestUri(input)),
+    );
+  }
+
+  Future<Map<String, dynamic>> _cachedOrspJson({
+    required String key,
+    required Duration ttl,
+    required Uri uri,
+    required Object? Function(Map<String, dynamic>) validate,
+    BookDownloadCancellation? cancellation,
+    bool deduplicateInFlight = true,
+    bool persistToDisk = true,
+  }) async {
+    final json = await _responseCache.getOrLoadJson(
+      key: key,
+      ttl: ttl,
+      deduplicateInFlight: deduplicateInFlight,
+      persistToDisk: persistToDisk,
+      loader: () async {
+        final value = decodeBookSourceJson(
+          await _getBounded(uri, cancellation: cancellation),
+        );
+        validate(value);
+        return value;
+      },
+    );
+    try {
+      validate(json);
+      return json;
+    } catch (_) {
+      // Semantically invalid cached JSON must not poison later requests.
+      await _responseCache.invalidate(key);
+      rethrow;
+    }
+  }
+
+  static Object? _validateCategoriesJson(Map<String, dynamic> json) {
+    final items = json['items'];
+    if (items is! List) {
+      throw const BookSourceProtocolException(
+        'Category response must contain an items array.',
+      );
+    }
+    for (final item in items) {
+      BookSourceCategory.fromJson(decodeBookSourceJson(item));
+    }
+    return null;
+  }
+
+  static String _orspSourceCachePrefix(RegisteredBookSource source) =>
+      'orsp|${Uri.encodeComponent(source.id)}|'
+      '${Uri.encodeComponent(source.apiBaseUrl.toString())}|'
+      '${Uri.encodeComponent(source.protocolVersion)}|';
+
+  static String _orspCacheKey(
+    RegisteredBookSource source,
+    String operation, [
+    List<String> parameters = const [],
+  ]) =>
+      '${_orspSourceCachePrefix(source)}${Uri.encodeComponent(operation)}|'
+      '${parameters.map(Uri.encodeComponent).join('|')}';
+
+  static String _discoveryCacheKey(Uri manifestUrl) =>
+      'orsp-discovery|${Uri.encodeComponent(manifestUrl.toString())}';
 
   SourceRuntime get _sourceEngine => _sourceRuntime ??= SourceRuntime();
 

@@ -4069,6 +4069,18 @@ abstract class AppLocalizations {
   /// **'Prevent the screen from turning off while reading'**
   String get settingsKeepScreenOnSubtitle;
 
+  /// Switch title for limiting the display refresh rate to save power
+  ///
+  /// In en, this message translates to:
+  /// **'Power saving mode'**
+  String get settingsPowerSavingModeTitle;
+
+  /// Switch subtitle explaining the 60 Hz power saving behavior
+  ///
+  /// In en, this message translates to:
+  /// **'Limit the app to 60 fps instead of using a high refresh rate'**
+  String get settingsPowerSavingModeSubtitle;
+
   /// Switch title for auto save
   ///
   /// In en, this message translates to:
@@ -4134,6 +4146,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Provider'**
   String get settingsAiProviderLabel;
+
+  /// Name of the custom AI provider option
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get settingsAiCustomProvider;
+
+  /// Label of the API protocol dropdown for a custom AI provider
+  ///
+  /// In en, this message translates to:
+  /// **'API protocol'**
+  String get settingsAiProtocolLabel;
+
+  /// OpenAI-compatible API protocol option
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Compatible'**
+  String get settingsAiProtocolOpenAi;
+
+  /// Anthropic API protocol option
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic'**
+  String get settingsAiProtocolAnthropic;
 
   /// Hint of the AI preset dropdown
   ///
@@ -6396,6 +6432,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Base URL'**
   String get settingsAiBaseUrlLabel;
+
+  /// Explains whether an OpenAI-compatible Base URL should include v1
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Compatible: the Base URL usually needs to include /v1 (for example, https://example.com/v1). The app appends /chat/completions.'**
+  String get settingsAiBaseUrlHintOpenAi;
+
+  /// Explains whether an Anthropic Base URL should include v1
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic: the Base URL may include /v1 or omit it. The app avoids duplicating /v1 and appends /messages.'**
+  String get settingsAiBaseUrlHintAnthropic;
 
   /// Input label for the AI provider API Key field
   ///

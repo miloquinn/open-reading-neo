@@ -2203,6 +2203,14 @@
     "description": "Switch title for keeping screen on"
   },
   "settingsKeepScreenOnSubtitle": "Prevent the screen from turning off while reading",
+  "settingsPowerSavingModeTitle": "Power saving mode",
+  "@settingsPowerSavingModeTitle": {
+    "description": "Switch title for limiting the display refresh rate to save power"
+  },
+  "settingsPowerSavingModeSubtitle": "Limit the app to 60 fps instead of using a high refresh rate",
+  "@settingsPowerSavingModeSubtitle": {
+    "description": "Switch subtitle explaining the 60 Hz power saving behavior"
+  },
   "@settingsKeepScreenOnSubtitle": {
     "description": "Switch subtitle for keeping screen on"
   },
@@ -2259,6 +2267,22 @@
   "settingsAiProviderLabel": "Provider",
   "@settingsAiProviderLabel": {
     "description": "Label of the AI provider dropdown"
+  },
+  "settingsAiCustomProvider": "Custom",
+  "@settingsAiCustomProvider": {
+    "description": "Name of the custom AI provider option"
+  },
+  "settingsAiProtocolLabel": "API protocol",
+  "@settingsAiProtocolLabel": {
+    "description": "Label of the API protocol dropdown for a custom AI provider"
+  },
+  "settingsAiProtocolOpenAi": "OpenAI Compatible",
+  "@settingsAiProtocolOpenAi": {
+    "description": "OpenAI-compatible API protocol option"
+  },
+  "settingsAiProtocolAnthropic": "Anthropic",
+  "@settingsAiProtocolAnthropic": {
+    "description": "Anthropic API protocol option"
   },
   "settingsAiPresetHint": "Select a preset model",
   "@settingsAiPresetHint": {
@@ -3346,6 +3370,14 @@
   "settingsAiBaseUrlLabel": "Base URL",
   "@settingsAiBaseUrlLabel": {
     "description": "Input label for the AI provider Base URL field"
+  },
+  "settingsAiBaseUrlHintOpenAi": "OpenAI Compatible: the Base URL usually needs to include /v1 (for example, https://example.com/v1). The app appends /chat/completions.",
+  "@settingsAiBaseUrlHintOpenAi": {
+    "description": "Explains whether an OpenAI-compatible Base URL should include v1"
+  },
+  "settingsAiBaseUrlHintAnthropic": "Anthropic: the Base URL may include /v1 or omit it. The app avoids duplicating /v1 and appends /messages.",
+  "@settingsAiBaseUrlHintAnthropic": {
+    "description": "Explains whether an Anthropic Base URL should include v1"
   },
   "settingsAiApiKeyLabel": "API Key",
   "@settingsAiApiKeyLabel": {

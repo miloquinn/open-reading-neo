@@ -232,6 +232,72 @@ void main() {
     },
   );
 
+  test(
+    'registry migrates the large legacy preference into external storage',
+    () async {
+      final source = ReadingSourceConfig.fromJson(
+        _source(),
+      ).toRegisteredSource();
+      final stored = source.toJson()
+        ..['description'] = ''.padRight(300000, 'x');
+      final raw = jsonEncode([stored]);
+      expect(raw.length, greaterThan(256 * 1024));
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': raw,
+      });
+      final storage = _MemoryBookSourceRegistryStorage();
+      final registry = BookSourceRegistry(storage: storage);
+
+      await registry.prepareStorage();
+
+      final preferences = await SharedPreferences.getInstance();
+      expect(storage.raw, raw);
+      expect(preferences.containsKey('open_reading_book_sources_v1'), isFalse);
+      expect(await registry.load(), hasLength(1));
+    },
+  );
+
+  test(
+    'registry does not report success when external storage update fails',
+    () async {
+      final source = ReadingSourceConfig.fromJson(
+        _source(),
+      ).toRegisteredSource(enabled: true);
+      final storage = _MemoryBookSourceRegistryStorage(
+        raw: jsonEncode([source.toJson()]),
+        writeSucceeds: false,
+      );
+      final registry = BookSourceRegistry(storage: storage);
+
+      await expectLater(
+        registry.setEnabled(source.id, false),
+        throwsA(isA<StateError>()),
+      );
+
+      expect((await registry.load()).single.enabled, isTrue);
+    },
+  );
+
+  test('registry does not replace an unreadable external registry', () async {
+    final source = ReadingSourceConfig.fromJson(
+      _source(),
+    ).toRegisteredSource(enabled: true);
+    final storage = _MemoryBookSourceRegistryStorage(
+      readError: Exception('temporarily unreadable'),
+    );
+    final registry = BookSourceRegistry(storage: storage);
+    var publishedChanges = 0;
+    final subscription = registry.changes.listen((_) => publishedChanges++);
+
+    await expectLater(registry.upsert(source), throwsA(isA<Exception>()));
+    await subscription.cancel();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(storage.writeCalls, 0);
+    expect(preferences.containsKey('open_reading_book_sources_v1'), isFalse);
+    expect(publishedChanges, 0);
+  });
+
   test('registry refreshes local capabilities without reimporting', () async {
     final source = ReadingSourceConfig.fromJson(_source()).toRegisteredSource();
     final legacy = source.toJson()
@@ -271,4 +337,31 @@ void main() {
       expect(await registry.loadRunnableInBackground(), hasLength(1));
     },
   );
+}
+
+class _MemoryBookSourceRegistryStorage implements BookSourceRegistryStorage {
+  _MemoryBookSourceRegistryStorage({
+    this.raw,
+    this.writeSucceeds = true,
+    this.readError,
+  });
+
+  String? raw;
+  final bool writeSucceeds;
+  final Object? readError;
+  int writeCalls = 0;
+
+  @override
+  Future<String?> read() async {
+    if (readError case final error?) throw error;
+    return raw;
+  }
+
+  @override
+  Future<bool> write(String value) async {
+    writeCalls++;
+    if (!writeSucceeds) return false;
+    raw = value;
+    return true;
+  }
 }

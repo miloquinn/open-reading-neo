@@ -380,8 +380,33 @@ void main() {
 
     expect(find.text('Showing 600 of 600'), findsOneWidget);
     expect(
+      find.byKey(const Key('bookSourceManagementScrollbar')),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const ValueKey('bookSourceCard-org.example.bulk-599')),
       findsNothing,
+    );
+
+    final verticalScrollable = find
+        .descendant(
+          of: find.byKey(const Key('bookSourceManagementList')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Source 024'),
+      500,
+      scrollable: verticalScrollable,
+      maxScrolls: 20,
+    );
+    expect(find.text('Source 024'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('bookSourceManagementSearchField')),
+      -500,
+      scrollable: verticalScrollable,
+      maxScrolls: 20,
     );
 
     await tester.enterText(

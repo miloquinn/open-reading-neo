@@ -2176,6 +2176,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsKeepScreenOnSubtitle => '阅读时防止屏幕自动关闭';
 
   @override
+  String get settingsPowerSavingModeTitle => '省电模式';
+
+  @override
+  String get settingsPowerSavingModeSubtitle => '开启后限制为 60 帧，不启用高刷新率';
+
+  @override
   String get settingsAutoSaveTitle => '自动保存';
 
   @override
@@ -2211,6 +2217,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAiProviderLabel => '服务商';
+
+  @override
+  String get settingsAiCustomProvider => '自定义';
+
+  @override
+  String get settingsAiProtocolLabel => '接口协议';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI 兼容协议';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic 协议';
 
   @override
   String get settingsAiPresetHint => '选择预设模型';
@@ -3415,6 +3433,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI 兼容协议：Base URL 通常需要带 /v1（例如 https://example.com/v1）；应用会继续追加 /chat/completions。';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic 协议：Base URL 可带或不带 /v1；应用会自动避免重复并追加 /messages。';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';
@@ -6697,6 +6723,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsKeepScreenOnSubtitle => '閱讀時防止螢幕自動關閉';
 
   @override
+  String get settingsPowerSavingModeTitle => '省電模式';
+
+  @override
+  String get settingsPowerSavingModeSubtitle => '開啟後限制為 60 幀，不啟用高更新率';
+
+  @override
   String get settingsAutoSaveTitle => '自動儲存';
 
   @override
@@ -6732,6 +6764,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAiProviderLabel => '服務商';
+
+  @override
+  String get settingsAiCustomProvider => '自訂';
+
+  @override
+  String get settingsAiProtocolLabel => '介面協定';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI 相容協定';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic 協定';
 
   @override
   String get settingsAiPresetHint => '選擇預設模型';
@@ -7936,6 +7980,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI 相容協定：Base URL 通常需要包含 /v1（例如 https://example.com/v1）；應用程式會繼續附加 /chat/completions。';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic 協定：Base URL 可包含或省略 /v1；應用程式會避免重複並附加 /messages。';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';

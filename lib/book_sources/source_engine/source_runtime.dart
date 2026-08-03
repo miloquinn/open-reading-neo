@@ -23,17 +23,20 @@ class SourceRuntime {
   static const int _maxSearchItems = 100;
   static const int _maxChapters = 30000;
   static const int _maxPageHops = 20;
+  static const int _maxRememberedBookStates = 1024;
 
   final SourceTransport _transport;
   late final SourceRuleEngine _rules = SourceRuleEngine(
     scriptEvaluatorProvider: () => _scripts,
   );
   SourceScriptEvaluator? _scriptEvaluator;
+  final Map<String, Map<String, Object?>> _bookRuleStates = {};
 
   SourceScriptEvaluator get _scripts =>
       _scriptEvaluator ??= QuickJsSourceScriptEvaluator();
 
   void close({bool force = true}) {
+    _bookRuleStates.clear();
     _scriptEvaluator?.dispose();
     _scriptEvaluator = null;
     final transport = _transport;
@@ -74,7 +77,7 @@ class SourceRuntime {
     }
     final books = <BookSourceBook>[];
     for (final context in contexts.take(_maxSearchItems)) {
-      final book = await _bookFromRules(document, context, rule);
+      final book = await _bookFromRules(source, document, context, rule);
       if (book != null) books.add(book);
     }
     if (page == 1 && books.isEmpty) {
@@ -150,7 +153,7 @@ class SourceRuntime {
     );
     final books = <BookSourceBook>[];
     for (final context in contexts.take(_maxSearchItems)) {
-      final book = await _bookFromRules(document, context, rule);
+      final book = await _bookFromRules(source, document, context, rule);
       if (book != null) books.add(book);
     }
     return BookSourceSearchPage(
@@ -166,15 +169,22 @@ class SourceRuntime {
 
   Future<BookSourceBook> getBook(
     RegisteredBookSource registered,
-    String bookId,
-  ) async {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
     final source = _source(registered);
     _ensureRulesSupported(source, const ['ruleBookInfo']);
-    final response = await _request(source, bookId);
+    final ruleState = _ruleStateFor(source, bookId, sourceVariables);
+    final response = await _request(
+      source,
+      bookId,
+      variables: _requestVariables(ruleState, {'bookUrl': bookId}),
+    );
     final document = _document(
       source,
       response,
       variables: {'bookUrl': bookId},
+      ruleState: ruleState,
     );
     final rule = source.rule('ruleBookInfo');
     final init = _optionalRule(rule, 'init');
@@ -187,7 +197,7 @@ class SourceRuntime {
         'Compatible source did not return a book title.',
       );
     }
-    return BookSourceBook(
+    final book = BookSourceBook(
       id: response.finalUri.toString(),
       title: title,
       author: await _value(document, context, rule, 'author'),
@@ -200,16 +210,22 @@ class SourceRuntime {
       latestChapter: _nullable(
         await _value(document, context, rule, 'lastChapter'),
       ),
+      sourceVariables: _sourceVariables(document.ruleState),
     );
+    _rememberRuleState(source, bookId, document.ruleState);
+    _rememberRuleState(source, book.id, document.ruleState);
+    return book;
   }
 
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource registered,
-    String bookId,
-  ) async {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
     final source = _source(registered);
     _ensureRulesSupported(source, const ['ruleBookInfo', 'ruleToc']);
-    final tocUrl = await _tocUrl(source, bookId);
+    final ruleState = _ruleStateFor(source, bookId, sourceVariables);
+    final tocUrl = await _tocUrl(source, bookId, ruleState);
     final rule = source.rule('ruleToc');
     final chapters = <BookSourceChapter>[];
     final seenPages = <String>{};
@@ -217,11 +233,16 @@ class SourceRuntime {
     var nextUrl = tocUrl;
     for (var hop = 0; hop < _maxPageHops && nextUrl.isNotEmpty; hop++) {
       if (!seenPages.add(nextUrl)) break;
-      final response = await _request(source, nextUrl);
+      final response = await _request(
+        source,
+        nextUrl,
+        variables: _requestVariables(ruleState, {'bookUrl': bookId}),
+      );
       final document = _document(
         source,
         response,
         variables: {'bookUrl': bookId},
+        ruleState: ruleState,
       );
       final contexts = await _rules.evaluateListAsync(
         document,
@@ -248,6 +269,7 @@ class SourceRuntime {
         'Compatible source did not return any chapters.',
       );
     }
+    _rememberRuleState(source, bookId, ruleState);
     return chapters;
   }
 
@@ -255,20 +277,30 @@ class SourceRuntime {
     RegisteredBookSource registered, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     final source = _source(registered);
     _ensureRulesSupported(source, const ['ruleContent']);
     final rule = source.rule('ruleContent');
+    final ruleState = _ruleStateFor(source, bookId, sourceVariables);
     final parts = <String>[];
     final seenPages = <String>{};
     var nextUrl = chapterId;
     for (var hop = 0; hop < _maxPageHops && nextUrl.isNotEmpty; hop++) {
       if (!seenPages.add(nextUrl)) break;
-      final response = await _request(source, nextUrl);
+      final response = await _request(
+        source,
+        nextUrl,
+        variables: _requestVariables(ruleState, {
+          'bookUrl': bookId,
+          'chapterUrl': chapterId,
+        }),
+      );
       final document = _document(
         source,
         response,
         variables: {'bookUrl': bookId, 'chapterUrl': chapterId},
+        ruleState: ruleState,
       );
       var content = await _value(
         document,
@@ -276,6 +308,8 @@ class SourceRuntime {
         rule,
         'content',
         required: true,
+        joinSeparator: '\n',
+        regexDotAll: false,
       );
       content = _rules.applyReplaceRule(
         content,
@@ -289,6 +323,7 @@ class SourceRuntime {
         'Compatible source did not return chapter content.',
       );
     }
+    _rememberRuleState(source, bookId, ruleState);
     return BookSourceChapterContent(
       bookId: bookId,
       chapterId: chapterId,
@@ -298,15 +333,24 @@ class SourceRuntime {
     );
   }
 
-  Future<String> _tocUrl(ReadingSourceConfig source, String bookId) async {
+  Future<String> _tocUrl(
+    ReadingSourceConfig source,
+    String bookId,
+    Map<String, Object?> ruleState,
+  ) async {
     final rule = source.rule('ruleBookInfo');
     final tocRule = _optionalRule(rule, 'tocUrl');
     if (tocRule.isEmpty) return bookId;
-    final response = await _request(source, bookId);
+    final response = await _request(
+      source,
+      bookId,
+      variables: _requestVariables(ruleState, {'bookUrl': bookId}),
+    );
     final document = _document(
       source,
       response,
       variables: {'bookUrl': bookId},
+      ruleState: ruleState,
     );
     final init = _optionalRule(rule, 'init');
     final context = init.isEmpty
@@ -321,6 +365,7 @@ class SourceRuntime {
   }
 
   Future<BookSourceBook?> _bookFromRules(
+    ReadingSourceConfig source,
     SourceRuleDocument document,
     Object? context,
     Map<String, dynamic> rule,
@@ -328,7 +373,7 @@ class SourceRuntime {
     final title = await _value(document, context, rule, 'name');
     final url = await _url(document, context, rule, 'bookUrl');
     if (title.isEmpty || url.isEmpty) return null;
-    return BookSourceBook(
+    final book = BookSourceBook(
       id: url,
       title: title,
       author: await _value(document, context, rule, 'author'),
@@ -340,7 +385,10 @@ class SourceRuntime {
       latestChapter: _nullable(
         await _value(document, context, rule, 'lastChapter'),
       ),
+      sourceVariables: _sourceVariables(document.ruleState),
     );
+    _rememberRuleState(source, book.id, document.ruleState);
+    return book;
   }
 
   Future<SourceResponse> _request(
@@ -370,18 +418,125 @@ class SourceRuntime {
     ReadingSourceConfig source,
     SourceResponse response, {
     Map<String, String> variables = const {},
+    Map<String, Object?>? ruleState,
   }) {
+    final state = ruleState ?? <String, Object?>{};
     return SourceRuleDocument.parse(
       response.body,
       response.finalUri,
+      ruleState: state,
       scriptContext: SourceScriptContext(
         source: source,
         baseUrl: response.finalUri,
-        variables: variables,
+        variables: _requestVariables(state, variables),
         networkHandler: (request) => _sendScriptNetwork(source, request),
       ),
     );
   }
+
+  Map<String, Object?> _ruleStateFor(
+    ReadingSourceConfig source,
+    String bookId,
+    Map<String, String> sourceVariables,
+  ) {
+    final state = <String, Object?>{
+      ...?_bookRuleStates[_bookStateKey(source, bookId)],
+      ...sourceVariables,
+    };
+    for (final entry in _inferRuleState(source, bookId).entries) {
+      state.putIfAbsent(entry.key, () => entry.value);
+    }
+    return state;
+  }
+
+  Map<String, String> _inferRuleState(
+    ReadingSourceConfig source,
+    String bookId,
+  ) {
+    final actualUrl = bookId.split(RegExp(r',\s*\{')).first;
+    for (final groupName in const ['ruleSearch', 'ruleExplore']) {
+      final rule = source.rule(groupName);
+      final bookUrlRule = _optionalRule(rule, 'bookUrl');
+      final templateMatch = RegExp(
+        r'\{\{\s*\$\.\.?([A-Za-z_]\w*)\s*\}\}',
+      ).firstMatch(bookUrlRule);
+      if (templateMatch == null ||
+          RegExp(
+                r'\{\{\s*\$\.\.?[A-Za-z_]\w*\s*\}\}',
+              ).allMatches(bookUrlRule).length !=
+              1) {
+        continue;
+      }
+      const marker = 'OPEN_READING_BOOK_VARIABLE_MARKER';
+      final resolvedPattern = resolveSourceRequestUrl(
+        source.baseUri,
+        bookUrlRule.replaceRange(
+          templateMatch.start,
+          templateMatch.end,
+          marker,
+        ),
+      ).split(RegExp(r',\s*\{')).first;
+      final markerIndex = resolvedPattern.indexOf(marker);
+      if (markerIndex < 0) continue;
+      final prefix = resolvedPattern.substring(0, markerIndex);
+      final suffix = resolvedPattern.substring(markerIndex + marker.length);
+      if (!actualUrl.startsWith(prefix) ||
+          !actualUrl.endsWith(suffix) ||
+          actualUrl.length < prefix.length + suffix.length) {
+        continue;
+      }
+      final captured = actualUrl.substring(
+        prefix.length,
+        actualUrl.length - suffix.length,
+      );
+      if (captured.isEmpty) continue;
+      final property = templateMatch.group(1)!;
+      for (final value in rule.values.whereType<String>()) {
+        final putMatch = RegExp(
+          r'@put:\s*\{([\s\S]*)\}\s*$',
+          caseSensitive: false,
+        ).firstMatch(value);
+        if (putMatch == null) continue;
+        for (final mapping in RegExp(
+          r'''["']?([A-Za-z_]\w*)["']?\s*:\s*(?:\$\.\.?)?([A-Za-z_]\w*)''',
+        ).allMatches(putMatch.group(1)!)) {
+          if (mapping.group(2) == property) {
+            return {mapping.group(1)!: Uri.decodeComponent(captured)};
+          }
+        }
+      }
+    }
+    return const {};
+  }
+
+  void _rememberRuleState(
+    ReadingSourceConfig source,
+    String bookId,
+    Map<String, Object?> state,
+  ) {
+    if (bookId.trim().isEmpty || state.isEmpty) return;
+    final key = _bookStateKey(source, bookId);
+    _bookRuleStates.remove(key);
+    _bookRuleStates[key] = Map<String, Object?>.from(state);
+    while (_bookRuleStates.length > _maxRememberedBookStates) {
+      _bookRuleStates.remove(_bookRuleStates.keys.first);
+    }
+  }
+
+  String _bookStateKey(ReadingSourceConfig source, String bookId) =>
+      '${source.stableId}\u0000$bookId';
+
+  Map<String, String> _requestVariables(
+    Map<String, Object?> state,
+    Map<String, String> variables,
+  ) => <String, String>{
+    for (final entry in state.entries)
+      if (entry.value != null) entry.key: '${entry.value}',
+    ...variables,
+  };
+
+  Map<String, String> _sourceVariables(Map<String, Object?> state) =>
+      Map.unmodifiable(_requestVariables(state, const {}));
 
   Future<Map<String, String>> _sourceHeaders(ReadingSourceConfig source) async {
     final raw = source.raw['header'];
@@ -534,12 +689,20 @@ class SourceRuntime {
     Map<String, dynamic> rules,
     String key, {
     bool required = false,
+    String joinSeparator = '',
+    bool regexDotAll = true,
   }) async {
     final rule = required
         ? _requiredRule(rules, key)
         : _optionalRule(rules, key);
     if (rule.isEmpty) return '';
-    return _rules.evaluateStringAsync(document, context, rule);
+    return _rules.evaluateStringAsync(
+      document,
+      context,
+      rule,
+      joinSeparator: joinSeparator,
+      regexDotAll: regexDotAll,
+    );
   }
 
   Future<String> _url(

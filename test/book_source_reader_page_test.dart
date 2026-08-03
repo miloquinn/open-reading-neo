@@ -523,7 +523,7 @@ void main() {
   });
 
   testWidgets(
-    'tablet source page curl uses two leaves and a fixed center spine',
+    'tablet source page curl uses two leaves and a subtle center divider',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 800));
       SharedPreferences.setMockInitialValues({
@@ -559,6 +559,9 @@ void main() {
           find.byType(ReaderPageCurlSpread),
         );
         expect(spread.coordinator.gutterWidth, 24);
+        final gutter = spread.gutter as SizedBox;
+        expect(gutter.child, isA<VerticalDivider>());
+        expect((gutter.child! as VerticalDivider).thickness, 1);
         final curls = tester
             .widgetList<ReaderShaderPageCurl>(curlFinder)
             .toList();
@@ -1437,8 +1440,9 @@ class _ConfigurableBookSourceClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => contents.keys
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => contents.keys
       .toList()
       .asMap()
       .entries
@@ -1456,6 +1460,7 @@ class _ConfigurableBookSourceClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     requestedChapterIds.add(chapterId);
     return BookSourceChapterContent(
@@ -1481,14 +1486,16 @@ class _DelayedOpeningBookSourceClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) => _catalog.future;
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) => _catalog.future;
 
   @override
   Future<BookSourceChapterContent> getChapterContent(
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     return BookSourceChapterContent(
       bookId: bookId,
@@ -1522,8 +1529,9 @@ class _DelayedThirdChapterClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => const [
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
     BookSourceChapter(id: 'chapter-1', title: 'Chapter 1', order: 1),
     BookSourceChapter(id: 'chapter-2', title: 'Chapter 2', order: 2),
     BookSourceChapter(id: 'chapter-3', title: 'Chapter 3', order: 3),
@@ -1534,6 +1542,7 @@ class _DelayedThirdChapterClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     requestedChapterIds.add(chapterId);
     if (chapterId == 'chapter-3') return _thirdChapter.future;
@@ -1576,8 +1585,9 @@ class _FakeBookSourceClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
     return const [
       BookSourceChapter(id: 'chapter-1', title: '第一章', order: 1),
       BookSourceChapter(id: 'chapter-2', title: '第二章', order: 2),
@@ -1589,6 +1599,7 @@ class _FakeBookSourceClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     requestedChapterIds.add(chapterId);
     final second = chapterId == 'chapter-2';
@@ -1606,8 +1617,9 @@ class _ReplacementBookSourceClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => const [
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
     BookSourceChapter(id: 'chapter-1', title: '[广告] 第一章', order: 1),
   ];
 
@@ -1616,6 +1628,7 @@ class _ReplacementBookSourceClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async => BookSourceChapterContent(
     bookId: bookId,
     chapterId: chapterId,
@@ -1631,6 +1644,7 @@ class _LongFakeBookSourceClient extends _FakeBookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     requestedChapterIds.add(chapterId);
     return BookSourceChapterContent(

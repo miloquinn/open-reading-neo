@@ -41,6 +41,7 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
   late final TextEditingController _queryController = TextEditingController(
     text: widget.currentBook.title,
   );
+  late final Future<BookSourceChangePosition> _positionFuture;
   StreamSubscription<BookSourceChangeSearchEvent>? _searchSubscription;
   Timer? _resultFlushTimer;
 
@@ -69,7 +70,9 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_prepareAndSearch());
+    _positionFuture = _loadPosition();
+    unawaited(_positionFuture.then<void>((_) {}, onError: (_, _) {}));
+    unawaited(_loadSourcesAndSearch());
   }
 
   @override
@@ -80,28 +83,36 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
     super.dispose();
   }
 
-  Future<void> _prepareAndSearch() async {
-    final results = await Future.wait<Object>([
-      _service.loadPosition(
-        source: widget.currentSource,
-        book: widget.currentBook,
-        shelfBook: widget.shelfBook,
-      ),
-      widget.sourcesFuture ??
-          Future<List<RegisteredBookSource>>.value(widget.sources!),
-    ]);
+  Future<BookSourceChangePosition> _loadPosition() async {
+    final position = await _service.loadPosition(
+      source: widget.currentSource,
+      book: widget.currentBook,
+      shelfBook: widget.shelfBook,
+    );
+    if (mounted) setState(() => _position = position);
+    return position;
+  }
+
+  Future<void> _loadSourcesAndSearch() async {
+    final sources =
+        await (widget.sourcesFuture ??
+            Future<List<RegisteredBookSource>>.value(widget.sources!));
     if (!mounted) return;
+    final total = _searchTargetCount(sources);
     setState(() {
-      _position = results[0] as BookSourceChangePosition;
-      _sources = results[1] as List<RegisteredBookSource>;
+      _sources = sources;
       _preparing = false;
+      _total = total;
+      _searching = total > 0;
     });
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
     await _startSearch();
   }
 
   Future<void> _startSearch({bool continueSearch = false}) async {
     final query = _queryController.text.trim();
-    if (query.isEmpty || _position == null) return;
+    if (query.isEmpty || _preparing) return;
     final generation = ++_generation;
     final previousSearch = _searchSubscription;
     _searchSubscription = null;
@@ -115,12 +126,7 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
     }
     _pendingCompleted = _searchedSourceIds.length;
     _pendingFailed = 0;
-    final targets = _sources.where(
-      (source) =>
-          source.enabled &&
-          source.id != widget.currentSource.id &&
-          source.capabilities.contains('search'),
-    );
+    final targetCount = _searchTargetCount(_sources);
     setState(() {
       if (!continueSearch) {
         _candidates = <BookSourceChangeCandidate>[];
@@ -131,8 +137,8 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
         _completed = 0;
         _failed = 0;
       }
-      _total = targets.length;
-      _searching = targets.length > _searchedSourceIds.length;
+      _total = targetCount;
+      _searching = targetCount > _searchedSourceIds.length;
       _hasMoreSources = false;
     });
     final completedOffset = _searchedSourceIds.length;
@@ -197,9 +203,11 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
       _validating = true;
     });
     try {
+      final position = _position ?? await _positionFuture;
+      if (!mounted || _selected != candidate) return;
       final validated = await _service.validate(
         candidate: candidate,
-        position: _position!,
+        position: position,
       );
       if (!mounted || _selected != candidate) return;
       setState(() => _validated = validated);
@@ -383,7 +391,12 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
 
   Widget _buildBody(BuildContext context) {
     if (_preparing) {
-      return const Center(child: CircularProgressIndicator());
+      return _EmptyChangeState(
+        icon: Icons.radar_rounded,
+        title: context.l10n.bookSourceChangeSearching,
+        message: context.l10n.bookSourceChangeSearchingHint,
+        loading: true,
+      );
     }
     if (_total == 0) {
       return _EmptyChangeState(
@@ -420,6 +433,15 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
       },
     );
   }
+
+  int _searchTargetCount(Iterable<RegisteredBookSource> sources) => sources
+      .where(
+        (source) =>
+            source.enabled &&
+            source.id != widget.currentSource.id &&
+            source.capabilities.contains('search'),
+      )
+      .length;
 
   Widget _buildCandidate(
     BuildContext context,
@@ -545,7 +567,7 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           const SizedBox(width: 8),
-          Text(context.l10n.bookSourceChangeValidating),
+          Expanded(child: Text(context.l10n.bookSourceChangeValidating)),
         ],
       );
     }

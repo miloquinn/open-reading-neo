@@ -24,6 +24,8 @@ void main() {
       final stageSeconds =
           Platform.environment['SOURCE_SAMPLE_STAGE_SECONDS'] ?? '15';
       await diagnostic.main([
+        if (Platform.environment['SOURCE_SAMPLE_STATIC_ONLY'] == 'true')
+          '--static-only',
         '--per-kind=$perKind',
         '--stage-seconds=$stageSeconds',
         ...files,

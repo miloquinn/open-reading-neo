@@ -19,7 +19,49 @@ class AIRequestMeta {
   });
 }
 
-enum AIProviderType { minimax, glm, openai, claude, gemini }
+enum AIProviderType { minimax, glm, openai, claude, gemini, custom }
+
+enum AIProtocolType { openai, anthropic, gemini }
+
+extension AIProtocolTypeX on AIProtocolType {
+  String get value {
+    switch (this) {
+      case AIProtocolType.openai:
+        return 'openai';
+      case AIProtocolType.anthropic:
+        return 'anthropic';
+      case AIProtocolType.gemini:
+        return 'gemini';
+    }
+  }
+
+  String get displayName {
+    switch (this) {
+      case AIProtocolType.openai:
+        return 'OpenAI Compatible';
+      case AIProtocolType.anthropic:
+        return 'Anthropic';
+      case AIProtocolType.gemini:
+        return 'Google Gemini';
+    }
+  }
+
+  static AIProtocolType fromValue(
+    String? value, {
+    required AIProtocolType fallback,
+  }) {
+    switch (value) {
+      case 'anthropic':
+        return AIProtocolType.anthropic;
+      case 'gemini':
+        return AIProtocolType.gemini;
+      case 'openai':
+        return AIProtocolType.openai;
+      default:
+        return fallback;
+    }
+  }
+}
 
 extension AIProviderTypeX on AIProviderType {
   String get value {
@@ -34,6 +76,8 @@ extension AIProviderTypeX on AIProviderType {
         return 'claude';
       case AIProviderType.gemini:
         return 'gemini';
+      case AIProviderType.custom:
+        return 'custom';
     }
   }
 
@@ -49,6 +93,8 @@ extension AIProviderTypeX on AIProviderType {
         return 'Claude';
       case AIProviderType.gemini:
         return 'Gemini';
+      case AIProviderType.custom:
+        return 'Custom';
     }
   }
 
@@ -62,13 +108,33 @@ extension AIProviderTypeX on AIProviderType {
         return AIProviderType.claude;
       case 'gemini':
         return AIProviderType.gemini;
+      case 'custom':
+        return AIProviderType.custom;
       default:
         return AIProviderType.minimax;
     }
   }
+
+  AIProtocolType get defaultProtocol {
+    switch (this) {
+      case AIProviderType.minimax:
+      case AIProviderType.glm:
+      case AIProviderType.openai:
+      case AIProviderType.custom:
+        return AIProtocolType.openai;
+      case AIProviderType.claude:
+        return AIProtocolType.anthropic;
+      case AIProviderType.gemini:
+        return AIProtocolType.gemini;
+    }
+  }
 }
 
-String normalizeAIBaseUrl(AIProviderType provider, String baseUrl) {
+String normalizeAIBaseUrl(
+  AIProviderType provider,
+  String baseUrl, {
+  AIProtocolType? protocol,
+}) {
   final trimmed = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (trimmed.isEmpty) {
     return '';
@@ -80,23 +146,24 @@ String normalizeAIBaseUrl(AIProviderType provider, String baseUrl) {
   }
 
   var path = uri.path.replaceAll(RegExp(r'/+$'), '');
-  switch (provider) {
-    case AIProviderType.minimax:
-    case AIProviderType.glm:
-    case AIProviderType.openai:
+  final effectiveProtocol = provider == AIProviderType.custom
+      ? protocol ?? provider.defaultProtocol
+      : provider.defaultProtocol;
+  switch (effectiveProtocol) {
+    case AIProtocolType.openai:
       path = path.replaceFirst(
         RegExp(r'/chat/completions$', caseSensitive: false),
         '',
       );
       break;
-    case AIProviderType.claude:
+    case AIProtocolType.anthropic:
       path = path.replaceFirst(
         RegExp(r'/v1/messages$', caseSensitive: false),
         '/v1',
       );
       path = path.replaceFirst(RegExp(r'/messages$', caseSensitive: false), '');
       break;
-    case AIProviderType.gemini:
+    case AIProtocolType.gemini:
       path = path.replaceFirst(
         RegExp(r'/models/[^/]+:generateContent$', caseSensitive: false),
         '',
@@ -126,7 +193,7 @@ String? validateAIProviderSettings(
     return 'base_url_invalid';
   }
 
-  if (!_isValidTemperature(normalized.provider, normalized.temperature)) {
+  if (!_isValidTemperature(normalized, normalized.temperature)) {
     return normalized.provider == AIProviderType.minimax
         ? 'temp_error_minimax'
         : 'temp_error_out_of_range';
@@ -155,21 +222,22 @@ String? validateAIProviderSettings(
       }
       break;
     case AIProviderType.openai:
+    case AIProviderType.custom:
       break;
   }
 
   return null;
 }
 
-bool _isValidTemperature(AIProviderType provider, double value) {
+bool _isValidTemperature(AIProviderSettings settings, double value) {
   if (!value.isFinite || value < 0 || value > 2) {
     return false;
   }
-  if (provider == AIProviderType.minimax) {
+  if (settings.provider == AIProviderType.minimax) {
     return value > 0 && value <= 1;
   }
-  if ((provider == AIProviderType.claude ||
-          provider == AIProviderType.gemini) &&
+  if ((settings.effectiveProtocol == AIProtocolType.anthropic ||
+          settings.effectiveProtocol == AIProtocolType.gemini) &&
       value > 1) {
     return false;
   }
@@ -412,6 +480,7 @@ class AIModelPresets {
 
 class AIProviderSettings {
   final AIProviderType provider;
+  final AIProtocolType? protocol;
   final String apiKey;
   final String baseUrl;
   final String model;
@@ -419,6 +488,7 @@ class AIProviderSettings {
 
   const AIProviderSettings({
     required this.provider,
+    this.protocol,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -426,11 +496,24 @@ class AIProviderSettings {
   });
 
   factory AIProviderSettings.defaults(AIProviderType provider) {
+    if (provider == AIProviderType.custom) {
+      return const AIProviderSettings(
+        provider: AIProviderType.custom,
+        protocol: AIProtocolType.openai,
+        apiKey: '',
+        baseUrl: '',
+        model: '',
+        temperature: 0.7,
+      );
+    }
     return AIModelPresets.defaultForProvider(provider).toSettings();
   }
 
+  AIProtocolType get effectiveProtocol => protocol ?? provider.defaultProtocol;
+
   AIProviderSettings copyWith({
     AIProviderType? provider,
+    AIProtocolType? protocol,
     String? apiKey,
     String? baseUrl,
     String? model,
@@ -438,6 +521,7 @@ class AIProviderSettings {
   }) {
     return AIProviderSettings(
       provider: provider ?? this.provider,
+      protocol: protocol ?? this.protocol,
       apiKey: apiKey ?? this.apiKey,
       baseUrl: baseUrl ?? this.baseUrl,
       model: model ?? this.model,
@@ -446,11 +530,19 @@ class AIProviderSettings {
   }
 
   AIProviderSettings normalized() {
-    final normalizedBaseUrl = normalizeAIBaseUrl(provider, baseUrl);
+    final normalizedProtocol = provider == AIProviderType.custom
+        ? effectiveProtocol
+        : provider.defaultProtocol;
+    final normalizedBaseUrl = normalizeAIBaseUrl(
+      provider,
+      baseUrl,
+      protocol: normalizedProtocol,
+    );
     final normalizedModel = model.trim();
     final normalizedTemperature = temperature.isFinite ? temperature : 0.7;
     return copyWith(
       apiKey: apiKey.trim(),
+      protocol: normalizedProtocol,
       baseUrl: normalizedBaseUrl.isEmpty
           ? _defaultBaseUrl(provider)
           : normalizedBaseUrl,
@@ -535,21 +627,26 @@ class ReaderHttpAIService implements ConfigurableAIService {
   static const _openaiApiKeyKey = 'reader_ai_openai_api_key_v1';
   static const _claudeApiKeyKey = 'reader_ai_claude_api_key_v1';
   static const _geminiApiKeyKey = 'reader_ai_gemini_api_key_v1';
+  static const _customApiKeyKey = 'reader_ai_custom_api_key_v1';
   static const _minimaxBaseUrlKey = 'reader_ai_minimax_base_url_v1';
   static const _glmBaseUrlKey = 'reader_ai_glm_base_url_v1';
   static const _openaiBaseUrlKey = 'reader_ai_openai_base_url_v1';
   static const _claudeBaseUrlKey = 'reader_ai_claude_base_url_v1';
   static const _geminiBaseUrlKey = 'reader_ai_gemini_base_url_v1';
+  static const _customBaseUrlKey = 'reader_ai_custom_base_url_v1';
   static const _minimaxModelKey = 'reader_ai_minimax_model_v1';
   static const _glmModelKey = 'reader_ai_glm_model_v1';
   static const _openaiModelKey = 'reader_ai_openai_model_v1';
   static const _claudeModelKey = 'reader_ai_claude_model_v1';
   static const _geminiModelKey = 'reader_ai_gemini_model_v1';
+  static const _customModelKey = 'reader_ai_custom_model_v1';
   static const _minimaxTemperatureKey = 'reader_ai_minimax_temp_v1';
   static const _glmTemperatureKey = 'reader_ai_glm_temp_v1';
   static const _openaiTemperatureKey = 'reader_ai_openai_temp_v1';
   static const _claudeTemperatureKey = 'reader_ai_claude_temp_v1';
   static const _geminiTemperatureKey = 'reader_ai_gemini_temp_v1';
+  static const _customTemperatureKey = 'reader_ai_custom_temp_v1';
+  static const _customProtocolKey = 'reader_ai_custom_protocol_v1';
 
   final Dio _dio;
 
@@ -616,9 +713,16 @@ class ReaderHttpAIService implements ConfigurableAIService {
     final temperature =
         prefs.getDouble(_temperatureKey(activeProvider)) ??
         defaults.temperature;
+    final protocol = activeProvider == AIProviderType.custom
+        ? AIProtocolTypeX.fromValue(
+            prefs.getString(_customProtocolKey),
+            fallback: defaults.effectiveProtocol,
+          )
+        : activeProvider.defaultProtocol;
 
     final settings = AIProviderSettings(
       provider: activeProvider,
+      protocol: protocol,
       apiKey: apiKey,
       baseUrl: baseUrl,
       model: model,
@@ -644,6 +748,12 @@ class ReaderHttpAIService implements ConfigurableAIService {
       _temperatureKey(normalized.provider),
       normalized.temperature,
     );
+    if (normalized.provider == AIProviderType.custom) {
+      await prefs.setString(
+        _customProtocolKey,
+        normalized.effectiveProtocol.value,
+      );
+    }
   }
 
   Future<List<String>> fetchAvailableModels(AIProviderSettings settings) async {
@@ -653,10 +763,10 @@ class ReaderHttpAIService implements ConfigurableAIService {
     }
 
     final base = normalized.baseUrl.replaceAll(RegExp(r'/+$'), '');
-    final endpoint = switch (normalized.provider) {
-      AIProviderType.claude =>
+    final endpoint = switch (normalized.effectiveProtocol) {
+      AIProtocolType.anthropic =>
         base.endsWith('/v1') ? '$base/models' : '$base/v1/models',
-      _ => '$base/models',
+      AIProtocolType.openai || AIProtocolType.gemini => '$base/models',
     };
     final options = _buildRequestOptions(normalized).copyWith(
       responseType: ResponseType.json,
@@ -851,17 +961,15 @@ class ReaderHttpAIService implements ConfigurableAIService {
 
   String _buildEndpoint(AIProviderSettings settings) {
     final base = settings.baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    switch (settings.provider) {
-      case AIProviderType.minimax:
-      case AIProviderType.glm:
-      case AIProviderType.openai:
+    switch (settings.effectiveProtocol) {
+      case AIProtocolType.openai:
         return '$base/chat/completions';
-      case AIProviderType.claude:
+      case AIProtocolType.anthropic:
         if (base.endsWith('/v1')) {
           return '$base/messages';
         }
         return '$base/v1/messages';
-      case AIProviderType.gemini:
+      case AIProtocolType.gemini:
         final modelPath = settings.model.startsWith('models/')
             ? settings.model
             : 'models/${settings.model}';
@@ -872,17 +980,15 @@ class ReaderHttpAIService implements ConfigurableAIService {
   Options _buildRequestOptions(AIProviderSettings settings) {
     final headers = <String, dynamic>{'Content-Type': 'application/json'};
 
-    switch (settings.provider) {
-      case AIProviderType.minimax:
-      case AIProviderType.glm:
-      case AIProviderType.openai:
+    switch (settings.effectiveProtocol) {
+      case AIProtocolType.openai:
         headers['Authorization'] = 'Bearer ${settings.apiKey}';
         break;
-      case AIProviderType.claude:
+      case AIProtocolType.anthropic:
         headers['x-api-key'] = settings.apiKey;
         headers['anthropic-version'] = '2023-06-01';
         break;
-      case AIProviderType.gemini:
+      case AIProtocolType.gemini:
         headers['x-goog-api-key'] = settings.apiKey;
         break;
     }
@@ -925,24 +1031,24 @@ class ReaderHttpAIService implements ConfigurableAIService {
     required AIProviderSettings settings,
     required List<Map<String, dynamic>> messages,
   }) {
-    switch (settings.provider) {
-      case AIProviderType.minimax:
-        final minimaxTemp = settings.temperature.clamp(0.01, 1.0);
-        return <String, dynamic>{
-          'model': settings.model,
-          'messages': messages,
-          'temperature': minimaxTemp,
-          'stream': false,
-        };
-      case AIProviderType.glm:
-      case AIProviderType.openai:
+    if (settings.provider == AIProviderType.minimax) {
+      final minimaxTemp = settings.temperature.clamp(0.01, 1.0);
+      return <String, dynamic>{
+        'model': settings.model,
+        'messages': messages,
+        'temperature': minimaxTemp,
+        'stream': false,
+      };
+    }
+    switch (settings.effectiveProtocol) {
+      case AIProtocolType.openai:
         return <String, dynamic>{
           'model': settings.model,
           'messages': messages,
           'temperature': settings.temperature,
           'stream': false,
         };
-      case AIProviderType.claude:
+      case AIProtocolType.anthropic:
         final systemPrompt =
             messages.isNotEmpty &&
                 messages.first['role'] == 'system' &&
@@ -967,7 +1073,7 @@ class ReaderHttpAIService implements ConfigurableAIService {
           'max_tokens': 1024,
           'temperature': settings.temperature.clamp(0.0, 1.0),
         };
-      case AIProviderType.gemini:
+      case AIProtocolType.gemini:
         final systemPrompt =
             messages.isNotEmpty &&
                 messages.first['role'] == 'system' &&
@@ -1004,14 +1110,12 @@ class ReaderHttpAIService implements ConfigurableAIService {
     required AIProviderSettings settings,
     required dynamic responseData,
   }) {
-    switch (settings.provider) {
-      case AIProviderType.minimax:
-      case AIProviderType.glm:
-      case AIProviderType.openai:
+    switch (settings.effectiveProtocol) {
+      case AIProtocolType.openai:
         return _extractOpenAIContent(responseData);
-      case AIProviderType.claude:
+      case AIProtocolType.anthropic:
         return _extractClaudeContent(responseData);
-      case AIProviderType.gemini:
+      case AIProtocolType.gemini:
         return _extractGeminiContent(responseData);
     }
   }
@@ -1230,6 +1334,8 @@ class ReaderHttpAIService implements ConfigurableAIService {
         return _claudeApiKeyKey;
       case AIProviderType.gemini:
         return _geminiApiKeyKey;
+      case AIProviderType.custom:
+        return _customApiKeyKey;
     }
   }
 
@@ -1245,6 +1351,8 @@ class ReaderHttpAIService implements ConfigurableAIService {
         return _claudeBaseUrlKey;
       case AIProviderType.gemini:
         return _geminiBaseUrlKey;
+      case AIProviderType.custom:
+        return _customBaseUrlKey;
     }
   }
 
@@ -1260,6 +1368,8 @@ class ReaderHttpAIService implements ConfigurableAIService {
         return _claudeModelKey;
       case AIProviderType.gemini:
         return _geminiModelKey;
+      case AIProviderType.custom:
+        return _customModelKey;
     }
   }
 
@@ -1275,6 +1385,8 @@ class ReaderHttpAIService implements ConfigurableAIService {
         return _claudeTemperatureKey;
       case AIProviderType.gemini:
         return _geminiTemperatureKey;
+      case AIProviderType.custom:
+        return _customTemperatureKey;
     }
   }
 }

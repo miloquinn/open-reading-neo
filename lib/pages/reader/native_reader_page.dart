@@ -2710,7 +2710,9 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           style: _readerTextStyle,
           firstLineIndent: _firstLineIndent,
           paragraphSpacing: _paragraphSpacing,
-          normalizeParagraphBreaks: widget.book.format.toLowerCase() == 'epub',
+          normalizeParagraphBreaks: _normalizesParagraphBreaks(
+            widget.book.format,
+          ),
           showDedicatedChapterTitlePage:
               widget.book.format.toLowerCase() != 'txt' ||
               _txtChapterTitlePageEnabled,
@@ -3512,7 +3514,9 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           sourceOffset: chunkStart,
           firstLineIndent: _firstLineIndent,
           paragraphSpacing: _paragraphSpacing,
-          normalizeParagraphBreaks: widget.book.format.toLowerCase() == 'epub',
+          normalizeParagraphBreaks: _normalizesParagraphBreaks(
+            widget.book.format,
+          ),
           indentFirstParagraph:
               chunkStart == 0 ||
               isReaderLineBreakCodeUnit(
@@ -4319,22 +4323,10 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     final colors = _readerThemeData.colorScheme;
     return SizedBox(
       width: _spreadGutter,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.shadow.withValues(alpha: 0),
-              colors.shadow.withValues(alpha: 0.09),
-              colors.shadow.withValues(alpha: 0),
-            ],
-          ),
-        ),
-        child: Center(
-          child: Container(
-            width: 1,
-            color: colors.outlineVariant.withValues(alpha: 0.48),
-          ),
-        ),
+      child: VerticalDivider(
+        width: 1,
+        thickness: 1,
+        color: colors.outlineVariant.withValues(alpha: 0.24),
       ),
     );
   }
@@ -5083,6 +5075,11 @@ List<_ReaderPageData> _paginateChapter(
     assert(pages[index - 1].endOffset == pages[index].startOffset);
   }
   return pages;
+}
+
+bool _normalizesParagraphBreaks(String format) {
+  final normalized = format.toLowerCase();
+  return normalized == 'txt' || normalized == 'epub';
 }
 
 class _NativeChapter {

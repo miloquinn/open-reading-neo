@@ -2192,6 +2192,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsKeepScreenOnSubtitle => '読書中に画面が自動で消えないようにします';
 
   @override
+  String get settingsPowerSavingModeTitle => '省電力モード';
+
+  @override
+  String get settingsPowerSavingModeSubtitle => '高リフレッシュレートを使用せず、60fps に制限します';
+
+  @override
   String get settingsAutoSaveTitle => '自動保存';
 
   @override
@@ -2228,6 +2234,18 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsAiProviderLabel => 'プロバイダー';
+
+  @override
+  String get settingsAiCustomProvider => 'カスタム';
+
+  @override
+  String get settingsAiProtocolLabel => 'API プロトコル';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI 互換プロトコル';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic プロトコル';
 
   @override
   String get settingsAiPresetHint => 'プリセットモデルを選択';
@@ -3450,6 +3468,14 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI 互換：Base URL には通常 /v1 を含めます（例：https://example.com/v1）。アプリは /chat/completions を追加します。';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic：Base URL は /v1 を含めても省略しても構いません。アプリが重複を避けて /messages を追加します。';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';

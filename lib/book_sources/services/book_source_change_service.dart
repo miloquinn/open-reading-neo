@@ -123,8 +123,13 @@ class BookSourceChangeService {
     );
     var chapters = const <BookSourceChapter>[];
     try {
-      chapters = [...await client.getChapters(source, book.id)]
-        ..sort(compareBookSourceChapters);
+      chapters = [
+        ...await client.getChapters(
+          source,
+          book.id,
+          sourceVariables: book.sourceVariables,
+        ),
+      ]..sort(compareBookSourceChapters);
     } catch (_) {
       // A broken current source must not prevent the user from finding a new one.
     }
@@ -156,19 +161,12 @@ class BookSourceChangeService {
     int? sourceLimit,
     int? candidateLimit,
   }) {
-    var targets = sources
-        .where(
-          (source) =>
-              source.enabled &&
-              source.id != currentSourceId &&
-              !excludedSourceIds.contains(source.id) &&
-              source.capabilities.contains('search'),
-        )
-        .toList(growable: false);
-    targets.sort(_compareChangeSourcePriority);
-    if (sourceLimit != null && targets.length > sourceLimit) {
-      targets = targets.take(sourceLimit).toList(growable: false);
-    }
+    final targets = _selectChangeSearchTargets(
+      sources: sources,
+      currentSourceId: currentSourceId,
+      excludedSourceIds: excludedSourceIds,
+      sourceLimit: sourceLimit,
+    );
     late final StreamController<BookSourceChangeSearchEvent> controller;
     if (targets.isEmpty) {
       controller = StreamController<BookSourceChangeSearchEvent>();
@@ -263,9 +261,18 @@ class BookSourceChangeService {
     required BookSourceChangePosition position,
   }) async {
     final stopwatch = Stopwatch()..start();
-    final detail = await client.getBook(candidate.source, candidate.book.id);
-    final chapters = [...await client.getChapters(candidate.source, detail.id)]
-      ..sort(compareBookSourceChapters);
+    final detail = await client.getBook(
+      candidate.source,
+      candidate.book.id,
+      sourceVariables: candidate.book.sourceVariables,
+    );
+    final chapters = [
+      ...await client.getChapters(
+        candidate.source,
+        detail.id,
+        sourceVariables: detail.sourceVariables,
+      ),
+    ]..sort(compareBookSourceChapters);
     if (chapters.isEmpty) {
       throw const BookSourceProtocolException(
         'The selected source returned an empty chapter catalog.',
@@ -282,6 +289,7 @@ class BookSourceChangeService {
       candidate.source,
       bookId: detail.id,
       chapterId: chapter.id,
+      sourceVariables: detail.sourceVariables,
     );
     if (content.content.trim().isEmpty) {
       throw const BookSourceProtocolException(
@@ -352,6 +360,73 @@ class BookSourceChangeService {
       chapterCount: validated.chapters.length,
       shelfBook: updatedShelfBook,
     );
+  }
+}
+
+List<RegisteredBookSource> _selectChangeSearchTargets({
+  required Iterable<RegisteredBookSource> sources,
+  required String? currentSourceId,
+  required Set<String> excludedSourceIds,
+  required int? sourceLimit,
+}) {
+  bool eligible(RegisteredBookSource source) =>
+      source.enabled &&
+      source.id != currentSourceId &&
+      !excludedSourceIds.contains(source.id) &&
+      source.capabilities.contains('search');
+
+  if (sourceLimit == null) {
+    final targets = sources.where(eligible).toList(growable: false);
+    targets.sort(_compareChangeSourcePriority);
+    return targets;
+  }
+  if (sourceLimit <= 0) return const [];
+
+  // The first pass only needs a small priority window (currently 60). Keep a
+  // bounded max-heap instead of sorting thousands of imported sources on the
+  // UI isolate before the loading indicator can advance.
+  final heap = <RegisteredBookSource>[];
+  for (final source in sources) {
+    if (!eligible(source)) continue;
+    if (heap.length < sourceLimit) {
+      heap.add(source);
+      _siftChangeSourceUp(heap, heap.length - 1);
+      continue;
+    }
+    if (_compareChangeSourcePriority(source, heap.first) >= 0) continue;
+    heap[0] = source;
+    _siftChangeSourceDown(heap, 0);
+  }
+  heap.sort(_compareChangeSourcePriority);
+  return heap;
+}
+
+void _siftChangeSourceUp(List<RegisteredBookSource> heap, int index) {
+  while (index > 0) {
+    final parent = (index - 1) ~/ 2;
+    if (_compareChangeSourcePriority(heap[parent], heap[index]) >= 0) return;
+    final value = heap[parent];
+    heap[parent] = heap[index];
+    heap[index] = value;
+    index = parent;
+  }
+}
+
+void _siftChangeSourceDown(List<RegisteredBookSource> heap, int index) {
+  while (true) {
+    final left = index * 2 + 1;
+    if (left >= heap.length) return;
+    final right = left + 1;
+    var larger = left;
+    if (right < heap.length &&
+        _compareChangeSourcePriority(heap[right], heap[left]) > 0) {
+      larger = right;
+    }
+    if (_compareChangeSourcePriority(heap[index], heap[larger]) >= 0) return;
+    final value = heap[index];
+    heap[index] = heap[larger];
+    heap[larger] = value;
+    index = larger;
   }
 }
 

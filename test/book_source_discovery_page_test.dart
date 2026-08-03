@@ -99,6 +99,39 @@ void main() {
     expect(merged.map((result) => result.book.title), ['B1', 'A1', 'B2', 'A2']);
   });
 
+  testWidgets('pull to refresh invalidates cached responses before reloading', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+    });
+    final client = _DiscoveryClient();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: BookSourcesPage(client: client)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await refresh.onRefresh();
+    await tester.pumpAndSettle();
+
+    expect(client.invalidatedSourceIds, [
+      ['source-a'],
+    ]);
+    expect(client.discoverySourceIds, ['source-a', 'source-a']);
+  });
+
   test('discover layout preference is restored by a new controller', () async {
     final first = BookSourcesPageController();
     await first.setLayout(BookSourceDiscoverLayout.list);
@@ -144,6 +177,15 @@ void main() {
       find.byKey(const Key('bookSourceListLayoutDirectory')),
       findsOneWidget,
     );
+    final scrollbar = tester.widget<Scrollbar>(
+      find.byKey(const Key('bookSourceDiscoverListScrollbar')),
+    );
+    final scrollView = tester.widget<CustomScrollView>(
+      find.byKey(const Key('bookSourceDiscoverScrollView')),
+    );
+    expect(scrollbar.thumbVisibility, isTrue);
+    expect(scrollbar.interactive, isTrue);
+    expect(scrollbar.controller, same(scrollView.controller));
     expect(
       find.byKey(const Key('bookSourceDiscoverScopeControl')),
       findsNothing,
@@ -867,6 +909,14 @@ class _DiscoveryClient extends BookSourceClient {
   final List<String> categoryBrowseSourceIds = [];
   final List<String> categoryLoadSourceIds = [];
   final List<String> discoverySourceIds = [];
+  final List<List<String>> invalidatedSourceIds = [];
+
+  @override
+  Future<void> invalidateResponseCaches(
+    Iterable<RegisteredBookSource> sources,
+  ) async {
+    invalidatedSourceIds.add(sources.map((source) => source.id).toList());
+  }
 
   @override
   Future<BookSourceDiscoveryPage> getDiscovery(

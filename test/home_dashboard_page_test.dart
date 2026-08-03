@@ -178,6 +178,36 @@ void main() {
     controller.dispose();
   });
 
+  test('首页批量读取最近书籍时保留统计顺序并忽略重复项', () async {
+    final dao = BookDao();
+    final allBooks = await dao.getAllBooks();
+    expect(allBooks.length, greaterThanOrEqualTo(3));
+
+    final firstId = allBooks[2].id!;
+    final secondId = allBooks.first.id!;
+    final books = await dao.getBooksByIds([
+      firstId,
+      secondId,
+      firstId,
+      2147483647,
+    ]);
+
+    expect(books.map((book) => book.id), [firstId, secondId]);
+  });
+
+  test('首页无阅读会话时由数据库直接返回有限的继续阅读候选', () async {
+    final books = await BookDao().getRecentlyReadBooks(limit: 2);
+
+    expect(books, hasLength(2));
+    expect(
+      books.map((book) => book.currentPage).toList(),
+      orderedEquals(
+        books.map((book) => book.currentPage).toList()
+          ..sort((left, right) => right.compareTo(left)),
+      ),
+    );
+  });
+
   test('首页继续阅读会把在线书籍交给书源阅读器', () {
     const sourceBook = BookSourceBook(
       id: 'online-book',

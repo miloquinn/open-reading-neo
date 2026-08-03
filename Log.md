@@ -1185,3 +1185,6 @@
 - 本地 Android 三 ABI 使用 Origo 身份完成正式签名构建与核验：armeabi-v7a `260804003`、arm64-v8a `260805003`、x86_64 `260807003`；三份 APK 均确认包名 `com.niki.xxread`、versionName `2.5.0`、单一目标 ABI、V2 签名及证书身份一致。正式 GitHub Release 仍由 Tag 工作流重新构建，不复用本地产物。
 - 私库 PR checks 的统一 `flutter test --coverage` 会让 `book_source_management_page_test.dart` 第六项在前五项之后稳定等待到 10 分钟超时，而该文件 8 项分别在新进程中均立即通过。CI 现将其余测试保持一次覆盖率运行，并仅把这 8 项逐项隔离执行，既保留全部断言，也避免框架级共享状态污染阻断主线。
 - 首次私库正式 Run 的平台构建与公共 GitHub Release 成功，但 GitHub 将 macOS 的预期 `skipped` 通过默认 `success()` 传播给下游，导致 Web 部署和官网镜像也被跳过。发布工作流现为下游增加显式依赖结果判断，并提供 `deployment_only` 恢复入口：只重建 Web、复用已发布且不可变的公共 Release 资产完成部署和官网导入，不重复生成平台安装包。
+- `v2.5.0` 正式 Run `30793778381` 成功完成 Android 三 ABI、Windows x64、Linux x64、iOS unsigned、Web 构建和公共 GitHub Release；macOS 因发布变量未启用而按设计跳过。deployment-only 恢复 Run `30795097049` 随后成功完成 Web 部署与官网镜像，确认修复后的显式依赖条件可在不重建不可变平台产物的情况下恢复下游发布。
+- 公共 Latest Release `https://github.com/miloquinn/open-reading/releases/tag/v2.5.0` 为非 Draft、非 Prerelease，共包含六个安装包及 `SHA256SUMS.txt`；全部产物重新下载后 SHA-256 复算 6/6 通过。Android 三个 APK 的包名 `com.niki.xxread`、versionName `2.5.0`、ABI 偏移 versionCode、V2 签名与 Origo 证书身份全部一致；iOS IPA ZIP、版本元数据和 Runner.app 未签名状态通过。
+- 官网 Android 三 ABI、Windows x64、Linux x64、iOS universal 六个平台槽位的版本、构建号、大小与 SHA-256 均和 GitHub Release 一致，Range 请求全部返回 206。`read.xxread.top/version.json` 已为 `2.5.0+260803003`，Web 首页、官网首页及下载页均返回 200。未做 Android/iOS 真机安装与视觉复核。

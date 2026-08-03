@@ -2293,11 +2293,120 @@ class AppLocalizationsJa extends AppLocalizations {
   String get firstHomeSupportPaperSemanticLabel => '開元閲読の開発者からの任意支援についての手紙';
 
   @override
-  String get settingsSupportDevelopmentCardTitle => '継続的な開発を支援';
+  String get settingsSupportDevelopmentCardTitle => '高度な機能を支援';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      '開発と保守には多くの時間と労力がかかっています。開元閲読が役に立った場合は、任意の寄付で支援いただけます。';
+      '現在すべての機能が無料です。支援は任意で、継続的な開発に使われます。';
+
+  @override
+  String get settingsAccountGuestTitle => '開元閲読にログイン';
+
+  @override
+  String get settingsAccountGuestSubtitle => 'プロフィールとサポーター情報を管理';
+
+  @override
+  String get settingsAccountOpen => 'アカウントセンター';
+
+  @override
+  String get settingsAccountVerified => '確認済みアカウント';
+
+  @override
+  String get accountPageTitle => 'アカウント';
+
+  @override
+  String get accountPageSubtitle => 'プロフィール、ログイン方法、サポーター情報を管理します。';
+
+  @override
+  String get accountLoginTab => 'ログイン';
+
+  @override
+  String get accountRegisterTab => '登録';
+
+  @override
+  String get accountCodeTab => 'メールコード';
+
+  @override
+  String get accountResetTab => '再設定';
+
+  @override
+  String get accountEmail => 'メール';
+
+  @override
+  String get accountPassword => 'パスワード';
+
+  @override
+  String get accountConfirmPassword => 'パスワード確認';
+
+  @override
+  String get accountUsername => 'ユーザー名';
+
+  @override
+  String get accountDisplayName => '表示名';
+
+  @override
+  String get accountVerificationCode => '確認コード';
+
+  @override
+  String get accountSendCode => 'コードを送信';
+
+  @override
+  String get accountSignIn => 'ログイン';
+
+  @override
+  String get accountCreate => 'アカウントを作成';
+
+  @override
+  String get accountResetPassword => 'パスワードを再設定';
+
+  @override
+  String get accountUseGithub => 'GitHub を使用';
+
+  @override
+  String get accountUseGoogle => 'Google を使用';
+
+  @override
+  String get accountUsePasskey => 'Passkey を使用';
+
+  @override
+  String get accountExternalHint => '安全なブラウザーが開きます。承認後に App へ戻ってください。';
+
+  @override
+  String get accountProfileTitle => 'プロフィール';
+
+  @override
+  String get accountSaveProfile => 'プロフィールを保存';
+
+  @override
+  String get accountChangeAvatar => '画像を変更';
+
+  @override
+  String get accountRemoveAvatar => '画像を削除';
+
+  @override
+  String get accountSignOut => 'ログアウト';
+
+  @override
+  String get accountSupportTitle => '高度な機能を支援';
+
+  @override
+  String get accountSupportFreeTitle => '現在すべての機能が無料です';
+
+  @override
+  String get accountSupportFreeSubtitle =>
+      '支援は任意で、WebDAV やその他の機能を解放するものではありません。';
+
+  @override
+  String get accountSupportAction => '今すぐ支援';
+
+  @override
+  String get accountSupporterBadge => 'サポーター';
+
+  @override
+  String get accountPasswordLengthHint => '12 文字以上';
+
+  @override
+  String get accountUsernameHint => '3〜30 文字の小文字、数字、アンダースコア';
 
   @override
   String get settingsDonationAction => 'WeChat で寄付';
@@ -4635,4 +4744,106 @@ class AppLocalizationsJa extends AppLocalizations {
   String replaceRulesTooMany(int max) {
     return 'ルールは最大 $max 件までです';
   }
+
+  @override
+  String get accountSecurityTitle => 'アカウントのセキュリティ';
+
+  @override
+  String get accountChangeEmailTitle => 'メールアドレスを変更';
+
+  @override
+  String get accountCurrentEmail => '現在のメール';
+
+  @override
+  String get accountNewEmail => '新しいメール';
+
+  @override
+  String get accountCurrentEmailCode => '現在のメールに届いたコード';
+
+  @override
+  String get accountNewEmailCode => '新しいメールに届いたコード';
+
+  @override
+  String get accountSendBothCodes => '両方にコードを送信';
+
+  @override
+  String get accountChangeEmailAction => 'メールを変更';
+
+  @override
+  String get accountEmailChanged => 'メールを変更しました';
+
+  @override
+  String get accountChangePasswordTitle => 'パスワードを設定・変更';
+
+  @override
+  String get accountNewPassword => '新しいパスワード';
+
+  @override
+  String get accountChangePasswordAction => 'パスワードを変更';
+
+  @override
+  String get accountPasswordChanged => 'パスワードを変更しました';
+
+  @override
+  String get accountPasswordsMismatch => 'パスワードが一致しません';
+
+  @override
+  String get accountMfaTitle => '2 段階認証';
+
+  @override
+  String get accountMfaEnabled => '有効です。ログイン時に認証アプリまたは未使用の復旧コードが必要です。';
+
+  @override
+  String get accountMfaDisabledByDefault =>
+      '初期状態では無効です。有効にするとパスワードとメールコードのログインを保護できます。';
+
+  @override
+  String get accountMfaChallengeTitle => '2 段階認証';
+
+  @override
+  String get accountMfaChallengeHint =>
+      'アカウントへ進むには、認証アプリのコードまたは未使用の復旧コードを入力してください。';
+
+  @override
+  String get accountMfaCode => '認証アプリのコード';
+
+  @override
+  String get accountMfaOrRecoveryCode => '認証アプリまたは復旧コード';
+
+  @override
+  String get accountMfaVerify => '確認して続行';
+
+  @override
+  String get accountMfaSendSetupCode => '設定用メールコードを送信';
+
+  @override
+  String get accountMfaContinueSetup => '設定を続ける';
+
+  @override
+  String get accountMfaSecretWarning => 'この秘密鍵を認証アプリへ追加してください。設定中にのみ表示されます。';
+
+  @override
+  String get accountMfaOpenAuthenticator => '認証アプリを開く';
+
+  @override
+  String get accountMfaConfirm => '確認して有効化';
+
+  @override
+  String get accountMfaDisable => '2 段階認証を無効化';
+
+  @override
+  String get accountMfaDisabled => '2 段階認証を無効にしました';
+
+  @override
+  String get accountRecoveryCodesWarning =>
+      '復旧コードを今すぐ保存してください。各コードは 1 回だけ使え、この一覧は再表示されません。';
+
+  @override
+  String get accountCopyRecoveryCodes => '復旧コードをコピー';
+
+  @override
+  String get accountRecoveryCodesCopied => '復旧コードをコピーしました';
+
+  @override
+  String get accountRecoveryCodesSaved => '復旧コードを保存しました';
 }

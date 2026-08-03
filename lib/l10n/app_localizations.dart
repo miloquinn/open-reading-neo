@@ -4264,14 +4264,230 @@ abstract class AppLocalizations {
   /// Title of the voluntary developer support card
   ///
   /// In en, this message translates to:
-  /// **'Support continued development'**
+  /// **'Support advanced features'**
   String get settingsSupportDevelopmentCardTitle;
 
   /// Explanation shown on the voluntary developer support card
   ///
   /// In en, this message translates to:
-  /// **'Building and maintaining Open Reading takes substantial time and effort. If it helps you, voluntary donations are welcome.'**
+  /// **'All features are currently free. Support is optional and helps fund continued development.'**
   String get settingsSupportDevelopmentCardSubtitle;
+
+  /// Guest account card title in settings
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to Open Reading'**
+  String get settingsAccountGuestTitle;
+
+  /// Guest account card subtitle in settings
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your account and supporter status together.'**
+  String get settingsAccountGuestSubtitle;
+
+  /// Action that opens the account center
+  ///
+  /// In en, this message translates to:
+  /// **'Account center'**
+  String get settingsAccountOpen;
+
+  /// Verified member account label
+  ///
+  /// In en, this message translates to:
+  /// **'Verified account'**
+  String get settingsAccountVerified;
+
+  /// Member account page title
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountPageTitle;
+
+  /// Member account page subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Profile, sign-in methods, and supporter status.'**
+  String get accountPageSubtitle;
+
+  /// Password sign-in tab
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get accountLoginTab;
+
+  /// Account registration tab
+  ///
+  /// In en, this message translates to:
+  /// **'Register'**
+  String get accountRegisterTab;
+
+  /// Email code sign-in tab
+  ///
+  /// In en, this message translates to:
+  /// **'Email code'**
+  String get accountCodeTab;
+
+  /// Password reset tab
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get accountResetTab;
+
+  /// Account email field
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get accountEmail;
+
+  /// Account password field
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get accountPassword;
+
+  /// Password confirmation field
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get accountConfirmPassword;
+
+  /// Public username field
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get accountUsername;
+
+  /// Display name field
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get accountDisplayName;
+
+  /// Email verification code field
+  ///
+  /// In en, this message translates to:
+  /// **'Verification code'**
+  String get accountVerificationCode;
+
+  /// Send an email verification code
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get accountSendCode;
+
+  /// Submit sign in
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get accountSignIn;
+
+  /// Submit account registration
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get accountCreate;
+
+  /// Submit password reset
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get accountResetPassword;
+
+  /// GitHub account login
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with GitHub'**
+  String get accountUseGithub;
+
+  /// Google account login
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get accountUseGoogle;
+
+  /// Passkey account login
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Passkey'**
+  String get accountUsePasskey;
+
+  /// External device authorization explanation
+  ///
+  /// In en, this message translates to:
+  /// **'A secure browser will open. Return here after approval.'**
+  String get accountExternalHint;
+
+  /// Profile settings section title
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get accountProfileTitle;
+
+  /// Save member profile action
+  ///
+  /// In en, this message translates to:
+  /// **'Save profile'**
+  String get accountSaveProfile;
+
+  /// Upload a new avatar
+  ///
+  /// In en, this message translates to:
+  /// **'Change avatar'**
+  String get accountChangeAvatar;
+
+  /// Delete the current avatar
+  ///
+  /// In en, this message translates to:
+  /// **'Remove avatar'**
+  String get accountRemoveAvatar;
+
+  /// Sign out of the member account
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get accountSignOut;
+
+  /// Supporter marketing card title
+  ///
+  /// In en, this message translates to:
+  /// **'Support advanced features'**
+  String get accountSupportTitle;
+
+  /// Clarifies current feature availability
+  ///
+  /// In en, this message translates to:
+  /// **'All features are free'**
+  String get accountSupportFreeTitle;
+
+  /// Clarifies support does not gate features
+  ///
+  /// In en, this message translates to:
+  /// **'Support is optional and does not unlock WebDAV or any other feature.'**
+  String get accountSupportFreeSubtitle;
+
+  /// Open the supporter purchase page
+  ///
+  /// In en, this message translates to:
+  /// **'Support now'**
+  String get accountSupportAction;
+
+  /// Supporter identity badge
+  ///
+  /// In en, this message translates to:
+  /// **'Supporter'**
+  String get accountSupporterBadge;
+
+  /// Password minimum length hint
+  ///
+  /// In en, this message translates to:
+  /// **'At least 12 characters'**
+  String get accountPasswordLengthHint;
+
+  /// Username format hint
+  ///
+  /// In en, this message translates to:
+  /// **'3–30 lowercase letters, numbers, or underscores'**
+  String get accountUsernameHint;
 
   /// Action label that opens the WeChat donation QR code
   ///
@@ -8450,6 +8666,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A maximum of {max} rules is supported'**
   String replaceRulesTooMany(int max);
+
+  /// No description provided for @accountSecurityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get accountSecurityTitle;
+
+  /// No description provided for @accountChangeEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get accountChangeEmailTitle;
+
+  /// No description provided for @accountCurrentEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Current email'**
+  String get accountCurrentEmail;
+
+  /// No description provided for @accountNewEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'New email'**
+  String get accountNewEmail;
+
+  /// No description provided for @accountCurrentEmailCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code sent to current email'**
+  String get accountCurrentEmailCode;
+
+  /// No description provided for @accountNewEmailCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code sent to new email'**
+  String get accountNewEmailCode;
+
+  /// No description provided for @accountSendBothCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Send both codes'**
+  String get accountSendBothCodes;
+
+  /// No description provided for @accountChangeEmailAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get accountChangeEmailAction;
+
+  /// No description provided for @accountEmailChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Email changed'**
+  String get accountEmailChanged;
+
+  /// No description provided for @accountChangePasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set or change password'**
+  String get accountChangePasswordTitle;
+
+  /// No description provided for @accountNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get accountNewPassword;
+
+  /// No description provided for @accountChangePasswordAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get accountChangePasswordAction;
+
+  /// No description provided for @accountPasswordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed'**
+  String get accountPasswordChanged;
+
+  /// No description provided for @accountPasswordsMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords do not match'**
+  String get accountPasswordsMismatch;
+
+  /// No description provided for @accountMfaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor authentication'**
+  String get accountMfaTitle;
+
+  /// No description provided for @accountMfaEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled. An authenticator or unused recovery code is required at sign-in.'**
+  String get accountMfaEnabled;
+
+  /// No description provided for @accountMfaDisabledByDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Off by default. Enable it to protect password and email-code sign-ins.'**
+  String get accountMfaDisabledByDefault;
+
+  /// No description provided for @accountMfaChallengeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor verification'**
+  String get accountMfaChallengeTitle;
+
+  /// No description provided for @accountMfaChallengeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code from your authenticator or an unused recovery code to access your account.'**
+  String get accountMfaChallengeHint;
+
+  /// No description provided for @accountMfaCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator code'**
+  String get accountMfaCode;
+
+  /// No description provided for @accountMfaOrRecoveryCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator or recovery code'**
+  String get accountMfaOrRecoveryCode;
+
+  /// No description provided for @accountMfaVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify and continue'**
+  String get accountMfaVerify;
+
+  /// No description provided for @accountMfaSendSetupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send setup email code'**
+  String get accountMfaSendSetupCode;
+
+  /// No description provided for @accountMfaContinueSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue setup'**
+  String get accountMfaContinueSetup;
+
+  /// No description provided for @accountMfaSecretWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this secret to your authenticator. It is shown only during setup.'**
+  String get accountMfaSecretWarning;
+
+  /// No description provided for @accountMfaOpenAuthenticator.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authenticator'**
+  String get accountMfaOpenAuthenticator;
+
+  /// No description provided for @accountMfaConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm and enable'**
+  String get accountMfaConfirm;
+
+  /// No description provided for @accountMfaDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable two-factor authentication'**
+  String get accountMfaDisable;
+
+  /// No description provided for @accountMfaDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor authentication disabled'**
+  String get accountMfaDisabled;
+
+  /// No description provided for @accountRecoveryCodesWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Save these recovery codes now. Each code works once, and this list will not be shown again.'**
+  String get accountRecoveryCodesWarning;
+
+  /// No description provided for @accountCopyRecoveryCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy recovery codes'**
+  String get accountCopyRecoveryCodes;
+
+  /// No description provided for @accountRecoveryCodesCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery codes copied'**
+  String get accountRecoveryCodesCopied;
+
+  /// No description provided for @accountRecoveryCodesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'I saved these codes'**
+  String get accountRecoveryCodesSaved;
 }
 
 class _AppLocalizationsDelegate

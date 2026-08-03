@@ -44,6 +44,7 @@ import 'package:xxread/widgets/accent_color_picker_sheet.dart';
 import 'package:xxread/widgets/contributors_view.dart';
 import 'package:xxread/widgets/developer_support_card.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
+import 'package:xxread/widgets/settings_account_card.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/update_check_gate.dart';
 
@@ -489,6 +490,8 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSettingsTopRow(l10n, useRailNavigation),
             const SizedBox(height: 24),
           ],
+          const SettingsAccountCard(),
+          const SizedBox(height: 20),
           _buildSectionCard(
             title: l10n.settingsSectionAppearanceFonts,
             icon: Icons.palette_outlined,

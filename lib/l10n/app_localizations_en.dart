@@ -2378,12 +2378,124 @@ class AppLocalizationsEn extends AppLocalizations {
       'A letter from the Open Reading developer asking for voluntary support';
 
   @override
-  String get settingsSupportDevelopmentCardTitle =>
-      'Support continued development';
+  String get settingsSupportDevelopmentCardTitle => 'Support advanced features';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      'Building and maintaining Open Reading takes substantial time and effort. If it helps you, voluntary donations are welcome.';
+      'All features are currently free. Support is optional and helps fund continued development.';
+
+  @override
+  String get settingsAccountGuestTitle => 'Sign in to Open Reading';
+
+  @override
+  String get settingsAccountGuestSubtitle =>
+      'Keep your account and supporter status together.';
+
+  @override
+  String get settingsAccountOpen => 'Account center';
+
+  @override
+  String get settingsAccountVerified => 'Verified account';
+
+  @override
+  String get accountPageTitle => 'Account';
+
+  @override
+  String get accountPageSubtitle =>
+      'Profile, sign-in methods, and supporter status.';
+
+  @override
+  String get accountLoginTab => 'Sign in';
+
+  @override
+  String get accountRegisterTab => 'Register';
+
+  @override
+  String get accountCodeTab => 'Email code';
+
+  @override
+  String get accountResetTab => 'Reset';
+
+  @override
+  String get accountEmail => 'Email';
+
+  @override
+  String get accountPassword => 'Password';
+
+  @override
+  String get accountConfirmPassword => 'Confirm password';
+
+  @override
+  String get accountUsername => 'Username';
+
+  @override
+  String get accountDisplayName => 'Display name';
+
+  @override
+  String get accountVerificationCode => 'Verification code';
+
+  @override
+  String get accountSendCode => 'Send code';
+
+  @override
+  String get accountSignIn => 'Sign in';
+
+  @override
+  String get accountCreate => 'Create account';
+
+  @override
+  String get accountResetPassword => 'Reset password';
+
+  @override
+  String get accountUseGithub => 'Continue with GitHub';
+
+  @override
+  String get accountUseGoogle => 'Continue with Google';
+
+  @override
+  String get accountUsePasskey => 'Continue with Passkey';
+
+  @override
+  String get accountExternalHint =>
+      'A secure browser will open. Return here after approval.';
+
+  @override
+  String get accountProfileTitle => 'Profile';
+
+  @override
+  String get accountSaveProfile => 'Save profile';
+
+  @override
+  String get accountChangeAvatar => 'Change avatar';
+
+  @override
+  String get accountRemoveAvatar => 'Remove avatar';
+
+  @override
+  String get accountSignOut => 'Sign out';
+
+  @override
+  String get accountSupportTitle => 'Support advanced features';
+
+  @override
+  String get accountSupportFreeTitle => 'All features are free';
+
+  @override
+  String get accountSupportFreeSubtitle =>
+      'Support is optional and does not unlock WebDAV or any other feature.';
+
+  @override
+  String get accountSupportAction => 'Support now';
+
+  @override
+  String get accountSupporterBadge => 'Supporter';
+
+  @override
+  String get accountPasswordLengthHint => 'At least 12 characters';
+
+  @override
+  String get accountUsernameHint =>
+      '3–30 lowercase letters, numbers, or underscores';
 
   @override
   String get settingsDonationAction => 'Donate with WeChat';
@@ -4818,4 +4930,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String replaceRulesTooMany(int max) {
     return 'A maximum of $max rules is supported';
   }
+
+  @override
+  String get accountSecurityTitle => 'Security';
+
+  @override
+  String get accountChangeEmailTitle => 'Change email';
+
+  @override
+  String get accountCurrentEmail => 'Current email';
+
+  @override
+  String get accountNewEmail => 'New email';
+
+  @override
+  String get accountCurrentEmailCode => 'Code sent to current email';
+
+  @override
+  String get accountNewEmailCode => 'Code sent to new email';
+
+  @override
+  String get accountSendBothCodes => 'Send both codes';
+
+  @override
+  String get accountChangeEmailAction => 'Change email';
+
+  @override
+  String get accountEmailChanged => 'Email changed';
+
+  @override
+  String get accountChangePasswordTitle => 'Set or change password';
+
+  @override
+  String get accountNewPassword => 'New password';
+
+  @override
+  String get accountChangePasswordAction => 'Change password';
+
+  @override
+  String get accountPasswordChanged => 'Password changed';
+
+  @override
+  String get accountPasswordsMismatch => 'The passwords do not match';
+
+  @override
+  String get accountMfaTitle => 'Two-factor authentication';
+
+  @override
+  String get accountMfaEnabled =>
+      'Enabled. An authenticator or unused recovery code is required at sign-in.';
+
+  @override
+  String get accountMfaDisabledByDefault =>
+      'Off by default. Enable it to protect password and email-code sign-ins.';
+
+  @override
+  String get accountMfaChallengeTitle => 'Two-factor verification';
+
+  @override
+  String get accountMfaChallengeHint =>
+      'Enter the code from your authenticator or an unused recovery code to access your account.';
+
+  @override
+  String get accountMfaCode => 'Authenticator code';
+
+  @override
+  String get accountMfaOrRecoveryCode => 'Authenticator or recovery code';
+
+  @override
+  String get accountMfaVerify => 'Verify and continue';
+
+  @override
+  String get accountMfaSendSetupCode => 'Send setup email code';
+
+  @override
+  String get accountMfaContinueSetup => 'Continue setup';
+
+  @override
+  String get accountMfaSecretWarning =>
+      'Add this secret to your authenticator. It is shown only during setup.';
+
+  @override
+  String get accountMfaOpenAuthenticator => 'Open authenticator';
+
+  @override
+  String get accountMfaConfirm => 'Confirm and enable';
+
+  @override
+  String get accountMfaDisable => 'Disable two-factor authentication';
+
+  @override
+  String get accountMfaDisabled => 'Two-factor authentication disabled';
+
+  @override
+  String get accountRecoveryCodesWarning =>
+      'Save these recovery codes now. Each code works once, and this list will not be shown again.';
+
+  @override
+  String get accountCopyRecoveryCodes => 'Copy recovery codes';
+
+  @override
+  String get accountRecoveryCodesCopied => 'Recovery codes copied';
+
+  @override
+  String get accountRecoveryCodesSaved => 'I saved these codes';
 }

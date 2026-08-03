@@ -2276,11 +2276,119 @@ class AppLocalizationsZh extends AppLocalizations {
   String get firstHomeSupportPaperSemanticLabel => '开元阅读开发者的自愿支持说明';
 
   @override
-  String get settingsSupportDevelopmentCardTitle => '支持持续开发';
+  String get settingsSupportDevelopmentCardTitle => '支持高级功能';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      '开发和维护投入了大量时间与精力。如果开元阅读对你有帮助，欢迎自愿捐赠支持。';
+      '当前所有功能免费。支持完全自愿，用于持续开发。';
+
+  @override
+  String get settingsAccountGuestTitle => '登录开元阅读';
+
+  @override
+  String get settingsAccountGuestSubtitle => '管理账号资料与支持者身份';
+
+  @override
+  String get settingsAccountOpen => '用户中心';
+
+  @override
+  String get settingsAccountVerified => '账号已验证';
+
+  @override
+  String get accountPageTitle => '用户中心';
+
+  @override
+  String get accountPageSubtitle => '管理资料、登录方式和支持者身份。';
+
+  @override
+  String get accountLoginTab => '登录';
+
+  @override
+  String get accountRegisterTab => '注册';
+
+  @override
+  String get accountCodeTab => '验证码';
+
+  @override
+  String get accountResetTab => '找回';
+
+  @override
+  String get accountEmail => '邮箱';
+
+  @override
+  String get accountPassword => '密码';
+
+  @override
+  String get accountConfirmPassword => '确认密码';
+
+  @override
+  String get accountUsername => '用户名';
+
+  @override
+  String get accountDisplayName => '昵称';
+
+  @override
+  String get accountVerificationCode => '验证码';
+
+  @override
+  String get accountSendCode => '发送验证码';
+
+  @override
+  String get accountSignIn => '登录';
+
+  @override
+  String get accountCreate => '创建账号';
+
+  @override
+  String get accountResetPassword => '重置密码';
+
+  @override
+  String get accountUseGithub => '使用 GitHub';
+
+  @override
+  String get accountUseGoogle => '使用 Google';
+
+  @override
+  String get accountUsePasskey => '使用 Passkey';
+
+  @override
+  String get accountExternalHint => '将打开安全浏览器，授权后返回 App 即可。';
+
+  @override
+  String get accountProfileTitle => '个人资料';
+
+  @override
+  String get accountSaveProfile => '保存资料';
+
+  @override
+  String get accountChangeAvatar => '更换头像';
+
+  @override
+  String get accountRemoveAvatar => '移除头像';
+
+  @override
+  String get accountSignOut => '退出登录';
+
+  @override
+  String get accountSupportTitle => '支持高级功能';
+
+  @override
+  String get accountSupportFreeTitle => '当前所有功能免费';
+
+  @override
+  String get accountSupportFreeSubtitle => '支持完全自愿，不会解锁 WebDAV 或其他功能。';
+
+  @override
+  String get accountSupportAction => '立即支持';
+
+  @override
+  String get accountSupporterBadge => '支持者';
+
+  @override
+  String get accountPasswordLengthHint => '至少 12 个字符';
+
+  @override
+  String get accountUsernameHint => '3–30 位小写字母、数字或下划线';
 
   @override
   String get settingsDonationAction => '微信捐赠';
@@ -4589,6 +4697,105 @@ class AppLocalizationsZh extends AppLocalizations {
   String replaceRulesTooMany(int max) {
     return '最多支持 $max 条规则';
   }
+
+  @override
+  String get accountSecurityTitle => '账号安全';
+
+  @override
+  String get accountChangeEmailTitle => '更换邮箱';
+
+  @override
+  String get accountCurrentEmail => '当前邮箱';
+
+  @override
+  String get accountNewEmail => '新邮箱';
+
+  @override
+  String get accountCurrentEmailCode => '当前邮箱验证码';
+
+  @override
+  String get accountNewEmailCode => '新邮箱验证码';
+
+  @override
+  String get accountSendBothCodes => '向两个邮箱发送验证码';
+
+  @override
+  String get accountChangeEmailAction => '确认更换邮箱';
+
+  @override
+  String get accountEmailChanged => '邮箱已更换';
+
+  @override
+  String get accountChangePasswordTitle => '设置或更换密码';
+
+  @override
+  String get accountNewPassword => '新密码';
+
+  @override
+  String get accountChangePasswordAction => '确认更换密码';
+
+  @override
+  String get accountPasswordChanged => '密码已更换';
+
+  @override
+  String get accountPasswordsMismatch => '两次输入的密码不一致';
+
+  @override
+  String get accountMfaTitle => '双重验证';
+
+  @override
+  String get accountMfaEnabled => '已开启。登录时需要验证器或未使用的恢复码。';
+
+  @override
+  String get accountMfaDisabledByDefault => '默认关闭。开启后可保护密码和邮箱验证码登录。';
+
+  @override
+  String get accountMfaChallengeTitle => '双重验证';
+
+  @override
+  String get accountMfaChallengeHint => '输入验证器动态码或未使用的恢复码，验证后才能访问账号。';
+
+  @override
+  String get accountMfaCode => '验证器动态码';
+
+  @override
+  String get accountMfaOrRecoveryCode => '验证器动态码或恢复码';
+
+  @override
+  String get accountMfaVerify => '验证并继续';
+
+  @override
+  String get accountMfaSendSetupCode => '发送开启确认邮件';
+
+  @override
+  String get accountMfaContinueSetup => '继续设置';
+
+  @override
+  String get accountMfaSecretWarning => '请将此密钥添加到验证器。密钥仅在设置期间显示。';
+
+  @override
+  String get accountMfaOpenAuthenticator => '打开验证器';
+
+  @override
+  String get accountMfaConfirm => '确认并开启';
+
+  @override
+  String get accountMfaDisable => '关闭双重验证';
+
+  @override
+  String get accountMfaDisabled => '双重验证已关闭';
+
+  @override
+  String get accountRecoveryCodesWarning => '请立即保存恢复码。每个恢复码只能使用一次，此列表不会再次显示。';
+
+  @override
+  String get accountCopyRecoveryCodes => '复制恢复码';
+
+  @override
+  String get accountRecoveryCodesCopied => '恢复码已复制';
+
+  @override
+  String get accountRecoveryCodesSaved => '我已保存恢复码';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -6823,11 +7030,119 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get firstHomeSupportPaperSemanticLabel => '開元閱讀開發者的自願支持說明';
 
   @override
-  String get settingsSupportDevelopmentCardTitle => '支持持續開發';
+  String get settingsSupportDevelopmentCardTitle => '支持進階功能';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      '開發與維護投入了大量時間和心力。如果開元閱讀對你有幫助，歡迎自願捐贈支持。';
+      '目前所有功能免費。支持完全自願，用於持續開發。';
+
+  @override
+  String get settingsAccountGuestTitle => '登入開元閱讀';
+
+  @override
+  String get settingsAccountGuestSubtitle => '管理帳號資料與支持者身分';
+
+  @override
+  String get settingsAccountOpen => '使用者中心';
+
+  @override
+  String get settingsAccountVerified => '帳號已驗證';
+
+  @override
+  String get accountPageTitle => '使用者中心';
+
+  @override
+  String get accountPageSubtitle => '管理資料、登入方式和支持者身分。';
+
+  @override
+  String get accountLoginTab => '登入';
+
+  @override
+  String get accountRegisterTab => '註冊';
+
+  @override
+  String get accountCodeTab => '驗證碼';
+
+  @override
+  String get accountResetTab => '找回';
+
+  @override
+  String get accountEmail => '電子郵件';
+
+  @override
+  String get accountPassword => '密碼';
+
+  @override
+  String get accountConfirmPassword => '確認密碼';
+
+  @override
+  String get accountUsername => '使用者名稱';
+
+  @override
+  String get accountDisplayName => '暱稱';
+
+  @override
+  String get accountVerificationCode => '驗證碼';
+
+  @override
+  String get accountSendCode => '傳送驗證碼';
+
+  @override
+  String get accountSignIn => '登入';
+
+  @override
+  String get accountCreate => '建立帳號';
+
+  @override
+  String get accountResetPassword => '重設密碼';
+
+  @override
+  String get accountUseGithub => '使用 GitHub';
+
+  @override
+  String get accountUseGoogle => '使用 Google';
+
+  @override
+  String get accountUsePasskey => '使用 Passkey';
+
+  @override
+  String get accountExternalHint => '將開啟安全瀏覽器，授權後返回 App 即可。';
+
+  @override
+  String get accountProfileTitle => '個人資料';
+
+  @override
+  String get accountSaveProfile => '儲存資料';
+
+  @override
+  String get accountChangeAvatar => '更換頭像';
+
+  @override
+  String get accountRemoveAvatar => '移除頭像';
+
+  @override
+  String get accountSignOut => '登出';
+
+  @override
+  String get accountSupportTitle => '支持進階功能';
+
+  @override
+  String get accountSupportFreeTitle => '目前所有功能免費';
+
+  @override
+  String get accountSupportFreeSubtitle => '支持完全自願，不會解鎖 WebDAV 或其他功能。';
+
+  @override
+  String get accountSupportAction => '立即支持';
+
+  @override
+  String get accountSupporterBadge => '支持者';
+
+  @override
+  String get accountPasswordLengthHint => '至少 12 個字元';
+
+  @override
+  String get accountUsernameHint => '3–30 位小寫字母、數字或底線';
 
   @override
   String get settingsDonationAction => '微信捐贈';
@@ -9136,4 +9451,103 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String replaceRulesTooMany(int max) {
     return '最多支援 $max 條規則';
   }
+
+  @override
+  String get accountSecurityTitle => '帳號安全';
+
+  @override
+  String get accountChangeEmailTitle => '更換電子郵件';
+
+  @override
+  String get accountCurrentEmail => '目前電子郵件';
+
+  @override
+  String get accountNewEmail => '新電子郵件';
+
+  @override
+  String get accountCurrentEmailCode => '目前電子郵件驗證碼';
+
+  @override
+  String get accountNewEmailCode => '新電子郵件驗證碼';
+
+  @override
+  String get accountSendBothCodes => '向兩個信箱傳送驗證碼';
+
+  @override
+  String get accountChangeEmailAction => '確認更換電子郵件';
+
+  @override
+  String get accountEmailChanged => '電子郵件已更換';
+
+  @override
+  String get accountChangePasswordTitle => '設定或更換密碼';
+
+  @override
+  String get accountNewPassword => '新密碼';
+
+  @override
+  String get accountChangePasswordAction => '確認更換密碼';
+
+  @override
+  String get accountPasswordChanged => '密碼已更換';
+
+  @override
+  String get accountPasswordsMismatch => '兩次輸入的密碼不一致';
+
+  @override
+  String get accountMfaTitle => '雙重驗證';
+
+  @override
+  String get accountMfaEnabled => '已開啟。登入時需要驗證器或未使用的恢復碼。';
+
+  @override
+  String get accountMfaDisabledByDefault => '預設關閉。開啟後可保護密碼和電子郵件驗證碼登入。';
+
+  @override
+  String get accountMfaChallengeTitle => '雙重驗證';
+
+  @override
+  String get accountMfaChallengeHint => '輸入驗證器動態碼或未使用的恢復碼，驗證後才能存取帳號。';
+
+  @override
+  String get accountMfaCode => '驗證器動態碼';
+
+  @override
+  String get accountMfaOrRecoveryCode => '驗證器動態碼或恢復碼';
+
+  @override
+  String get accountMfaVerify => '驗證並繼續';
+
+  @override
+  String get accountMfaSendSetupCode => '傳送開啟確認郵件';
+
+  @override
+  String get accountMfaContinueSetup => '繼續設定';
+
+  @override
+  String get accountMfaSecretWarning => '請將此密鑰加入驗證器。密鑰僅在設定期間顯示。';
+
+  @override
+  String get accountMfaOpenAuthenticator => '開啟驗證器';
+
+  @override
+  String get accountMfaConfirm => '確認並開啟';
+
+  @override
+  String get accountMfaDisable => '關閉雙重驗證';
+
+  @override
+  String get accountMfaDisabled => '雙重驗證已關閉';
+
+  @override
+  String get accountRecoveryCodesWarning => '請立即儲存恢復碼。每個恢復碼只能使用一次，此清單不會再次顯示。';
+
+  @override
+  String get accountCopyRecoveryCodes => '複製恢復碼';
+
+  @override
+  String get accountRecoveryCodesCopied => '恢復碼已複製';
+
+  @override
+  String get accountRecoveryCodesSaved => '我已儲存恢復碼';
 }

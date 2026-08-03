@@ -80,6 +80,7 @@ lib/
 │  ├─ book_sources/         书源发现、搜索、管理与业务 widgets
 │  ├─ reader/               本地/书源阅读器与 themes
 │  ├─ reading_stats/        阅读统计页与 parts
+│  ├─ account/              登录、注册、资料与支持者身份管理
 │  ├─ ai/                   AI 页：对话历史、独立对话与选书上下文
 │  ├─ settings/             设置、字体、WebDAV 同步、parts 与 about 页面
 │  └─ legal/                协议等法律页面
@@ -90,6 +91,7 @@ lib/
 │  ├─ core/                 数据库、设置、应用状态、缓存、更新、后台下载通知与自定义字体存储
 │  ├─ library/              书库事件、聚合服务和下载任务队列
 │  ├─ reading/              阅读统计、阅读计划与启动阅读恢复
+│  ├─ account/              账号 API、设备授权、令牌轮换与安全存储
 │  ├─ sync/                 WebDAV 协议、变更存储、元数据适配器与书籍文件传输
 │  └─ storage/              平台存储桥接与 Android 文件夹授权
 ├─ utils/                   主题、字体、玻璃效果、本地化扩展等工具
@@ -119,7 +121,8 @@ lib/
 - `book_sources/services/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
 - `pages/book_sources/source_search_page.dart`：在线书源搜索与发现；大型书源库的范围条按需构建，“全部书源”通过最多 8 个 worker 有界并发搜索，按单源超时渐进追加结果，清空、切换范围或离页时取消当前请求。手机入口先打开加载页，再在后台解析注册表并替换为搜索页。
 - `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型阅读书源聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和能力标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/可执行状态、分组筛选和针对当前结果的批量操作。
-- `pages/settings/settings_page.dart`：应用设置、版本与维护入口，按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”五个分区组织；重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
+- `pages/settings/settings_page.dart`：应用设置、版本与维护入口；顶部账号卡片进入 `pages/account/account_page.dart`，其余设置按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”组织。重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
+- `pages/account/account_page.dart` 与 `services/account/`：邮箱密码注册/登录、邮箱验证码、密码找回、GitHub/Google/Passkey 浏览器设备授权、资料与头像管理、令牌安全存储和刷新轮换。账号安全区支持当前邮箱与新邮箱双验证码换绑、通过当前邮箱验证码设置或修改密码，以及默认关闭的 TOTP 两步验证；恢复码只展示一次，MFA 未完成的 bearer 会话会安全持久化并在启动时恢复到验证界面，不会被刷新或误清除。浏览器授权只在网页端明确确认后一次性交换 App bearer 会话；支持者身份不控制 WebDAV 或其他功能，当前全部功能免费。
 - `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片支持添加/编辑/删除/激活，服务商除内置项外可选“自定义”。自定义服务商把厂商身份与接口协议拆开，可选择 OpenAI Compatible 或 Anthropic，并按协议提示 Base URL 是否需要包含 `/v1`；快捷模型 JSON 同时保存协议，旧记录缺省按服务商原协议兼容读取。AI 预处理开关也位于此页。
 - `pages/settings/sync/`：WebDAV 概览、独立连接配置、即时保存的同步内容开关和书籍文件管理页；书源、书架信息、阅读进度等元数据自动同步，原文件需先开启上传权限，再按书选择上传或下载。新导入书籍提供“每次询问（默认）/ 自动上传 / 始终手动”三种策略；自动上传只处理符合安全限制的真正新增本地文件。
 - `pages/settings/replace_rules_page.dart` 与 `services/reader/replace_rule_service.dart`：全局“替换净化”规则管理与执行边界。规则使用 SharedPreferences JSON 持久化，支持新建、编辑、启停、删除、搜索、排序、JSON 导入导出，以及常见新旧字段（`pattern`/`regex`、`name`/`replaceSummary`、`isEnabled`/`enable`、`scope`/`useTo`、`order`/`serialNumber`）；规则可按书名/书源范围、排除范围和标题/正文类型生效。设置页提供稳定入口，本地文字阅读器和在线书源阅读器控制栏提供快速入口；标题与正文都在分页前净化，EPUB/Kindle 富文本会重算样式块偏移并保留图片，规则变更后当前阅读器清理文字/分页缓存并按现有进度重排。
@@ -393,7 +396,7 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 
 - SQLite：书籍、书签、笔记、阅读会话、WebDAV 变更镜像和书籍 blob 索引。
 - SharedPreferences：阅读 UI 设置、应用强调色、App/阅读字体选择、书库布局、网格密度与网格书名/进度显隐、首页导航文字显隐与稳定目的地顺序、移动端省电模式刷新率偏好、显式跳过的更新版本、WebDAV 地址/用户名/根目录/同步范围、应用偏好和轻量状态；自定义阅读主题以 JSON 列表保存，预设与自定义主题的统一顺序以稳定 ID 列表单独保存，两个阅读器共享，旧单主题记录首次读取时自动迁移。
-- 安全存储：WebDAV 密码只保存在 `flutter_secure_storage`，不写入 SharedPreferences、SQLite、远端批次或日志。
+- 安全存储：WebDAV 密码以及账号 access/refresh token 只保存在 `flutter_secure_storage`，不写入 SharedPreferences、SQLite、远端批次或日志；TOTP 设置密钥和一次性恢复码只在对应设置步骤的内存 UI 中短暂存在。
 - 应用私有目录：数据库、缓存、封面、应用管理的书籍文件，`custom_fonts/` 下的用户字体与清单，以及 `reader_theme_backgrounds/` 下由应用托管的阅读主题背景图片。书源临时封面位于平台 cache 的 `source_covers/`，公开书源元数据响应位于 `book_source_responses/`，加入书架后保存的封面位于 documents 的 `covers/`，三者清理边界分离。启动流程不并发执行全库路径回写或临时/孤儿文件删除；本地书打开前只修复该书路径，避免和导入、下载及 WebDAV 同步竞争。
 - 设置页缓存管理只允许清理 `source_covers/`、`book_source_chapters/`、`book_source_responses/`、`native_reader_cache/` 和 `updates/` 等明确归属的缓存，同时清理 SourceCoverCache 压缩内存、书源响应内存和 Flutter 解码图片缓存；不枚举或删除数据库、书籍、documents 封面、进度、偏好或安全凭据。
 - 用户授权目录：通过平台存储桥接原地管理或导入书籍。

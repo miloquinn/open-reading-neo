@@ -36,6 +36,7 @@ import 'utils/app_themes.dart';
 import 'utils/book_open_transition.dart';
 import 'services/tts_service.dart';
 import 'services/reader_aloud_service.dart';
+import 'services/account/account.dart';
 import 'package:path_provider/path_provider.dart';
 import 'utils/glass_config.dart';
 import 'utils/localization_extension.dart';
@@ -110,6 +111,9 @@ void main(List<String> arguments) async {
           ),
           provider.ChangeNotifierProvider(
             create: (_) => WebDavSyncController(),
+          ),
+          provider.ChangeNotifierProvider(
+            create: (_) => MemberAccountController()..initialize(),
           ),
         ],
         child: XxReadApp(

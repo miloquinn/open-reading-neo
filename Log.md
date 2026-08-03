@@ -1183,3 +1183,4 @@
 - 发布前 Web release 首次被 `source_script_engine.dart` 对 `flutter_js` 的直接引用带入 `dart:ffi` 阻断；现改为平台条件导出，原生继续使用 QuickJS，Web 使用同 API 的不支持实现。书源脚本与端到端 10 项回归通过，Web release 随后构建成功。
 - 发布前客户端测试除已知会在同一进程退出阶段触发通道关闭错误的书源管理文件外 821 项一次通过，该文件 8 项逐项隔离全部通过，合计 829 项无断言失败；全项目静态分析无 error/warning、保留 55 条既有 info，格式检查 432 文件零变更，Actionlint 通过。官网后端 107 项测试、Ruff、compileall、锁文件和部署脚本语法全部通过。
 - 本地 Android 三 ABI 使用 Origo 身份完成正式签名构建与核验：armeabi-v7a `260804003`、arm64-v8a `260805003`、x86_64 `260807003`；三份 APK 均确认包名 `com.niki.xxread`、versionName `2.5.0`、单一目标 ABI、V2 签名及证书身份一致。正式 GitHub Release 仍由 Tag 工作流重新构建，不复用本地产物。
+- 私库 PR checks 的统一 `flutter test --coverage` 会让 `book_source_management_page_test.dart` 第六项在前五项之后稳定等待到 10 分钟超时，而该文件 8 项分别在新进程中均立即通过。CI 现将其余测试保持一次覆盖率运行，并仅把这 8 项逐项隔离执行，既保留全部断言，也避免框架级共享状态污染阻断主线。

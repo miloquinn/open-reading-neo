@@ -294,6 +294,7 @@ void main() {
         'title': 'Nested chapter',
         'depth': 1,
         'chapterIndex': 1,
+        'fragment': 'start',
       },
     ]);
 
@@ -306,7 +307,13 @@ void main() {
     });
     final chapters = (parsed['chapters'] as List).cast<Map>();
     expect(chapters[0]['plainText'], 'UTF-16 内容完整。');
-    expect(chapters[1]['plainText'], 'GBK 章节不应丢字。');
+    expect(chapters[1]['plainText'], '引言。\n\nGBK 章节不应丢字。');
+    final startOffset = (chapters[1]['anchors'] as Map)['start'] as int;
+    expect(startOffset, greaterThan(0));
+    expect(
+      (chapters[1]['plainText'] as String).substring(startOffset),
+      'GBK 章节不应丢字。',
+    );
   });
 }
 
@@ -362,7 +369,7 @@ List<int> _epub3FixtureWithoutSpine() {
     'EPUB/text/two.xhtml',
     gbk_bytes.encode(
       '<html><head><meta charset="gbk"></head>'
-      '<body><p>GBK 章节不应丢字。</p></body></html>',
+      '<body><p>引言。</p><p id="start">GBK 章节不应丢字。</p></body></html>',
     ),
   );
   return ZipEncoder().encode(archive)!;

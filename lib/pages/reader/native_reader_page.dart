@@ -219,6 +219,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   late final Map<String, List<_ReaderPageData>> _pageCache;
   List<_NativeChapter> _loadedChapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
+  int? _lastNavigationJumpPosition;
   bool _readerDependenciesInitialized = false;
   int _chapterIndex = 0;
   int _chapterLoadSerial = 0;
@@ -1513,6 +1514,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
               title: values['title'] as String? ?? '',
               index: chapterIndex,
               id: chapters[chapterIndex].id,
+              fragment: values['fragment'] as String?,
               depth: values['depth'] as int? ?? 0,
             );
           })
@@ -2580,6 +2582,47 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     );
   }
 
+  Future<void> _jumpToNavigationChapter(
+    ReaderNavigationChapter navigation,
+    List<_NativeChapter> chapters,
+  ) async {
+    final navigationPosition = _navigationChapters.indexOf(navigation);
+    _lastNavigationJumpPosition = navigationPosition < 0
+        ? null
+        : navigationPosition;
+    final chapterIndex = navigation.index.clamp(0, chapters.length - 1);
+    await _loadIndexedChapterWindow(chapters, chapterIndex);
+    if (!mounted) return;
+    final chapter = chapters[chapterIndex];
+    final offset = chapter.navigationOffsetFor(navigation) ?? 0;
+    final excerptEnd = (offset + 72).clamp(offset, chapter.plainText.length);
+    final locator = CanonicalLocator.fromComponents(
+      format: BookFormat.fromFileExtension(widget.book.format),
+      chapterId: chapter.id,
+      offset: offset,
+      excerpt: chapter.plainText.substring(offset, excerptEnd),
+      progression: chapter.plainText.isEmpty
+          ? 0
+          : offset / chapter.plainText.length,
+    );
+    final alreadyInChapter = chapterIndex == _chapterIndex;
+    await _jumpToBookmark(
+      Bookmark(
+        bookId: widget.book.id ?? 0,
+        pageNumber: chapterIndex,
+        chapterIndex: chapterIndex,
+        chapterTitle: navigation.title,
+        canonicalLocator: LocatorCodec.encodeCanonicalLocator(locator),
+      ),
+      chapters,
+    );
+    if (alreadyInChapter &&
+        mounted &&
+        _pageMode != NativePageMode.verticalScroll) {
+      setState(() {});
+    }
+  }
+
   Future<void> _jumpToAnnotation(
     BookNote annotation,
     List<_NativeChapter> chapters,
@@ -2613,6 +2656,10 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     // Prepared once while the book is loading. Opening the sheet must not
     // allocate one navigation model per chapter on the interaction frame.
     final navigationChapters = _navigationChapters;
+    final currentNavigationPosition = _currentNavigationPosition(
+      navigationChapters,
+      chapters,
+    );
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2631,6 +2678,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
             currentChapterIndex: _chapterIndex,
             currentChapterOffset: _anchorOffset,
             currentChapterText: chapters[_chapterIndex].plainText,
+            currentNavigationPosition: currentNavigationPosition,
             bookmarks: _bookmarks,
             annotations: _annotations,
             currentAnchorKey: currentAnchorKey,
@@ -2643,6 +2691,10 @@ class _NativeReaderPageState extends State<NativeReaderPage>
                   recenterContinuousScroll: true,
                 ),
               );
+            },
+            onNavigationChapterSelected: (navigation) {
+              Navigator.of(sheetContext).pop();
+              unawaited(_jumpToNavigationChapter(navigation, chapters));
             },
             onBookmarkSelected: (bookmark) {
               Navigator.of(sheetContext).pop();
@@ -2664,6 +2716,61 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         ),
       ),
     );
+  }
+
+  int _currentNavigationPosition(
+    List<ReaderNavigationChapter> navigation,
+    List<_NativeChapter> chapters,
+  ) {
+    if (_chapterIndex < 0 || _chapterIndex >= chapters.length) return -1;
+    final chapter = chapters[_chapterIndex];
+    final lastJumpPosition = _lastNavigationJumpPosition;
+    if (lastJumpPosition != null &&
+        lastJumpPosition >= 0 &&
+        lastJumpPosition < navigation.length &&
+        _pageMode != NativePageMode.verticalScroll &&
+        _visiblePages.isNotEmpty) {
+      final target = navigation[lastJumpPosition];
+      if (target.index == _chapterIndex) {
+        final targetOffset = chapter.navigationOffsetFor(target) ?? 0;
+        final firstPage = _pageIndex.clamp(0, _visiblePages.length - 1);
+        final lastPage = _visibleUsesTwoPageLayout
+            ? (firstPage + 1).clamp(firstPage, _visiblePages.length - 1)
+            : firstPage;
+        if (targetOffset >= _visiblePages[firstPage].startOffset &&
+            targetOffset < _visiblePages[lastPage].endOffset) {
+          return lastJumpPosition;
+        }
+      }
+    }
+    final currentOffset = (_anchorOffset ?? 0).clamp(
+      0,
+      chapter.plainText.length,
+    );
+    var selectedPosition = -1;
+    var selectedChapterIndex = -1;
+    var selectedOffset = -1;
+    for (var position = 0; position < navigation.length; position++) {
+      final target = navigation[position];
+      if (target.index > _chapterIndex) continue;
+      if (target.index < _chapterIndex) {
+        if (target.index >= selectedChapterIndex) {
+          selectedPosition = position;
+          selectedChapterIndex = target.index;
+          selectedOffset = -1;
+        }
+        continue;
+      }
+      final targetOffset = chapter.navigationOffsetFor(target) ?? 0;
+      if (targetOffset <= currentOffset &&
+          (selectedChapterIndex < _chapterIndex ||
+              targetOffset >= selectedOffset)) {
+        selectedPosition = position;
+        selectedChapterIndex = _chapterIndex;
+        selectedOffset = targetOffset;
+      }
+    }
+    return selectedPosition;
   }
 
   List<_ReaderPageData> _pagesFor(
@@ -5139,6 +5246,7 @@ class _NativeChapter {
   final int _endOffset;
   Map<String, dynamic>? _epubDescriptor;
   Map<String, dynamic>? _epubLoadArguments;
+  Map<String, int>? _loadedAnchorOffsets;
   String? _loadedText;
   Future<String>? _textLoad;
   Future<void>? _pendingLoad;
@@ -5231,6 +5339,9 @@ class _NativeChapter {
   void applyEpubResult(Map<String, dynamic> result) {
     final chapter = Map<String, dynamic>.from(result['chapter'] as Map);
     _loadedText = chapter['plainText'] as String? ?? '';
+    _loadedAnchorOffsets = Map<String, int>.from(
+      chapter['anchors'] as Map? ?? const <String, int>{},
+    );
     _loadedBlocks = (chapter['blocks'] as List<dynamic>? ?? const [])
         .map(
           (block) =>
@@ -5244,7 +5355,35 @@ class _NativeChapter {
     if (!isLazyEpub || _pendingLoad != null) return;
     _loadedText = null;
     _loadedBlocks = null;
+    _loadedAnchorOffsets = null;
     _resetReplacementCache();
+  }
+
+  int? navigationOffsetFor(ReaderNavigationChapter navigation) {
+    final text = plainText;
+    if (text.isEmpty) return 0;
+    final fragment = navigation.fragment;
+    final anchorOffset = fragment == null
+        ? null
+        : _loadedAnchorOffsets?[fragment]?.clamp(0, text.length);
+    final title = navigation.title.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (title.isEmpty) return anchorOffset;
+
+    int? closestTitleOffset;
+    var closestDistance = 1 << 62;
+    var searchFrom = 0;
+    while (searchFrom <= text.length - title.length) {
+      final titleOffset = text.indexOf(title, searchFrom);
+      if (titleOffset < 0) break;
+      if (anchorOffset == null) return titleOffset;
+      final distance = (titleOffset - anchorOffset).abs();
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestTitleOffset = titleOffset;
+      }
+      searchFrom = titleOffset + math.max(1, title.length);
+    }
+    return closestTitleOffset ?? anchorOffset;
   }
 
   void _ensureRulesApplied() {

@@ -12,12 +12,14 @@ class ReaderNavigationChapter {
     required this.title,
     required this.index,
     this.id,
+    this.fragment,
     this.depth = 0,
   });
 
   final String title;
   final int index;
   final String? id;
+  final String? fragment;
   final int depth;
 }
 
@@ -31,12 +33,14 @@ class ReaderNavigationSheet extends StatefulWidget {
     required this.onChapterSelected,
     required this.onBookmarkSelected,
     required this.onBookmarkDeleted,
+    this.onNavigationChapterSelected,
     this.annotations = const [],
     this.onAnnotationSelected,
     this.onAnnotationDeleted,
     this.currentAnchorKey,
     this.currentChapterOffset,
     this.currentChapterText,
+    this.currentNavigationPosition,
   });
 
   final ReaderThemePalette palette;
@@ -47,7 +51,9 @@ class ReaderNavigationSheet extends StatefulWidget {
   final String? currentAnchorKey;
   final int? currentChapterOffset;
   final String? currentChapterText;
+  final int? currentNavigationPosition;
   final ValueChanged<int> onChapterSelected;
+  final ValueChanged<ReaderNavigationChapter>? onNavigationChapterSelected;
   final ValueChanged<Bookmark> onBookmarkSelected;
   final ValueChanged<Bookmark> onBookmarkDeleted;
   final ValueChanged<BookNote>? onAnnotationSelected;
@@ -119,6 +125,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       final after = next[index];
       if (before.index != after.index ||
           before.depth != after.depth ||
+          before.fragment != after.fragment ||
           before.title != after.title) {
         return false;
       }
@@ -194,6 +201,12 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   }
 
   int get _currentChapterPosition {
+    final suppliedPosition = widget.currentNavigationPosition;
+    if (suppliedPosition != null &&
+        suppliedPosition >= 0 &&
+        suppliedPosition < _treeEntries.length) {
+      return suppliedPosition;
+    }
     final matchingPositions = <int>[
       for (final entry in _treeEntries)
         if (entry.chapter.index == widget.currentChapterIndex) entry.position,
@@ -538,7 +551,15 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: InkWell(
-          onTap: () => widget.onChapterSelected(chapter.index),
+          onTap: () {
+            final onNavigationChapterSelected =
+                widget.onNavigationChapterSelected;
+            if (onNavigationChapterSelected != null) {
+              onNavigationChapterSelected(chapter);
+            } else {
+              widget.onChapterSelected(chapter.index);
+            }
+          },
           borderRadius: BorderRadius.circular(16),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),

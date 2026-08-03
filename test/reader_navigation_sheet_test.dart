@@ -160,6 +160,7 @@ void main() {
         '学习就是调整心理模型的参数\n\n正文一。\n\n'
         '学习是在利用组合爆炸\n\n正文二。\n\n'
         '学习就是将错误降到最低\n\n正文三。';
+    ReaderNavigationChapter? selectedNavigation;
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
@@ -179,6 +180,7 @@ void main() {
               ReaderNavigationChapter(
                 title: '学习就是将错误降到最低',
                 index: 10,
+                fragment: 'section-3',
                 depth: 1,
               ),
             ],
@@ -187,6 +189,7 @@ void main() {
             currentChapterText: chapterText,
             bookmarks: const [],
             onChapterSelected: (_) {},
+            onNavigationChapterSelected: (value) => selectedNavigation = value,
             onBookmarkSelected: (_) {},
             onBookmarkDeleted: (_) {},
           ),
@@ -205,6 +208,9 @@ void main() {
       tester.widget<Text>(find.text('学习是在利用组合爆炸')).style?.color,
       ReaderThemes.day.text,
     );
+
+    await tester.tap(find.text('学习就是将错误降到最低'));
+    expect(selectedNavigation?.fragment, 'section-3');
   });
 
   testWidgets('navigation sheet collapses nested chapter branches', (
@@ -269,6 +275,52 @@ void main() {
     expect(find.text('深层小节'), findsOneWidget);
     expect(find.text('同级章节'), findsNothing);
     expect(find.text('第二部'), findsNothing);
+  });
+
+  testWidgets('a subheading remains current while its section crosses files', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ReaderNavigationSheet(
+            palette: ReaderThemes.day,
+            chapters: const [
+              ReaderNavigationChapter(title: '第1章', index: 10),
+              ReaderNavigationChapter(
+                title: '学习是一种优化的奖励函数',
+                index: 10,
+                depth: 1,
+              ),
+              ReaderNavigationChapter(title: '学习限定了搜索空间', index: 11, depth: 1),
+            ],
+            currentChapterIndex: 11,
+            currentNavigationPosition: 1,
+            bookmarks: const [],
+            onChapterSelected: (_) {},
+            onBookmarkSelected: (_) {},
+            onBookmarkDeleted: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OpenReadingCurrentIcon), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('学习是一种优化的奖励函数')).style?.color,
+      ReaderThemes.day.accent,
+    );
+    expect(
+      tester.widget<Text>(find.text('学习限定了搜索空间')).style?.color,
+      ReaderThemes.day.text,
+    );
   });
 
   testWidgets('navigation sheet opens a deeply nested catalog', (tester) async {

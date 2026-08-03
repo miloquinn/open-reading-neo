@@ -14,7 +14,7 @@ import 'package:html/dom.dart' as html_dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as path;
 
-const int epubNativeCacheVersion = 3;
+const int epubNativeCacheVersion = 4;
 
 Map<String, dynamic> extractEpubNativeMetadata(Map<String, dynamic> arguments) {
   final epubPath = arguments['epubPath'] as String;
@@ -358,6 +358,7 @@ Map<String, dynamic> buildEpubNativeIndex(Map<String, dynamic> arguments) {
             'title': entry.title,
             'depth': entry.depth,
             'chapterIndex': target,
+            if (entry.fragment != null) 'fragment': entry.fragment,
           },
     ];
 
@@ -648,7 +649,14 @@ List<_EpubNavigationEntry> _navigationEntriesFromDocument({
     final archivePath = _resolveArchivePath(navigationArchivePath, source);
     final title = labels[point] ?? '';
     if (title.isNotEmpty) {
-      entries.add(_EpubNavigationEntry(title, archivePath, depth));
+      entries.add(
+        _EpubNavigationEntry(
+          title,
+          archivePath,
+          depth,
+          _fragmentFromReference(source),
+        ),
+      );
     }
   }
   if (entries.isNotEmpty) return entries;
@@ -678,7 +686,14 @@ List<_EpubNavigationEntry> _navigationEntriesFromDocument({
       final archivePath = _resolveArchivePath(navigationArchivePath, reference);
       final title = anchor.text.trim();
       if (title.isNotEmpty) {
-        entries.add(_EpubNavigationEntry(title, archivePath, depth));
+        entries.add(
+          _EpubNavigationEntry(
+            title,
+            archivePath,
+            depth,
+            _fragmentFromReference(reference),
+          ),
+        );
       }
     }
   }
@@ -686,11 +701,29 @@ List<_EpubNavigationEntry> _navigationEntriesFromDocument({
 }
 
 class _EpubNavigationEntry {
-  const _EpubNavigationEntry(this.title, this.archivePath, this.depth);
+  const _EpubNavigationEntry(
+    this.title,
+    this.archivePath,
+    this.depth,
+    this.fragment,
+  );
 
   final String title;
   final String archivePath;
   final int depth;
+  final String? fragment;
+}
+
+String? _fragmentFromReference(String reference) {
+  final marker = reference.indexOf('#');
+  if (marker < 0 || marker == reference.length - 1) return null;
+  final raw = reference.substring(marker + 1).split('?').first.trim();
+  if (raw.isEmpty) return null;
+  try {
+    return Uri.decodeComponent(raw);
+  } on FormatException {
+    return raw;
+  }
 }
 
 String _normalizeArchivePath(String value) {
@@ -870,6 +903,7 @@ _ParsedChapter _parseChapterDocument(
   final plainText = StringBuffer();
   final blocks = <Map<String, dynamic>>[];
   final fonts = <String, String>{};
+  final anchors = <String, int>{};
   final styleCache = <html_dom.Element, _EpubTextStyle>{};
 
   _EpubTextStyle styleFor(html_dom.Element element) {
@@ -956,6 +990,7 @@ _ParsedChapter _parseChapterDocument(
       chapterArchivePath: chapterArchivePath,
     );
     plainText.write(content.text);
+    anchors.addAll(content.anchors);
     for (final run in content.runs) {
       final family = run.style.fontFamily;
       if (family != null) extractFont(family);
@@ -988,6 +1023,7 @@ _ParsedChapter _parseChapterDocument(
     'depth': chapter['depth'] as int? ?? 0,
     'plainText': plainText.toString(),
     'blocks': blocks,
+    'anchors': anchors,
   }, fonts);
 }
 
@@ -999,6 +1035,7 @@ _InlineContent _collectInlineContent(
   final output = StringBuffer();
   final runs = <_InlineRun>[];
   final images = <_InlineImage>[];
+  final anchors = <String, int>{};
   var pendingSpace = false;
   var trailingNewlines = 0;
   const paragraphStyle = _EpubTextStyle();
@@ -1085,6 +1122,12 @@ _InlineContent _collectInlineContent(
       final style = styleFor(child);
       final isBlock = _textBlockTags.contains(tag);
       if (isBlock) appendParagraphBoundary();
+      final id = child.id.trim();
+      if (id.isNotEmpty) anchors.putIfAbsent(id, () => output.length);
+      final name = child.attributes['name']?.trim();
+      if (name != null && name.isNotEmpty) {
+        anchors.putIfAbsent(name, () => output.length);
+      }
       visit(child, style, preformatted || tag == 'pre');
       if (isBlock) appendParagraphBoundary();
     }
@@ -1115,8 +1158,11 @@ _InlineContent _collectInlineContent(
         image.resourcePath,
       );
     }
+    for (final entry in anchors.entries.toList(growable: false)) {
+      anchors[entry.key] = (entry.value - leading).clamp(0, text.length);
+    }
   }
-  return _InlineContent(text, runs, images);
+  return _InlineContent(text, runs, images, anchors);
 }
 
 bool _isImageElement(html_dom.Element element) {
@@ -1418,11 +1464,12 @@ class _InlineImage {
 }
 
 class _InlineContent {
-  const _InlineContent(this.text, this.runs, this.images);
+  const _InlineContent(this.text, this.runs, this.images, this.anchors);
 
   final String text;
   final List<_InlineRun> runs;
   final List<_InlineImage> images;
+  final Map<String, int> anchors;
 }
 
 class _ParsedChapter {

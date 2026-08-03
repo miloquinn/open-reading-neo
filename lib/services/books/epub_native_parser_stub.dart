@@ -1,4 +1,4 @@
-const int epubNativeCacheVersion = 2;
+const int epubNativeCacheVersion = 4;
 
 Never _unsupported() =>
     throw UnsupportedError('File-backed EPUB parsing is unavailable on Web.');

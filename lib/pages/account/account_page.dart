@@ -476,15 +476,15 @@ class _AccountPageState extends State<AccountPage> {
   ) => [
     _SignedInHeader(user: user, supporter: account.membership?.premium == true),
     const SizedBox(height: 16),
-    _profileCard(account, user),
-    const SizedBox(height: 16),
-    _LoginMethodsCard(user: user),
-    const SizedBox(height: 16),
-    _securityCard(account, user),
-    const SizedBox(height: 16),
     _SupportCard(account: account),
-    const SizedBox(height: 18),
-    OutlinedButton.icon(
+    const SizedBox(height: 16),
+    _AccountActionsCard(
+      user: user,
+      onEditProfile: () => _openProfileEditor(),
+      onOpenSecurity: () => _openAccountSecurity(),
+    ),
+    const SizedBox(height: 20),
+    TextButton.icon(
       onPressed: account.loading
           ? null
           : () async {
@@ -495,6 +495,59 @@ class _AccountPageState extends State<AccountPage> {
       label: Text(context.l10n.accountSignOut),
     ),
   ];
+
+  Future<void> _openProfileEditor() async {
+    _syncProfile(context.read<MemberAccountController>().user);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Consumer<MemberAccountController>(
+          builder: (context, account, child) {
+            final user = account.user;
+            return Scaffold(
+              appBar: AppBar(title: Text(context.l10n.accountEditProfile)),
+              body: user == null
+                  ? const SizedBox.shrink()
+                  : SafeArea(
+                      top: false,
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+                        children: [_profileCard(account, user)],
+                      ),
+                    ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAccountSecurity() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Consumer<MemberAccountController>(
+          builder: (context, account, child) {
+            final user = account.user;
+            return Scaffold(
+              appBar: AppBar(title: Text(context.l10n.accountSecurityTitle)),
+              body: user == null
+                  ? const SizedBox.shrink()
+                  : SafeArea(
+                      top: false,
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+                        children: [
+                          _LoginMethodsCard(user: user),
+                          const SizedBox(height: 16),
+                          _securityCard(account, user),
+                        ],
+                      ),
+                    ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   Widget _formCard(MemberAccountController account) {
     final l10n = context.l10n;
@@ -1107,7 +1160,7 @@ class _LoginMethodsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _SectionCard(
-    title: context.l10n.accountUsePasskey,
+    title: context.l10n.accountSignInMethodsTitle,
     icon: Icons.shield_outlined,
     child: Wrap(
       spacing: 8,
@@ -1133,6 +1186,82 @@ class _LoginMethodsCard extends StatelessWidget {
   };
 }
 
+class _AccountActionsCard extends StatelessWidget {
+  const _AccountActionsCard({
+    required this.user,
+    required this.onEditProfile,
+    required this.onOpenSecurity,
+  });
+
+  final MemberUser user;
+  final VoidCallback onEditProfile;
+  final VoidCallback onOpenSecurity;
+
+  @override
+  Widget build(BuildContext context) => _SectionCard(
+    child: Column(
+      children: [
+        _AccountActionTile(
+          key: const ValueKey('account-edit-profile'),
+          icon: Icons.person_outline_rounded,
+          title: context.l10n.accountEditProfile,
+          subtitle: '@${user.username}',
+          onTap: onEditProfile,
+        ),
+        const Divider(height: 1),
+        _AccountActionTile(
+          key: const ValueKey('account-security'),
+          icon: Icons.shield_outlined,
+          title: context.l10n.accountSecurityTitle,
+          subtitle: user.email,
+          onTap: onOpenSecurity,
+        ),
+      ],
+    ),
+  );
+}
+
+class _AccountActionTile extends StatelessWidget {
+  const _AccountActionTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+      leading: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 21,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    ),
+  );
+}
+
 class _SupportCard extends StatelessWidget {
   const _SupportCard({required this.account});
 
@@ -1141,23 +1270,57 @@ class _SupportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final purchaseUrl = account.membershipConfig?.purchaseUrl;
-    return _SectionCard(
-      title: context.l10n.accountSupportTitle,
-      icon: Icons.volunteer_activism_outlined,
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.18)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.volunteer_activism_rounded,
+                  size: 21,
+                  color: colors.onPrimary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.l10n.accountSupportTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colors.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Text(
             context.l10n.accountSupportFreeTitle,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 5),
           Text(
             context.l10n.accountSupportFreeSubtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: colors.onSurfaceVariant,
               height: 1.45,
             ),
           ),
@@ -1199,8 +1362,7 @@ class _MemberAvatar extends StatelessWidget {
         style: TextStyle(fontSize: size * 0.34, fontWeight: FontWeight.w800),
       ),
     );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(size * 0.28),
+    return ClipOval(
       child: user.avatarUrl == null
           ? fallback
           : Image.network(

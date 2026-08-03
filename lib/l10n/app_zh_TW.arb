@@ -1112,6 +1112,8 @@
   "accountUsePasskey": "使用 Passkey",
   "accountExternalHint": "將開啟安全瀏覽器，授權後返回 App 即可。",
   "accountProfileTitle": "個人資料",
+  "accountEditProfile": "編輯資料",
+  "accountSignInMethodsTitle": "登入方式",
   "accountSaveProfile": "儲存資料",
   "accountChangeAvatar": "更換頭像",
   "accountRemoveAvatar": "移除頭像",

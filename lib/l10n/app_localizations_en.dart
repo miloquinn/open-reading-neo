@@ -2463,6 +2463,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountProfileTitle => 'Profile';
 
   @override
+  String get accountEditProfile => 'Edit profile';
+
+  @override
+  String get accountSignInMethodsTitle => 'Sign-in methods';
+
+  @override
   String get accountSaveProfile => 'Save profile';
 
   @override

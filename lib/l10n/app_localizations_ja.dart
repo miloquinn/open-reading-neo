@@ -2375,6 +2375,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountProfileTitle => 'プロフィール';
 
   @override
+  String get accountEditProfile => 'プロフィールを編集';
+
+  @override
+  String get accountSignInMethodsTitle => 'ログイン方法';
+
+  @override
   String get accountSaveProfile => 'プロフィールを保存';
 
   @override

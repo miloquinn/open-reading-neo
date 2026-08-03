@@ -2358,6 +2358,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountProfileTitle => '个人资料';
 
   @override
+  String get accountEditProfile => '编辑资料';
+
+  @override
+  String get accountSignInMethodsTitle => '登录方式';
+
+  @override
   String get accountSaveProfile => '保存资料';
 
   @override
@@ -7110,6 +7116,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountProfileTitle => '個人資料';
+
+  @override
+  String get accountEditProfile => '編輯資料';
+
+  @override
+  String get accountSignInMethodsTitle => '登入方式';
 
   @override
   String get accountSaveProfile => '儲存資料';

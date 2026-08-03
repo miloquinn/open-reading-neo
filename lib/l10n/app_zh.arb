@@ -1517,6 +1517,8 @@
   "accountUsePasskey": "使用 Passkey",
   "accountExternalHint": "将打开安全浏览器，授权后返回 App 即可。",
   "accountProfileTitle": "个人资料",
+  "accountEditProfile": "编辑资料",
+  "accountSignInMethodsTitle": "登录方式",
   "accountSaveProfile": "保存资料",
   "accountChangeAvatar": "更换头像",
   "accountRemoveAvatar": "移除头像",

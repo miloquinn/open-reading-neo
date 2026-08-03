@@ -100,48 +100,68 @@ void main() {
     expect(find.text('支持高级功能'), findsNothing);
   });
 
-  testWidgets('signed-in security section exposes email password and MFA off', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final tokenStore = _PageTokenStore()..mfaPending = false;
-    final controller = MemberAccountController(
-      api: MemberAccountApiClient(
-        dio: Dio()..httpClientAdapter = _SignedInAdapter(),
-        tokenStore: tokenStore,
-      ),
-    );
-    await tester.runAsync(controller.initialize);
-
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: controller,
-        child: MaterialApp(
-          locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const AccountPage(),
+  testWidgets(
+    'signed-in center keeps profile and security details tucked away',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final tokenStore = _PageTokenStore()..mfaPending = false;
+      final controller = MemberAccountController(
+        api: MemberAccountApiClient(
+          dio: Dio()..httpClientAdapter = _SignedInAdapter(),
+          tokenStore: tokenStore,
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('账号安全'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+      );
+      await tester.runAsync(controller.initialize);
 
-    expect(find.text('账号安全'), findsOneWidget);
-    expect(find.text('更换邮箱'), findsOneWidget);
-    expect(find.text('设置或更换密码'), findsOneWidget);
-    expect(find.text('双重验证'), findsOneWidget);
-    expect(find.textContaining('默认关闭'), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-mfa-setup')), findsOneWidget);
-    expect(find.text('恢复码已复制'), findsNothing);
-  });
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: controller,
+          child: MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const AccountPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('账号安全'), findsOneWidget);
+      expect(find.text('编辑资料'), findsOneWidget);
+      expect(find.byType(ClipOval), findsOneWidget);
+      expect(find.text('登录方式'), findsNothing);
+      expect(find.text('更换邮箱'), findsNothing);
+      expect(find.text('设置或更换密码'), findsNothing);
+      expect(find.byKey(const ValueKey('account-mfa-setup')), findsNothing);
+      expect(
+        tester.getTopLeft(find.text('支持高级功能')).dy,
+        lessThan(tester.getTopLeft(find.text('编辑资料')).dy),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('account-security')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('登录方式'), findsOneWidget);
+      expect(find.text('更换邮箱'), findsOneWidget);
+      expect(find.text('设置或更换密码'), findsOneWidget);
+      expect(find.text('双重验证'), findsOneWidget);
+      expect(find.textContaining('默认关闭'), findsOneWidget);
+      expect(find.byKey(const ValueKey('account-mfa-setup')), findsOneWidget);
+      expect(find.text('恢复码已复制'), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('account-edit-profile')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('编辑资料'), findsOneWidget);
+      expect(find.text('个人资料'), findsOneWidget);
+      expect(find.text('更换头像'), findsOneWidget);
+    },
+  );
 }
 
 class _AccountAdapter implements HttpClientAdapter {

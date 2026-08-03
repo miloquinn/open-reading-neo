@@ -1112,6 +1112,8 @@
   "accountUsePasskey": "Passkey を使用",
   "accountExternalHint": "安全なブラウザーが開きます。承認後に App へ戻ってください。",
   "accountProfileTitle": "プロフィール",
+  "accountEditProfile": "プロフィールを編集",
+  "accountSignInMethodsTitle": "ログイン方法",
   "accountSaveProfile": "プロフィールを保存",
   "accountChangeAvatar": "画像を変更",
   "accountRemoveAvatar": "画像を削除",

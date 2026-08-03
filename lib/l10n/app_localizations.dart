@@ -4423,6 +4423,18 @@ abstract class AppLocalizations {
   /// **'Profile'**
   String get accountProfileTitle;
 
+  /// Open or title the profile editor
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get accountEditProfile;
+
+  /// Linked sign-in methods section title
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in methods'**
+  String get accountSignInMethodsTitle;
+
   /// Save member profile action
   ///
   /// In en, this message translates to:

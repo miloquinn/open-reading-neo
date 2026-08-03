@@ -15,6 +15,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'l10n/app_localizations.dart';
 import 'book_sources/services/book_source_client.dart';
+import 'book_sources/services/book_source_registry.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
 import 'core/reader/native_reader_service.dart';
 import 'models/book.dart';
@@ -28,16 +29,19 @@ import 'services/reading/reading_resume_service.dart';
 import 'services/core/app_update_download_service.dart';
 import 'services/core/background_download_notifier.dart';
 import 'services/core/core_services.dart';
+import 'services/core/display_refresh_rate_controller.dart';
 import 'services/library/download_task_controller.dart';
 import 'services/sync/webdav_sync_controller.dart';
 import 'utils/app_themes.dart';
 import 'utils/book_open_transition.dart';
 import 'services/tts_service.dart';
 import 'services/reader_aloud_service.dart';
+import 'services/account/account.dart';
 import 'package:path_provider/path_provider.dart';
 import 'utils/glass_config.dart';
 import 'utils/localization_extension.dart';
 import 'utils/font_catalog_helper.dart';
+import 'utils/reader_themes.dart';
 import 'utils/ui_style.dart';
 import 'widgets/app_brand_icon.dart';
 import 'widgets/side_toast.dart';
@@ -46,24 +50,23 @@ import 'widgets/update_check_gate.dart';
 void main(List<String> arguments) async {
   // 确保可以在 runApp 前安全调用 SystemChrome
   WidgetsFlutterBinding.ensureInitialized();
+  // Large imported source libraries used to live in one SharedPreferences
+  // value. Move that blob before any global preference cache is warmed so a
+  // multi-thousand-source library cannot make startup consume ~1 GB or ANR.
+  await BookSourceRegistry().prepareStorage();
+  // Warm the reader palette while the app shell is starting so tapping a book
+  // does not have to wait for SharedPreferences and custom-theme decoding.
+  unawaited(ReaderThemes.loadSavedPalette());
 
-  // 🚀 启用高刷新率支持
+  // 按用户偏好选择 60Hz 省电模式或设备支持的最高刷新率。
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-    // 检查并启用设备的最高刷新率
     SystemChrome.setApplicationSwitcherDescription(
       const ApplicationSwitcherDescription(
         label: '开元阅读',
         primaryColor: 0xFF1976D2,
       ),
     );
-    if (Platform.isAndroid) {
-      const fullscreenChannel = MethodChannel('com.niki.xxread/fullscreen');
-      try {
-        await fullscreenChannel.invokeMethod<void>('enableHighRefreshRate');
-      } catch (_) {
-        // 部分机型不支持动态切换高刷，忽略异常
-      }
-    }
+    await DisplayRefreshRateController.applySavedPreference();
   }
 
   // 在桌面平台上初始化 sqflite_common_ffi
@@ -108,6 +111,9 @@ void main(List<String> arguments) async {
           ),
           provider.ChangeNotifierProvider(
             create: (_) => WebDavSyncController(),
+          ),
+          provider.ChangeNotifierProvider(
+            create: (_) => MemberAccountController()..initialize(),
           ),
         ],
         child: XxReadApp(
@@ -536,16 +542,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
           setState(() => _bootstrapError = _BootstrapError.imageManager);
         }
         return;
-      }
-
-      // 修复历史绝对路径（升级/重装后可能导致书籍与封面路径失效）
-      try {
-        await BookStorageRepairService().repairAllBooksIfNeeded();
-        // 清理历史残留的临时/无效文件，避免占用存储
-        await BookStorageRepairService().cleanupUnusedStorageArtifacts();
-      } catch (e) {
-        // 路径修复失败不阻塞启动
-        debugPrint('书籍路径修复失败（已忽略，不阻塞启动）: $e');
       }
     }
 

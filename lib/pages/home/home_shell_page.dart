@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
@@ -105,6 +106,8 @@ class _HomeShellPageState extends State<HomeShellPage> {
       HomeDashboardController();
   final SettingsPageController _settingsController = SettingsPageController();
   final AiPageController _aiPageController = AiPageController();
+  final BookSourcesPageController _bookSourcesController =
+      BookSourcesPageController();
   AppLocalizations? _l10n;
   final LibraryPageController _libraryController = LibraryPageController();
 
@@ -124,6 +127,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
   void initState() {
     super.initState();
     _libraryController.selection.addListener(_handleLibrarySelectionChanged);
+    unawaited(_bookSourcesController.initialize());
     // 优化PageController，设置合适的视窗比例
     _pageController = PageController(
       viewportFraction: 1.0, // 保持全屏显示
@@ -193,7 +197,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
         icon: Icons.explore_outlined,
         selectedIcon: Icons.explore_rounded,
         label: l10n.discover,
-        page: const BookSourcesPage(),
+        page: BookSourcesPage(controller: _bookSourcesController),
       ),
       HomeNavigationDestination.ai: HomeNavigationItem(
         destination: HomeNavigationDestination.ai,
@@ -344,6 +348,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
     _pageController.dispose();
     _homeDashboardController.dispose();
     _settingsController.dispose();
+    _bookSourcesController.dispose();
     _libraryController.dispose();
     super.dispose();
   }

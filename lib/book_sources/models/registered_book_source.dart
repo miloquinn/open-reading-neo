@@ -1,6 +1,7 @@
 import '../protocol/book_source_protocol.dart';
+import '../source_engine/source_explore.dart';
 
-enum BookSourceProtocolKind { orsp, legado }
+enum BookSourceProtocolKind { orsp, readingSource }
 
 class RegisteredBookSource {
   final String id;
@@ -75,7 +76,9 @@ class RegisteredBookSource {
 
   factory RegisteredBookSource.fromJson(Map<String, dynamic> json) {
     final sourceProtocol = switch (json['sourceProtocol']) {
-      'legado' => BookSourceProtocolKind.legado,
+      // Keep decoding the historical value so existing local libraries
+      // migrate without losing source identities or enabled state.
+      'legado' || 'readingSource' => BookSourceProtocolKind.readingSource,
       _ => BookSourceProtocolKind.orsp,
     };
     final id = _requiredStoredString(json, 'id');
@@ -101,11 +104,20 @@ class RegisteredBookSource {
             (key, value) => MapEntry('$key', value),
           )
         : null;
-    if (sourceProtocol == BookSourceProtocolKind.legado &&
+    if (sourceProtocol == BookSourceProtocolKind.readingSource &&
         sourceConfig == null) {
       throw const BookSourceProtocolException(
         'Stored compatible book source is missing its source configuration.',
       );
+    }
+    final capabilities = (json['capabilities'] as List? ?? const [])
+        .whereType<String>()
+        .toSet();
+    if (sourceProtocol == BookSourceProtocolKind.readingSource &&
+        sourceConfig != null &&
+        capabilities.isNotEmpty &&
+        parseSourceExploreCatalog(sourceConfig).canBrowse) {
+      capabilities.addAll(const {'categories', 'browse'});
     }
     return RegisteredBookSource(
       id: id,
@@ -123,9 +135,7 @@ class RegisteredBookSource {
       languages: (json['languages'] as List? ?? const [])
           .whereType<String>()
           .toList(growable: false),
-      capabilities: (json['capabilities'] as List? ?? const [])
-          .whereType<String>()
-          .toSet(),
+      capabilities: capabilities,
       maxCatalogPageSize: maxCatalogPageSize,
       enabled: json['enabled'] as bool? ?? true,
       addedAt:

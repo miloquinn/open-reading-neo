@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/core/reader/reader_page_turn_geometry.dart';
+import 'package:xxread/core/reader/reader_transition_work_scope.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
@@ -157,16 +158,21 @@ void main() {
     navigatorKey.currentState!.push<void>(
       BookOpenTransition.createRoute<void>(
         Scaffold(
-          body: ReaderShaderPageCurl(
-            currentPage: _snapshot('current'),
-            forwardPage: _snapshot('next'),
-            backwardPage: _snapshot('previous'),
-            preparePages: () async {
-              preparationCalls++;
-            },
-            onTurnForward: () {},
-            onTurnBackward: () {},
-            paperColor: Colors.white,
+          body: Builder(
+            builder: (context) => BookOpenTransition.buildReaderContentReveal(
+              context,
+              child: ReaderShaderPageCurl(
+                currentPage: _snapshot('current'),
+                forwardPage: _snapshot('next'),
+                backwardPage: _snapshot('previous'),
+                preparePages: () async {
+                  preparationCalls++;
+                },
+                onTurnForward: () {},
+                onTurnBackward: () {},
+                paperColor: Colors.white,
+              ),
+            ),
           ),
         ),
         animation: BookOpenAnimation(
@@ -180,7 +186,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    final workMode = tester.widget<TickerMode>(
+    final workMode = tester.widget<ReaderTransitionWorkScope>(
       find.byKey(const ValueKey('book-open-transition-reader-work-mode')),
     );
     expect(workMode.enabled, isFalse);
@@ -232,6 +238,48 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(preparationCalls, 1);
+  });
+
+  testWidgets('idle snapshot warming does not rebuild the visible page', (
+    tester,
+  ) async {
+    final controller = ReaderPageCurlController();
+    late StateSetter updateHost;
+    var revision = 0;
+    Completer<void>? preparation;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setHostState) {
+            updateHost = setHostState;
+            return SizedBox(
+              width: 400,
+              height: 700,
+              child: ReaderShaderPageCurl(
+                controller: controller,
+                currentPage: _snapshot('current-$revision'),
+                forwardPage: _snapshot('next-$revision'),
+                backwardPage: _snapshot('previous-$revision'),
+                preparePages: () => preparation?.future ?? Future<void>.value(),
+                onTurnForward: () {},
+                onTurnBackward: () {},
+                paperColor: Colors.white,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    preparation = Completer<void>();
+    updateHost(() => revision++);
+    await tester.pump();
+    final buildsAfterPageUpdate = controller.debugBuildCount;
+    preparation.complete();
+    await tester.pumpAndSettle();
+
+    expect(controller.debugBuildCount, buildsAfterPageUpdate);
   });
 
   testWidgets('phone leaf keeps the physical binding on the left', (
@@ -793,19 +841,17 @@ void main() {
       expect(controller.debugUsesProvisionalSnapshot, isTrue);
       expect(controller.debugFoldStart, isNotNull);
       expect(controller.debugFoldEnd, isNotNull);
+      final activeSourceImage = controller.debugActiveSourceImageIdentity;
+      expect(activeSourceImage, isNotNull);
 
       preparation.complete();
-      for (
-        var frame = 0;
-        frame < 20 && controller.debugUsesProvisionalSnapshot;
-        frame++
-      ) {
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      expect(controller.debugUsesProvisionalSnapshot, isFalse);
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(controller.debugUsesProvisionalSnapshot, isTrue);
+      expect(controller.debugActiveSourceImageIdentity, activeSourceImage);
 
       await gesture.cancel();
       await tester.pumpAndSettle();
+      expect(controller.debugUsesProvisionalSnapshot, isFalse);
     },
   );
 
@@ -832,18 +878,30 @@ void main() {
         ),
       );
       await tester.pump();
+      for (
+        var frame = 0;
+        frame < 20 && !controller.debugUsesClassicFoldShader;
+        frame++
+      ) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(controller.debugUsesClassicFoldShader, isTrue);
 
       final rect = tester.getRect(find.byType(ReaderShaderPageCurl));
-      final gesture = await tester.startGesture(rect.center);
+      final gesture = await tester.startGesture(
+        Offset(rect.right - 2, rect.center.dy),
+      );
       await gesture.moveBy(const Offset(-30, 0));
       await tester.pump();
 
       expect(controller.debugAnimationReady, isTrue);
       expect(controller.debugUsesProvisionalSnapshot, isFalse);
 
+      final buildsBeforePreparation = controller.debugBuildCount;
       preparation.complete();
       await tester.pump(const Duration(milliseconds: 160));
       expect(controller.debugUsesProvisionalSnapshot, isFalse);
+      expect(controller.debugBuildCount, buildsBeforePreparation);
 
       await gesture.cancel();
       await tester.pumpAndSettle();
@@ -1051,51 +1109,60 @@ void main() {
     },
   );
 
-  testWidgets('committed diagonal turn snaps to the exact shader endpoint', (
-    tester,
-  ) async {
-    final controller = ReaderPageCurlController();
-    final callbackGate = Completer<void>();
-    var callbackStarted = false;
+  testWidgets(
+    'committed diagonal turn settles naturally at the exact shader endpoint',
+    (tester) async {
+      final controller = ReaderPageCurlController();
+      final callbackGate = Completer<void>();
+      var callbackStarted = false;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SizedBox(
-          width: 400,
-          height: 700,
-          child: ReaderShaderPageCurl(
-            controller: controller,
-            currentPage: _snapshot('current'),
-            forwardPage: _snapshot('next'),
-            onTurnForward: () {
-              callbackStarted = true;
-              return callbackGate.future;
-            },
-            onTurnBackward: () {},
-            paperColor: Colors.white,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            width: 400,
+            height: 700,
+            child: ReaderShaderPageCurl(
+              controller: controller,
+              currentPage: _snapshot('current'),
+              forwardPage: _snapshot('next'),
+              onTurnForward: () {
+                callbackStarted = true;
+                return callbackGate.future;
+              },
+              onTurnBackward: () {},
+              paperColor: Colors.white,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final rect = tester.getRect(find.byType(ReaderShaderPageCurl));
-    final gesture = await tester.startGesture(
-      Offset(rect.right - 2, rect.top + rect.height * 0.72),
-    );
-    await gesture.moveBy(Offset(-rect.width * 0.72, -160));
-    await gesture.up();
-    for (var frame = 0; frame < 30 && !callbackStarted; frame++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+      final rect = tester.getRect(find.byType(ReaderShaderPageCurl));
+      final gesture = await tester.startGesture(
+        Offset(rect.right - 2, rect.top + rect.height * 0.72),
+      );
+      await gesture.moveBy(Offset(-rect.width * 0.72, -160));
+      await gesture.up();
+      var sawGentleTerminalApproach = false;
+      for (var frame = 0; frame < 80 && !callbackStarted; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final lineA = controller.debugShaderLineA;
+        if (lineA != null && lineA.dx > 0 && lineA.dx < 1.5) {
+          sawGentleTerminalApproach = true;
+        }
+      }
 
-    expect(callbackStarted, isTrue);
-    expect(controller.debugShaderLineA, Offset.zero);
-    expect(controller.debugShaderLineB, Offset(0, rect.height));
+      expect(callbackStarted, isTrue);
+      expect(sawGentleTerminalApproach, isTrue);
+      expect(controller.debugShaderLineA, Offset.zero);
+      expect(controller.debugShaderLineB, Offset(0, rect.height));
 
-    callbackGate.complete();
-    await tester.pumpAndSettle();
-  });
+      callbackGate.complete();
+      await tester.idle();
+      expect(controller.debugAnimationReady, isTrue);
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('tablet spread paints the active leaf above its sibling', (
     tester,
@@ -1279,6 +1346,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await Future.wait([forwardTurn, backwardTurn]);
+    await tester.pump();
 
     expect(backwardCallbacks, 1);
     expect(coordinator.debugIsBusy, isFalse);

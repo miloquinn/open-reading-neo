@@ -39,6 +39,13 @@ jobs:
       - name: Install locked dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Prepare QuickJS runtime for tests
+        shell: bash
+        run: |
+          quickjs_dir="${PUB_CACHE}/hosted/pub.dev/flutter_js-0.8.7/linux/shared"
+          test -f "${quickjs_dir}/libquickjs_c_bridge_plugin.so"
+          echo "LD_LIBRARY_PATH=${quickjs_dir}:${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
+
       - name: Generate localizations
         run: flutter gen-l10n
 
@@ -54,7 +61,35 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Run tests with coverage
-        run: flutter test --coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' test_files < <(
+            find test -type f -name '*_test.dart' \
+              ! -name 'book_source_management_page_test.dart' \
+              -print0
+          )
+          flutter test --coverage "${test_files[@]}"
+
+          # This file mutates SharedPreferences-backed registry state across
+          # several widget trees. Flutter's combined test process can leave
+          # the sixth case waiting until the 10-minute per-test timeout, while
+          # every case completes immediately in a fresh process. Keep all
+          # assertions in the gate and isolate only this known stateful file.
+          management_tests=(
+            'keeps native ORSP source management available'
+            'uses one add flow regardless of the advanced toggle'
+            'keeps dense source metadata readable on narrow phones'
+            'groups connected sources by protocol'
+            'adding a source requires explicit third-party acknowledgment'
+            'selection mode exposes bulk source actions'
+            'shows operator-supplied rights metadata as unverified'
+            'large source collections build lazily and remain searchable'
+          )
+          for test_name in "${management_tests[@]}"; do
+            flutter test test/book_source_management_page_test.dart \
+              --plain-name "$test_name"
+          done
 
       - name: Upload coverage report
         if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}

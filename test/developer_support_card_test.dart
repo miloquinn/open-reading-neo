@@ -31,7 +31,8 @@ void main() {
       ),
     );
 
-    expect(find.text('支持持续开发'), findsOneWidget);
+    expect(find.text('支持高级功能'), findsOneWidget);
+    expect(find.text('当前所有功能免费。支持完全自愿，用于持续开发。'), findsOneWidget);
     expect(find.text('微信捐赠'), findsOneWidget);
     expect(find.text('支付宝捐赠'), findsOneWidget);
 

@@ -4,8 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:xxread/book_sources/legado/legado_source_import_service.dart';
-import 'package:xxread/book_sources/legado/legado_source_verifier.dart';
+import 'package:xxread/book_sources/source_engine/source_import_service.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
@@ -31,45 +30,78 @@ class BookSourceManagementPage extends StatefulWidget {
 }
 
 class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
+  static const int _initialSourceBatchSize = 24;
+  static const int _sourceBatchSize = 24;
+  static const double _loadMoreExtent = 800;
+
   final BookSourceRegistry _registry = BookSourceRegistry();
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   BookSourceClient? _client;
-  LegadoSourceImportService? _importService;
+  SourceImportService? _importService;
   BookSourceImportAnalyzer? _importAnalyzer;
-  LegadoSourceVerifier? _sourceVerifier;
 
   BookSourceClient get _sourceClient => _client ??= BookSourceClient();
-  LegadoSourceImportService get _additionalImportService =>
-      _importService ??= LegadoSourceImportService();
+  SourceImportService get _additionalImportService =>
+      _importService ??= SourceImportService();
   BookSourceImportAnalyzer get _sourceImportAnalyzer => _importAnalyzer ??=
       BookSourceImportAnalyzer(additionalImporter: _additionalImportService);
-  LegadoSourceVerifier get _additionalSourceVerifier =>
-      _sourceVerifier ??= LegadoSourceVerifier();
-
   List<RegisteredBookSource> _sources = const [];
   final Set<String> _selectedSourceIds = {};
   bool _loading = true;
   bool _selectionMode = false;
+  String _searchQuery = '';
+  _BookSourceFilter _filter = _BookSourceFilter.all;
+  String? _selectedGroup;
+  int _sourceDisplayLimit = _initialSourceBatchSize;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_loadMoreSourcesIfNeeded);
     unawaited(_loadSources());
   }
 
   Future<void> _loadSources() async {
-    final sources = await _registry.load();
+    final sources = await _registry.loadInBackground();
     if (!mounted) return;
     setState(() {
       _sources = sources;
       _loading = false;
+      _sourceDisplayLimit = _initialSourceBatchSize;
     });
+  }
+
+  void _loadMoreSourcesIfNeeded() {
+    if (_loading || !_scrollController.hasClients) return;
+    if (!_scrollController.position.isScrollingNotifier.value) return;
+    if (_scrollController.position.extentAfter > _loadMoreExtent) return;
+    final sourceCount = _visibleSources.length;
+    if (_sourceDisplayLimit >= sourceCount) return;
+    setState(() {
+      final nextLimit = _sourceDisplayLimit + _sourceBatchSize;
+      _sourceDisplayLimit = nextLimit < sourceCount ? nextLimit : sourceCount;
+    });
+  }
+
+  void _updateSourceView(VoidCallback update) {
+    setState(() {
+      update();
+      _sourceDisplayLimit = _initialSourceBatchSize;
+    });
+    if (_scrollController.hasClients && _scrollController.offset != 0) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   @override
   void dispose() {
+    _scrollController
+      ..removeListener(_loadMoreSourcesIfNeeded)
+      ..dispose();
+    _searchController.dispose();
     _client?.close();
     _importService?.close();
-    _sourceVerifier?.close();
     super.dispose();
   }
 
@@ -102,77 +134,160 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         ),
         child: SafeArea(
           top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 920),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        context.l10n.bookSourceManagementSubtitle,
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              context.l10n.bookSourcesManageTitle,
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                          FilledButton.icon(
-                            onPressed: _showAddSourceDialog,
-                            icon: const Icon(Icons.add_rounded),
-                            label: Text(context.l10n.bookSourcesAdd),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            key: const Key('bookSourcesSelectionModeButton'),
-                            tooltip: context.l10n.bookSourcesSelect,
-                            onPressed: () => setState(() {
-                              _selectionMode = !_selectionMode;
-                              _selectedSourceIds.clear();
-                            }),
-                            icon: Icon(
-                              _selectionMode
-                                  ? Icons.close_rounded
-                                  : Icons.checklist_rounded,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (_selectionMode) ...[
-                        _buildBulkActions(additionalProtocolsEnabled),
-                        const SizedBox(height: 12),
-                      ],
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.all(36),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (_sources.isEmpty)
-                        _buildNoSourcesCard()
-                      else
-                        ..._buildSourceGroups(additionalProtocolsEnabled),
-                      const SizedBox(height: 22),
-                      _buildProtocolCard(),
-                    ],
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 920),
+              child: _buildSourceList(additionalProtocolsEnabled, scheme),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceList(bool additionalProtocolsEnabled, ColorScheme scheme) {
+    final visibleSources = _visibleSources;
+    final allOrspSources = visibleSources
+        .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
+        .toList(growable: false);
+    final allAdditionalSources = visibleSources
+        .where((source) => source.sourceProtocol != BookSourceProtocolKind.orsp)
+        .toList(growable: false);
+    final orsp = allOrspSources
+        .take(_sourceDisplayLimit)
+        .toList(growable: false);
+    final remainingLimit = _sourceDisplayLimit - orsp.length;
+    final additional = allAdditionalSources
+        .take(remainingLimit > 0 ? remainingLimit : 0)
+        .toList(growable: false);
+    final displayedSourceCount = orsp.length + additional.length;
+    return Scrollbar(
+      key: const Key('bookSourceManagementScrollbar'),
+      controller: _scrollController,
+      thumbVisibility: true,
+      interactive: true,
+      child: CustomScrollView(
+        key: const Key('bookSourceManagementList'),
+        controller: _scrollController,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    context.l10n.bookSourceManagementSubtitle,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
                   ),
+                  const SizedBox(height: 18),
+                  _buildManagementHeader(visibleSources.length),
+                  const SizedBox(height: 12),
+                  _buildSearchAndFilters(),
+                  if (_selectionMode) ...[
+                    const SizedBox(height: 12),
+                    _buildBulkActions(additionalProtocolsEnabled),
+                  ],
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_sources.isEmpty)
+            _paddedSliver(_buildNoSourcesCard())
+          else if (visibleSources.isEmpty)
+            _paddedSliver(_buildNoMatchingSourcesCard())
+          else ...[
+            if (orsp.isNotEmpty)
+              ..._buildSourceGroupSlivers(
+                title: context.l10n.bookSourcesProtocolGroupOrsp,
+                sources: orsp,
+                totalCount: allOrspSources.length,
+                additionalProtocolsEnabled: additionalProtocolsEnabled,
+              ),
+            if (additional.isNotEmpty)
+              ..._buildSourceGroupSlivers(
+                title: context.l10n.bookSourcesProtocolGroupAdditional,
+                sources: additional,
+                totalCount: allAdditionalSources.length,
+                additionalProtocolsEnabled: additionalProtocolsEnabled,
+              ),
+            if (displayedSourceCount < visibleSources.length)
+              const SliverPadding(
+                key: Key('bookSourceManagementLoadingMore'),
+                padding: EdgeInsets.symmetric(vertical: 12),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          if (_loading || displayedSourceCount >= visibleSources.length)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
+              sliver: SliverToBoxAdapter(child: _buildProtocolCard()),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManagementHeader(int visibleCount) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.bookSourcesManageTitle,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                context.l10n.bookSourcesVisibleCount(
+                  visibleCount,
+                  _sources.length,
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
           ),
         ),
-      ),
+        FilledButton.icon(
+          onPressed: _showAddSourceDialog,
+          icon: const Icon(Icons.add_rounded),
+          label: Text(context.l10n.bookSourcesAdd),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          key: const Key('bookSourcesSelectionModeButton'),
+          tooltip: context.l10n.bookSourcesSelect,
+          onPressed: () => setState(() {
+            _selectionMode = !_selectionMode;
+            _selectedSourceIds.clear();
+          }),
+          icon: Icon(
+            _selectionMode ? Icons.close_rounded : Icons.checklist_rounded,
+          ),
+        ),
+      ],
     );
   }
 
@@ -207,31 +322,169 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     );
   }
 
-  List<Widget> _buildSourceGroups(bool additionalProtocolsEnabled) {
-    final orsp = _sources
-        .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
+  List<RegisteredBookSource> get _visibleSources {
+    final query = _searchQuery.trim().toLowerCase();
+    return _sources
+        .where((source) {
+          final groups = _sourceGroups(source);
+          final matchesState = switch (_filter) {
+            _BookSourceFilter.all => true,
+            _BookSourceFilter.enabled => source.enabled,
+            _BookSourceFilter.disabled => !source.enabled,
+            _BookSourceFilter.runnable => source.capabilities.isNotEmpty,
+            _BookSourceFilter.pending => source.capabilities.isEmpty,
+          };
+          if (!matchesState) return false;
+          final selectedGroup = _selectedGroup;
+          if (selectedGroup != null && !groups.contains(selectedGroup)) {
+            return false;
+          }
+          if (query.isEmpty) return true;
+          return source.name.toLowerCase().contains(query) ||
+              source.description.toLowerCase().contains(query) ||
+              source.apiBaseUrl.toString().toLowerCase().contains(query) ||
+              groups.any((group) => group.toLowerCase().contains(query));
+        })
         .toList(growable: false);
-    final additional = _sources
-        .where((source) => source.sourceProtocol != BookSourceProtocolKind.orsp)
+  }
+
+  List<String> get _availableGroups {
+    final groups = <String>{};
+    for (final source in _sources) {
+      groups.addAll(_sourceGroups(source));
+    }
+    return groups.toList()..sort();
+  }
+
+  List<String> _sourceGroups(RegisteredBookSource source) {
+    final raw = source.sourceConfig?['bookSourceGroup'];
+    if (raw is! String || raw.trim().isEmpty) return const [];
+    return raw
+        .split(RegExp(r'[,;，；\n]'))
+        .map((group) => group.trim())
+        .where((group) => group.isNotEmpty)
         .toList(growable: false);
-    return [
-      if (orsp.isNotEmpty)
-        ..._buildSourceGroup(
-          title: context.l10n.bookSourcesProtocolGroupOrsp,
-          sources: orsp,
-          additionalProtocolsEnabled: additionalProtocolsEnabled,
+  }
+
+  Widget _buildSearchAndFilters() {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: const Key('bookSourceManagementSearchField'),
+          controller: _searchController,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: context.l10n.bookSourcesManagementSearchHint,
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: context.l10n.bookSourcesClearSearch,
+                    onPressed: () {
+                      _searchController.clear();
+                      _updateSourceView(() => _searchQuery = '');
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+            filled: true,
+            fillColor: scheme.surfaceContainerLow,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          onChanged: (value) => _updateSourceView(() => _searchQuery = value),
         ),
-      if (additional.isNotEmpty)
-        ..._buildSourceGroup(
-          title: context.l10n.bookSourcesProtocolGroupAdditional,
-          sources: additional,
-          additionalProtocolsEnabled: additionalProtocolsEnabled,
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 42,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final filter in _BookSourceFilter.values) ...[
+                ChoiceChip(
+                  key: Key('bookSourceFilter-${filter.name}'),
+                  selected: _filter == filter,
+                  label: Text(_filterLabel(filter)),
+                  onSelected: (_) => _updateSourceView(() => _filter = filter),
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (_availableGroups.isNotEmpty)
+                ActionChip(
+                  key: const Key('bookSourceGroupFilter'),
+                  avatar: const Icon(Icons.folder_outlined, size: 18),
+                  label: Text(
+                    _selectedGroup ?? context.l10n.bookSourcesAllGroups,
+                  ),
+                  onPressed: _showGroupPicker,
+                ),
+            ],
+          ),
         ),
-    ];
+      ],
+    );
+  }
+
+  String _filterLabel(_BookSourceFilter filter) => switch (filter) {
+    _BookSourceFilter.all => context.l10n.statsRangeAll,
+    _BookSourceFilter.enabled => context.l10n.bookSourcesEnabled,
+    _BookSourceFilter.disabled => context.l10n.bookSourcesDisabled,
+    _BookSourceFilter.runnable => context.l10n.bookSourcesRunnable,
+    _BookSourceFilter.pending => context.l10n.bookSourcesPendingCompatibility,
+  };
+
+  Future<void> _showGroupPicker() async {
+    final groups = _availableGroups;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) =>
+          _BookSourceGroupPicker(groups: groups, selected: _selectedGroup),
+    );
+    if (!mounted || selected == null) return;
+    final normalized = selected.isEmpty ? null : selected;
+    if (normalized == _selectedGroup) return;
+    _updateSourceView(() => _selectedGroup = normalized);
+  }
+
+  Widget _paddedSliver(Widget child) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      sliver: SliverToBoxAdapter(child: child),
+    );
+  }
+
+  Widget _buildNoMatchingSourcesCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: _panelDecoration(radius: 20),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_alt_off_outlined),
+          const SizedBox(width: 12),
+          Expanded(child: Text(context.l10n.bookSourcesNoMatchingSources)),
+          TextButton(
+            onPressed: () {
+              _searchController.clear();
+              _updateSourceView(() {
+                _searchQuery = '';
+                _filter = _BookSourceFilter.all;
+                _selectedGroup = null;
+              });
+            },
+            child: Text(context.l10n.bookSourcesResetFilters),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildBulkActions(bool additionalProtocolsEnabled) {
-    final allIds = _sources.map((source) => source.id).toSet();
+    final allIds = _visibleSources.map((source) => source.id).toSet();
     final allSelected =
         allIds.isNotEmpty && _selectedSourceIds.containsAll(allIds);
     return Wrap(
@@ -344,38 +597,46 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     });
   }
 
-  List<Widget> _buildSourceGroup({
+  List<Widget> _buildSourceGroupSlivers({
     required String title,
     required List<RegisteredBookSource> sources,
+    required int totalCount,
     required bool additionalProtocolsEnabled,
   }) {
     return [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+        sliver: SliverToBoxAdapter(
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-            ),
-            Text(
-              '${sources.length}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
+              Text(
+                '$totalCount',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      ...sources.map(
-        (source) => _buildSourceCard(
-          source,
-          additionalProtocolsEnabled: additionalProtocolsEnabled,
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return _buildSourceCard(
+              sources[index],
+              additionalProtocolsEnabled: additionalProtocolsEnabled,
+            );
+          }, childCount: sources.length),
         ),
       ),
     ];
@@ -529,6 +790,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
 
   Widget _buildSourceSummary(RegisteredBookSource source) {
     final scheme = Theme.of(context).colorScheme;
+    final groups = _sourceGroups(source);
+    final runnable = source.capabilities.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -552,6 +815,48 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             color: scheme.onSurfaceVariant,
             fontSize: 13,
             height: 1.4,
+          ),
+        ),
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource ||
+            groups.isNotEmpty) ...[
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 7,
+            runSpacing: 5,
+            children: [
+              if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
+                _buildSourceMetaPill(
+                  runnable
+                      ? context.l10n.bookSourcesRunnable
+                      : context.l10n.bookSourcesPendingCompatibility,
+                  runnable ? Icons.check_circle_outline : Icons.extension_off,
+                  runnable ? scheme.primary : scheme.onSurfaceVariant,
+                ),
+              for (final group in groups.take(2))
+                _buildSourceMetaPill(
+                  group,
+                  Icons.folder_outlined,
+                  scheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSourceMetaPill(String label, IconData icon, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -860,9 +1165,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     var responsibilityAccepted = false;
     var mode = _AddSourceMode.link;
     BookSourceImportAnalysis? analysis;
-    var verificationCompleted = 0;
-    var verificationTotal = 0;
-    var verificationAvailable = 0;
     String? errorText;
 
     Future<void> analyzeLink(
@@ -901,7 +1203,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       );
       if (result == null || result.files.isEmpty) return;
       final file = result.files.single;
-      if (file.size > LegadoSourceImportService.maxImportBytes) {
+      if (file.size > SourceImportService.maxImportBytes) {
         setRouteState(() => errorText = 'Source file exceeds 64 MiB.');
         return;
       }
@@ -916,7 +1218,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         analysis = null;
       });
       try {
-        final detected = _sourceImportAnalyzer.analyzeBytes(bytes);
+        final detected = await _sourceImportAnalyzer.analyzeBytesAsync(bytes);
         if (!routeContext.mounted) return;
         setRouteState(() {
           analysis = detected;
@@ -935,7 +1237,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       BuildContext routeContext,
       StateSetter setRouteState,
     ) async {
-      final noWorkingSourcesMessage = context.l10n.bookSourcesNoWorkingSources;
       final detected = analysis;
       if (detected == null) return;
       if (detected.kind == BookSourceImportKind.additional &&
@@ -956,22 +1257,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           sources = await _registry.upsert(detected.sources.single);
         } else {
           final preview = detected.additionalPreview!;
-          final verified = await _additionalSourceVerifier.verify(
-            preview.sources,
-            onProgress: (completed, total, available) {
-              if (!routeContext.mounted) return;
-              setRouteState(() {
-                verificationCompleted = completed;
-                verificationTotal = total;
-                verificationAvailable = available;
-              });
-            },
-          );
-          if (verified.available.isEmpty) {
-            throw BookSourceProtocolException(noWorkingSourcesMessage);
-          }
-          importedAdditionalCount = verified.available.length;
-          sources = await _registry.upsertAll(verified.available);
+          importedAdditionalCount = preview.sources.length;
+          sources = await _registry.upsertAll(preview.toRegisteredSources());
         }
         if (!mounted || !routeContext.mounted) return;
         Navigator.pop(routeContext);
@@ -1003,9 +1290,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         responsibilityAccepted: responsibilityAccepted,
         mode: mode,
         analysis: analysis,
-        verificationCompleted: verificationCompleted,
-        verificationTotal: verificationTotal,
-        verificationAvailable: verificationAvailable,
         errorText: errorText,
         sheet: sheet,
         onModeChanged: (value) => setRouteState(() {
@@ -1143,6 +1427,88 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 }
 
+enum _BookSourceFilter { all, enabled, disabled, runnable, pending }
+
+class _BookSourceGroupPicker extends StatefulWidget {
+  const _BookSourceGroupPicker({required this.groups, required this.selected});
+
+  final List<String> groups;
+  final String? selected;
+
+  @override
+  State<_BookSourceGroupPicker> createState() => _BookSourceGroupPickerState();
+}
+
+class _BookSourceGroupPickerState extends State<_BookSourceGroupPicker> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final groups = widget.groups
+        .where((group) => query.isEmpty || group.toLowerCase().contains(query))
+        .toList(growable: false);
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.72,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Text(
+              context.l10n.bookSourcesChooseGroup,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              key: const Key('bookSourceGroupSearchField'),
+              decoration: InputDecoration(
+                hintText: context.l10n.bookSourcesSearchGroups,
+                prefixIcon: const Icon(Icons.search_rounded),
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (value) => setState(() => _query = value),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView.builder(
+              itemCount: groups.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return ListTile(
+                    leading: Icon(
+                      widget.selected == null
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                    ),
+                    title: Text(context.l10n.bookSourcesAllGroups),
+                    onTap: () => Navigator.pop(context, ''),
+                  );
+                }
+                final group = groups[index - 1];
+                return ListTile(
+                  leading: Icon(
+                    widget.selected == group
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                  ),
+                  title: Text(group),
+                  onTap: () => Navigator.pop(context, group),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 enum _AddSourceMode { link, file }
 
 class _AddBookSourcePanel extends StatelessWidget {
@@ -1151,9 +1517,6 @@ class _AddBookSourcePanel extends StatelessWidget {
   final bool responsibilityAccepted;
   final _AddSourceMode mode;
   final BookSourceImportAnalysis? analysis;
-  final int verificationCompleted;
-  final int verificationTotal;
-  final int verificationAvailable;
   final String? errorText;
   final bool sheet;
   final ValueChanged<_AddSourceMode> onModeChanged;
@@ -1169,9 +1532,6 @@ class _AddBookSourcePanel extends StatelessWidget {
     required this.responsibilityAccepted,
     required this.mode,
     required this.analysis,
-    required this.verificationCompleted,
-    required this.verificationTotal,
-    required this.verificationAvailable,
     required this.errorText,
     required this.sheet,
     required this.onModeChanged,
@@ -1306,20 +1666,6 @@ class _AddBookSourcePanel extends StatelessWidget {
                   Text(context.l10n.bookSourcesConnecting),
                 ],
               ),
-              if (verificationTotal > 0) ...[
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: verificationCompleted / verificationTotal,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  context.l10n.bookSourcesVerificationProgress(
-                    verificationCompleted,
-                    verificationTotal,
-                    verificationAvailable,
-                  ),
-                ),
-              ],
             ],
             const SizedBox(height: 16),
             Row(
@@ -1386,10 +1732,9 @@ class _DetectedSourceSummary extends StatelessWidget {
             Text(analysis.sources.single.name)
           else if (preview != null)
             Text(
-              context.l10n.additionalSourcesPreview(
-                preview.supported,
-                preview.partial,
-                preview.unsupported,
+              context.l10n.additionalSourcesQuickPreview(
+                preview.sources.length,
+                preview.skipped,
               ),
             ),
         ],

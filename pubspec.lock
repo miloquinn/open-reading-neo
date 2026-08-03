@@ -137,6 +137,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  convert:
+    dependency: transitive
+    description:
+      name: convert
+      sha256: b30acd5944035672bc15c6b7a8b47d773e41e2f17de064350988c5d02adb1c68
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.2"
   cross_file:
     dependency: transitive
     description:
@@ -278,6 +286,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_js:
+    dependency: "direct main"
+    description:
+      name: flutter_js
+      sha256: "046428059ac7bef71e305dc35fc24be933b684684a43e83eab7ebd0dc407ad85"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.7"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:
@@ -437,6 +453,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.20.2"
+  iregexp:
+    dependency: transitive
+    description:
+      name: iregexp
+      sha256: c79119931b7ae9c0b6327adaa4495811813fcae7e6236ac68c15f45ca857d38b
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   json_annotation:
     dependency: transitive
     description:
@@ -445,6 +469,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.9.0"
+  json_path:
+    dependency: "direct main"
+    description:
+      name: json_path
+      sha256: "99cef94ca7b604ad85b9442bc8852e55396f559c08c0ab961d10b90b730c326f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.9.0"
   kindle_unpack:
     dependency: "direct main"
     description:
@@ -509,6 +541,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.0"
+  maybe_just_nothing:
+    dependency: transitive
+    description:
+      name: maybe_just_nothing
+      sha256: "57af3cacbbe57d5889a4479983755b76551db3c8862aa6335f57f50657945054"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.0"
   meta:
     dependency: transitive
     description:
@@ -653,6 +693,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  pointycastle:
+    dependency: "direct main"
+    description:
+      name: pointycastle
+      sha256: "92aa3841d083cc4b0f4709b5c74fd6409a3e6ba833ffc7dc6a8fee096366acf5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.0"
   pool:
     dependency: transitive
     description:
@@ -701,6 +749,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.0"
+  rfc_6901:
+    dependency: transitive
+    description:
+      name: rfc_6901
+      sha256: "6a43b1858dca2febaf93e15639aa6b0c49ccdfd7647775f15a499f872b018154"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
   scrollable_positioned_list:
     dependency: "direct main"
     description:
@@ -866,6 +922,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  sync_http:
+    dependency: transitive
+    description:
+      name: sync_http
+      sha256: "7f0cd72eca000d2e026bcd6f990b81d0ca06022ef4e32fb257b30d3d1014a961"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.1"
   synchronized:
     dependency: transitive
     description:

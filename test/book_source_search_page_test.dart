@@ -8,10 +8,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_sources_page.dart';
 import 'package:xxread/pages/book_sources/source_search_page.dart';
+import 'package:xxread/services/core/app_settings_service.dart';
 
 void main() {
   setUp(() {
@@ -196,6 +198,141 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('large source lists build scope chips lazily', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 1000);
+    addTearDown(tester.view.reset);
+
+    final sources = List.generate(
+      600,
+      (index) => _sourceWithId('large-$index', 'Large Source $index'),
+      growable: false,
+    );
+    final client = _ScopeTrackingClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SourceSearchPage(
+          sources: sources,
+          client: client,
+          shelfService: BookSourceShelfService(client: client),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChoiceChip).evaluate().length, lessThan(20));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'all-source search uses bounded concurrency and streams results',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+
+      final sources = List.generate(
+        10,
+        (index) => _sourceWithId('progress-$index', 'Progress $index'),
+        growable: false,
+      );
+      final client = _ProgressiveSearchClient();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SourceSearchPage(
+            sources: sources,
+            client: client,
+            shelfService: BookSourceShelfService(client: client),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final queryField = find.byKey(const Key('bookSourceQueryControl'));
+      await tester.enterText(queryField, 'test');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+
+      expect(
+        client.startedSourceIds,
+        List.generate(8, (index) => 'progress-$index'),
+      );
+      expect(client.maxActive, 8);
+
+      client.complete('progress-0');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
+
+      expect(find.text('Book from Progress 0'), findsOneWidget);
+      expect(find.text('1/10'), findsOneWidget);
+      expect(client.startedSourceIds, contains('progress-8'));
+      expect(client.maxActive, 8);
+
+      for (var index = 1; index < sources.length; index++) {
+        final sourceId = 'progress-$index';
+        while (!client.startedSourceIds.contains(sourceId)) {
+          await tester.pump(const Duration(milliseconds: 1));
+        }
+        client.complete(sourceId);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 1));
+      }
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Book from Progress 9'), findsOneWidget);
+      expect(client.maxActive, 8);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a timed-out source does not block the remaining sources', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 1000);
+    addTearDown(tester.view.reset);
+
+    final client = _TimeoutSearchClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SourceSearchPage(
+          sources: [
+            _sourceWithId('slow', 'Slow'),
+            _sourceWithId('fast', 'Fast'),
+          ],
+          client: client,
+          shelfService: BookSourceShelfService(client: client),
+          perSourceSearchTimeout: const Duration(milliseconds: 30),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final queryField = find.byKey(const Key('bookSourceQueryControl'));
+    await tester.enterText(queryField, 'test');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
+
+    expect(client.startedSourceIds, ['slow', 'fast']);
+    expect(find.text('Book from Fast'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.pumpAndSettle();
+
+    expect(client.slowWasCancelled, isTrue);
+    expect(find.text('Book from Fast'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('ignores an old search after changing source scope', (
     tester,
   ) async {
@@ -243,6 +380,48 @@ void main() {
     expect(find.text('Book of Source B'), findsOneWidget);
     expect(find.text('Book of Source A'), findsNothing);
   });
+
+  testWidgets(
+    'discover page selects a reading source, channel, and next page',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+      final source = _readingDiscoverySource();
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+        additionalSourceProtocolsPreferenceKey: true,
+      });
+      final client = _DiscoveryBookSourceClient();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.widgetWithText(ChoiceChip, 'reading source E'),
+        findsOneWidget,
+      );
+      expect(find.text('Ranking'), findsOneWidget);
+      expect(find.text('Channel Book 1'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'reading source E'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ranking'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('bookSourceCategoryLoadMore')));
+      await tester.pumpAndSettle();
+
+      expect(client.requestedPages, [1, 1, 2]);
+      expect(find.text('Channel Book 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _DelayedScopeClient extends BookSourceClient {
@@ -263,6 +442,7 @@ class _DelayedScopeClient extends BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
     final completer = Completer<void>();
     _completers.putIfAbsent(source.id, () => []).add(completer);
@@ -294,6 +474,7 @@ class _ScopeTrackingClient extends BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
     searchedSourceIds.add(source.id);
     return BookSourceSearchPage(
@@ -327,6 +508,90 @@ RegisteredBookSource _source() => RegisteredBookSource(
   addedAt: DateTime.utc(2026, 7, 13),
 );
 
+RegisteredBookSource _sourceWithId(String id, String name) =>
+    RegisteredBookSource(
+      id: id,
+      name: name,
+      description: '',
+      manifestUrl: Uri.parse('https://$id.example/source.json'),
+      apiBaseUrl: Uri.parse('https://$id.example/api/'),
+      protocolVersion: '1.5',
+      languages: const ['en'],
+      capabilities: const {'search'},
+      enabled: true,
+      addedAt: DateTime.utc(2026, 8, 3),
+    );
+
+RegisteredBookSource _readingDiscoverySource() => RegisteredBookSource(
+  id: 'reading-source',
+  name: 'reading source E',
+  description: '',
+  manifestUrl: Uri.parse('https://source.example'),
+  apiBaseUrl: Uri.parse('https://source.example'),
+  protocolVersion: 'reading-source-1',
+  languages: const [],
+  capabilities: const {
+    'search',
+    'detail',
+    'catalog',
+    'content',
+    'categories',
+    'browse',
+  },
+  enabled: true,
+  addedAt: DateTime.utc(2026, 8, 1),
+  sourceProtocol: BookSourceProtocolKind.readingSource,
+  sourceConfig: const {
+    'bookSourceName': 'reading source E',
+    'bookSourceUrl': 'https://source.example',
+    'searchUrl': '/search?q={{key}}',
+    'exploreUrl': 'Ranking::/rank?page={{page}}',
+    'ruleSearch': {'bookList': '.book', 'bookUrl': 'a@href', 'name': 'a@text'},
+    'ruleBookInfo': {'name': 'h1@text'},
+    'ruleToc': {
+      'chapterList': '.chapter',
+      'chapterName': 'text',
+      'chapterUrl': 'href',
+    },
+    'ruleContent': {'content': '#content@text'},
+    '_openReadingReadingChainVerifiedAt': '2026-08-01T00:00:00Z',
+  },
+);
+
+class _DiscoveryBookSourceClient extends BookSourceClient {
+  final List<int> requestedPages = [];
+
+  @override
+  Future<List<BookSourceCategory>> getCategories(
+    RegisteredBookSource source,
+  ) async => const [BookSourceCategory(id: '/rank', name: 'Ranking')];
+
+  @override
+  Future<BookSourceSearchPage> browse(
+    RegisteredBookSource source, {
+    String? category,
+    String sort = 'latest',
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    requestedPages.add(page);
+    return BookSourceSearchPage(
+      items: [
+        BookSourceBook(
+          id: 'channel-book-$page',
+          title: 'Channel Book $page',
+          author: 'Author',
+          description: '',
+          categories: const [],
+        ),
+      ],
+      page: page,
+      pageSize: 1,
+      hasMore: page == 1,
+    );
+  }
+}
+
 class _PagingBookSourceClient extends BookSourceClient {
   final List<int> requestedPages = [];
 
@@ -336,6 +601,7 @@ class _PagingBookSourceClient extends BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
     requestedPages.add(page);
     final start = page == 1 ? 1 : 11;
@@ -355,6 +621,89 @@ class _PagingBookSourceClient extends BookSourceClient {
       pageSize: pageSize,
       total: 11,
       hasMore: page == 1,
+    );
+  }
+}
+
+class _ProgressiveSearchClient extends BookSourceClient {
+  final List<String> startedSourceIds = [];
+  final Map<String, Completer<BookSourceSearchPage>> _completers = {};
+  int active = 0;
+  int maxActive = 0;
+
+  void complete(String sourceId) {
+    _completers[sourceId]!.complete(
+      BookSourceSearchPage(
+        items: [
+          BookSourceBook(
+            id: '$sourceId-book',
+            title:
+                'Book from ${sourceId.replaceFirst('progress-', 'Progress ')}',
+            author: 'Author',
+            description: '',
+            categories: const [],
+          ),
+        ],
+        page: 1,
+        pageSize: 20,
+        total: 1,
+        hasMore: false,
+      ),
+    );
+  }
+
+  @override
+  Future<BookSourceSearchPage> search(
+    RegisteredBookSource source,
+    String query, {
+    int page = 1,
+    int pageSize = 20,
+    BookDownloadCancellation? cancellation,
+  }) async {
+    startedSourceIds.add(source.id);
+    active++;
+    if (active > maxActive) maxActive = active;
+    final completer = Completer<BookSourceSearchPage>();
+    _completers[source.id] = completer;
+    try {
+      return await completer.future;
+    } finally {
+      active--;
+    }
+  }
+}
+
+class _TimeoutSearchClient extends BookSourceClient {
+  final List<String> startedSourceIds = [];
+  bool slowWasCancelled = false;
+
+  @override
+  Future<BookSourceSearchPage> search(
+    RegisteredBookSource source,
+    String query, {
+    int page = 1,
+    int pageSize = 20,
+    BookDownloadCancellation? cancellation,
+  }) async {
+    startedSourceIds.add(source.id);
+    if (source.id == 'slow') {
+      cancellation?.addListener(() => slowWasCancelled = true);
+      return Completer<BookSourceSearchPage>().future;
+    }
+    return BookSourceSearchPage(
+      items: const [
+        BookSourceBook(
+          id: 'fast-book',
+          title: 'Book from Fast',
+          author: 'Author',
+          description: '',
+          categories: [],
+        ),
+      ],
+      page: page,
+      pageSize: pageSize,
+      total: 1,
+      hasMore: false,
     );
   }
 }

@@ -191,6 +191,228 @@ abstract class AppLocalizations {
   /// **'There are no books to show in this category yet.'**
   String get discoverCategoryEmpty;
 
+  /// No description provided for @bookSourceChannelLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load channel'**
+  String get bookSourceChannelLoadFailed;
+
+  /// No description provided for @bookSourceChannelLoadFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The source returned no usable books: {details}'**
+  String bookSourceChannelLoadFailedMessage(String details);
+
+  /// No description provided for @bookSourceConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect to the source server after trying its available network addresses. Try again later.'**
+  String get bookSourceConnectionFailed;
+
+  /// No description provided for @bookSourceRedirectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The source site kept redirecting. Site cookies were retained, but the address still returned no content.'**
+  String get bookSourceRedirectFailed;
+
+  /// No description provided for @bookSourceHttpFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The source site returned HTTP {status}. The channel address may be stale or blocked by the site.'**
+  String bookSourceHttpFailed(int status);
+
+  /// No description provided for @bookSourceStandardLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard layout'**
+  String get bookSourceStandardLayout;
+
+  /// No description provided for @bookSourceListLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'List layout'**
+  String get bookSourceListLayout;
+
+  /// No description provided for @bookSourceChangeChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get bookSourceChangeChannel;
+
+  /// No description provided for @bookSourceChangeSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change source'**
+  String get bookSourceChangeSourceTitle;
+
+  /// No description provided for @bookSourceChangeCurrentSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Current source'**
+  String get bookSourceChangeCurrentSource;
+
+  /// No description provided for @bookSourceChangeTargetSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to'**
+  String get bookSourceChangeTargetSource;
+
+  /// No description provided for @bookSourceChangeNotSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not selected'**
+  String get bookSourceChangeNotSelected;
+
+  /// No description provided for @bookSourceChangeCurrentChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently at chapter {chapter}'**
+  String bookSourceChangeCurrentChapter(int chapter);
+
+  /// No description provided for @bookSourceChangeSearchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Find this book in other sources'**
+  String get bookSourceChangeSearchLabel;
+
+  /// No description provided for @bookSourceChangeSearchAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Search again'**
+  String get bookSourceChangeSearchAgain;
+
+  /// No description provided for @bookSourceChangeSearchRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Search all remaining sources'**
+  String get bookSourceChangeSearchRemaining;
+
+  /// No description provided for @bookSourceChangeCheckAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Match author'**
+  String get bookSourceChangeCheckAuthor;
+
+  /// No description provided for @bookSourceChangeSearchProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {completed} of {total}'**
+  String bookSourceChangeSearchProgress(int completed, int total);
+
+  /// No description provided for @bookSourceChangeNoOtherSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No other sources available'**
+  String get bookSourceChangeNoOtherSources;
+
+  /// No description provided for @bookSourceChangeNoOtherSourcesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add and enable another source that supports search first.'**
+  String get bookSourceChangeNoOtherSourcesHint;
+
+  /// No description provided for @bookSourceChangeSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding other sources'**
+  String get bookSourceChangeSearching;
+
+  /// No description provided for @bookSourceChangeSearchingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Matches appear as each source finishes searching.'**
+  String get bookSourceChangeSearchingHint;
+
+  /// No description provided for @bookSourceChangeNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching sources found'**
+  String get bookSourceChangeNoMatches;
+
+  /// No description provided for @bookSourceChangeNoMatchesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the title or turn off author matching, then search again.'**
+  String get bookSourceChangeNoMatchesHint;
+
+  /// No description provided for @bookSourceChangeFailedSources.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} source request(s) failed. You can search again.'**
+  String bookSourceChangeFailedSources(int count);
+
+  /// No description provided for @bookSourceChangeAuthorDifferent.
+  ///
+  /// In en, this message translates to:
+  /// **'Different author'**
+  String get bookSourceChangeAuthorDifferent;
+
+  /// No description provided for @bookSourceChangeValidating.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the catalog and current chapter…'**
+  String get bookSourceChangeValidating;
+
+  /// No description provided for @bookSourceChangeValidationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Validation failed: {details}'**
+  String bookSourceChangeValidationFailed(String details);
+
+  /// No description provided for @bookSourceChangeReadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Current chapter readable'**
+  String get bookSourceChangeReadable;
+
+  /// No description provided for @bookSourceChangeChapterCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chapters'**
+  String bookSourceChangeChapterCount(int count);
+
+  /// No description provided for @bookSourceChangeResponseTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{milliseconds} ms'**
+  String bookSourceChangeResponseTime(int milliseconds);
+
+  /// No description provided for @bookSourceChangeTapToValidate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select to check the catalog and current chapter.'**
+  String get bookSourceChangeTapToValidate;
+
+  /// No description provided for @bookSourceChangeAlreadyOnShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'This source version is already on the bookshelf.'**
+  String get bookSourceChangeAlreadyOnShelf;
+
+  /// No description provided for @bookSourceChangeSwitching.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing source…'**
+  String get bookSourceChangeSwitching;
+
+  /// No description provided for @bookSourceChangeSwitchAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to this source'**
+  String get bookSourceChangeSwitchAction;
+
+  /// No description provided for @bookSourceChangeSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed source to {source}'**
+  String bookSourceChangeSuccess(String source);
+
+  /// No description provided for @bookSourceChannelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} channels'**
+  String bookSourceChannelCount(int count);
+
   /// No description provided for @bookSourceManagementTitle.
   ///
   /// In en, this message translates to:
@@ -293,6 +515,66 @@ abstract class AppLocalizations {
   /// **'Disabled'**
   String get bookSourcesDisabled;
 
+  /// No description provided for @bookSourcesRunnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to use'**
+  String get bookSourcesRunnable;
+
+  /// No description provided for @bookSourcesPendingCompatibility.
+  ///
+  /// In en, this message translates to:
+  /// **'No runnable rules'**
+  String get bookSourcesPendingCompatibility;
+
+  /// No description provided for @bookSourcesManagementSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search name, URL, notes, or group'**
+  String get bookSourcesManagementSearchHint;
+
+  /// No description provided for @bookSourcesClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get bookSourcesClearSearch;
+
+  /// No description provided for @bookSourcesAllGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get bookSourcesAllGroups;
+
+  /// No description provided for @bookSourcesChooseGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a source group'**
+  String get bookSourcesChooseGroup;
+
+  /// No description provided for @bookSourcesSearchGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'Search groups'**
+  String get bookSourcesSearchGroups;
+
+  /// No description provided for @bookSourcesNoMatchingSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No sources match the current search and filters'**
+  String get bookSourcesNoMatchingSources;
+
+  /// No description provided for @bookSourcesResetFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get bookSourcesResetFilters;
+
+  /// No description provided for @bookSourcesVisibleCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {visible} of {total}'**
+  String bookSourcesVisibleCount(int visible, int total);
+
   /// No description provided for @bookSourcesRemove.
   ///
   /// In en, this message translates to:
@@ -338,7 +620,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesAnalyze.
   ///
   /// In en, this message translates to:
-  /// **'Analyze'**
+  /// **'Read sources'**
   String get bookSourcesAnalyze;
 
   /// No description provided for @bookSourcesDetectedOrsp.
@@ -456,13 +738,13 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesConnect.
   ///
   /// In en, this message translates to:
-  /// **'Connect and validate'**
+  /// **'Read and import'**
   String get bookSourcesConnect;
 
   /// No description provided for @bookSourcesConnecting.
   ///
   /// In en, this message translates to:
-  /// **'Validating protocol…'**
+  /// **'Processing sources…'**
   String get bookSourcesConnecting;
 
   /// No description provided for @bookSourcesAdded.
@@ -1116,8 +1398,20 @@ abstract class AppLocalizations {
   /// No description provided for @fontDownloadHint.
   ///
   /// In en, this message translates to:
-  /// **'First use requires download from GitHub'**
+  /// **'First use requires an online download'**
   String get fontDownloadHint;
+
+  /// No description provided for @fontVariableWeightRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustable weight {min}–{max}'**
+  String fontVariableWeightRange(int min, int max);
+
+  /// No description provided for @fontStaticWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed weight (bold is synthesized)'**
+  String get fontStaticWeight;
 
   /// No description provided for @fontDeleteDownload.
   ///
@@ -1382,6 +1676,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Font Size'**
   String get fontSizeLabel;
+
+  /// No description provided for @readerFontWeightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Font Weight'**
+  String get readerFontWeightLabel;
+
+  /// No description provided for @readerFontWeightLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get readerFontWeightLight;
+
+  /// No description provided for @readerFontWeightRegular.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular'**
+  String get readerFontWeightRegular;
+
+  /// No description provided for @readerFontWeightMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get readerFontWeightMedium;
+
+  /// No description provided for @readerFontWeightSemiBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Semi-bold'**
+  String get readerFontWeightSemiBold;
+
+  /// No description provided for @readerFontWeightBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Bold'**
+  String get readerFontWeightBold;
+
+  /// No description provided for @readerFontWeightVariableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading controls use five legible steps from 300–700. This font\'s true full range is {min}–{max}.'**
+  String readerFontWeightVariableHint(int min, int max);
+
+  /// No description provided for @readerFontWeightSyntheticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading controls use five steps from 300–700. This font has no declared variable weight axis, so the system approximates the result and it may differ by platform.'**
+  String get readerFontWeightSyntheticHint;
+
+  /// No description provided for @readerFontWeightPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'A quiet page reads farther · 字里行间'**
+  String get readerFontWeightPreview;
 
   /// Line spacing label
   ///
@@ -3629,7 +3977,7 @@ abstract class AppLocalizations {
   /// No description provided for @additionalSourcesImportNotice.
   ///
   /// In en, this message translates to:
-  /// **'Imported sources are checked before use and remain disabled until you enable them.'**
+  /// **'Import only parses and deduplicates locally; it does not probe every source online. Sources with callable rules keep their imported enabled state, and each capability is checked when used.'**
   String get additionalSourcesImportNotice;
 
   /// No description provided for @additionalSourcesChooseFile.
@@ -3656,6 +4004,23 @@ abstract class AppLocalizations {
   /// **'{supported} available, {partial} partially supported, {unsupported} not supported'**
   String additionalSourcesPreview(int supported, int partial, int unsupported);
 
+  /// No description provided for @additionalSourcesPreviewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'{supported} standard-rule, {partial} extended-rule, {unsupported} advanced-rule, {skipped} skipped'**
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  );
+
+  /// No description provided for @additionalSourcesQuickPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sources ready to import, {skipped} skipped'**
+  String additionalSourcesQuickPreview(int count, int skipped);
+
   /// No description provided for @additionalSourcesAvailable.
   ///
   /// In en, this message translates to:
@@ -3677,7 +4042,7 @@ abstract class AppLocalizations {
   /// No description provided for @additionalSourcesImportConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Import disabled'**
+  /// **'Import all'**
   String get additionalSourcesImportConfirm;
 
   /// No description provided for @additionalSourcesImported.
@@ -3703,6 +4068,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prevent the screen from turning off while reading'**
   String get settingsKeepScreenOnSubtitle;
+
+  /// Switch title for limiting the display refresh rate to save power
+  ///
+  /// In en, this message translates to:
+  /// **'Power saving mode'**
+  String get settingsPowerSavingModeTitle;
+
+  /// Switch subtitle explaining the 60 Hz power saving behavior
+  ///
+  /// In en, this message translates to:
+  /// **'Limit the app to 60 fps instead of using a high refresh rate'**
+  String get settingsPowerSavingModeSubtitle;
 
   /// Switch title for auto save
   ///
@@ -3769,6 +4146,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Provider'**
   String get settingsAiProviderLabel;
+
+  /// Name of the custom AI provider option
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get settingsAiCustomProvider;
+
+  /// Label of the API protocol dropdown for a custom AI provider
+  ///
+  /// In en, this message translates to:
+  /// **'API protocol'**
+  String get settingsAiProtocolLabel;
+
+  /// OpenAI-compatible API protocol option
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Compatible'**
+  String get settingsAiProtocolOpenAi;
+
+  /// Anthropic API protocol option
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic'**
+  String get settingsAiProtocolAnthropic;
 
   /// Hint of the AI preset dropdown
   ///
@@ -3863,14 +4264,242 @@ abstract class AppLocalizations {
   /// Title of the voluntary developer support card
   ///
   /// In en, this message translates to:
-  /// **'Support continued development'**
+  /// **'Support advanced features'**
   String get settingsSupportDevelopmentCardTitle;
 
   /// Explanation shown on the voluntary developer support card
   ///
   /// In en, this message translates to:
-  /// **'Building and maintaining Open Reading takes substantial time and effort. If it helps you, voluntary donations are welcome.'**
+  /// **'All features are currently free. Support is optional and helps fund continued development.'**
   String get settingsSupportDevelopmentCardSubtitle;
+
+  /// Guest account card title in settings
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to Open Reading'**
+  String get settingsAccountGuestTitle;
+
+  /// Guest account card subtitle in settings
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your account and supporter status together.'**
+  String get settingsAccountGuestSubtitle;
+
+  /// Action that opens the account center
+  ///
+  /// In en, this message translates to:
+  /// **'Account center'**
+  String get settingsAccountOpen;
+
+  /// Verified member account label
+  ///
+  /// In en, this message translates to:
+  /// **'Verified account'**
+  String get settingsAccountVerified;
+
+  /// Member account page title
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountPageTitle;
+
+  /// Member account page subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Profile, sign-in methods, and supporter status.'**
+  String get accountPageSubtitle;
+
+  /// Password sign-in tab
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get accountLoginTab;
+
+  /// Account registration tab
+  ///
+  /// In en, this message translates to:
+  /// **'Register'**
+  String get accountRegisterTab;
+
+  /// Email code sign-in tab
+  ///
+  /// In en, this message translates to:
+  /// **'Email code'**
+  String get accountCodeTab;
+
+  /// Password reset tab
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get accountResetTab;
+
+  /// Account email field
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get accountEmail;
+
+  /// Account password field
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get accountPassword;
+
+  /// Password confirmation field
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get accountConfirmPassword;
+
+  /// Public username field
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get accountUsername;
+
+  /// Display name field
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get accountDisplayName;
+
+  /// Email verification code field
+  ///
+  /// In en, this message translates to:
+  /// **'Verification code'**
+  String get accountVerificationCode;
+
+  /// Send an email verification code
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get accountSendCode;
+
+  /// Submit sign in
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get accountSignIn;
+
+  /// Submit account registration
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get accountCreate;
+
+  /// Submit password reset
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get accountResetPassword;
+
+  /// GitHub account login
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with GitHub'**
+  String get accountUseGithub;
+
+  /// Google account login
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get accountUseGoogle;
+
+  /// Passkey account login
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Passkey'**
+  String get accountUsePasskey;
+
+  /// External device authorization explanation
+  ///
+  /// In en, this message translates to:
+  /// **'A secure browser will open. Return here after approval.'**
+  String get accountExternalHint;
+
+  /// Profile settings section title
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get accountProfileTitle;
+
+  /// Open or title the profile editor
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get accountEditProfile;
+
+  /// Linked sign-in methods section title
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in methods'**
+  String get accountSignInMethodsTitle;
+
+  /// Save member profile action
+  ///
+  /// In en, this message translates to:
+  /// **'Save profile'**
+  String get accountSaveProfile;
+
+  /// Upload a new avatar
+  ///
+  /// In en, this message translates to:
+  /// **'Change avatar'**
+  String get accountChangeAvatar;
+
+  /// Delete the current avatar
+  ///
+  /// In en, this message translates to:
+  /// **'Remove avatar'**
+  String get accountRemoveAvatar;
+
+  /// Sign out of the member account
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get accountSignOut;
+
+  /// Supporter marketing card title
+  ///
+  /// In en, this message translates to:
+  /// **'Support advanced features'**
+  String get accountSupportTitle;
+
+  /// Clarifies current feature availability
+  ///
+  /// In en, this message translates to:
+  /// **'All features are free'**
+  String get accountSupportFreeTitle;
+
+  /// Clarifies support does not gate features
+  ///
+  /// In en, this message translates to:
+  /// **'Support is optional and does not unlock WebDAV or any other feature.'**
+  String get accountSupportFreeSubtitle;
+
+  /// Open the supporter purchase page
+  ///
+  /// In en, this message translates to:
+  /// **'Support now'**
+  String get accountSupportAction;
+
+  /// Supporter identity badge
+  ///
+  /// In en, this message translates to:
+  /// **'Supporter'**
+  String get accountSupporterBadge;
+
+  /// Password minimum length hint
+  ///
+  /// In en, this message translates to:
+  /// **'At least 12 characters'**
+  String get accountPasswordLengthHint;
+
+  /// Username format hint
+  ///
+  /// In en, this message translates to:
+  /// **'3–30 lowercase letters, numbers, or underscores'**
+  String get accountUsernameHint;
 
   /// Action label that opens the WeChat donation QR code
   ///
@@ -3989,7 +4618,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceLicensesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Open-source licenses'**
+  /// **'Open-source & font licenses'**
   String get openSourceLicensesTitle;
 
   /// No description provided for @openSourceLicensesSubtitle.
@@ -4001,7 +4630,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceLicensesIntro.
   ///
   /// In en, this message translates to:
-  /// **'These license texts are available offline in the app. Open Reading, bundled fonts, and third-party software remain subject to their respective licenses.'**
+  /// **'These license texts and notices are available offline in the app. Open Reading, on-demand fonts, and third-party software remain subject to their respective licenses.'**
   String get openSourceLicensesIntro;
 
   /// No description provided for @openSourceProjectSection.
@@ -4019,7 +4648,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceFontsSection.
   ///
   /// In en, this message translates to:
-  /// **'Bundled fonts'**
+  /// **'Font licenses'**
   String get openSourceFontsSection;
 
   /// No description provided for @openSourceDependenciesSection.
@@ -4349,7 +4978,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLibraryOpenAnimationMinimalHint.
   ///
   /// In en, this message translates to:
-  /// **'A quick, stable fade with no directional movement'**
+  /// **'Fade in the text without directional movement'**
   String get settingsLibraryOpenAnimationMinimalHint;
 
   /// No description provided for @settingsLibraryOpenAnimationPaperRise.
@@ -4376,17 +5005,35 @@ abstract class AppLocalizations {
   /// **'The reading page enters with a short sideways motion'**
   String get settingsLibraryOpenAnimationPageSlideHint;
 
-  /// No description provided for @settingsLibraryOpenAnimationBookSpread.
+  /// No description provided for @settingsLibraryOpenAnimationPaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Book spread'**
-  String get settingsLibraryOpenAnimationBookSpread;
+  /// **'Animation pace'**
+  String get settingsLibraryOpenAnimationPaceTitle;
 
-  /// No description provided for @settingsLibraryOpenAnimationBookSpreadHint.
+  /// No description provided for @settingsLibraryOpenAnimationFast.
   ///
   /// In en, this message translates to:
-  /// **'Two paper halves open outward from the center'**
-  String get settingsLibraryOpenAnimationBookSpreadHint;
+  /// **'Fast'**
+  String get settingsLibraryOpenAnimationFast;
+
+  /// No description provided for @settingsLibraryOpenAnimationFastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fade in quickly once the text is ready'**
+  String get settingsLibraryOpenAnimationFastHint;
+
+  /// No description provided for @settingsLibraryOpenAnimationElegant.
+  ///
+  /// In en, this message translates to:
+  /// **'Elegant'**
+  String get settingsLibraryOpenAnimationElegant;
+
+  /// No description provided for @settingsLibraryOpenAnimationElegantHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal the text more gradually for a calmer handoff'**
+  String get settingsLibraryOpenAnimationElegantHint;
 
   /// Accent summary when following the app theme
   ///
@@ -6013,6 +6660,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Base URL'**
   String get settingsAiBaseUrlLabel;
+
+  /// Explains whether an OpenAI-compatible Base URL should include v1
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Compatible: the Base URL usually needs to include /v1 (for example, https://example.com/v1). The app appends /chat/completions.'**
+  String get settingsAiBaseUrlHintOpenAi;
+
+  /// Explains whether an Anthropic Base URL should include v1
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic: the Base URL may include /v1 or omit it. The app avoids duplicating /v1 and appends /messages.'**
+  String get settingsAiBaseUrlHintAnthropic;
 
   /// Input label for the AI provider API Key field
   ///
@@ -7815,6 +8474,408 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select text to highlight or add a comment. Tap an underlined comment to read it again.'**
   String get readerNoAnnotationsHint;
+
+  /// No description provided for @replaceRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace & clean'**
+  String get replaceRulesTitle;
+
+  /// No description provided for @replaceRulesSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove ads, promotions, and other unwanted text while reading'**
+  String get replaceRulesSettingsSubtitle;
+
+  /// No description provided for @replaceRulesImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import rules'**
+  String get replaceRulesImport;
+
+  /// No description provided for @replaceRulesExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export rules'**
+  String get replaceRulesExport;
+
+  /// No description provided for @replaceRulesSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search names, groups, or patterns'**
+  String get replaceRulesSearchHint;
+
+  /// No description provided for @replaceRulesUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed rule'**
+  String get replaceRulesUnnamed;
+
+  /// No description provided for @replaceRulesDeleteValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get replaceRulesDeleteValue;
+
+  /// No description provided for @replaceRulesCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New rule'**
+  String get replaceRulesCreate;
+
+  /// No description provided for @replaceRulesEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No replacement rules'**
+  String get replaceRulesEmptyTitle;
+
+  /// No description provided for @replaceRulesEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a reading-source JSON file or create a regular-expression rule.'**
+  String get replaceRulesEmptyBody;
+
+  /// No description provided for @replaceRulesNoSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching rules'**
+  String get replaceRulesNoSearchResults;
+
+  /// No description provided for @replaceRulesCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New replacement rule'**
+  String get replaceRulesCreateTitle;
+
+  /// No description provided for @replaceRulesEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit replacement rule'**
+  String get replaceRulesEditTitle;
+
+  /// No description provided for @replaceRulesNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule name'**
+  String get replaceRulesNameLabel;
+
+  /// No description provided for @replaceRulesPatternLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Text or regular expression to match'**
+  String get replaceRulesPatternLabel;
+
+  /// No description provided for @replaceRulesPatternHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the replacement empty to remove matched text'**
+  String get replaceRulesPatternHelper;
+
+  /// No description provided for @replaceRulesReplacementLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace with'**
+  String get replaceRulesReplacementLabel;
+
+  /// No description provided for @replaceRulesRegexLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a regular expression'**
+  String get replaceRulesRegexLabel;
+
+  /// No description provided for @replaceRulesScopeTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to chapter titles'**
+  String get replaceRulesScopeTitleLabel;
+
+  /// No description provided for @replaceRulesScopeContentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to chapter content'**
+  String get replaceRulesScopeContentLabel;
+
+  /// No description provided for @replaceRulesGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group (optional)'**
+  String get replaceRulesGroupLabel;
+
+  /// No description provided for @replaceRulesScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope (optional)'**
+  String get replaceRulesScopeLabel;
+
+  /// No description provided for @replaceRulesScopeHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate book titles or source names with semicolons'**
+  String get replaceRulesScopeHelper;
+
+  /// No description provided for @replaceRulesExcludeScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded scope (optional)'**
+  String get replaceRulesExcludeScopeLabel;
+
+  /// No description provided for @replaceRulesDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this rule?'**
+  String get replaceRulesDeleteConfirmTitle;
+
+  /// No description provided for @replaceRulesDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The rule will be removed from this device.'**
+  String get replaceRulesDeleteConfirmBody;
+
+  /// Replacement-rule import success
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} rules'**
+  String replaceRulesImported(int count);
+
+  /// Replacement-rule import error
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import rules: {error}'**
+  String replaceRulesImportFailed(String error);
+
+  /// Replacement-rule import file size error
+  ///
+  /// In en, this message translates to:
+  /// **'The rule file exceeds {max}'**
+  String replaceRulesImportTooLarge(String max);
+
+  /// No description provided for @replaceRulesExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules exported'**
+  String get replaceRulesExported;
+
+  /// No description provided for @replaceRulesPatternRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter text or a regular expression to match'**
+  String get replaceRulesPatternRequired;
+
+  /// Replacement-rule pattern size error
+  ///
+  /// In en, this message translates to:
+  /// **'The pattern exceeds {max} characters'**
+  String replaceRulesPatternTooLong(int max);
+
+  /// Replacement-rule regular expression error
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid regular expression: {error}'**
+  String replaceRulesInvalidRegex(String error);
+
+  /// Replacement-rule count error
+  ///
+  /// In en, this message translates to:
+  /// **'A maximum of {max} rules is supported'**
+  String replaceRulesTooMany(int max);
+
+  /// No description provided for @accountSecurityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get accountSecurityTitle;
+
+  /// No description provided for @accountChangeEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get accountChangeEmailTitle;
+
+  /// No description provided for @accountCurrentEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Current email'**
+  String get accountCurrentEmail;
+
+  /// No description provided for @accountNewEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'New email'**
+  String get accountNewEmail;
+
+  /// No description provided for @accountCurrentEmailCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code sent to current email'**
+  String get accountCurrentEmailCode;
+
+  /// No description provided for @accountNewEmailCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code sent to new email'**
+  String get accountNewEmailCode;
+
+  /// No description provided for @accountSendBothCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Send both codes'**
+  String get accountSendBothCodes;
+
+  /// No description provided for @accountChangeEmailAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get accountChangeEmailAction;
+
+  /// No description provided for @accountEmailChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Email changed'**
+  String get accountEmailChanged;
+
+  /// No description provided for @accountChangePasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set or change password'**
+  String get accountChangePasswordTitle;
+
+  /// No description provided for @accountNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get accountNewPassword;
+
+  /// No description provided for @accountChangePasswordAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get accountChangePasswordAction;
+
+  /// No description provided for @accountPasswordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed'**
+  String get accountPasswordChanged;
+
+  /// No description provided for @accountPasswordsMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords do not match'**
+  String get accountPasswordsMismatch;
+
+  /// No description provided for @accountMfaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor authentication'**
+  String get accountMfaTitle;
+
+  /// No description provided for @accountMfaEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled. An authenticator or unused recovery code is required at sign-in.'**
+  String get accountMfaEnabled;
+
+  /// No description provided for @accountMfaDisabledByDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Off by default. Enable it to protect password and email-code sign-ins.'**
+  String get accountMfaDisabledByDefault;
+
+  /// No description provided for @accountMfaChallengeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor verification'**
+  String get accountMfaChallengeTitle;
+
+  /// No description provided for @accountMfaChallengeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code from your authenticator or an unused recovery code to access your account.'**
+  String get accountMfaChallengeHint;
+
+  /// No description provided for @accountMfaCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator code'**
+  String get accountMfaCode;
+
+  /// No description provided for @accountMfaOrRecoveryCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator or recovery code'**
+  String get accountMfaOrRecoveryCode;
+
+  /// No description provided for @accountMfaVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify and continue'**
+  String get accountMfaVerify;
+
+  /// No description provided for @accountMfaSendSetupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send setup email code'**
+  String get accountMfaSendSetupCode;
+
+  /// No description provided for @accountMfaContinueSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue setup'**
+  String get accountMfaContinueSetup;
+
+  /// No description provided for @accountMfaSecretWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this secret to your authenticator. It is shown only during setup.'**
+  String get accountMfaSecretWarning;
+
+  /// No description provided for @accountMfaOpenAuthenticator.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authenticator'**
+  String get accountMfaOpenAuthenticator;
+
+  /// No description provided for @accountMfaConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm and enable'**
+  String get accountMfaConfirm;
+
+  /// No description provided for @accountMfaDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable two-factor authentication'**
+  String get accountMfaDisable;
+
+  /// No description provided for @accountMfaDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor authentication disabled'**
+  String get accountMfaDisabled;
+
+  /// No description provided for @accountRecoveryCodesWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Save these recovery codes now. Each code works once, and this list will not be shown again.'**
+  String get accountRecoveryCodesWarning;
+
+  /// No description provided for @accountCopyRecoveryCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy recovery codes'**
+  String get accountCopyRecoveryCodes;
+
+  /// No description provided for @accountRecoveryCodesCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery codes copied'**
+  String get accountRecoveryCodesCopied;
+
+  /// No description provided for @accountRecoveryCodesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'I saved these codes'**
+  String get accountRecoveryCodesSaved;
 }
 
 class _AppLocalizationsDelegate

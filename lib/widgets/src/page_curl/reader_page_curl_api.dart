@@ -69,19 +69,23 @@ class ReaderPageCurlController {
   bool get debugAnimationReady => _state?._animationReady ?? false;
 
   @visibleForTesting
+  int get debugBuildCount => _state?._buildCount ?? 0;
+
+  @visibleForTesting
+  int? get debugActiveSourceImageIdentity {
+    final image = _state?._activeSourceImage;
+    return image == null ? null : identityHashCode(image);
+  }
+
+  @visibleForTesting
   Offset? get debugShaderLineA => _state?._geometry?.lineA;
 
   @visibleForTesting
   Offset? get debugShaderLineB => _state?._geometry?.lineB;
 
   @visibleForTesting
-  bool get debugUsesProvisionalSnapshot {
-    final state = _state;
-    final source = state?._activeSourcePage;
-    return state != null &&
-        source != null &&
-        state._syncSnapshotKeys.contains(source.key);
-  }
+  bool get debugUsesProvisionalSnapshot =>
+      _state?._activeSourceUsesProvisional ?? false;
 
   void _attach(_ReaderShaderPageCurlState state) => _state = state;
 

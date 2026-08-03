@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:xxread/models/book.dart';
+import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/pages/reader/comic_reader_page.dart';
 import 'package:xxread/pages/reader/native_reader_page.dart';
 import 'package:xxread/pages/reader/pdf_reader_page.dart';
 import 'package:xxread/services/books/book_storage_repair_service.dart';
+import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
@@ -50,12 +52,37 @@ class NativeReaderService {
     Book book, {
     BookOpenAnimation? animation,
     LibraryBookOpenAnimation? libraryAnimation,
+    LibraryBookOpenAnimationPace animationPace =
+        LibraryBookOpenAnimationPace.fast,
+    ReaderThemePalette? initialTheme,
     ReaderPageTransitionOrigin origin = ReaderPageTransitionOrigin.standard,
     bool waitForReaderClose = true,
   }) async {
-    final repaired = kIsWeb
+    final initialThemeFuture = initialTheme == null
+        ? ReaderThemes.loadSavedPalette()
+        : SynchronousFuture(initialTheme);
+    var repaired = kIsWeb
         ? book
         : await BookStorageRepairService().repairSingleBookIfNeeded(book);
+    if (!kIsWeb) {
+      final progressRepaired =
+          BookSourceShelfService.repairLegacyDownloadedProgress(repaired);
+      if (progressRepaired.currentPage != repaired.currentPage) {
+        final bookId = progressRepaired.id;
+        if (bookId != null) {
+          try {
+            await BookDao().updateBookProgress(
+              bookId,
+              progressRepaired.currentPage,
+              readingProgress: progressRepaired.readingProgress,
+            );
+          } catch (error) {
+            debugPrint('repair downloaded source progress failed: $error');
+          }
+        }
+        repaired = progressRepaired;
+      }
+    }
     final fileExists = kIsWeb
         ? WebBookFileStore.isWebBookPath(repaired.filePath) &&
               await WebBookFileStore().exists(repaired.filePath)
@@ -72,12 +99,15 @@ class NativeReaderService {
     }
     final format = repaired.format.toLowerCase();
     if (_comicFormats.contains(format)) {
+      final resolvedInitialTheme = await initialThemeFuture;
       if (!context.mounted) return;
       await ComicReaderPage.open(
         context,
         repaired,
+        initialTheme: resolvedInitialTheme,
         animation: animation,
         libraryAnimation: libraryAnimation,
+        animationPace: animationPace,
         waitForReaderClose: waitForReaderClose,
       );
       return;
@@ -93,11 +123,15 @@ class NativeReaderService {
         );
         return;
       }
+      final resolvedInitialTheme = await initialThemeFuture;
+      if (!context.mounted) return;
       await PdfReaderPage.open(
         context,
         repaired,
+        initialTheme: resolvedInitialTheme,
         animation: animation,
         libraryAnimation: libraryAnimation,
+        animationPace: animationPace,
         waitForReaderClose: waitForReaderClose,
       );
       return;
@@ -113,15 +147,17 @@ class NativeReaderService {
       return;
     }
     if (!context.mounted) return;
-    final initialTheme = animation == null && libraryAnimation == null
-        ? null
-        : await ReaderThemes.loadSavedPalette();
+    // Resolve the reader palette before pushing the route so its very first
+    // opaque frame already matches the saved reading theme. Letting the reader
+    // load it after navigation produces a visible white flash for dark themes.
+    final resolvedInitialTheme = await initialThemeFuture;
     if (!context.mounted) return;
     final route = BookOpenTransition.createRoute<void>(
-      NativeReaderPage(book: repaired, initialTheme: initialTheme),
+      NativeReaderPage(book: repaired, initialTheme: resolvedInitialTheme),
       animation: animation,
       libraryAnimation: libraryAnimation,
-      readerBackgroundColor: initialTheme?.background,
+      animationPace: animationPace,
+      readerBackgroundColor: resolvedInitialTheme.background,
       origin: origin,
       waitForReaderReady: true,
     );

@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -24,6 +26,33 @@ class BookSourceShelfService {
   /// "章节序号 * unitsPerChapter + 章内进度"，而不是真实页码。
   /// UI 展示总量/当前值时需要除以该常量换算回章节数，避免把它当作页数显示。
   static const int unitsPerChapter = 1000;
+
+  /// Repairs books downloaded by versions that changed `storage_type` to
+  /// local but left `currentPage` in online chapter-unit encoding.
+  static Book repairLegacyDownloadedProgress(Book book) {
+    final normalizedProgress = book.readingProgress;
+    if (book.isOnline ||
+        book.format.toLowerCase() != 'txt' ||
+        book.sourceId == null ||
+        book.sourceBookId == null ||
+        book.totalPages <= 0 ||
+        book.currentPage <= 0 ||
+        normalizedProgress == null ||
+        (book.lastCanonicalLocator?.trim().isNotEmpty ?? false)) {
+      return book;
+    }
+    final localEstimate = book.currentPage / book.totalPages;
+    final encodedEstimate =
+        book.currentPage / (book.totalPages * unitsPerChapter);
+    final localDistance = (normalizedProgress - localEstimate).abs();
+    final encodedDistance = (normalizedProgress - encodedEstimate).abs();
+    if (encodedDistance + 0.000001 >= localDistance) return book;
+    final chapterIndex = (book.currentPage ~/ unitsPerChapter).clamp(
+      0,
+      book.totalPages - 1,
+    );
+    return book.copyWith(currentPage: chapterIndex);
+  }
 
   BookSourceShelfService({
     BookDao? bookDao,
@@ -91,6 +120,37 @@ class BookSourceShelfService {
     await _bookDao.updateBookTotalPages(shelfBookId, totalUnits);
   }
 
+  Future<Book> replaceOnlineSourceBinding({
+    required Book shelfBook,
+    required RegisteredBookSource source,
+    required BookSourceBook book,
+    required int chapterIndex,
+    required int chapterCount,
+    required double chapterProgress,
+  }) async {
+    if (shelfBook.id == null || !shelfBook.isOnline) {
+      throw const BookSourceProtocolException(
+        'Only an online shelf book can change source.',
+      );
+    }
+    final currentUnits =
+        chapterIndex * unitsPerChapter +
+        (chapterProgress.clamp(0, 1) * unitsPerChapter).round();
+    final totalUnits = chapterCount * unitsPerChapter;
+    final updated = shelfBook.copyWith(
+      currentPage: currentUnits,
+      totalPages: totalUnits,
+      readingProgress: totalUnits <= 0 ? 0 : currentUnits / totalUnits,
+      sourceId: source.id,
+      sourceBookId: book.id,
+      sourceJson: jsonEncode(source.toJson()),
+      sourceBookJson: jsonEncode(book.toJson()),
+    );
+    await _bookDao.updateBook(updated);
+    LibraryEventBus().notifyLibraryChanged();
+    return updated;
+  }
+
   Future<Book> downloadToLocal({
     required RegisteredBookSource source,
     required BookSourceBook book,
@@ -102,6 +162,7 @@ class BookSourceShelfService {
       ...await _client.getChaptersForDownload(
         source,
         book.id,
+        sourceVariables: book.sourceVariables,
         cancellation: cancellation,
       ),
     ]..sort(compareBookSourceChapters);
@@ -145,6 +206,7 @@ class BookSourceShelfService {
               source,
               bookId: book.id,
               chapterId: chapter.id,
+              sourceVariables: book.sourceVariables,
               cancellation: cancellation,
             );
             cancellation?.throwIfCancelled();
@@ -195,11 +257,17 @@ class BookSourceShelfService {
         existing?.coverImagePath ?? await _storedCoverPath(source, book);
     cancellation?.throwIfCancelled();
     if (existing != null) {
+      final localChapterIndex =
+          (existing.isOnline
+                  ? existing.currentPage ~/ unitsPerChapter
+                  : existing.currentPage)
+              .clamp(0, chapters.length - 1);
       final downloaded = existing.copyWith(
         title: book.title,
         author: book.author,
         filePath: file.path,
         format: 'txt',
+        currentPage: localChapterIndex,
         totalPages: chapters.length,
         storageType: 'local',
         sourceJson: jsonEncode(source.toJson()),

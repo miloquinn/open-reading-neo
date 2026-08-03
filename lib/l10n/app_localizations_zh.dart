@@ -56,6 +56,137 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverCategoryEmpty => '这个分类暂时没有可展示的书籍。';
 
   @override
+  String get bookSourceChannelLoadFailed => '频道加载失败';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return '书源没有返回可用书籍：$details';
+  }
+
+  @override
+  String get bookSourceConnectionFailed => '无法连接书源服务器，已自动尝试其他网络地址，请稍后重试。';
+
+  @override
+  String get bookSourceRedirectFailed => '书源网站反复跳转；客户端已保留站点 Cookie，但该地址仍未返回内容。';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return '书源网站返回 HTTP $status，频道地址可能已经失效或被站点拦截。';
+  }
+
+  @override
+  String get bookSourceStandardLayout => '标准布局';
+
+  @override
+  String get bookSourceListLayout => '列表布局';
+
+  @override
+  String get bookSourceChangeChannel => '更换';
+
+  @override
+  String get bookSourceChangeSourceTitle => '换源';
+
+  @override
+  String get bookSourceChangeCurrentSource => '当前来源';
+
+  @override
+  String get bookSourceChangeTargetSource => '切换到';
+
+  @override
+  String get bookSourceChangeNotSelected => '尚未选择';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return '当前读到第 $chapter 章';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => '按书名查找其他来源';
+
+  @override
+  String get bookSourceChangeSearchAgain => '重新搜索';
+
+  @override
+  String get bookSourceChangeSearchRemaining => '继续查找全部来源';
+
+  @override
+  String get bookSourceChangeCheckAuthor => '校验作者';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return '已检查 $completed / $total';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => '没有其他可用书源';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint => '请先添加并启用至少一个支持搜索的其他书源。';
+
+  @override
+  String get bookSourceChangeSearching => '正在查找其他来源';
+
+  @override
+  String get bookSourceChangeSearchingHint => '匹配结果会在各书源完成搜索后逐个出现。';
+
+  @override
+  String get bookSourceChangeNoMatches => '没有找到匹配来源';
+
+  @override
+  String get bookSourceChangeNoMatchesHint => '可以修改书名，或关闭作者校验后重新搜索。';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count 个书源请求失败，可以重新搜索。';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => '作者不同';
+
+  @override
+  String get bookSourceChangeValidating => '正在验证目录和当前章节…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return '验证失败：$details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => '当前章节可读';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count 章';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate => '选择后将验证目录和当前章节。';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf => '该来源版本已经在书架中。';
+
+  @override
+  String get bookSourceChangeSwitching => '正在换源…';
+
+  @override
+  String get bookSourceChangeSwitchAction => '切换到此来源';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return '已切换到 $source';
+  }
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count 个频道';
+  }
+
+  @override
   String get bookSourceManagementTitle => '书源管理';
 
   @override
@@ -110,6 +241,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesDisabled => '已停用';
 
   @override
+  String get bookSourcesRunnable => '可直接使用';
+
+  @override
+  String get bookSourcesPendingCompatibility => '缺少可执行规则';
+
+  @override
+  String get bookSourcesManagementSearchHint => '搜索名称、网址、备注或分组';
+
+  @override
+  String get bookSourcesClearSearch => '清空搜索';
+
+  @override
+  String get bookSourcesAllGroups => '全部分组';
+
+  @override
+  String get bookSourcesChooseGroup => '选择书源分组';
+
+  @override
+  String get bookSourcesSearchGroups => '搜索分组';
+
+  @override
+  String get bookSourcesNoMatchingSources => '没有符合当前搜索和筛选条件的书源';
+
+  @override
+  String get bookSourcesResetFilters => '重置';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return '显示 $visible / 共 $total 个';
+  }
+
+  @override
   String get bookSourcesRemove => '移除';
 
   @override
@@ -131,7 +294,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesImportLink => '导入链接';
 
   @override
-  String get bookSourcesAnalyze => '分析书源';
+  String get bookSourcesAnalyze => '读取书源';
 
   @override
   String get bookSourcesDetectedOrsp => '识别为：ORSP 书源';
@@ -199,10 +362,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '我确认自己有权访问相关内容，且不会利用书源绕过登录、付费、DRM 或其他访问控制。';
 
   @override
-  String get bookSourcesConnect => '连接并校验';
+  String get bookSourcesConnect => '读取并导入';
 
   @override
-  String get bookSourcesConnecting => '正在校验协议…';
+  String get bookSourcesConnecting => '正在处理书源…';
 
   @override
   String get bookSourcesAdded => '书源已添加';
@@ -535,7 +698,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fontDownloadFailed => '下载失败，点此重试';
 
   @override
-  String get fontDownloadHint => '首次使用需从 GitHub 下载';
+  String get fontDownloadHint => '首次使用需在线下载';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return '可调字重 $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => '固定字重（加粗为系统合成）';
 
   @override
   String get fontDeleteDownload => '删除下载';
@@ -674,6 +845,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fontSizeLabel => '字体大小';
+
+  @override
+  String get readerFontWeightLabel => '字体粗细';
+
+  @override
+  String get readerFontWeightLight => '较细';
+
+  @override
+  String get readerFontWeightRegular => '标准';
+
+  @override
+  String get readerFontWeightMedium => '中等';
+
+  @override
+  String get readerFontWeightSemiBold => '半粗';
+
+  @override
+  String get readerFontWeightBold => '粗';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return '阅读调节提供 300–700 五档；当前字体的真实完整范围为 $min–$max。';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      '阅读调节提供 300–700 五档；当前字体未声明可变字重，由系统近似合成，效果可能因平台而异。';
+
+  @override
+  String get readerFontWeightPreview => '春风又绿江南岸 · Reading';
 
   @override
   String get lineSpacingLabel => '行距';
@@ -1916,7 +2117,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get additionalSourcesImportTitle => '导入书源 JSON';
 
   @override
-  String get additionalSourcesImportNotice => '导入内容会先进行兼容性预检，并保持停用，需由你主动开启。';
+  String get additionalSourcesImportNotice =>
+      '导入只做本地解析和去重，不会逐条联网检测；具备可调用规则的书源按原配置启用，具体能力在实际使用时判断。';
 
   @override
   String get additionalSourcesChooseFile => '从 JSON 文件添加';
@@ -1933,6 +2135,21 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '标准规则 $supported 个，扩展规则 $partial 个，高级规则 $unsupported 个，跳过 $skipped 条';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count 个书源可导入，跳过 $skipped 个';
+  }
+
+  @override
   String get additionalSourcesAvailable => '可使用';
 
   @override
@@ -1942,7 +2159,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get additionalSourcesUnsupported => '暂不支持';
 
   @override
-  String get additionalSourcesImportConfirm => '停用状态导入';
+  String get additionalSourcesImportConfirm => '批量导入';
 
   @override
   String additionalSourcesImported(int count) {
@@ -1957,6 +2174,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsKeepScreenOnSubtitle => '阅读时防止屏幕自动关闭';
+
+  @override
+  String get settingsPowerSavingModeTitle => '省电模式';
+
+  @override
+  String get settingsPowerSavingModeSubtitle => '开启后限制为 60 帧，不启用高刷新率';
 
   @override
   String get settingsAutoSaveTitle => '自动保存';
@@ -1994,6 +2217,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAiProviderLabel => '服务商';
+
+  @override
+  String get settingsAiCustomProvider => '自定义';
+
+  @override
+  String get settingsAiProtocolLabel => '接口协议';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI 兼容协议';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic 协议';
 
   @override
   String get settingsAiPresetHint => '选择预设模型';
@@ -2041,11 +2276,125 @@ class AppLocalizationsZh extends AppLocalizations {
   String get firstHomeSupportPaperSemanticLabel => '开元阅读开发者的自愿支持说明';
 
   @override
-  String get settingsSupportDevelopmentCardTitle => '支持持续开发';
+  String get settingsSupportDevelopmentCardTitle => '支持高级功能';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      '开发和维护投入了大量时间与精力。如果开元阅读对你有帮助，欢迎自愿捐赠支持。';
+      '当前所有功能免费。支持完全自愿，用于持续开发。';
+
+  @override
+  String get settingsAccountGuestTitle => '登录开元阅读';
+
+  @override
+  String get settingsAccountGuestSubtitle => '管理账号资料与支持者身份';
+
+  @override
+  String get settingsAccountOpen => '用户中心';
+
+  @override
+  String get settingsAccountVerified => '账号已验证';
+
+  @override
+  String get accountPageTitle => '用户中心';
+
+  @override
+  String get accountPageSubtitle => '管理资料、登录方式和支持者身份。';
+
+  @override
+  String get accountLoginTab => '登录';
+
+  @override
+  String get accountRegisterTab => '注册';
+
+  @override
+  String get accountCodeTab => '验证码';
+
+  @override
+  String get accountResetTab => '找回';
+
+  @override
+  String get accountEmail => '邮箱';
+
+  @override
+  String get accountPassword => '密码';
+
+  @override
+  String get accountConfirmPassword => '确认密码';
+
+  @override
+  String get accountUsername => '用户名';
+
+  @override
+  String get accountDisplayName => '昵称';
+
+  @override
+  String get accountVerificationCode => '验证码';
+
+  @override
+  String get accountSendCode => '发送验证码';
+
+  @override
+  String get accountSignIn => '登录';
+
+  @override
+  String get accountCreate => '创建账号';
+
+  @override
+  String get accountResetPassword => '重置密码';
+
+  @override
+  String get accountUseGithub => '使用 GitHub';
+
+  @override
+  String get accountUseGoogle => '使用 Google';
+
+  @override
+  String get accountUsePasskey => '使用 Passkey';
+
+  @override
+  String get accountExternalHint => '将打开安全浏览器，授权后返回 App 即可。';
+
+  @override
+  String get accountProfileTitle => '个人资料';
+
+  @override
+  String get accountEditProfile => '编辑资料';
+
+  @override
+  String get accountSignInMethodsTitle => '登录方式';
+
+  @override
+  String get accountSaveProfile => '保存资料';
+
+  @override
+  String get accountChangeAvatar => '更换头像';
+
+  @override
+  String get accountRemoveAvatar => '移除头像';
+
+  @override
+  String get accountSignOut => '退出登录';
+
+  @override
+  String get accountSupportTitle => '支持高级功能';
+
+  @override
+  String get accountSupportFreeTitle => '当前所有功能免费';
+
+  @override
+  String get accountSupportFreeSubtitle => '支持完全自愿，不会解锁 WebDAV 或其他功能。';
+
+  @override
+  String get accountSupportAction => '立即支持';
+
+  @override
+  String get accountSupporterBadge => '支持者';
+
+  @override
+  String get accountPasswordLengthHint => '至少 12 个字符';
+
+  @override
+  String get accountUsernameHint => '3–30 位小写字母、数字或下划线';
 
   @override
   String get settingsDonationAction => '微信捐赠';
@@ -2105,14 +2454,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get changelogHistorySubtitle => '查看各版本更新内容';
 
   @override
-  String get openSourceLicensesTitle => '开源许可';
+  String get openSourceLicensesTitle => '开源与字体许可';
 
   @override
   String get openSourceLicensesSubtitle => '查看应用、内置字体与第三方组件的许可';
 
   @override
   String get openSourceLicensesIntro =>
-      '以下许可文本随应用离线提供。Open Reading、内置字体及第三方软件分别遵循各自的许可条款。';
+      '以下许可文本及声明随应用离线提供。Open Reading、在线字体及第三方软件分别遵循各自的许可条款。';
 
   @override
   String get openSourceProjectSection => '项目许可';
@@ -2121,7 +2470,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSourceLegacyLicenseTitle => '历史版本';
 
   @override
-  String get openSourceFontsSection => '内置字体';
+  String get openSourceFontsSection => '字体许可';
 
   @override
   String get openSourceDependenciesSection => '第三方软件';
@@ -2289,7 +2638,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLibraryOpenAnimationMinimal => '极简淡入';
 
   @override
-  String get settingsLibraryOpenAnimationMinimalHint => '快速稳定地淡入，没有方向位移';
+  String get settingsLibraryOpenAnimationMinimalHint => '稳定淡入正文，没有方向位移';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => '纸面浮现';
@@ -2304,10 +2653,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLibraryOpenAnimationPageSlideHint => '阅读纸面从侧边短距离滑入';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => '双页展开';
+  String get settingsLibraryOpenAnimationPaceTitle => '动画节奏';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint => '两侧纸面从中缝向外展开';
+  String get settingsLibraryOpenAnimationFast => '快速';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint => '正文就绪后快速淡入，缩短等待感';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => '优雅';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint => '延长正文渐显，平稳衔接到阅读页';
 
   @override
   String get settingsAccentFollowTheme => '强调色：跟随主题';
@@ -3189,6 +3547,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI 兼容协议：Base URL 通常需要带 /v1（例如 https://example.com/v1）；应用会继续追加 /chat/completions。';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic 协议：Base URL 可带或不带 /v1；应用会自动避免重复并追加 /messages。';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';
@@ -4223,6 +4589,219 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerNoAnnotationsHint => '选中文字即可高亮或添加文字批注；点击带下划线的批注文字可再次查看笔记。';
+
+  @override
+  String get replaceRulesTitle => '替换净化';
+
+  @override
+  String get replaceRulesSettingsSubtitle => '清理正文中的广告、推广语等无关内容';
+
+  @override
+  String get replaceRulesImport => '导入规则';
+
+  @override
+  String get replaceRulesExport => '导出规则';
+
+  @override
+  String get replaceRulesSearchHint => '搜索规则名称、分组或表达式';
+
+  @override
+  String get replaceRulesUnnamed => '未命名规则';
+
+  @override
+  String get replaceRulesDeleteValue => '删除';
+
+  @override
+  String get replaceRulesCreate => '新建规则';
+
+  @override
+  String get replaceRulesEmptyTitle => '还没有替换规则';
+
+  @override
+  String get replaceRulesEmptyBody => '可以导入阅读书源 JSON，或新建一条正则规则。';
+
+  @override
+  String get replaceRulesNoSearchResults => '没有匹配的规则';
+
+  @override
+  String get replaceRulesCreateTitle => '新建替换规则';
+
+  @override
+  String get replaceRulesEditTitle => '编辑替换规则';
+
+  @override
+  String get replaceRulesNameLabel => '规则名称';
+
+  @override
+  String get replaceRulesPatternLabel => '匹配内容 / 正则表达式';
+
+  @override
+  String get replaceRulesPatternHelper => '要删除广告时，将“替换为”留空即可';
+
+  @override
+  String get replaceRulesReplacementLabel => '替换为';
+
+  @override
+  String get replaceRulesRegexLabel => '使用正则表达式';
+
+  @override
+  String get replaceRulesScopeTitleLabel => '作用于章节标题';
+
+  @override
+  String get replaceRulesScopeContentLabel => '作用于正文';
+
+  @override
+  String get replaceRulesGroupLabel => '分组（可选）';
+
+  @override
+  String get replaceRulesScopeLabel => '作用范围（可选）';
+
+  @override
+  String get replaceRulesScopeHelper => '多个书名或书源名称用分号分隔';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => '排除范围（可选）';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => '删除这条规则？';
+
+  @override
+  String get replaceRulesDeleteConfirmBody => '这条规则将从当前设备移除。';
+
+  @override
+  String replaceRulesImported(int count) {
+    return '已导入 $count 条规则';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return '规则文件不能超过 $max';
+  }
+
+  @override
+  String get replaceRulesExported => '规则已导出';
+
+  @override
+  String get replaceRulesPatternRequired => '请输入匹配内容或正则表达式';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return '表达式不能超过 $max 个字符';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return '正则表达式无效：$error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return '最多支持 $max 条规则';
+  }
+
+  @override
+  String get accountSecurityTitle => '账号安全';
+
+  @override
+  String get accountChangeEmailTitle => '更换邮箱';
+
+  @override
+  String get accountCurrentEmail => '当前邮箱';
+
+  @override
+  String get accountNewEmail => '新邮箱';
+
+  @override
+  String get accountCurrentEmailCode => '当前邮箱验证码';
+
+  @override
+  String get accountNewEmailCode => '新邮箱验证码';
+
+  @override
+  String get accountSendBothCodes => '向两个邮箱发送验证码';
+
+  @override
+  String get accountChangeEmailAction => '确认更换邮箱';
+
+  @override
+  String get accountEmailChanged => '邮箱已更换';
+
+  @override
+  String get accountChangePasswordTitle => '设置或更换密码';
+
+  @override
+  String get accountNewPassword => '新密码';
+
+  @override
+  String get accountChangePasswordAction => '确认更换密码';
+
+  @override
+  String get accountPasswordChanged => '密码已更换';
+
+  @override
+  String get accountPasswordsMismatch => '两次输入的密码不一致';
+
+  @override
+  String get accountMfaTitle => '双重验证';
+
+  @override
+  String get accountMfaEnabled => '已开启。登录时需要验证器或未使用的恢复码。';
+
+  @override
+  String get accountMfaDisabledByDefault => '默认关闭。开启后可保护密码和邮箱验证码登录。';
+
+  @override
+  String get accountMfaChallengeTitle => '双重验证';
+
+  @override
+  String get accountMfaChallengeHint => '输入验证器动态码或未使用的恢复码，验证后才能访问账号。';
+
+  @override
+  String get accountMfaCode => '验证器动态码';
+
+  @override
+  String get accountMfaOrRecoveryCode => '验证器动态码或恢复码';
+
+  @override
+  String get accountMfaVerify => '验证并继续';
+
+  @override
+  String get accountMfaSendSetupCode => '发送开启确认邮件';
+
+  @override
+  String get accountMfaContinueSetup => '继续设置';
+
+  @override
+  String get accountMfaSecretWarning => '请将此密钥添加到验证器。密钥仅在设置期间显示。';
+
+  @override
+  String get accountMfaOpenAuthenticator => '打开验证器';
+
+  @override
+  String get accountMfaConfirm => '确认并开启';
+
+  @override
+  String get accountMfaDisable => '关闭双重验证';
+
+  @override
+  String get accountMfaDisabled => '双重验证已关闭';
+
+  @override
+  String get accountRecoveryCodesWarning => '请立即保存恢复码。每个恢复码只能使用一次，此列表不会再次显示。';
+
+  @override
+  String get accountCopyRecoveryCodes => '复制恢复码';
+
+  @override
+  String get accountRecoveryCodesCopied => '恢复码已复制';
+
+  @override
+  String get accountRecoveryCodesSaved => '我已保存恢复码';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -4275,6 +4854,137 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get discoverCategoryEmpty => '這個分類暫時沒有可顯示的書籍。';
+
+  @override
+  String get bookSourceChannelLoadFailed => '頻道載入失敗';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return '書源沒有傳回可用書籍：$details';
+  }
+
+  @override
+  String get bookSourceConnectionFailed => '無法連線書源伺服器，已自動嘗試其他網路位址，請稍後重試。';
+
+  @override
+  String get bookSourceRedirectFailed => '書源網站反覆跳轉；用戶端已保留網站 Cookie，但該位址仍未傳回內容。';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return '書源網站傳回 HTTP $status，頻道位址可能已失效或被網站阻擋。';
+  }
+
+  @override
+  String get bookSourceStandardLayout => '標準版面';
+
+  @override
+  String get bookSourceListLayout => '清單版面';
+
+  @override
+  String get bookSourceChangeChannel => '更換';
+
+  @override
+  String get bookSourceChangeSourceTitle => '更換來源';
+
+  @override
+  String get bookSourceChangeCurrentSource => '目前來源';
+
+  @override
+  String get bookSourceChangeTargetSource => '切換到';
+
+  @override
+  String get bookSourceChangeNotSelected => '尚未選擇';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return '目前讀到第 $chapter 章';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => '依書名尋找其他來源';
+
+  @override
+  String get bookSourceChangeSearchAgain => '重新搜尋';
+
+  @override
+  String get bookSourceChangeSearchRemaining => '繼續搜尋全部來源';
+
+  @override
+  String get bookSourceChangeCheckAuthor => '核對作者';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return '已檢查 $completed / $total';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => '沒有其他可用書源';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint => '請先新增並啟用至少一個支援搜尋的其他書源。';
+
+  @override
+  String get bookSourceChangeSearching => '正在尋找其他來源';
+
+  @override
+  String get bookSourceChangeSearchingHint => '符合的結果會在各書源完成搜尋後逐一出現。';
+
+  @override
+  String get bookSourceChangeNoMatches => '找不到相符來源';
+
+  @override
+  String get bookSourceChangeNoMatchesHint => '可以修改書名，或關閉作者核對後重新搜尋。';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count 個書源請求失敗，可以重新搜尋。';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => '作者不同';
+
+  @override
+  String get bookSourceChangeValidating => '正在驗證目錄與目前章節…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return '驗證失敗：$details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => '目前章節可讀';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count 章';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate => '選擇後將驗證目錄與目前章節。';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf => '此來源版本已在書架中。';
+
+  @override
+  String get bookSourceChangeSwitching => '正在更換來源…';
+
+  @override
+  String get bookSourceChangeSwitchAction => '切換到此來源';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return '已切換到 $source';
+  }
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count 個頻道';
+  }
 
   @override
   String get bookSourceManagementTitle => '書源管理';
@@ -4331,6 +5041,38 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesDisabled => '已停用';
 
   @override
+  String get bookSourcesRunnable => '可直接使用';
+
+  @override
+  String get bookSourcesPendingCompatibility => '缺少可執行規則';
+
+  @override
+  String get bookSourcesManagementSearchHint => '搜尋名稱、網址、備註或群組';
+
+  @override
+  String get bookSourcesClearSearch => '清除搜尋';
+
+  @override
+  String get bookSourcesAllGroups => '全部群組';
+
+  @override
+  String get bookSourcesChooseGroup => '選擇書源群組';
+
+  @override
+  String get bookSourcesSearchGroups => '搜尋群組';
+
+  @override
+  String get bookSourcesNoMatchingSources => '沒有符合目前搜尋和篩選條件的書源';
+
+  @override
+  String get bookSourcesResetFilters => '重設';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return '顯示 $visible / 共 $total 個';
+  }
+
+  @override
   String get bookSourcesRemove => '移除';
 
   @override
@@ -4352,7 +5094,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesImportLink => '匯入連結';
 
   @override
-  String get bookSourcesAnalyze => '分析書源';
+  String get bookSourcesAnalyze => '讀取書源';
 
   @override
   String get bookSourcesDetectedOrsp => '識別為：ORSP 書源';
@@ -4420,10 +5162,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '我確認自己有權存取相關內容，且不會利用書源繞過登入、付費、DRM 或其他存取控制。';
 
   @override
-  String get bookSourcesConnect => '連接並驗證';
+  String get bookSourcesConnect => '讀取並匯入';
 
   @override
-  String get bookSourcesConnecting => '正在驗證協定…';
+  String get bookSourcesConnecting => '正在處理書源…';
 
   @override
   String get bookSourcesAdded => '書源已新增';
@@ -4741,6 +5483,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get builtInFonts => '內建字體';
 
   @override
+  String get fontDownloadHint => '首次使用需線上下載';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return '可調字重 $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => '固定字重（粗體由系統合成）';
+
+  @override
   String get importFont => '匯入字體';
 
   @override
@@ -4852,6 +5605,36 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get fontSizeLabel => '字體大小';
+
+  @override
+  String get readerFontWeightLabel => '字體粗細';
+
+  @override
+  String get readerFontWeightLight => '較細';
+
+  @override
+  String get readerFontWeightRegular => '標準';
+
+  @override
+  String get readerFontWeightMedium => '中等';
+
+  @override
+  String get readerFontWeightSemiBold => '半粗';
+
+  @override
+  String get readerFontWeightBold => '粗';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return '閱讀調整提供 300–700 五檔；目前字型的真正完整範圍為 $min–$max。';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      '閱讀調整提供 300–700 五檔；目前字型未宣告可變字重，由系統近似合成，效果可能因平台而異。';
+
+  @override
+  String get readerFontWeightPreview => '春風又綠江南岸 · Reading';
 
   @override
   String get lineSpacingLabel => '行距';
@@ -6094,7 +6877,8 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get additionalSourcesImportTitle => '匯入書源 JSON';
 
   @override
-  String get additionalSourcesImportNotice => '匯入內容會先進行相容性預檢，並保持停用，需由你主動開啟。';
+  String get additionalSourcesImportNotice =>
+      '匯入只做本機解析和去重，不會逐一連線檢測；具備可呼叫規則的書源依原設定啟用，具體能力在實際使用時判斷。';
 
   @override
   String get additionalSourcesChooseFile => '從 JSON 檔案新增';
@@ -6111,6 +6895,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '標準規則 $supported 個，擴充規則 $partial 個，進階規則 $unsupported 個，略過 $skipped 條';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count 個書源可匯入，略過 $skipped 個';
+  }
+
+  @override
   String get additionalSourcesAvailable => '可使用';
 
   @override
@@ -6120,7 +6919,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get additionalSourcesUnsupported => '暫不支援';
 
   @override
-  String get additionalSourcesImportConfirm => '停用狀態匯入';
+  String get additionalSourcesImportConfirm => '批次匯入';
 
   @override
   String additionalSourcesImported(int count) {
@@ -6135,6 +6934,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsKeepScreenOnSubtitle => '閱讀時防止螢幕自動關閉';
+
+  @override
+  String get settingsPowerSavingModeTitle => '省電模式';
+
+  @override
+  String get settingsPowerSavingModeSubtitle => '開啟後限制為 60 幀，不啟用高更新率';
 
   @override
   String get settingsAutoSaveTitle => '自動儲存';
@@ -6172,6 +6977,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAiProviderLabel => '服務商';
+
+  @override
+  String get settingsAiCustomProvider => '自訂';
+
+  @override
+  String get settingsAiProtocolLabel => '介面協定';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI 相容協定';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic 協定';
 
   @override
   String get settingsAiPresetHint => '選擇預設模型';
@@ -6219,11 +7036,125 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get firstHomeSupportPaperSemanticLabel => '開元閱讀開發者的自願支持說明';
 
   @override
-  String get settingsSupportDevelopmentCardTitle => '支持持續開發';
+  String get settingsSupportDevelopmentCardTitle => '支持進階功能';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      '開發與維護投入了大量時間和心力。如果開元閱讀對你有幫助，歡迎自願捐贈支持。';
+      '目前所有功能免費。支持完全自願，用於持續開發。';
+
+  @override
+  String get settingsAccountGuestTitle => '登入開元閱讀';
+
+  @override
+  String get settingsAccountGuestSubtitle => '管理帳號資料與支持者身分';
+
+  @override
+  String get settingsAccountOpen => '使用者中心';
+
+  @override
+  String get settingsAccountVerified => '帳號已驗證';
+
+  @override
+  String get accountPageTitle => '使用者中心';
+
+  @override
+  String get accountPageSubtitle => '管理資料、登入方式和支持者身分。';
+
+  @override
+  String get accountLoginTab => '登入';
+
+  @override
+  String get accountRegisterTab => '註冊';
+
+  @override
+  String get accountCodeTab => '驗證碼';
+
+  @override
+  String get accountResetTab => '找回';
+
+  @override
+  String get accountEmail => '電子郵件';
+
+  @override
+  String get accountPassword => '密碼';
+
+  @override
+  String get accountConfirmPassword => '確認密碼';
+
+  @override
+  String get accountUsername => '使用者名稱';
+
+  @override
+  String get accountDisplayName => '暱稱';
+
+  @override
+  String get accountVerificationCode => '驗證碼';
+
+  @override
+  String get accountSendCode => '傳送驗證碼';
+
+  @override
+  String get accountSignIn => '登入';
+
+  @override
+  String get accountCreate => '建立帳號';
+
+  @override
+  String get accountResetPassword => '重設密碼';
+
+  @override
+  String get accountUseGithub => '使用 GitHub';
+
+  @override
+  String get accountUseGoogle => '使用 Google';
+
+  @override
+  String get accountUsePasskey => '使用 Passkey';
+
+  @override
+  String get accountExternalHint => '將開啟安全瀏覽器，授權後返回 App 即可。';
+
+  @override
+  String get accountProfileTitle => '個人資料';
+
+  @override
+  String get accountEditProfile => '編輯資料';
+
+  @override
+  String get accountSignInMethodsTitle => '登入方式';
+
+  @override
+  String get accountSaveProfile => '儲存資料';
+
+  @override
+  String get accountChangeAvatar => '更換頭像';
+
+  @override
+  String get accountRemoveAvatar => '移除頭像';
+
+  @override
+  String get accountSignOut => '登出';
+
+  @override
+  String get accountSupportTitle => '支持進階功能';
+
+  @override
+  String get accountSupportFreeTitle => '目前所有功能免費';
+
+  @override
+  String get accountSupportFreeSubtitle => '支持完全自願，不會解鎖 WebDAV 或其他功能。';
+
+  @override
+  String get accountSupportAction => '立即支持';
+
+  @override
+  String get accountSupporterBadge => '支持者';
+
+  @override
+  String get accountPasswordLengthHint => '至少 12 個字元';
+
+  @override
+  String get accountUsernameHint => '3–30 位小寫字母、數字或底線';
 
   @override
   String get settingsDonationAction => '微信捐贈';
@@ -6283,14 +7214,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get changelogHistorySubtitle => '查看各版本更新內容';
 
   @override
-  String get openSourceLicensesTitle => '開源授權';
+  String get openSourceLicensesTitle => '開源與字型授權';
 
   @override
   String get openSourceLicensesSubtitle => '查看應用程式、內建字型與第三方元件的授權';
 
   @override
   String get openSourceLicensesIntro =>
-      '以下授權文字隨應用程式離線提供。Open Reading、內建字型及第三方軟體分別適用各自的授權條款。';
+      '以下授權文字及聲明隨應用程式離線提供。Open Reading、線上字型及第三方軟體分別適用各自的授權條款。';
 
   @override
   String get openSourceProjectSection => '專案授權';
@@ -6299,7 +7230,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get openSourceLegacyLicenseTitle => '歷史版本';
 
   @override
-  String get openSourceFontsSection => '內建字型';
+  String get openSourceFontsSection => '字型授權';
 
   @override
   String get openSourceDependenciesSection => '第三方軟體';
@@ -6467,7 +7398,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLibraryOpenAnimationMinimal => '極簡淡入';
 
   @override
-  String get settingsLibraryOpenAnimationMinimalHint => '快速穩定地淡入，沒有方向位移';
+  String get settingsLibraryOpenAnimationMinimalHint => '穩定淡入正文，沒有方向位移';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => '紙面浮現';
@@ -6482,10 +7413,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLibraryOpenAnimationPageSlideHint => '閱讀紙面從側邊短距離滑入';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => '雙頁展開';
+  String get settingsLibraryOpenAnimationPaceTitle => '動畫節奏';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint => '兩側紙面從中縫向外展開';
+  String get settingsLibraryOpenAnimationFast => '快速';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint => '正文就緒後快速淡入，縮短等待感';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => '優雅';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint => '延長正文漸顯，平穩銜接至閱讀頁';
 
   @override
   String get settingsAccentFollowTheme => '強調色：跟隨主題';
@@ -7367,6 +8307,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI 相容協定：Base URL 通常需要包含 /v1（例如 https://example.com/v1）；應用程式會繼續附加 /chat/completions。';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic 協定：Base URL 可包含或省略 /v1；應用程式會避免重複並附加 /messages。';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';
@@ -8401,4 +9349,217 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readerNoAnnotationsHint => '選取文字即可高亮或新增文字批註；點擊帶底線的批註文字可再次查看筆記。';
+
+  @override
+  String get replaceRulesTitle => '替換淨化';
+
+  @override
+  String get replaceRulesSettingsSubtitle => '清理正文中的廣告、推廣語等無關內容';
+
+  @override
+  String get replaceRulesImport => '匯入規則';
+
+  @override
+  String get replaceRulesExport => '匯出規則';
+
+  @override
+  String get replaceRulesSearchHint => '搜尋規則名稱、群組或運算式';
+
+  @override
+  String get replaceRulesUnnamed => '未命名規則';
+
+  @override
+  String get replaceRulesDeleteValue => '刪除';
+
+  @override
+  String get replaceRulesCreate => '新增規則';
+
+  @override
+  String get replaceRulesEmptyTitle => '還沒有替換規則';
+
+  @override
+  String get replaceRulesEmptyBody => '可以匯入閱讀書源 JSON，或新增一條正則規則。';
+
+  @override
+  String get replaceRulesNoSearchResults => '沒有符合的規則';
+
+  @override
+  String get replaceRulesCreateTitle => '新增替換規則';
+
+  @override
+  String get replaceRulesEditTitle => '編輯替換規則';
+
+  @override
+  String get replaceRulesNameLabel => '規則名稱';
+
+  @override
+  String get replaceRulesPatternLabel => '符合內容 / 正則運算式';
+
+  @override
+  String get replaceRulesPatternHelper => '要刪除廣告時，將「替換為」留空即可';
+
+  @override
+  String get replaceRulesReplacementLabel => '替換為';
+
+  @override
+  String get replaceRulesRegexLabel => '使用正則運算式';
+
+  @override
+  String get replaceRulesScopeTitleLabel => '套用於章節標題';
+
+  @override
+  String get replaceRulesScopeContentLabel => '套用於正文';
+
+  @override
+  String get replaceRulesGroupLabel => '群組（選填）';
+
+  @override
+  String get replaceRulesScopeLabel => '作用範圍（選填）';
+
+  @override
+  String get replaceRulesScopeHelper => '多個書名或書源名稱請用分號分隔';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => '排除範圍（選填）';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => '刪除這條規則？';
+
+  @override
+  String get replaceRulesDeleteConfirmBody => '這條規則將從目前裝置移除。';
+
+  @override
+  String replaceRulesImported(int count) {
+    return '已匯入 $count 條規則';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return '匯入失敗：$error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return '規則檔案不能超過 $max';
+  }
+
+  @override
+  String get replaceRulesExported => '規則已匯出';
+
+  @override
+  String get replaceRulesPatternRequired => '請輸入符合內容或正則運算式';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return '運算式不能超過 $max 個字元';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return '正則運算式無效：$error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return '最多支援 $max 條規則';
+  }
+
+  @override
+  String get accountSecurityTitle => '帳號安全';
+
+  @override
+  String get accountChangeEmailTitle => '更換電子郵件';
+
+  @override
+  String get accountCurrentEmail => '目前電子郵件';
+
+  @override
+  String get accountNewEmail => '新電子郵件';
+
+  @override
+  String get accountCurrentEmailCode => '目前電子郵件驗證碼';
+
+  @override
+  String get accountNewEmailCode => '新電子郵件驗證碼';
+
+  @override
+  String get accountSendBothCodes => '向兩個信箱傳送驗證碼';
+
+  @override
+  String get accountChangeEmailAction => '確認更換電子郵件';
+
+  @override
+  String get accountEmailChanged => '電子郵件已更換';
+
+  @override
+  String get accountChangePasswordTitle => '設定或更換密碼';
+
+  @override
+  String get accountNewPassword => '新密碼';
+
+  @override
+  String get accountChangePasswordAction => '確認更換密碼';
+
+  @override
+  String get accountPasswordChanged => '密碼已更換';
+
+  @override
+  String get accountPasswordsMismatch => '兩次輸入的密碼不一致';
+
+  @override
+  String get accountMfaTitle => '雙重驗證';
+
+  @override
+  String get accountMfaEnabled => '已開啟。登入時需要驗證器或未使用的恢復碼。';
+
+  @override
+  String get accountMfaDisabledByDefault => '預設關閉。開啟後可保護密碼和電子郵件驗證碼登入。';
+
+  @override
+  String get accountMfaChallengeTitle => '雙重驗證';
+
+  @override
+  String get accountMfaChallengeHint => '輸入驗證器動態碼或未使用的恢復碼，驗證後才能存取帳號。';
+
+  @override
+  String get accountMfaCode => '驗證器動態碼';
+
+  @override
+  String get accountMfaOrRecoveryCode => '驗證器動態碼或恢復碼';
+
+  @override
+  String get accountMfaVerify => '驗證並繼續';
+
+  @override
+  String get accountMfaSendSetupCode => '傳送開啟確認郵件';
+
+  @override
+  String get accountMfaContinueSetup => '繼續設定';
+
+  @override
+  String get accountMfaSecretWarning => '請將此密鑰加入驗證器。密鑰僅在設定期間顯示。';
+
+  @override
+  String get accountMfaOpenAuthenticator => '開啟驗證器';
+
+  @override
+  String get accountMfaConfirm => '確認並開啟';
+
+  @override
+  String get accountMfaDisable => '關閉雙重驗證';
+
+  @override
+  String get accountMfaDisabled => '雙重驗證已關閉';
+
+  @override
+  String get accountRecoveryCodesWarning => '請立即儲存恢復碼。每個恢復碼只能使用一次，此清單不會再次顯示。';
+
+  @override
+  String get accountCopyRecoveryCodes => '複製恢復碼';
+
+  @override
+  String get accountRecoveryCodesCopied => '恢復碼已複製';
+
+  @override
+  String get accountRecoveryCodesSaved => '我已儲存恢復碼';
 }

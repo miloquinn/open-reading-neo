@@ -20,6 +20,8 @@ class FontOption {
   final int? fileSize;
   final bool isCustom;
   final bool isAvailable;
+  final int? variableWeightMin;
+  final int? variableWeightMax;
 
   /// 在线字体下载文件清单（空表示系统字体或用户导入的字体）。
   ///
@@ -39,6 +41,8 @@ class FontOption {
     this.isCustom = false,
     this.isAvailable = true,
     this.downloadFiles = const <OnlineFontFile>[],
+    this.variableWeightMin,
+    this.variableWeightMax,
   });
 
   /// 是否为在线下载字体（系统/自定义字体为 false）。
@@ -47,6 +51,10 @@ class FontOption {
   /// 在线字体总下载字节数；非在线字体返回 0。
   int get onlineTotalBytes =>
       downloadFiles.fold<int>(0, (sum, file) => sum + file.size);
+
+  /// 是否包含真实的 `wght` 变量轴，而不是由系统合成粗体。
+  bool get supportsVariableWeight =>
+      variableWeightMin != null && variableWeightMax != null;
 }
 
 class FontCatalog {
@@ -57,6 +65,7 @@ class FontCatalog {
   static const String instrumentSansId = 'instrument_sans';
   static const String newsreaderId = 'newsreader';
   static const String jetBrainsMonoId = 'jetbrains_mono';
+  static const String harmonyOSSansId = 'harmony_os_sans';
 
   /// 在线字体源 URL（jsDelivr CDN 取 google/fonts 仓库，NotoSerifSC 因 25MB
   /// 文件触发 jsDelivr 403，回退到 raw.githubusercontent.com）。
@@ -71,6 +80,8 @@ class FontCatalog {
       'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/newsreader/Newsreader%5Bopsz%2Cwght%5D.ttf';
   static const String _jetBrainsMonoUrl =
       'https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@2.304/fonts/ttf/JetBrainsMono-Regular.ttf';
+  static const String _harmonyOSSansArchiveUrl =
+      'https://developer.huawei.com/images/download/next/HarmonyOS-Sans.zip';
 
   /// 各在线字体的预期字节数（与上游仓库当前 HEAD 一致，用于进度展示与超额保护）。
   /// 实际下载完成后由 OnlineFontService 计算并存储 SHA-256，无需与这些数字匹配。
@@ -79,6 +90,7 @@ class FontCatalog {
   static const int _instrumentSansBytes = 194_336;
   static const int _newsreaderBytes = 451_664;
   static const int _jetBrainsMonoBytes = 273_900;
+  static const int _harmonyOSSansBytes = 8_483_132;
 
   static const FontOption systemFont = FontOption(
     id: systemId,
@@ -95,13 +107,15 @@ class FontCatalog {
     displayName: '苹方',
   );
 
-  /// 思源宋体（Noto Serif SC 变量字体，覆盖字重 300–700）。
+  /// 思源宋体（Noto Serif SC 变量字体，覆盖字重 200–900）。
   /// 文件 25MB，jsDelivr 因大文件 403，使用 raw.githubusercontent.com 直连。
   static const FontOption sourceHanSerif = FontOption(
     id: sourceHanSerifId,
     family: 'SourceHanSerifCN',
     fallbackFamilies: ['SourceHanSansCN'],
     tone: FontTone.serif,
+    variableWeightMin: 200,
+    variableWeightMax: 900,
     downloadFiles: <OnlineFontFile>[
       OnlineFontFile(
         url: _notoSerifSCUrl,
@@ -119,6 +133,8 @@ class FontCatalog {
     family: 'SourceHanSansCN',
     fallbackFamilies: [],
     tone: FontTone.sansSerif,
+    variableWeightMin: 100,
+    variableWeightMax: 900,
     downloadFiles: <OnlineFontFile>[
       OnlineFontFile(
         url: _notoSansSCUrl,
@@ -134,6 +150,8 @@ class FontCatalog {
     family: 'InstrumentSans',
     fallbackFamilies: ['SourceHanSansCN'],
     tone: FontTone.sansSerif,
+    variableWeightMin: 400,
+    variableWeightMax: 700,
     downloadFiles: <OnlineFontFile>[
       OnlineFontFile(
         url: _instrumentSansUrl,
@@ -150,6 +168,8 @@ class FontCatalog {
     family: 'Newsreader',
     fallbackFamilies: ['SourceHanSerifCN', 'SourceHanSansCN'],
     tone: FontTone.serif,
+    variableWeightMin: 200,
+    variableWeightMax: 800,
     downloadFiles: <OnlineFontFile>[
       OnlineFontFile(
         url: _newsreaderUrl,
@@ -174,6 +194,34 @@ class FontCatalog {
     ],
   );
 
+  /// HarmonyOS Sans SC Regular。
+  ///
+  /// 直接从华为官方 ZIP 包按 HTTP Range 读取并解压未修改的 Regular 条目，
+  /// 不经过第三方字体镜像。官方公开包提供的是多份静态字重文件；Flutter
+  /// 运行时注册无法可靠绑定多份静态文件的 weight，因此当前只注册 Regular，
+  /// 不宣称支持真实的连续字重调节。
+  static const FontOption harmonyOSSans = FontOption(
+    id: harmonyOSSansId,
+    family: 'HarmonyOSSansSC',
+    fallbackFamilies: ['SourceHanSansCN'],
+    tone: FontTone.sansSerif,
+    displayName: 'HarmonyOS Sans',
+    downloadFiles: <OnlineFontFile>[
+      OnlineFontFile(
+        url: _harmonyOSSansArchiveUrl,
+        fileName: 'harmony_os_sans_sc.ttf',
+        size: _harmonyOSSansBytes,
+        expectedSha256:
+            '984cf609545acee8ef060780fb70fc3099b058c0553416331b6e863fdf7c26fa',
+        zipEntry: OnlineFontZipEntry(
+          path: 'HarmonyOS Sans/HarmonyOS_SansSC/HarmonyOS_SansSC_Regular.ttf',
+          compressedOffset: 6_855_920,
+          compressedSize: 5_667_691,
+        ),
+      ),
+    ],
+  );
+
   /// 默认 App 字体（系统字体，无需下载，离线可用）。
   static const FontOption defaultAppFont = systemFont;
 
@@ -185,6 +233,7 @@ class FontCatalog {
     systemFont,
     sourceHanSerif,
     sourceHanSans,
+    harmonyOSSans,
     instrumentSans,
     jetBrainsMono,
   ];
@@ -195,6 +244,7 @@ class FontCatalog {
     sourceHanSerif,
     newsreader,
     sourceHanSans,
+    harmonyOSSans,
     jetBrainsMono,
   ];
 
@@ -277,6 +327,8 @@ class FontCatalog {
         return l10n.fontNewsreader;
       case jetBrainsMonoId:
         return l10n.fontJetBrainsMono;
+      case harmonyOSSansId:
+        return option.displayName!;
       default:
         return l10n.fontSystem;
     }

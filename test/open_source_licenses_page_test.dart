@@ -17,7 +17,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('开源许可'), findsOneWidget);
+    expect(find.text('开源与字体许可'), findsOneWidget);
     expect(find.text('Open Reading'), findsOneWidget);
     expect(find.text('GNU Affero General Public License v3.0'), findsOneWidget);
     expect(find.text('Noto Serif SC / Source Han Serif'), findsOneWidget);
@@ -28,6 +28,7 @@ void main() {
     );
 
     expect(find.text('JetBrains Mono'), findsOneWidget);
+    expect(find.text('HarmonyOS Sans'), findsOneWidget);
     expect(find.text('Flutter 与 Dart 依赖'), findsOneWidget);
   });
 

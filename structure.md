@@ -1,6 +1,6 @@
 # Open Reading 项目结构
 
-> 最后更新：2026-07-25
+> 最后更新：2026-08-03
 > 当前版本：2.3.8
 > 本文记录稳定的项目结构、模块边界和核心数据结构，不罗列每个实现细节。
 
@@ -22,8 +22,8 @@
 - 应用图标以 `ios/Runner/AppIcon.icon` 的 Icon Composer 分层工程为 iOS 原生源；`assets/images/app_icon*.png` 提供 Flutter、Android 与桌面回退，Windows runner 使用多尺寸 ICO，Linux runner 从打包后的 Flutter assets 加载窗口图标。
 - iOS App 级隐私清单位于 `ios/Runner/PrivacyInfo.xcprivacy`，声明 Runner 原生文件导入、iCloud Documents 与用户授权文件所使用的 required reason API；第三方 Flutter 插件继续各自在 bundle 内携带其隐私清单。
 - 本地结构化数据使用 SQLite，移动端通过 `sqflite`，桌面端通过 `sqflite_common_ffi`。
-- 轻量设置使用 `SharedPreferences`。
-- 在线书源使用 Open Reading Source Protocol，不包含 Legado 兼容层。
+- 轻量设置使用 `SharedPreferences`；大型书源注册表独立存放在应用支持目录，避免偏好缓存整体装载大 JSON。
+- 在线书源同时支持 Open Reading Source Protocol 与阅读书源 JSON；阅读书源由应用内置运行时直接执行，不依赖外部阅读器。
 - 官网、发行 API、安装包镜像和下载统计已拆分到独立仓库 `miloquinn/open-reading-web`；本仓库只保留客户端集成和发布后的官网下载校验工具。
 
 ## 顶层目录
@@ -58,6 +58,7 @@ open-reading/
 - `.github/workflows/pr-checks.yml`：对 Pull Request、`main` 推送和手动运行执行锁定依赖解析、国际化生成一致性、格式检查、静态分析、带覆盖率测试，以及 Android debug 和 Web release 冒烟构建；官网服务使用独立 Python 3.12 job 执行 Ruff 和 Pytest；Pull Request 额外执行依赖安全审查。Web 构建当前为提示性检查，不阻塞合并。
 - `.github/workflows/platform-smoke.yml`：在相关源码或平台工程变更、每周计划任务和手动运行时，构建 Linux、Windows、macOS release 以及不签名的 iOS release，用于尽早发现平台工程漂移。OpenHarmony 仍依赖专用 SDK，不在 GitHub 托管运行器中构建。
 - `.github/workflows/release.yml`：所有版本 Tag 共用同一发布并发锁；Tag 发布前验证客户端与官网服务，并在写入 GitHub Latest 前拒绝低于或等于当前 Latest 的其他 Tag，同 Tag 重跑保持幂等。随后构建 Android、未签名 iOS IPA、Windows、Linux 发布包；仓库变量启用后还会构建 macOS universal 包，使用 Developer ID、Hardened Runtime 和 Apple 公证签名。未签名 IPA 只供开发者自行签名或重新打包，不能直接安装。全部资产生成校验和并发布 GitHub Release，随后通过固定 `known_hosts` 和受控导入 wrapper 原子镜像到官网。macOS 凭据和官网启用顺序记录在 `docs/macos-release-signing.md`。
+- 私有仓库 `miloquinn/open-reading-neo` 是后续源码、验证和发布 Tag 的权威位置；发布工作流使用审批保护的 `PUBLIC_RELEASE_TOKEN`，仅把公开安装包、校验清单和人工维护的 Release Notes 写入 `miloquinn/open-reading`。公开仓库的 `main` 保留最后公开源码，不能作为后续构建输入；跨仓库发布 Tag 只用于承载 GitHub Release，不代表公开源码快照。
 - GitHub `release` Environment 同时保护 Android/macOS 签名 job 和官网镜像 job，并应配置 required reviewers。Android 签名、macOS Developer ID/Notary API Key 与 `OFFICIAL_SITE_SSH_HOST`、`OFFICIAL_SITE_SSH_PORT`、`OFFICIAL_SITE_SSH_USER`、`OFFICIAL_SITE_SSH_PRIVATE_KEY`、`OFFICIAL_SITE_SSH_KNOWN_HOSTS` 均只保存在该 Environment，不保留仓库级副本。
 - `pubspec.lock` 纳入版本控制，CI 和发布流程均使用 `--enforce-lockfile` 保证依赖解析可复现。
 
@@ -79,6 +80,7 @@ lib/
 │  ├─ book_sources/         书源发现、搜索、管理与业务 widgets
 │  ├─ reader/               本地/书源阅读器与 themes
 │  ├─ reading_stats/        阅读统计页与 parts
+│  ├─ account/              登录、注册、资料与支持者身份管理
 │  ├─ ai/                   AI 页：对话历史、独立对话与选书上下文
 │  ├─ settings/             设置、字体、WebDAV 同步、parts 与 about 页面
 │  └─ legal/                协议等法律页面
@@ -89,6 +91,7 @@ lib/
 │  ├─ core/                 数据库、设置、应用状态、缓存、更新、后台下载通知与自定义字体存储
 │  ├─ library/              书库事件、聚合服务和下载任务队列
 │  ├─ reading/              阅读统计、阅读计划与启动阅读恢复
+│  ├─ account/              账号 API、设备授权、令牌轮换与安全存储
 │  ├─ sync/                 WebDAV 协议、变更存储、元数据适配器与书籍文件传输
 │  └─ storage/              平台存储桥接与 Android 文件夹授权
 ├─ utils/                   主题、字体、玻璃效果、本地化扩展等工具
@@ -106,21 +109,23 @@ lib/
 ## 主要页面
 
 - `pages/home/home_shell_page.dart`：应用主壳和导航入口；手机悬浮底栏支持纯图标与“图标＋文字”两种模式，用户可按稳定目的地 ID 调整首页、书库、发现和设置的顺序，同一顺序同步驱动手机 `PageView`、悬浮栏与宽屏 `NavigationRail`，重排时按目的地保持当前页面。底栏宽度在手机上取 `screenWidth - 36` 并以四项约 368px 为理想上限。新用户完成欢迎协议后，主壳可挂载一次性开发者支持浮层。
-- `pages/home/home_mobile_dashboard_page.dart`：手机与宽屏共用的响应式首页；信息层级固定为“继续阅读 → 阅读节奏 → 最近阅读”，只读取本地书籍与阅读统计，不加载阅读计划或 AI 推荐。`home_dashboard_page.dart` 仅保留稳定路由类型并转交统一实现。
+- `pages/home/home_mobile_dashboard_page.dart`：手机与宽屏共用的响应式首页；信息层级固定为“继续阅读 → 阅读节奏 → 最近阅读”，只读取本地书籍与阅读统计，不加载阅读计划或 AI 推荐。最近阅读按统计顺序批量查询书籍摘要，无会话记录时由 SQLite 直接筛选、排序并限制候选，不再逐本查询或把全书库载入 Dart。`home_dashboard_page.dart` 仅保留稳定路由类型并转交统一实现。
 - `pages/reading_stats/detailed_stats_page.dart`：阅读统计详情入口与数据加载；`reading_stats/parts/` 按公共样式、总览、图表、热力图、书籍排行和成就拆分页面模块，避免统计页继续膨胀为巨型文件。
-- `pages/library/library_page.dart`：本地与在线书架；书库顶部提供下载任务入口，WebDAV 配置后显示书籍文件入口并指示远端可用文件。本地书长按可把应用管理文件导出到系统位置，在线未下载记录不会显示误导性的导出入口。
+- `pages/library/library_page.dart`：本地与在线书架；书库顶部提供下载任务入口，WebDAV 配置后显示书籍文件入口并指示远端可用文件。本地书长按可把应用管理文件导出到系统位置，在线未下载记录不会显示误导性的导出入口。当前筛选与规范化搜索词对应的可见书籍列表按书库 revision 记忆，普通组件重建不再重复扫描和分配整份列表。
 - `pages/library/download_tasks_page.dart`：跨平台书籍下载队列的状态查看页；等待中和下载中的任务可逐条取消，取消状态与失败状态分离展示。
 - `pages/library/import_book/import_book_page.dart`：跨平台书籍导入队列；手机确认态采用顶部安全标题栏、独立滚动书目区和页面内底部操作区，并对文件选择器返回的异常窗口 inset 做限幅。
 - `services/books/book_export_*`：统一书籍导出结果、文件名/MIME 校验和平台后端；Android 走 MediaStore `Download/开元阅读`，iOS 走系统文档导出器，桌面端走另存为并流式复制。
 - `services/books/incoming_book_*`：统一系统“打开方式/分享”入站请求、冷/热启动 FIFO、初始化/协议门禁、格式与文件头校验、单书导入后打开及多书导入队列；原生层必须先把临时 URI/URL 物化成本地暂存文件。
-- `pages/reader/native_reader_page.dart`：本地 TXT、EPUB 等内容适配器；全局阅读字体尚未从磁盘恢复并完成运行时注册时只显示主题化打开占位。正文排版读取共享的字间距与对齐方式，重排后按 canonical 文本锚点恢复位置。
-- `pages/reader/book_source_reader_page.dart`：在线书源章节内容适配器；与本地阅读器共享字体就绪门禁、字间距和自然/两端对齐设置，目录或正文先返回时也不会提前使用临时字体绘制。
+- `pages/reader/native_reader_page.dart`：本地 TXT、EPUB 等内容适配器；全局阅读字体尚未从磁盘恢复并完成运行时注册时只显示主题化打开占位。正文排版读取共享的字重、字间距与对齐方式，重排后按 canonical 文本锚点恢复位置。EPUB 的 NCX/Navigation Document 目录链接会保留 fragment，并映射到解析后正文的 UTF-16 offset；同一 XHTML 内的二级标题可精确跳转，活动小节按全书目录目标位置判定，章节内容跨越相邻 XHTML 时仍保持上一小节为当前状态，直到下一个锚点进入阅读位置。
+- `pages/reader/book_source_reader_page.dart`：在线书源章节内容适配器；与本地阅读器共享字体就绪门禁、字重、字间距和自然/两端对齐设置，目录或正文先返回时也不会提前使用临时字体绘制。
 - `book_sources/services/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
-- `pages/book_sources/source_search_page.dart`：在线书源搜索与发现。
-- `pages/book_sources/book_source_management_page.dart`：原生协议书源管理。
-- `pages/settings/settings_page.dart`：应用设置、版本与维护入口，按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”五个分区组织；重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
-- `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片的添加/编辑/删除/激活与 AI 预处理开关从主设置页整体迁入，存储键（`reader_ai_quick_models_v1` 等）保持不变。
+- `pages/book_sources/source_search_page.dart`：在线书源搜索与发现；大型书源库的范围条按需构建，“全部书源”通过最多 8 个 worker 有界并发搜索，按单源超时渐进追加结果，清空、切换范围或离页时取消当前请求。手机入口先打开加载页，再在后台解析注册表并替换为搜索页。
+- `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型阅读书源聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和能力标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/可执行状态、分组筛选和针对当前结果的批量操作。
+- `pages/settings/settings_page.dart`：应用设置、版本与维护入口；顶部账号卡片进入 `pages/account/account_page.dart`，其余设置按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”组织。重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
+- `pages/account/account_page.dart` 与 `services/account/`：邮箱密码注册/登录、邮箱验证码、密码找回、GitHub/Google/Passkey 浏览器设备授权、资料与头像管理、令牌安全存储和刷新轮换。登录后的用户中心首页只展示圆形头像身份摘要、靠前的高级功能支持卡，以及“编辑资料 / 账号安全”入口；资料表单收纳到编辑页，登录方式、邮箱换绑、密码和 MFA 收纳到账号安全页。账号安全流程支持当前邮箱与新邮箱双验证码换绑、通过当前邮箱验证码设置或修改密码，以及默认关闭的 TOTP 两步验证；恢复码只展示一次，MFA 未完成的 bearer 会话会安全持久化并在启动时恢复到验证界面，不会被刷新或误清除。浏览器授权只在网页端明确确认后一次性交换 App bearer 会话；支持者身份不控制 WebDAV 或其他功能，当前全部功能免费。
+- `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片支持添加/编辑/删除/激活，服务商除内置项外可选“自定义”。自定义服务商把厂商身份与接口协议拆开，可选择 OpenAI Compatible 或 Anthropic，并按协议提示 Base URL 是否需要包含 `/v1`；快捷模型 JSON 同时保存协议，旧记录缺省按服务商原协议兼容读取。AI 预处理开关也位于此页。
 - `pages/settings/sync/`：WebDAV 概览、独立连接配置、即时保存的同步内容开关和书籍文件管理页；书源、书架信息、阅读进度等元数据自动同步，原文件需先开启上传权限，再按书选择上传或下载。新导入书籍提供“每次询问（默认）/ 自动上传 / 始终手动”三种策略；自动上传只处理符合安全限制的真正新增本地文件。
+- `pages/settings/replace_rules_page.dart` 与 `services/reader/replace_rule_service.dart`：全局“替换净化”规则管理与执行边界。规则使用 SharedPreferences JSON 持久化，支持新建、编辑、启停、删除、搜索、排序、JSON 导入导出，以及常见新旧字段（`pattern`/`regex`、`name`/`replaceSummary`、`isEnabled`/`enable`、`scope`/`useTo`、`order`/`serialNumber`）；规则可按书名/书源范围、排除范围和标题/正文类型生效。设置页提供稳定入口，本地文字阅读器和在线书源阅读器控制栏提供快速入口；标题与正文都在分页前净化，EPUB/Kindle 富文本会重算样式块偏移并保留图片，规则变更后当前阅读器清理文字/分页缓存并按现有进度重排。
 - `services/sync/`：本地优先的 WebDAV v1 同步实现。每台设备写入独立的不可变变更批次，使用 HLC、tombstone 和记录级 LWW 合并；`book_sources` 按书源 ID 同步公开注册信息，在线书籍通过 `source_id + source_book_id`、书源快照和书籍快照恢复为可直接打开的书架项，在线章节进度复用 `progress` 数据集同步，但章节正文、目录、封面路径和缓存始终留在设备本地。新上传书籍以未加密的原始字节和原始文件名保存在 `books/<书名 - 作者>/`，同名异内容使用 `(2)`、`(3)` 可读编号避免覆盖。SHA-256 仅保存在同步元数据和本地索引中用于校验，历史无扩展名 blob 仍可下载；持久封面继续独立按 SHA-256 内容寻址。`sync_dataset_catalog.dart` 分离稳定协议数据集与当前版本能力，暂未开放的笔记/高亮记录可保留在同步镜像中，但不会扫描或写入业务表。
 - `pages/settings/custom_fonts_page.dart`：用户字体库的导入、应用、重命名和删除入口。
 - `widgets/side_toast.dart`：应用内短反馈的统一浮层。手机在顶部居中、宽屏在右上展示，连续提示直接替换；普通/成功提示短暂停留，警告/错误略延长，并通过 `IgnorePointer` 保证通知出现时底层操作仍可点击。页面内不再直接使用底部 `SnackBar`。
@@ -155,13 +160,14 @@ lib/
 - `FontCatalog` 维护 App 字体与阅读字体两套内置语义目录；用户字体作为共享资产同时合并到两套候选列表。
 - `AppSettingsNotifier` 分别保存 `app_font_id_v2` 与 `reader_font_id_v2`，同一用户字体可独立用于 App、阅读或两者。
 - `AppSettingsNotifier` 同时持久化手机底部导航文字显隐、稳定目的地顺序与可选的自定义高度/左右边距；自动尺寸会在带 Home Indicator 的 iPhone 上增加高度并收窄栏体，悬浮导航配置页的预览与 `HomeShellPage` 共用同一计算。配置更新后，Provider 即时同步手机横滑页、悬浮栏和宽屏侧栏，默认保持纯图标与“首页、书库、发现、设置”顺序。书籍路由存活时，手机悬浮栏向屏幕下方滑出并停止接收点击；点击返回或 Android 预测性返回手势起步时立即从下方回弹，手势取消则重新收起。阅读活动彻底结束前首页会锁住进入阅读器前的系统安全区，避免 Android 临时手势提示栏改变 inset 后让回弹中的悬浮栏跳高。
+- `services/core/display_refresh_rate_controller.dart` 管理移动端刷新率偏好：Android 通过 `MainActivity` 在当前分辨率下切换最接近 60Hz / 最高刷新率的显示模式；iOS 原生层在 Flutter 创建 `CADisplayLink` 时捕获引擎显示链路，省电时把首选帧率范围固定为 60fps，关闭后恢复 ProMotion 的系统最高帧率。偏好键为 `power_saving_mode_v1`，启动时从 SharedPreferences / UserDefaults 恢复，不改变桌面端和 Web 的显示策略。
 - `ThemeNotifier` 只持久化一个应用强调色 `appAccentColorV2`；`AppThemes.fromAccentColor` 通过 Material 3 `ColorScheme.fromSeed` 同时生成浅色与深色色板。旧版 `appTheme`、`customAccentColor`、`globalAccentColor` 首次读取时按覆盖优先级折叠迁移，设置页不再暴露独立的“应用主题”。
 - `AppSettingsNotifier` 持久化书库卡片/纯封面网格模式与手机网格 2/3 列密度；手机严格按选择列数显示，平板和桌面按同一封面密度响应式增加列数。卡片模式保留既有书名、进度等信息，纯封面网格仍支持点击阅读与长按管理。
-- `CustomFontService` 在原生平台负责 TTF/OTF 校验、SHA-256 去重、运行时 `FontLoader` 注册、清单恢复和文件删除；Web 首版不提供持久化字体导入。
-- `OnlineFontService` 将下载进度保留在独立、节流的局部监听器中，网络分块不再触发 `AppSettingsNotifier` 全局重建；大字体签名检查与 SHA-256 流式校验在后台 isolate 完成，UI isolate 只承担最终 `FontLoader` 注册。
+- `CustomFontService` 在原生平台负责 TTF/OTF 校验、SHA-256 去重、运行时 `FontLoader` 注册、清单恢复和文件删除；导入时只读解析 SFNT `fvar` 表中的 `wght` 轴并持久化真实范围，旧清单会对本地原文件回扫一次补齐元数据。Web 首版不提供持久化字体导入。
+- `OnlineFontService` 将下载进度保留在独立、节流的局部监听器中，网络分块不再触发 `AppSettingsNotifier` 全局重建；大字体签名检查与 SHA-256 流式校验在后台 isolate 完成，UI isolate 只承担最终 `FontLoader` 注册。官方字体只提供 ZIP 总包时，可用受限 HTTP Range 读取指定 Deflate 条目，解压后必须通过大小、字体签名和固定 SHA-256 校验，服务端不返回 `206` 时拒绝下载，避免误取整个压缩包。
 - 用户字体使用 `custom_<hash>` 稳定 ID 和 `OpenReadingCustom_<hash>` 运行时 family，避免同名字体互相覆盖。
 - 删除正在使用的用户字体时，App 字体与阅读字体分别恢复各自默认值；阅读字体 ID 仍参与分页布局签名。
-- 内置字体的 SIL OFL 1.1 原文保存在 `assets/fonts/licenses/`，通过应用内开源许可页离线展示；用户自行导入的字体仍由用户负责确认授权范围。
+- 在线字体的许可原文保存在 `assets/fonts/licenses/`，通过应用内许可页离线展示；HarmonyOS Sans 只从华为官方包读取未修改的 SC Regular，并保留专用字体协议显著声明。`FontOption` 对在线和用户导入字体统一记录真实变量 `wght` 轴范围；阅读字重控件会区分变量字体与固定字重/系统合成效果。用户自行导入字体仍由用户负责确认授权范围。
 
 ## 本地书籍格式
 
@@ -200,18 +206,19 @@ lib/
 
 核心文件：
 
-- `utils/book_open_transition.dart`：书架封面展开/缩回路由；点击书籍的同步阶段就发布阅读活动信号，供手机首页壳层立即收起悬浮导航。打开动画首帧就在封面层后挂载阅读器预热，但封面接近全屏后会停留，直到阅读器报告正文首帧及内部 360ms 淡入已经完成，再用 380ms 让封面与正文直接交叉透明度；不再按固定 460ms 撤掉封面并暴露主题白底。只有持续加载超过 850ms 时，封面才渐隐到已经淡入的主题化书本加载动画，加载完成后再由阅读器用 360ms 交叉渐变到正文；加载期正文表面仍可点击呼出标题栏和控制栏退出。封面放大与退出缩回共用“前段快速响应、后段柔和落位”的 ease-out 曲线。无法捕获封面位置的入口不再缩放完整阅读器，而是按入口来源使用纯纵向纸面位移与双阶段淡入：首页位移较轻，发现页延续底部详情面板方向，退出时原路下沉；减少动态效果开启时取消位移。退出动作起步时通过 `SnapshotWidget` 把当前阅读屏冻结成纹理，后续缩放、裁剪和透明度只作用于该快照，避免复杂正文层树逐帧合成；预测性返回取消时保持快照完成全屏恢复，落定后才重新启用实时阅读页。退出时正文透明度从返回进度 2% 起直接映射到封面，并在约 40% 时完成交接；Android 14+ 通过 `PredictiveBackEvent` 把系统侧滑进度直接写入同一动画，取消时恢复全屏阅读，提交时从当前拖动位置继续缩回。调用方通过 `route.completed` 等待反向动画真正离开 Overlay 后才刷新书架/首页统计，避免卡片重建与封面位置解析抢同一帧；封面祖先尚未布局时坐标解析安全退回捕获位置。直接打开且退出前需要“加入书架？”确认的在线书籍继续禁用预测性弹出，以保留业务门禁。
+- `utils/book_open_transition.dart`：书架封面展开/缩回路由；点击书籍的同步阶段就发布阅读活动信号，供手机首页壳层立即收起悬浮导航。书库保留经典封面、极简淡入、纸面浮现和侧页推入四种类型（双页展开已移除），每种类型共享独立的快速/优雅节奏偏好，默认快速。非经典动画把当前页面平滑交接到预先读取的阅读主题底色；阅读器可在后方预热，但正文透明度始终保持 0，直到报告“正文首帧就绪”后才单向渐现到 1（快速 240ms、优雅 720ms）。本地与在线阅读器不再维护额外的开场 `AnimatedSwitcher`，加载态也不能提前修改正文透明度，因此不会出现“正文先闪出、被隐藏、再渐现”的多重时间轴。经典封面仍保留原封面飞行与退出缩回，内容迟到时保持封面，正文就绪后再按快速/优雅节奏完成唯一一次交接。无法捕获封面位置的入口不再缩放完整阅读器，而是按动画类型使用无位移淡入、纵向纸面浮现或侧向推入；减少动态效果开启时取消位移。应用启动时预热阅读主题并复用内存缓存；首页和书库打开书籍时让主题读取与书籍查询并行，本地文件修复/存在性检查也与主题准备重叠。主题在创建路由前已经确定，纯黑/黑夜主题不会插入白色中间帧；进行中的旧主题读取不能覆盖用户刚选择的新主题。转场监听器在路由生命周期内复用，避免每帧重复分配。退出动作起步时通过 `SnapshotWidget` 把当前阅读屏冻结成纹理，后续缩放、裁剪和透明度只作用于该快照；预测性返回取消时保持快照完成全屏恢复，落定后才重新启用实时阅读页。退出时正文透明度从返回进度 2% 起直接映射到封面，并在约 40% 时完成交接；Android 14+ 通过 `PredictiveBackEvent` 把系统侧滑进度直接写入同一动画。调用方通过 `route.completed` 等待反向动画真正离开 Overlay 后才刷新书架/首页统计；直接打开且退出前需要“加入书架？”确认的在线书籍继续禁用预测性弹出，以保留业务门禁。
+- 打开门禁只包裹正文绘制层，不再让整个阅读页透明或暂停整棵 Ticker 树；主题画布、慢加载反馈、控制栏和返回始终可见可操作。高成本翻页快照继续通过 `ReaderTransitionWorkScope` 与正文局部 `TickerMode` 延后。本地阅读器的初始位置占位层位于正文之上、控制栏之下，即使位置恢复异常也不能遮挡或拦截退出操作；本地和在线阅读器在 220ms 后显示主题化加载反馈。
 - `core/reader/reader_transition_work_scope.dart`：阅读路由转场的高成本工作许可；打开阶段允许正文异步解析但延后 page-curl GPU 快照，退出交接完成后暂停翻页 ticker 与新快照，预测性返回取消并恢复全屏后再继续。
 - `core/reader/reader_settings.dart`：统一字号、行高、主题、翻页模式、首行缩进、段落间距、独立上下边距、“下拉书签”“点击动画”和平板双页偏好。`tabletTwoPageEnabled` 默认开启，以 `reader_tablet_two_page_enabled` 在两个阅读器之间共享持久化。
 - `core/reader/reader_custom_theme.dart`：有序自定义阅读主题库模型；每个主题拥有稳定 ID、名称、字体色、阅读背景色、控制栏色、可选背景图片路径与显示强度。`ReaderCustomThemeStore` 使用 SharedPreferences JSON 列表持久化，并自动迁移旧的单主题 `reader_custom_theme_v1` 数据。
 - `core/reader/reader_theme_order.dart`：阅读主题全局顺序存储；以稳定主题 ID 列表统一持久化预设与自定义主题的排列，并在读取时去除空值和重复项。旧排序缺少 `system` 时会把“跟随系统”迁移到首位，用户后续仍可重新排序。
-- `core/reader/reader_layout.dart`：翻页模式、分页缓存指纹与阅读布局断点；指纹包含字号、行高、字间距、对齐方式、边距、系统文字缩放、方向和字体等会改变分页的输入。最短边至少 600 才视为平板，双页仅在横屏且宽度至少 720 时可用，并继续受用户开关控制。`pageCurl` 固定使用经典折页，不再维护额外的仿真样式状态。
+- `core/reader/reader_layout.dart`：翻页模式、分页缓存指纹与阅读布局断点；指纹包含字号、字重、行高、字间距、对齐方式、边距、系统文字缩放、方向和字体等会改变分页的输入。最短边至少 600 才视为平板，双页仅在横屏且宽度至少 720 时可用，并继续受用户开关控制。`pageCurl` 固定使用经典折页，不再维护额外的仿真样式状态。
 - `core/reader/native_text_paginator.dart`：本地与在线纯文本分页共享实现；正文默认自然对齐以保持显式字间距稳定，用户可切换为两端对齐，分页测量与最终绘制始终共用同一文字流。书籍正文使用独立的 `readerBodyTextScaler`，字号只由阅读设置控制，不再被 iOS Dynamic Type 或 Windows 系统文字缩放二次放大；阅读控制栏仍遵循平台无障碍缩放。“系统默认”继续保持 `fontFamily: null`，但 iOS 中文环境通过 `readerFontFamilyFallbacks` 固定系统自带苹方的简/繁回退顺序，避免 Impeller 隐式 CJK fallback 产生相邻字形粗细或视觉尺寸漂移；其他平台和显式字体 fallback 不变。正文行高仅作用于行间，首行上方和末行下方的 leading 统一裁剪，配套 strut 不携带 `height`。分页范围分别记录连续的原文归属边界与实际可见边界：落在页首的段落间距、连续换行和空白段只在显示层折叠，既不生成空白首页/空白续页，也不破坏书签和进度 offset。分页可为第一页单独指定 `firstPageHeight`，供 EPUB 图片页缩小首屏文字区而让后续纯文字页恢复全高。
 - `core/reader/reader_text_pagination.dart`：本地文件与在线书源唯一的文字章节分页入口和 `ReaderTextPage` 页面模型；统一 canonical/display offset、首行缩进、段落间距、页首空白折叠、独占章节标题页、首屏特殊高度和 760px 单 leaf 内容宽度上限。书源兼容包装不再拥有独立分页算法。
 - `core/reader/reader_annotation.dart`：阅读标注共享领域层；把页内选区还原为章节 UTF-16 offset 与 `CanonicalLocator/TextAnchor`，统一高亮/下划线/文字批注样式、批注点击识别和章节匹配。听书当前句以独立的临时 UTF-16 范围叠加，不写入 `book_notes`；文字批注优先保留下划线与点击语义，重排后仍跟随原文锚点。
 - `core/reader/reader_text_characters.dart`：TXT、EPUB、HTML/HTM/XHTML、Markdown、FB2、RTF、DOCX 与在线书源共享的硬换行和段首空白规则；覆盖 CR/LF、VT、FF、NEL、Unicode line/paragraph separator，以及常见 Unicode 空格和 BOM，保证各适配器与 Flutter 排版对段落起点的判断一致。
 - `core/reader/txt_chapter_parser.dart`：TXT 章节识别与标题/正文边界的单一实现；识别出的标题独立存储，正文范围跳过标题行和相邻空行，并输出 `isNeedSplitTitle` 供分页模式插入章节标题页。小文件解析缓存和大文件 UTF-8 索引共用该边界结果；超大 TXT 的每一个超过约 32K 字符的章节都会优先靠近换行边界切成懒加载片段，避免整本无章节文件或单个异常巨型章节在 UI isolate 同步解码、分页。索引片段由异步文件读取器按当前窗口加载；首次大文件索引延后到封面→加载交接完成后启动，既有有效索引在封面飞行动画落定后立即复用，避免缓存反序列化和首屏准备抢占入口动画。
-- `core/reader/reader_text_layout.dart`：把首行缩进和段落间距投影成显示文字，并维护显示 UTF-16 boundary 到原文 boundary 的单调映射，保证书签和阅读进度仍使用 canonical offset；所有可重排文本格式使用同一段首识别，既有半角/全角空白统一替换为设置宽度。视觉缩进使用字形为空、Unicode 分类为宽字符而非空白的 Hangul Filler，避免 Flutter/SkParagraph 在两端对齐的长段落首行裁掉前导空白。EPUB 解析器生成的连续段落换行只在显示层归一化，不改写规范文本。
+- `core/reader/reader_text_layout.dart`：把首行缩进和段落间距投影成显示文字，并维护显示 UTF-16 boundary 到原文 boundary 的单调映射，保证书签和阅读进度仍使用 canonical offset；所有可重排文本格式使用同一段首识别，既有半角/全角空白统一替换为设置宽度。视觉缩进使用字形为空、Unicode 分类为宽字符而非空白的 Hangul Filler，避免 Flutter/SkParagraph 在两端对齐的长段落首行裁掉前导空白。TXT、EPUB 与在线书源会在显示层把连续换行和夹有空格/Tab 的空白行归一为一个结构换行，再仅按用户的段距设置增加间距，不改写规范文本和原文锚点。
 - `core/reader/reader_page_turn_geometry.dart` 与 `widgets/src/page_curl/reader_page_curl_state.dart`：经典折页使用“局部装订始终为 x=0”的 leaf canonical 坐标；`bindingEdge` 只负责左右 leaf 的坐标换算，翻页方向不再移动书脊。几何显式区分 outgoing（当前页卷走）与 incoming（上一页展开）两种运动；手机单页手势以真实水平位移决定方向，所以任意横向起点向左均可翻下一页、向右均可翻上一页，匹配自由外缘的起手继续使用更宽松阈值和即时跟手。平板双页仍以 `edgeDragOnly` 仅允许两侧自由外缘起手，避免从中央书脊误触。手机 backward 按起手后的位移驱动折线，固定起手高度参与对角斜率，纵向移动会实时改变折痕。提交时双轴弹簧吸附到精确的 x=0 / x=width 竖直端点，使 shader 的透明/identity 终态分支稳定命中。
 - `core/reader/reader_leaf_status.dart`：分钟级时间、电量状态；Android/iOS 通过 `com.niki.xxread/reader_status` method channel 读取电量。分页模式选用阅读信息栏时，状态 revision 会参与纸页快照更新；上下翻页则由固定视口信息栏直接消费。
 - `core/reader/reader_safe_area.dart`：系统安全区、阅读信息栏预留、正文边距和页码位置。
@@ -230,9 +237,9 @@ lib/
 - `widgets/reader_theme_background.dart`：阅读背景合成层，按主题底色铺底并以受控强度叠加用户图片；本地阅读器、在线书源阅读器、纸页快照和主题预览共同使用。
 - `widgets/reader_settings_controls.dart`：完整阅读设置、主题横向卡片、翻页模式、三态顶部信息选择器和阅读交互开关面板；平板会显示双页布局开关，手机不渲染该选项。预设与自定义主题按统一用户顺序展示，最右侧固定为带自定义主题数量的管理入口；“跟随系统”在浅色外观使用白天配色、深色外观使用纯黑配色，并随系统亮度即时更新。关闭玻璃效果时，阅读控制栏、图标按钮和可见系统栏均使用阅读主题实色，不再叠加玻璃态提亮。
 - `widgets/reader_aloud_panel.dart`：阅读器听书控制面板；本地书和在线书源共用 72% 屏高上限、系统拖拽条和下拉关闭行为，正文超出时在面板内滚动。提供播放/暂停、上下句、停止、章节进度、系统/云端引擎切换、OpenAI-compatible TTS 配置、系统音色、语速/音量/音调，以及可自由选择小时和分钟、显示剩余进度的定时停止。
-- `widgets/reader_ai_panel.dart`：阅读器“问AI”底部对话面板；本地书和在线书源共用，从控制栏（当前页文本作上下文）或选中工具栏（选区加前后各 1400 字符窗口，自动发出本地化的解释提问）打开。面板内维护多轮对话历史并调用 `reader_core/ai/ai_service.dart` 的 `ReaderHttpAIService.chat`，错误经 `ai_error_translator` 翻译；未配置 API Key 时禁用输入并提示前往设置。AI 提供商、模型与密钥配置仍集中在设置页“AI 阅读助手”区块。
+- `widgets/reader_ai_panel.dart`：阅读器“问AI”底部对话面板；本地书和在线书源共用，从控制栏（当前页文本作上下文）或选中工具栏（选区加前后各 1400 字符窗口，自动发出本地化的解释提问）打开。面板内维护多轮对话历史并调用 `reader_core/ai/ai_service.dart` 的 `ReaderHttpAIService.chat`，错误经 `ai_error_translator` 翻译；未配置 API Key 时禁用输入并提示前往设置。`AIProviderSettings` 独立保存服务商与有效协议，HTTP 服务按协议构造 endpoint、认证头、消息体和响应解析，自定义服务商可复用 OpenAI Compatible 或 Anthropic 请求链路。
 - `pages/ai/ai_page.dart` 与 `pages/ai/ai_history_page.dart`：首页导航新增的 AI 页，进入即为对话界面（悬浮输入条、可关联任意书籍，把该书预处理摘要与用户笔记/高亮注入为上下文）；左上角历史按钮进入独立历史页（`services/ai/ai_chat_history_store.dart`，prefs JSON、上限 100 会话，滑动删除、清空、Markdown 转写详情）。导航目的地可在悬浮导航设置页按开关隐藏（设置页锁定），隐藏集合存 `home_navigation_hidden_v1`。
-- `services/ai/book_preprocess_service.dart`、`services/ai/ai_preprocess_task_controller.dart` 与 `services/books/book_text_extraction_service.dart`：AI 预处理链路。抽取服务无头解析 TXT/EPUB/Kindle 章节文本（解码/解包/HTML 转纯文本统一放 isolate，失败回退主线程）；预处理服务分块总结再合并成 Markdown 知识库，写入 `ai_knowledge/books/<id>/memory.json` 的 `summary` 字段；相邻请求保留 1.5s 间隔，限流（429/529）/5xx/网络错误按 5s/15s/45s 退避重试最多 3 次（配置类错误立即失败），退避与间隔等待期间取消即时生效；任务经全局 FIFO 队列后台串行执行，"下载任务"页第二个 Tab 展示进度并支持取消/清理。入口：设置页"AI 预处理书籍"开关（默认关，开启校验模型并提示 token 消耗）、导入钩子 `scheduleImportedBookAnalysis`、书架长按菜单手动入队。
+- `services/ai/book_preprocess_service.dart`、`services/ai/ai_preprocess_task_controller.dart` 与 `services/books/book_text_extraction_service.dart`：AI 预处理链路。抽取服务无头解析 TXT/EPUB/Kindle 章节文本（解码/解包/HTML 转纯文本统一放 isolate，失败回退主线程）；正文按最多 2800 字符且优先靠近段落/句末边界切分，每份摘要限制为 900 字，再以最多 3 份一组做多层归并，最终 Markdown 请求不再一次注入整本书的全部分段摘要；产物写入 `ai_knowledge/books/<id>/memory.json` 的 `summary` 字段。相邻请求保留 1.5s 间隔，限流（429/529）/5xx/网络错误按 5s/15s/45s 退避重试最多 3 次（配置类错误立即失败），退避与间隔等待期间取消即时生效；任务经全局 FIFO 队列后台串行执行，"下载任务"页第二个 Tab 展示包含分层归并步骤的进度并支持取消/清理。入口：设置页"AI 预处理书籍"开关（默认关，开启校验模型并提示 token 消耗）、导入钩子 `scheduleImportedBookAnalysis`、书架长按菜单手动入队。
 - `services/ai/ai_request_coordinator.dart`：全局 AI 请求协调器。阅读器问 AI 面板与 AI 页对话经 `runInteractive` 登记为交互式请求；预处理在每次分块/合并请求前 `waitUntilInteractiveIdle` 主动让行，预处理进行中对话依然随问随答，不受服务商按 Key 并发限制挤占。
 - `widgets/reader_pull_bookmark.dart`：只从屏幕顶部区域起手的原始指针下拉手势、阈值反馈和当前页书签页缘标记；数据仍复用既有 `BookmarkDao`。
 - `widgets/reader_vertical_paging_surface.dart`：本地文件与在线书源共用的上下翻页交互宿主；把中间轻点识别放在 `SelectionArea` 内部，统一“轻点呼出控制栏、竖滑只滚正文”的手势优先级。
@@ -243,9 +250,9 @@ lib/
 - `widgets/reader_tap_observer.dart`：本地与在线阅读器共享的轻点观察器；不进入 Flutter gesture arena，只把短时、未移动的指针序列交给翻页/控制栏，长按选区、拖选、滚动和批注点击继续由各自手势处理。普通轻点会延后到内联文字识别器完成后再兜底，避免查看笔记时同时翻页。
 - `widgets/reader_paper_page_leaf.dart`：正文、可选的页内阅读信息栏与章内页码组成完整纸页；无动画、横滑和仿真翻页均以它为最小 page leaf，因此时间、标题、电量和页码会随纸张运动。手机/单页页码位于右下，平板 spread 的左 leaf 位于左下、右 leaf 位于右下；空白和补位 leaf 保留对应顶部信息角色，但不显示虚假页码。页码距离外侧屏幕边缘至少 24px，避开圆角遮挡。
 - `widgets/reader_top_information_bar.dart`：时间、章节标题和电量的共享绘制组件；单页使用 `full`，平板 spread 左页使用 `spreadLeft` 仅在左上显示章节标题，右页使用 `spreadRight` 仅在右上显示时间和电量；上下翻页复用于固定视口 chrome。
-- `widgets/reader_shader_page_curl.dart`：经典折页公共 library 入口，外部 API 保持稳定；实现按 API、状态机、快照缓存、绘制、收尾物理和内部类型拆到 `widgets/src/page_curl/`。手机 forward 以 current 为卷动源、next 为实时底页；backward 以 previous 为展开 source、current 为实时 underlay。平板 outgoing 可额外传入 `outgoingBackPage` 作为纸张背面：右页 forward 使用下一 spread 左页，左页 backward 使用上一 spread 右页；第二张 shader sampler 会在折叠逆变换后再反转纹理 X，使背页落到书脊另一侧时保持正常阅读方向，手机未传该页时继续沿用镜像 source。交互折页直接观察原始指针流，不再与页内 `SelectionArea` 争夺 gesture arena；18px 水平意图触发折页，长按超时则让位给文字选择，右侧轻点观察器使用同一系统 touch slop，消除两套阈值之间的无响应空档。backward 激活后每帧直接使用真实 X/Y 位移，不保留水平/对角永久锁，松手只比较最终 X 是否越过 activation X 且不读取 release velocity。120ms 自由边追赶只属于屏幕中部起手的 outgoing，真实边缘起手直接跟手。Incoming 的提交与取消都以 X 为主通道，并在剩余 X 行程前 84% 内平滑拉平 Y，进入终点后保持精确竖直 pose，避免右下甩尾或阴影复现。活动 source 或纸背缓存未命中时先用已完成 paint 的 `RepaintBoundary.toImageSync()` 临时纹理保证首帧跟手，随后在页面准备完成后异步重抓并原子替换；异步抓图会先确认 `RenderRepaintBoundary` 已完成 paint，并遵循 `ReaderTransitionWorkScope` 在打开/退出转场中暂停预热，避免 `debugNeedsPaint` 断言和无效 GPU readback。Shader 直接消费 canonical `posA/posB`，保留恢复出的 `max(0,x)` 装订硬边界。单 leaf 连续请求走有界 FIFO；平板左右 leaf 通过共享 coordinator 串行化，并由 `ReaderPageCurlSpread` 按当前活动装订边动态调整绘制层级。
+- `widgets/reader_shader_page_curl.dart`：经典折页公共 library 入口，外部 API 保持稳定；实现按 API、状态机、快照缓存、绘制、收尾物理和内部类型拆到 `widgets/src/page_curl/`。手机 forward 以 current 为卷动源、next 为实时底页；backward 以 previous 为展开 source、current 为实时 underlay。平板 outgoing 可额外传入 `outgoingBackPage` 作为纸张背面：右页 forward 使用下一 spread 左页，左页 backward 使用上一 spread 右页；第二张 shader sampler 会在折叠逆变换后再反转纹理 X，使背页落到书脊另一侧时保持正常阅读方向，手机未传该页时继续沿用镜像 source。交互折页直接观察原始指针流，不再与页内 `SelectionArea` 争夺 gesture arena；18px 水平意图触发折页，长按超时则让位给文字选择，右侧轻点观察器使用同一系统 touch slop，消除两套阈值之间的无响应空档。backward 激活后每帧直接使用真实 X/Y 位移，不保留水平/对角永久锁，松手只比较最终 X 是否越过 activation X 且不读取 release velocity。120ms 自由边追赶只属于屏幕中部起手的 outgoing，真实边缘起手直接跟手。Incoming 的提交与取消都以 X 为主通道，并在剩余 X 行程前 84% 内平滑拉平 Y，进入终点后保持精确竖直 pose，避免右下甩尾或阴影复现。活动 source 或纸背缓存未命中时先用已完成 paint 的 `RepaintBoundary.toImageSync()` 临时纹理保证首帧跟手；一次翻页开始后会克隆并锁定本次 source/back 纹理，页面准备完成产生的新快照只进入缓存供下一次翻页使用，不在当前手势中替换画面。空闲预热写入缓存时不再触发可见层重建；异步抓图会先确认 `RenderRepaintBoundary` 已完成 paint，并遵循 `ReaderTransitionWorkScope` 在打开/退出转场中暂停预热，避免 `debugNeedsPaint` 断言和无效 GPU readback。Shader 直接消费 canonical `posA/posB`，保留恢复出的 `max(0,x)` 装订硬边界。单 leaf 连续请求走有界 FIFO；平板左右 leaf 通过共享 coordinator 串行化，并由 `ReaderPageCurlSpread` 按当前活动装订边动态调整绘制层级。
 - `widgets/reader_control_chrome.dart`：统一顶部、底部控制栏，并仅为上下翻页承载固定视口阅读信息栏；信息栏在系统安全区下方显示时间、章节标题和电量，并在控制栏展开时淡出。上下翻页的章内页码固定在右下，其余分页模式的信息栏与页码均由纸页 leaf 绘制。
-- `widgets/reader_navigation_sheet.dart`：目录、书签、批注和定位面板；批注页统一列出高亮、下划线和文字批注，支持按 canonical locator 跳转与删除。旧手写记录继续保留在数据库兼容层，但不再由产品界面创建、绘制或展示。整个面板使用当前阅读主题配色，目录按 EPUB 等来源提供的 `depth` 还原为可展开/收起的层级树，搜索结果保留祖先路径，“当前”定位会自动展开被折叠的父链。目录展示模型在书籍内容加载阶段预先生成；无折叠时直接复用树列表，折叠可见性以深度栈线性扫描，避免超长目录首次打开时发生平方级祖先回溯。
+- `widgets/reader_navigation_sheet.dart`：目录、书签、批注和定位面板；批注页统一列出高亮、下划线和文字批注，支持按 canonical locator 跳转与删除。旧手写记录继续保留在数据库兼容层，但不再由产品界面创建、绘制或展示。整个面板使用当前阅读主题配色，目录按 EPUB 等来源提供的 `depth` 还原为可展开/收起的层级树，搜索结果保留祖先路径，“当前”定位会自动展开被折叠的父链；本地 EPUB 目录项同时传递 fragment 目标，点击二级标题不再退化为整章起点，同一 spine 文档下也始终只有实际活动小节显示“当前”。目录展示模型在书籍内容加载阶段预先生成；无折叠时直接复用树列表，折叠可见性以深度栈线性扫描，避免超长目录首次打开时发生平方级祖先回溯。
 - `widgets/generated_book_cover.dart`：无真实封面时的统一实时封面组件，与持久化 PNG 共用同一绘制器。
 - `widgets/source_cover_image.dart`：ORSP 远程封面的统一展示入口；复用受控加载器，在解码失败时驱逐损坏缓存并最多重新获取一次。
 
@@ -286,19 +293,36 @@ EPUB 图片块与其后的正文共用同一个显示投影：携带图片的第
 
 书源服务边界：
 
-- `BookSourceRegistry`：注册和启用状态。
-- `BookSourceClient`：协议请求。
+- `BookSourceRegistry`：注册和启用状态。所有结构合法的导入记录都会保留；`loadRunnable()` 才按全局协议开关和本地运行能力缩小运行集合。换源等交互入口使用 `loadRunnableInBackground()`，把大型注册表 JSON 解码、阅读书源兼容扫描和运行门禁过滤移到后台 isolate，主 isolate 只恢复已筛选记录。原生平台把注册表作为单独 JSON 文件原子写入应用支持目录；启动时会在任何全局偏好缓存预热之前，把旧版 `open_reading_book_sources_v1` SharedPreferences 大字段迁出并删除，Web 与缺少文件插件的测试环境保留旧存储回退。批量导入只序列化和写入一次且直接返回内存结果，单项/批量变更通过全局异步尾队列串行，避免并发覆盖。
+- `BookSourceClient`：协议请求。ORSP 清单、推荐、分类、浏览和详情使用按书源 API/协议版本/操作/分页参数隔离的响应缓存；TTL 分别按数据变化频率设置，手动刷新先清除当前范围缓存。搜索结果只进入短期内存缓存，带取消令牌的搜索不共享在途请求，避免一个页面取消影响另一个调用方。阅读书源运行时响应可能包含变量或认证派生状态，因此不进入该持久缓存。
+- `BookSourceResponseCache`：公开书源元数据的有界两级缓存。原生平台使用 48 项/4 MiB 内存 LRU 与 160 项/16 MiB 临时目录 JSON 缓存，Web 端条件导出为同配额的内存实现；冷缓存并发请求共享一次加载，响应进入内存后立即返回，JSON 编码、磁盘写入、原子替换和配额清理在有序后台队列完成。单 key/前缀失效只推进相关活动代次并建立磁盘读取屏障，全部清空才推进全局 epoch；活动代次在对应加载和写入结束后释放，既阻止旧结果复活，也不无限积累或牵连其他书源。损坏、过期、失败或取消结果不会持久化。
+- `BookSourceChangeService`：手动整书换源编排。以最多 12 个 worker 有界并发搜索当前来源之外的已启用书源，每源搜索预算 6 秒；优先搜索 ORSP、已完整验证的阅读书源和配置中 `respondTime` 较低的来源，再按 `customOrder` 与名称稳定排序。取消订阅或单源超时会把取消令牌下传到 ORSP Dio 与阅读书源 HTTP 传输层，终止在途请求并释放 worker，而非只停止 UI 更新；书名必须规范化精确匹配，作者校验可由用户关闭。候选在提交前必须实际通过详情、目录和映射后当前章节正文验证。章节位置优先按完整标题、章节号匹配，再按新旧目录比例回退。
+- `SourceImportService` / `BookSourceImportAnalyzer`：64 MiB、最多 10,000 条的聚合导入边界；单次 UTF-8/JSON 解码，按 `bookSourceUrl` 保留最后一条，分别统计无效项和重复项。文件解析使用后台 isolate；URL 输入只在直接内容不是有效书源且声明嵌套 URL 时递归加载。能力扫描只生成本地摘要，不执行站点可用性探测，也不作为保存书源的前置条件。
+- `SourceRuntime` / `SourceHttpTransport`：阅读书源的应用内执行链路。搜索和详情规则产生的书籍级变量会随书籍快照传入目录、正文、下载与换源验证；旧快照缺变量时可从详情 URL 模板和状态写入规则反推。章节地址绝对化保留末尾请求选项，正文多节点按换行合并后再执行默认不跨行的清理表达式。请求按书源维持独立 Cookie 会话，接收并校验 `Set-Cookie` 的域、路径、Secure 与过期属性，支持配置中的静态 Cookie；重定向按浏览器语义处理 301/302/303/307/308，跨站时移除 Host、Authorization 和静态 Cookie。源级请求头支持 `source.getKey()`、`source.bookSourceUrl` 等常见取值表达式。普通公网 DNS 使用已校验地址连接；虚拟 DNS 的保留地址在同样检查后使用系统网络通道，避免本地隧道被自定义连接破坏。脚本网络调用通过暂停、APP 请求和上下文重放实现同步语义；Android 后台网页等待导航稳定后再回传最终 DOM、URL 与 Cookie。脚本 evaluator 通过 `source_script_engine_platform.dart` 条件导出：原生平台使用 QuickJS，Web 使用 API 兼容的明确不支持实现，避免 `flutter_js` 的 `dart:ffi` 依赖进入 Dart2JS，同时在实际遇到脚本规则时返回可识别错误。
 - `BookSourceChapterText`：仅把 HTML/纯文本响应转换为 canonical chapter text，并清理重复远端页码；HTML 和 64 KiB 以上正文通过后台 isolate 规范化，短纯文本保留直接路径以避免 isolate 开销。若正文最前面的首行/首段与接口标题或目录标题规范化后完全相同，则像本地 TXT 章节解析一样剥离该重复标题。不注入首行缩进、段间距或章节标题，这些展示语义全部交给共享文字阅读内核。
 - `BookSourceChapterCache`：章节正文的内存/磁盘缓存和并发去重；网络结果进入内存后立即返回，目录与正文 JSON 持久化在后台完成，磁盘失败不阻断阅读。同一缓存键的后台写入严格串行并通过临时文件替换；缓存清理递增写入代次，使清理前尚未完成的任务不能重新创建旧缓存。在线阅读器的 canonical 正文只保留最近 8 章，优先预取下一章并在正文首帧后生成分页布局，再机会式准备上一章与更远的后一章。水平滑动到相邻章节时，真实预览页先在当前 `PageView` 内完成整段动画，只有 `ScrollEnd` 确认停在边界页后才提交章节状态；提交后复用已预热布局，并让新控制器直接挂接目标页，避免停稳后的可见重置。中途回滑会取消待提交切章，进度持久化不阻塞跨章提交。
 - `SourceCoverCache`：书源封面 URL 级请求去重、最多 4 路并发、瞬态失败单次退避重试、压缩字节内存 LRU 和应用缓存目录磁盘缓存；单 URL 驱逐使用独立 epoch，旧请求完成时不能覆盖或移除新请求。
-- `BookSourceShelfService`：在线书籍加入本地书架；完整下载以最多 3 章为一批并发抓取，按目录顺序持续写入同目录 `.part` 文件，每批 flush 后释放正文对象，完成后再改名为正式 TXT，内存占用不随整书篇幅线性增长。任务级取消会停止目录/章节请求并删除未完成的 `.part`；书源提供远程封面时下载到文档目录的 `covers/` 作为书架持久封面，缺失时生成统一封面。
+- `BookSourceShelfService`：在线书籍加入本地书架与原位替换来源绑定；换源保持原 `Book.id`、书名、封面、书签/笔记外键和书架顺序，只更新来源快照及映射后的章节进度。完整下载以最多 3 章为一批并发抓取，按目录顺序持续写入同目录 `.part` 文件，每批 flush 后释放正文对象，完成后再改名为正式 TXT，内存占用不随整书篇幅线性增长。任务级取消会停止目录/章节请求并删除未完成的 `.part`；书源提供远程封面时下载到文档目录的 `covers/` 作为书架持久封面，缺失时生成统一封面。
 - `BookSourceReadingProgressStore`：在线章节阅读进度。
+- `source_engine/source_explore.dart`：阅读书源发现入口；把旧式 `标题::URL` 和 JSON `type=url` 入口转换为静态频道。导入阶段只解析、去重并按已有规则组声明可尝试能力，不逐源联网或因其他高级规则整体禁用；请求模板与规则语法在实际调用对应搜索、详情、目录、正文或发现能力时按需校验。
 
-发现页默认聚合当前栏目下所有已启用且声明对应能力的书源，并允许按单一书源筛选。
+发现页提供共享同一缓存、分页、详情和阅读链路的两种视图，并通过 `book_source_discover_layout_v1` 记忆选择：标准布局先展示可发现书源，再展示当前范围可用的推荐/分类/最新栏目；来源条使用 builder 惰性构建，超过 40 个可发现来源时默认限定到单一来源，避免“全部”触发数千来源聚合。列表布局以 Sliver 惰性列出书源，初始不解析所有频道，只有展开某一来源时才加载其频道；选择频道后收起目录并进入该频道书单，通过“更换”返回目录。下拉刷新会先失效当前范围的响应缓存；列表布局同时清空已加载频道和错误，再按需重建。跨来源发现请求由最多 8 个 worker 有界执行，注册表超过 256 KiB 时在后台 isolate 解码和兼容扫描。只有一个栏目时标准布局自动省略栏目切换。
+`pages/book_sources/book_source_change_page.dart` 是在线书籍的换源任务页：顶部固定显示“当前来源 -> 目标来源”，候选按书源完成顺序渐进出现，选择后才验证目录和当前章节；验证完成前不能提交。书源列表与当前阅读位置并行准备，列表就绪即开始候选搜索，位置加载只在候选验证时形成门禁。默认快速首轮通过有界优先队列只保留优先级最高的 60 个来源，并在累计找到 8 个候选后暂停；用户可继续检查尚未搜索的全部来源，已有候选和进度不会清空。书源完成事件以 120ms 窗口批量合并，候选列表原位追加并用稳定键去重，避免数千来源返回时高频整页重建和反复复制列表；重新搜索会立即取消旧任务，不等待慢请求串行退出。入口位于书架在线书长按菜单和在线阅读器顶栏，本地书不显示。阅读器换源后创建新的在线阅读实例，退出时继续完成原书架打开路由的关闭流程。
+阅读书源的安全发现入口映射为分类频道，频道书单通过 `ruleExplore` 解析并在缺失时回退
+`ruleSearch`，继续复用统一书籍卡片、详情、阅读与加入书架链路。分类书单支持分页加载，
+下一页为空或没有新增 `sourceId + bookId` 时停止，防止忽略页码的第三方站点无限重复请求。
 推荐分区和分类保留来源边界；最新列表保留各源内部顺序后按来源均衡穿插，每个书籍身份
 始终由 `sourceId + bookId` 共同确定。
-分类栏目只在主页面展示当前分类；完整分类集合在移动端底部面板或桌面对话框中按书源
-分组，并通过可搜索的惰性列表选择，避免分类数量随书源增长时同步构建全部标签。
+分类栏目以横向频道 Chip 展示当前选择，并始终保留完整分类入口；完整集合在移动端底部
+面板或桌面对话框中按书源分组，通过可搜索的惰性列表选择，避免分类数量随书源增长时
+同步构建全部标签。
+
+第三方书源简介在展示层统一解码 HTML 实体，转换 `<br>`、转义换行和块级标签，清除
+不可见字符并合并多余空白；原始书源配置和运行时返回值保持不变。
+
+兼容书源 HTTP 请求默认补齐浏览器 User-Agent，并允许源配置为公网 IP 虚拟主机提供静态
+Host；Cookie、Content-Length 等敏感或传输控制头仍被拒绝。频道首次请求失败、HTTP 状态
+异常或 `bookList` 规则未匹配时，发现页保留明确错误与重试入口，不再伪装成空分类。
 
 发现、分类与最新书籍列表使用纵向 Sliver 惰性构建；横向书架只为当前视口附近的 section
 创建封面组件，避免多书源聚合时一次性发出数十到数百个封面请求。
@@ -321,7 +345,7 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 - 阅读数据：当前页、总页数、目录和分页缓存。
 - 稳定定位：`lastCanonicalLocator`。
 - 渲染定位：`lastRenderedLocator`、`layoutSignature`。
-- 来源身份：`storageType`、`sourceId`、`sourceBookId`、来源 JSON 和来源定位。
+- 来源身份：`storageType`、`sourceId`、`sourceBookId`、来源 JSON 和来源定位；在线书籍快照可附带 `sourceVariables`，保存搜索/发现规则产生的书籍级变量，使详情、目录、正文和书架重开继续使用同一规则上下文。
 
 ### Bookmark
 
@@ -331,7 +355,7 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 
 统一保存：
 
-- 字号、行高、水平边距。
+- 字号、正文五档字重（300/400/500/600/700）、行高、水平边距；默认字重 400。
 - 独立的上边距和下边距。
 - 阅读主题。
 - 翻页模式。
@@ -371,10 +395,10 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 ## 持久化边界
 
 - SQLite：书籍、书签、笔记、阅读会话、WebDAV 变更镜像和书籍 blob 索引。
-- SharedPreferences：阅读 UI 设置、应用强调色、App/阅读字体选择、书库布局、网格密度与网格书名/进度显隐、首页导航文字显隐与稳定目的地顺序、显式跳过的更新版本、WebDAV 地址/用户名/根目录/同步范围、应用偏好和轻量状态；自定义阅读主题以 JSON 列表保存，预设与自定义主题的统一顺序以稳定 ID 列表单独保存，两个阅读器共享，旧单主题记录首次读取时自动迁移。
-- 安全存储：WebDAV 密码只保存在 `flutter_secure_storage`，不写入 SharedPreferences、SQLite、远端批次或日志。
-- 应用私有目录：数据库、缓存、封面、应用管理的书籍文件，`custom_fonts/` 下的用户字体与清单，以及 `reader_theme_backgrounds/` 下由应用托管的阅读主题背景图片。书源临时封面位于平台 cache 的 `source_covers/`，加入书架后保存的封面位于 documents 的 `covers/`，两者清理边界分离。
-- 设置页缓存管理只允许清理 `source_covers/`、`book_source_chapters/` 和 `updates/` 三类已知缓存，同时清理 SourceCoverCache 压缩内存与 Flutter 解码图片缓存；不枚举或删除数据库、书籍、documents 封面、进度、偏好或安全凭据。
+- SharedPreferences：阅读 UI 设置、应用强调色、App/阅读字体选择、书库布局、网格密度与网格书名/进度显隐、首页导航文字显隐与稳定目的地顺序、移动端省电模式刷新率偏好、显式跳过的更新版本、WebDAV 地址/用户名/根目录/同步范围、应用偏好和轻量状态；自定义阅读主题以 JSON 列表保存，预设与自定义主题的统一顺序以稳定 ID 列表单独保存，两个阅读器共享，旧单主题记录首次读取时自动迁移。
+- 安全存储：WebDAV 密码以及账号 access/refresh token 只保存在 `flutter_secure_storage`，不写入 SharedPreferences、SQLite、远端批次或日志；TOTP 设置密钥和一次性恢复码只在对应设置步骤的内存 UI 中短暂存在。
+- 应用私有目录：数据库、缓存、封面、应用管理的书籍文件，`custom_fonts/` 下的用户字体与清单，以及 `reader_theme_backgrounds/` 下由应用托管的阅读主题背景图片。书源临时封面位于平台 cache 的 `source_covers/`，公开书源元数据响应位于 `book_source_responses/`，加入书架后保存的封面位于 documents 的 `covers/`，三者清理边界分离。启动流程不并发执行全库路径回写或临时/孤儿文件删除；本地书打开前只修复该书路径，避免和导入、下载及 WebDAV 同步竞争。
+- 设置页缓存管理只允许清理 `source_covers/`、`book_source_chapters/`、`book_source_responses/`、`native_reader_cache/` 和 `updates/` 等明确归属的缓存，同时清理 SourceCoverCache 压缩内存、书源响应内存和 Flutter 解码图片缓存；不枚举或删除数据库、书籍、documents 封面、进度、偏好或安全凭据。
 - 用户授权目录：通过平台存储桥接原地管理或导入书籍。
 - 网络：仅在用户使用在线书源、封面、AI、同步或更新检查等功能时访问。WebDAV 默认要求 HTTPS，只有用户显式允许时才可对私网/localhost 使用 HTTP；书籍恢复当前以 100 MiB 为安全上限。
 

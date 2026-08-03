@@ -5,6 +5,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 import '../../book_sources/services/book_source_chapter_cache.dart';
+import '../../book_sources/services/book_source_response_cache.dart';
 import '../../book_sources/services/source_cover_cache.dart';
 
 enum AppCacheCategory { sourceCovers, sourceData, temporaryFiles }
@@ -27,10 +28,13 @@ class AppCacheUsage {
 class AppCacheManager {
   AppCacheManager({
     SourceCoverCache? sourceCoverCache,
+    BookSourceResponseCache? sourceResponseCache,
     Directory? temporaryDirectory,
     Future<void> Function()? clearFlutterImageCache,
     int Function()? imageCacheBytesReader,
   }) : _sourceCoverCache = sourceCoverCache ?? SourceCoverCache.instance,
+       _sourceResponseCache =
+           sourceResponseCache ?? BookSourceResponseCache.instance,
        _temporaryDirectory = temporaryDirectory,
        _clearFlutterImageCache =
            clearFlutterImageCache ?? _defaultClearFlutterImageCache,
@@ -41,6 +45,7 @@ class AppCacheManager {
   static const String nativeReaderDirectoryName = 'native_reader_cache';
 
   final SourceCoverCache _sourceCoverCache;
+  final BookSourceResponseCache _sourceResponseCache;
   final Directory? _temporaryDirectory;
   final Future<void> Function() _clearFlutterImageCache;
   final int Function() _imageCacheBytesReader;
@@ -55,6 +60,10 @@ class AppCacheManager {
         bytesByCategory[AppCacheCategory.sourceCovers]! +
         _sourceCoverCache.memorySizeBytes +
         _imageCacheBytesReader();
+    bytesByCategory[AppCacheCategory.sourceData] =
+        bytesByCategory[AppCacheCategory.sourceData]! +
+        _sourceResponseCache.memorySizeBytes +
+        await _sourceResponseCache.diskSizeBytes();
     return AppCacheUsage(bytesByCategory);
   }
 
@@ -66,6 +75,7 @@ class AppCacheManager {
         return;
       case AppCacheCategory.sourceData:
         BookSourceChapterCache.clearMemory();
+        await _sourceResponseCache.clear();
         break;
       case AppCacheCategory.temporaryFiles:
         break;

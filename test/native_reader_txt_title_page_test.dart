@@ -228,6 +228,13 @@ void main() {
       '第十二章  风暴将至',
     );
     expect(_richTextContaining('天边压着墨色的云。'), findsOneWidget);
+    final bodyText = tester
+        .widgetList<RichText>(_richTextContaining('天边压着墨色的云。'))
+        .single
+        .text
+        .toPlainText();
+    expect(bodyText, contains('风从旷野尽头吹来。'));
+    expect(bodyText, isNot(contains('\n\n')));
     expect(find.text('1 / 1'), findsOneWidget);
   });
 

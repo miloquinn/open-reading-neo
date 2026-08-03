@@ -31,9 +31,16 @@ class _BookChunk {
   final String text;
 }
 
+class _BookSummary {
+  const _BookSummary({required this.label, required this.text});
+
+  final String label;
+  final String text;
+}
+
 /// 把整本书分块交给 AI 总结，再合并为一份 Markdown 知识库文档。
 ///
-/// 消耗大量 token：每块一次请求 + 最终合并一次请求。
+/// 消耗大量 token：每块一次请求 + 分层归并请求。
 /// 相邻请求之间保留间隔，限流/网络类错误按退避重试，
 /// 避免背靠背连发触发服务商限流后整个任务直接失败。
 class BookPreprocessService {
@@ -62,8 +69,15 @@ class BookPreprocessService {
   /// 限流/网络类错误的退避序列；长度即额外重试次数。
   final List<Duration> _retryDelays;
 
-  static const int chunkChars = 6000;
+  /// 单次正文请求控制在约 3 千字符内，为系统提示与模型输出预留上下文。
+  /// 中文通常接近“一字一 token”，原来的 6000 字符对小上下文模型过于激进。
+  static const int chunkChars = 2800;
   static const int maxChunks = 24;
+
+  /// 合并也必须分批；每次最多读取三份已压缩摘要，避免最终一次性塞入
+  /// 全部 24 份摘要而超过模型上下文。
+  static const int mergeFanIn = 3;
+  static const int intermediateSummaryChars = 900;
 
   static const Duration defaultRequestGap = Duration(milliseconds: 1500);
   static const List<Duration> defaultRetryDelays = [
@@ -83,42 +97,75 @@ class BookPreprocessService {
     final chapters = await _extractor.extractChapters(book);
     final chunks = _buildChunks(chapters);
     final sampled = _sampleChunks(chunks);
-    final total = sampled.length + 1;
+    final total = sampled.length + _mergeRequestCount(sampled.length);
+    var done = 0;
     onProgress?.call(0, total);
 
     final bookId = book.id?.toString() ?? '';
-    final partSummaries = <String>[];
-    for (var index = 0; index < sampled.length; index++) {
+    Future<String> sendRequest(String prompt, String chapterId) async {
       _throwIfCancelled(cancelToken);
-      if (index > 0) {
+      if (done > 0) {
         await _cancellableDelay(_requestGap, cancelToken);
       }
-      final chunk = sampled[index];
       final answer = await _chatWithRetry(
-        history: [
-          AIChatMessage(
-            role: 'user',
-            content:
-                '下面是书籍《${book.title}》的一段正文（${chunk.label}）。'
-                '请用简洁的要点总结这一段的核心内容、出场人物/概念与关键情节，'
-                '直接输出要点，不要客套话。\n\n${chunk.text}',
-          ),
-        ],
-        meta: AIRequestMeta(bookId: bookId, chapterId: chunk.label),
+        history: [AIChatMessage(role: 'user', content: prompt)],
+        meta: AIRequestMeta(bookId: bookId, chapterId: chapterId),
         cancelToken: cancelToken,
       );
-      partSummaries.add('### ${chunk.label}\n${answer.trim()}');
-      onProgress?.call(index + 1, total);
+      done += 1;
+      onProgress?.call(done, total);
+      return answer.trim();
+    }
+
+    final partSummaries = <_BookSummary>[];
+    for (var index = 0; index < sampled.length; index++) {
+      _throwIfCancelled(cancelToken);
+      final chunk = sampled[index];
+      final answer = await sendRequest(
+        '下面是书籍《${book.title}》的一段正文（${chunk.label}）。'
+        '请按原文顺序提炼核心内容、出场人物/概念、关键情节与因果关系。'
+        '控制在 $intermediateSummaryChars 字以内，直接输出摘要，不要客套话。'
+        '\n\n${chunk.text}',
+        chunk.label,
+      );
+      partSummaries.add(
+        _BookSummary(label: chunk.label, text: _limitSummary(answer)),
+      );
+    }
+
+    // 多层归并：24 份摘要不会再直接进入一次最终请求，而是按 3 份一组
+    // 逐层压缩，直到最终请求最多只读取三份中间摘要。
+    var mergeLevel = 1;
+    var summaries = partSummaries;
+    while (summaries.length > mergeFanIn) {
+      final merged = <_BookSummary>[];
+      for (var start = 0; start < summaries.length; start += mergeFanIn) {
+        final end = (start + mergeFanIn).clamp(0, summaries.length);
+        final group = summaries.sublist(start, end);
+        final label = _summaryRangeLabel(group);
+        final prompt = StringBuffer()
+          ..writeln('以下是书籍《${book.title}》连续部分的摘要。')
+          ..writeln(
+            '请按原书顺序合并为一份中间摘要，保留人物/概念、关键情节、'
+            '因果、转折和章节范围，控制在 $intermediateSummaryChars 字以内。',
+          )
+          ..writeln()
+          ..writeln(_formatSummaries(group));
+        final answer = await sendRequest(
+          prompt.toString(),
+          'preprocess-merge-$mergeLevel-${merged.length + 1}',
+        );
+        merged.add(_BookSummary(label: label, text: _limitSummary(answer)));
+      }
+      summaries = merged;
+      mergeLevel += 1;
     }
 
     _throwIfCancelled(cancelToken);
-    if (sampled.isNotEmpty) {
-      await _cancellableDelay(_requestGap, cancelToken);
-    }
     final omitted = chunks.length - sampled.length;
     final mergePrompt = StringBuffer()
       ..writeln(
-        '以下是书籍《${book.title}》（作者：${book.author}）各部分的分段总结。'
+        '以下是书籍《${book.title}》（作者：${book.author}）按顺序归并后的摘要。'
         '请把它们整理成一份结构化的 Markdown 知识库文档，包含：'
         '一段总体梗概、主要人物或核心概念列表、按顺序的分章要点。'
         '直接输出 Markdown 正文，以“# ${book.title}”开头。',
@@ -128,19 +175,43 @@ class BookPreprocessService {
     }
     mergePrompt
       ..writeln()
-      ..writeln(partSummaries.join('\n\n'));
+      ..writeln(_formatSummaries(summaries));
 
-    final markdown = await _chatWithRetry(
-      history: [AIChatMessage(role: 'user', content: mergePrompt.toString())],
-      meta: AIRequestMeta(bookId: bookId, chapterId: 'preprocess-merge'),
-      cancelToken: cancelToken,
+    final markdown = await sendRequest(
+      mergePrompt.toString(),
+      'preprocess-merge',
     );
-    onProgress?.call(total, total);
 
-    final document = markdown.trim();
+    final document = markdown;
     await _knowledge.saveBookSummary(bookId: bookId, summary: document);
     return document;
   }
+
+  int _mergeRequestCount(int summaryCount) {
+    var current = summaryCount;
+    var requests = 1; // 最终 Markdown 整理请求。
+    while (current > mergeFanIn) {
+      current = (current + mergeFanIn - 1) ~/ mergeFanIn;
+      requests += current;
+    }
+    return requests;
+  }
+
+  String _limitSummary(String text) {
+    final compact = text.trim();
+    if (compact.length <= intermediateSummaryChars) return compact;
+    return '${compact.substring(0, intermediateSummaryChars)}…';
+  }
+
+  String _summaryRangeLabel(List<_BookSummary> summaries) {
+    if (summaries.isEmpty) return '未命名部分';
+    if (summaries.length == 1) return summaries.first.label;
+    return '${summaries.first.label} — ${summaries.last.label}';
+  }
+
+  String _formatSummaries(List<_BookSummary> summaries) => summaries
+      .map((summary) => '### ${summary.label}\n${summary.text}')
+      .join('\n\n');
 
   /// 发出一次预处理请求：每次尝试前先让行交互式对话；
   /// 限流/网络类错误按 [_retryDelays] 退避重试，其余错误立即失败。
@@ -225,18 +296,16 @@ class BookPreprocessService {
       if (text.isEmpty) continue;
       if (text.length >= chunkChars) {
         flush();
-        var start = 0;
-        var part = 1;
-        while (start < text.length) {
-          final end = (start + chunkChars).clamp(0, text.length);
+        final parts = _splitLongText(text);
+        for (var index = 0; index < parts.length; index++) {
           chunks.add(
             _BookChunk(
-              label: part == 1 ? chapter.title : '${chapter.title}（$part）',
-              text: text.substring(start, end),
+              label: index == 0
+                  ? chapter.title
+                  : '${chapter.title}（${index + 1}）',
+              text: parts[index],
             ),
           );
-          start = end;
-          part += 1;
         }
         continue;
       }
@@ -250,6 +319,43 @@ class BookPreprocessService {
     }
     flush();
     return chunks;
+  }
+
+  /// 长章节优先在段落或句末切开；找不到自然边界时才按字符上限硬切。
+  /// 这样每个请求既有明确的上下文上限，也尽量不把一句话截成两半。
+  List<String> _splitLongText(String text) {
+    final parts = <String>[];
+    var start = 0;
+    while (start < text.length) {
+      var end = (start + chunkChars).clamp(0, text.length);
+      if (end < text.length) {
+        final earliest = start + (chunkChars * 3 ~/ 4);
+        end = _naturalSplitPosition(text, earliest, end);
+        if (_splitsSurrogatePair(text, end)) end -= 1;
+      }
+      final part = text.substring(start, end).trim();
+      if (part.isNotEmpty) parts.add(part);
+      start = end;
+    }
+    return parts;
+  }
+
+  int _naturalSplitPosition(String text, int earliest, int fallback) {
+    const boundaries = {'\n', '。', '！', '？', '；', '.', '!', '?', ';'};
+    for (var index = fallback - 1; index >= earliest; index--) {
+      if (boundaries.contains(text[index])) return index + 1;
+    }
+    return fallback;
+  }
+
+  bool _splitsSurrogatePair(String text, int position) {
+    if (position <= 0 || position >= text.length) return false;
+    final before = text.codeUnitAt(position - 1);
+    final after = text.codeUnitAt(position);
+    return before >= 0xD800 &&
+        before <= 0xDBFF &&
+        after >= 0xDC00 &&
+        after <= 0xDFFF;
   }
 
   /// 超长书籍均匀抽样，控制 token 消耗上限。

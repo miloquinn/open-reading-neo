@@ -1,0 +1,41 @@
+name: Validate public release access
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate public release token
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 5
+    steps:
+      - name: Verify read and write access without modifying the repository
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
+          GH_REPO: miloquinn/open-reading
+          GH_TARGET_BRANCH: main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::PUBLIC_RELEASE_TOKEN is missing from the release Environment."
+            exit 1
+          fi
+
+          repository_json="$(gh api "repos/${GH_REPO}")"
+          if [[ "$(jq -r '.visibility' <<<"$repository_json")" != "public" ]]; then
+            echo "::error::${GH_REPO} is not the expected public release repository."
+            exit 1
+          fi
+          if [[ "$(jq -r '.permissions.push' <<<"$repository_json")" != "true" ]]; then
+            echo "::error::PUBLIC_RELEASE_TOKEN does not have Contents write access to ${GH_REPO}."
+            exit 1
+          fi
+
+          gh api "repos/${GH_REPO}/git/ref/heads/${GH_TARGET_BRANCH}" >/dev/null
+          gh api "repos/${GH_REPO}/releases/latest" >/dev/null
+          echo "PUBLIC_RELEASE_TOKEN has the required access to ${GH_REPO}; no repository data was changed."

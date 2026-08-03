@@ -155,7 +155,7 @@ class LibraryLayoutSettingsPage extends StatelessWidget {
                       child: Column(
                         children: [
                           for (final animation
-                              in LibraryBookOpenAnimation.values)
+                              in LibraryBookOpenAnimation.values) ...[
                             RadioListTile<LibraryBookOpenAnimation>(
                               key: ValueKey(
                                 'settings-library-open-animation-${animation.name}',
@@ -168,6 +168,75 @@ class LibraryLayoutSettingsPage extends StatelessWidget {
                                 _animationSubtitle(l10n, animation),
                               ),
                             ),
+                            if (settings.libraryBookOpenAnimation == animation)
+                              Padding(
+                                key: ValueKey(
+                                  'settings-library-open-animation-pace-${animation.name}',
+                                ),
+                                padding: const EdgeInsets.fromLTRB(
+                                  40,
+                                  0,
+                                  0,
+                                  12,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l10n.settingsLibraryOpenAnimationPaceTitle,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: SegmentedButton<LibraryBookOpenAnimationPace>(
+                                        key: const ValueKey(
+                                          'settings-library-open-animation-pace-selector',
+                                        ),
+                                        showSelectedIcon: false,
+                                        expandedInsets: EdgeInsets.zero,
+                                        segments: [
+                                          ButtonSegment(
+                                            value: LibraryBookOpenAnimationPace
+                                                .fast,
+                                            label: Text(
+                                              l10n.settingsLibraryOpenAnimationFast,
+                                            ),
+                                          ),
+                                          ButtonSegment(
+                                            value: LibraryBookOpenAnimationPace
+                                                .elegant,
+                                            label: Text(
+                                              l10n.settingsLibraryOpenAnimationElegant,
+                                            ),
+                                          ),
+                                        ],
+                                        selected: {
+                                          settings.libraryBookOpenAnimationPace,
+                                        },
+                                        onSelectionChanged: (selection) {
+                                          if (selection.isEmpty) return;
+                                          unawaited(
+                                            settings
+                                                .setLibraryBookOpenAnimationPace(
+                                                  selection.first,
+                                                ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ],
                       ),
                     ),
@@ -193,8 +262,6 @@ class LibraryLayoutSettingsPage extends StatelessWidget {
       l10n.settingsLibraryOpenAnimationPaperRise,
     LibraryBookOpenAnimation.pageSlide =>
       l10n.settingsLibraryOpenAnimationPageSlide,
-    LibraryBookOpenAnimation.bookSpread =>
-      l10n.settingsLibraryOpenAnimationBookSpread,
   };
 
   String _animationSubtitle(
@@ -209,8 +276,6 @@ class LibraryLayoutSettingsPage extends StatelessWidget {
       l10n.settingsLibraryOpenAnimationPaperRiseHint,
     LibraryBookOpenAnimation.pageSlide =>
       l10n.settingsLibraryOpenAnimationPageSlideHint,
-    LibraryBookOpenAnimation.bookSpread =>
-      l10n.settingsLibraryOpenAnimationBookSpreadHint,
   };
 }
 

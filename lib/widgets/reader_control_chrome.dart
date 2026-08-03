@@ -32,6 +32,10 @@ class ReaderChromeOverlay extends StatelessWidget {
     this.readAloudActive = false,
     this.onAskAi,
     this.askAiTooltip,
+    this.onReplaceRules,
+    this.replaceRulesTooltip,
+    this.onChangeSource,
+    this.changeSourceTooltip,
     this.bookmarkBusy = false,
     this.topKey,
     this.bottomKey,
@@ -58,6 +62,10 @@ class ReaderChromeOverlay extends StatelessWidget {
   final VoidCallback? onReadAloud;
   final VoidCallback? onAskAi;
   final String? askAiTooltip;
+  final VoidCallback? onReplaceRules;
+  final String? replaceRulesTooltip;
+  final VoidCallback? onChangeSource;
+  final String? changeSourceTooltip;
   final String backTooltip;
   final String bookmarkTooltip;
   final String tableOfContentsTooltip;
@@ -194,6 +202,13 @@ class ReaderChromeOverlay extends StatelessWidget {
                             ? Icons.bookmark_rounded
                             : Icons.bookmark_border_rounded,
                       ),
+                      if (onChangeSource != null)
+                        ReaderControlIconButton(
+                          palette: palette,
+                          onPressed: onChangeSource,
+                          tooltip: changeSourceTooltip ?? '',
+                          icon: Icons.swap_horiz_rounded,
+                        ),
                     ],
                   ),
                 ),
@@ -244,6 +259,13 @@ class ReaderChromeOverlay extends StatelessWidget {
                           onPressed: onAskAi,
                           tooltip: askAiTooltip ?? '',
                           icon: Icons.auto_awesome_outlined,
+                        ),
+                      if (onReplaceRules != null)
+                        ReaderControlIconButton(
+                          palette: palette,
+                          onPressed: onReplaceRules,
+                          tooltip: replaceRulesTooltip ?? '',
+                          icon: Icons.find_replace_outlined,
                         ),
                       if (showSettingsAction)
                         ReaderControlIconButton(

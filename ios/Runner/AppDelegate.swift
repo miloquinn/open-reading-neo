@@ -125,6 +125,31 @@ import UIKit
       }
     }
 
+    let frameRateChannel = FlutterMethodChannel(
+      name: "com.niki.xxread/fullscreen",
+      binaryMessenger: messenger
+    )
+    frameRateChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      switch call.method {
+      case "setPowerSavingMode":
+        guard let args = call.arguments as? [String: Any],
+              let enabled = args["enabled"] as? Bool else {
+          result(
+            FlutterError(
+              code: "invalid_args",
+              message: "expected {enabled: bool}",
+              details: nil
+            )
+          )
+          return
+        }
+        IOSFrameRateController.setPowerSavingMode(enabled)
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     storageBridge = StorageBridge(messenger: messenger)
     incomingBookBridge = IncomingBookBridge(messenger: messenger)
 

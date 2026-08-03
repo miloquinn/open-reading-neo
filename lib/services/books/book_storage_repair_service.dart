@@ -25,10 +25,21 @@ class BookStorageRepairService {
 
   Future<int> repairAllBooksIfNeeded() async {
     final books = await _bookDao.getAllBooks();
+    return _repairBooks(books);
+  }
+
+  Future<int> _repairBooks(List<Book> books) async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    final booksDir = Directory(p.join(docsDir.path, 'books'));
+    final coversDir = Directory(p.join(docsDir.path, 'covers'));
     int repairedCount = 0;
 
     for (final book in books) {
-      final repaired = await repairSingleBookIfNeeded(book);
+      final repaired = await _repairSingleBookIfNeeded(
+        book,
+        booksDir: booksDir,
+        coversDir: coversDir,
+      );
       if (repaired.filePath != book.filePath ||
           repaired.coverImagePath != book.coverImagePath) {
         repairedCount++;
@@ -72,14 +83,23 @@ class BookStorageRepairService {
   }
 
   Future<Book> repairSingleBookIfNeeded(Book book) async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    return _repairSingleBookIfNeeded(
+      book,
+      booksDir: Directory(p.join(docsDir.path, 'books')),
+      coversDir: Directory(p.join(docsDir.path, 'covers')),
+    );
+  }
+
+  Future<Book> _repairSingleBookIfNeeded(
+    Book book, {
+    required Directory booksDir,
+    required Directory coversDir,
+  }) async {
     // 没有数据库ID时无法回写，只做读取校验
     if (book.id == null) {
       return book;
     }
-
-    final docsDir = await getApplicationDocumentsDirectory();
-    final booksDir = Directory(p.join(docsDir.path, 'books'));
-    final coversDir = Directory(p.join(docsDir.path, 'covers'));
 
     String filePath = book.filePath;
     String? coverPath = book.coverImagePath;

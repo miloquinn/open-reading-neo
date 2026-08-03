@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
@@ -19,13 +20,17 @@ class SourceSearchPage extends StatefulWidget {
   final List<RegisteredBookSource> sources;
   final BookSourceClient client;
   final BookSourceShelfService shelfService;
+  final int maxConcurrentSearches;
+  final Duration perSourceSearchTimeout;
 
   const SourceSearchPage({
     super.key,
     required this.sources,
     required this.client,
     required this.shelfService,
-  });
+    this.maxConcurrentSearches = 8,
+    this.perSourceSearchTimeout = const Duration(seconds: 6),
+  }) : assert(maxConcurrentSearches > 0);
 
   /// 解析实际参与搜索的书源集合；发现页与测试也复用这份规则。
   static List<RegisteredBookSource> searchTargets(
@@ -47,6 +52,10 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   final TextEditingController _queryController = TextEditingController();
   final FocusNode _queryFocus = FocusNode();
   final ScrollController _scrollController = ScrollController();
+  final Set<BookDownloadCancellation> _activeSearchCancellations = {};
+  final List<SourcedBook> _results = [];
+  final Set<String> _resultKeys = {};
+  final Map<String, _SearchPageState> _pageStates = {};
   late final SourcedBookActions _actions = SourcedBookActions(
     context: context,
     client: widget.client,
@@ -54,8 +63,6 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   );
 
   String? _selectedSourceId;
-  List<SourcedBook> _results = const [];
-  Map<String, _SearchPageState> _pageStates = const {};
   bool _searching = false;
   bool _hasSearched = false;
   bool _loadingMore = false;
@@ -63,6 +70,8 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   int _failedSourceCount = 0;
   String _activeQuery = '';
   int _searchGeneration = 0;
+  int _completedSourceCount = 0;
+  int _totalSourceCount = 0;
 
   bool get _hasMore => _pageStates.values.any((state) => state.hasMore);
 
@@ -78,6 +87,7 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
 
   @override
   void dispose() {
+    _cancelActiveSearches();
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
@@ -98,14 +108,72 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   List<RegisteredBookSource> get _targets =>
       SourceSearchPage.searchTargets(widget.sources, _selectedSourceId);
 
+  void _cancelActiveSearches() {
+    for (final cancellation in _activeSearchCancellations.toList()) {
+      cancellation.cancel();
+    }
+    _activeSearchCancellations.clear();
+  }
+
+  Future<_SearchBatch> _searchSource(
+    RegisteredBookSource source,
+    String query, {
+    int page = 1,
+  }) async {
+    final cancellation = BookDownloadCancellation();
+    _activeSearchCancellations.add(cancellation);
+    try {
+      final result = await widget.client
+          .search(source, query, page: page, cancellation: cancellation)
+          .timeout(
+            widget.perSourceSearchTimeout,
+            onTimeout: () {
+              cancellation.cancel();
+              throw TimeoutException(
+                'Book source search timed out: ${source.id}',
+              );
+            },
+          );
+      return _SearchBatch(
+        source: source,
+        items: result.items
+            .map((book) => SourcedBook(source: source, book: book))
+            .toList(growable: false),
+        page: result.page,
+        hasMore: result.hasMore && result.items.isNotEmpty,
+      );
+    } catch (_) {
+      return _SearchBatch(source: source, items: const [], failed: true);
+    } finally {
+      _activeSearchCancellations.remove(cancellation);
+    }
+  }
+
+  void _mergeBatch(_SearchBatch batch) {
+    if (!batch.failed) {
+      _pageStates[batch.source.id] = _SearchPageState(
+        source: batch.source,
+        page: batch.page,
+        hasMore: batch.hasMore,
+      );
+    }
+    for (final item in batch.items) {
+      final key = '${item.source.id}\u0000${item.book.id}';
+      if (_resultKeys.add(key)) _results.add(item);
+    }
+  }
+
   Future<void> _search() async {
     final query = _queryController.text.trim();
     final targetSources = _targets;
     if (query.isEmpty || targetSources.isEmpty) {
+      _searchGeneration++;
+      _cancelActiveSearches();
       if (_searching && mounted) setState(() => _searching = false);
       return;
     }
     final generation = ++_searchGeneration;
+    _cancelActiveSearches();
 
     FocusScope.of(context).unfocus();
     setState(() {
@@ -113,45 +181,40 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       _hasSearched = true;
       _failedSourceCount = 0;
       _activeQuery = query;
-      _results = const [];
-      _pageStates = const {};
+      _results.clear();
+      _resultKeys.clear();
+      _pageStates.clear();
       _loadingMore = false;
       _loadMoreFailed = false;
+      _completedSourceCount = 0;
+      _totalSourceCount = targetSources.length;
     });
 
-    final batches = await Future.wait(
-      targetSources.map((source) async {
-        try {
-          final page = await widget.client.search(source, query);
-          return _SearchBatch(
-            source: source,
-            items: page.items
-                .map((book) => SourcedBook(source: source, book: book))
-                .toList(growable: false),
-            page: page.page,
-            hasMore: page.hasMore && page.items.isNotEmpty,
-          );
-        } catch (_) {
-          return _SearchBatch(source: source, items: const [], failed: true);
-        }
-      }),
-    );
+    var nextIndex = 0;
+    Future<void> worker() async {
+      while (mounted && generation == _searchGeneration) {
+        final index = nextIndex++;
+        if (index >= targetSources.length) return;
+        final batch = await _searchSource(targetSources[index], query);
+        if (!mounted || generation != _searchGeneration) return;
+        setState(() {
+          _mergeBatch(batch);
+          _completedSourceCount++;
+          if (batch.failed) _failedSourceCount++;
+        });
+        // Synchronously failing sources must still yield so a large registry
+        // cannot starve Flutter's next frame.
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    final concurrency = targetSources.length < widget.maxConcurrentSearches
+        ? targetSources.length
+        : widget.maxConcurrentSearches;
+    await Future.wait(List.generate(concurrency, (_) => worker()));
 
     if (!mounted || generation != _searchGeneration) return;
-    setState(() {
-      _results = batches.expand((batch) => batch.items).toList(growable: false);
-      _pageStates = {
-        for (final batch in batches)
-          if (!batch.failed)
-            batch.source.id: _SearchPageState(
-              source: batch.source,
-              page: batch.page,
-              hasMore: batch.hasMore,
-            ),
-      };
-      _failedSourceCount = batches.where((batch) => batch.failed).length;
-      _searching = false;
-    });
+    setState(() => _searching = false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleScroll());
   }
 
@@ -171,73 +234,61 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       _loadMoreFailed = false;
     });
 
-    final batches = await Future.wait(
-      targets.map((state) async {
-        try {
-          final page = await widget.client.search(
-            state.source,
-            query,
-            page: state.page + 1,
-          );
-          return _SearchBatch(
-            source: state.source,
-            items: page.items
-                .map((book) => SourcedBook(source: state.source, book: book))
-                .toList(growable: false),
-            page: page.page,
-            hasMore: page.hasMore && page.items.isNotEmpty,
-          );
-        } catch (_) {
-          return _SearchBatch(
-            source: state.source,
-            items: const [],
-            failed: true,
-          );
+    var anyFailed = false;
+    var nextIndex = 0;
+    Future<void> worker() async {
+      while (mounted &&
+          generation == _searchGeneration &&
+          query == _activeQuery) {
+        final index = nextIndex++;
+        if (index >= targets.length) return;
+        final state = targets[index];
+        final batch = await _searchSource(
+          state.source,
+          query,
+          page: state.page + 1,
+        );
+        if (!mounted ||
+            generation != _searchGeneration ||
+            query != _activeQuery) {
+          return;
         }
-      }),
-    );
+        setState(() {
+          anyFailed = anyFailed || batch.failed;
+          if (!batch.failed) _mergeBatch(batch);
+          _loadMoreFailed = anyFailed;
+        });
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    final concurrency = targets.length < widget.maxConcurrentSearches
+        ? targets.length
+        : widget.maxConcurrentSearches;
+    await Future.wait(List.generate(concurrency, (_) => worker()));
 
     if (!mounted || generation != _searchGeneration || query != _activeQuery) {
       return;
     }
-    final seen = _results
-        .map((item) => '${item.source.id}\u0000${item.book.id}')
-        .toSet();
-    final appended = <SourcedBook>[];
-    final nextStates = Map<String, _SearchPageState>.from(_pageStates);
-    for (final batch in batches) {
-      if (batch.failed) continue;
-      nextStates[batch.source.id] = _SearchPageState(
-        source: batch.source,
-        page: batch.page,
-        hasMore: batch.hasMore,
-      );
-      for (final item in batch.items) {
-        final key = '${item.source.id}\u0000${item.book.id}';
-        if (seen.add(key)) appended.add(item);
-      }
-    }
-
-    setState(() {
-      _results = [..._results, ...appended];
-      _pageStates = nextStates;
-      _loadingMore = false;
-      _loadMoreFailed = batches.any((batch) => batch.failed);
-    });
+    setState(() => _loadingMore = false);
   }
 
   void _clearSearch() {
     _searchGeneration++;
+    _cancelActiveSearches();
     _queryController.clear();
     setState(() {
-      _results = const [];
-      _pageStates = const {};
+      _results.clear();
+      _resultKeys.clear();
+      _pageStates.clear();
       _hasSearched = false;
       _failedSourceCount = 0;
       _activeQuery = '';
       _searching = false;
       _loadingMore = false;
       _loadMoreFailed = false;
+      _completedSourceCount = 0;
+      _totalSourceCount = 0;
     });
     _queryFocus.requestFocus();
   }
@@ -268,7 +319,7 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   }
 
   Widget _buildQueryField(List<RegisteredBookSource> enabledSources) {
-    final canSearch = enabledSources.isNotEmpty && !_searching;
+    final canSearch = enabledSources.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: TextField(
@@ -301,25 +352,26 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
     return SizedBox(
       key: const Key('bookSourceScopeControl'),
       height: 48,
-      child: ListView(
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        children: [
-          ChoiceChip(
-            selected: _selectedSourceId == null,
-            label: Text(context.l10n.statsRangeAll),
-            onSelected: (_) => _changeScope(null),
-          ),
-          const SizedBox(width: 8),
-          for (final source in enabledSources) ...[
-            ChoiceChip(
-              selected: _selectedSourceId == source.id,
-              label: Text(source.name),
-              onSelected: (_) => _changeScope(source.id),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ],
+        itemCount: enabledSources.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return ChoiceChip(
+              selected: _selectedSourceId == null,
+              label: Text(context.l10n.statsRangeAll),
+              onSelected: (_) => _changeScope(null),
+            );
+          }
+          final source = enabledSources[index - 1];
+          return ChoiceChip(
+            selected: _selectedSourceId == source.id,
+            label: Text(source.name),
+            onSelected: (_) => _changeScope(source.id),
+          );
+        },
       ),
     );
   }
@@ -327,12 +379,14 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   void _changeScope(String? sourceId) {
     if (_selectedSourceId == sourceId) return;
     _searchGeneration++;
+    _cancelActiveSearches();
     setState(() {
       _selectedSourceId = sourceId;
       if (_hasSearched) {
-        _searching = true;
-        _results = const [];
-        _pageStates = const {};
+        _searching = false;
+        _results.clear();
+        _resultKeys.clear();
+        _pageStates.clear();
       }
     });
     if (_hasSearched && _activeQuery.isNotEmpty) {
@@ -350,9 +404,6 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
         message: context.l10n.bookSourcesNoSourcesDescription,
       );
     }
-    if (_searching) {
-      return const Center(child: CircularProgressIndicator());
-    }
     if (!_hasSearched) {
       return _buildMessage(
         icon: Icons.manage_search_rounded,
@@ -361,6 +412,9 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       );
     }
     if (_results.isEmpty) {
+      if (_searching) {
+        return _buildSearchingMessage();
+      }
       return _buildMessage(
         icon: Icons.search_off_rounded,
         title: context.l10n.bookSourcesNoResults,
@@ -386,6 +440,15 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
                     ),
                   ),
                 ),
+                if (_searching) ...[
+                  Text('$_completedSourceCount/$_totalSourceCount'),
+                  const SizedBox(width: 10),
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  ),
+                ],
               ],
             ),
           ),
@@ -456,6 +519,22 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       if (source.id == _selectedSourceId) return source.name;
     }
     return context.l10n.statsRangeAll;
+  }
+
+  Widget _buildSearchingMessage() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 14),
+          Text(
+            '${context.l10n.bookSourcesSearch} '
+            '$_completedSourceCount/$_totalSourceCount',
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMessage({

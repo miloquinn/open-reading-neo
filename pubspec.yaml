@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.4.5+260731002
+version: 2.5.1+260803004
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -53,6 +53,10 @@ dependencies:
 
   # 数据处理
   html: ^0.15.6
+  json_path: ^0.9.0
+
+  # 阅读书源脚本运行时（Android/Windows/Linux 使用 QuickJS，Apple 使用 JavaScriptCore）
+  flutter_js: ^0.8.7
 
   # UI
   fl_chart: ^1.2.0
@@ -76,6 +80,7 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   sqflite_common_ffi_web: ^1.1.2
   audioplayers: ^6.8.1
+  pointycastle: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -127,9 +132,9 @@ flutter:
   # example:
   #
   # 字体不内置打包：所有非系统字体由 OnlineFontService 在用户首次选择时从
-  # GitHub 上游仓库（jsDelivr CDN 或 raw.githubusercontent.com）下载到 app 私有
-  # 目录，校验 SHA-256 后通过 FontLoader 运行时注册。License 文本仍打包在
-  # assets/fonts/licenses/ 以便离线展示。
+  # 受许可的官方源或 GitHub 上游仓库（jsDelivr CDN/raw.githubusercontent.com）
+  # 下载到 app 私有目录，校验签名与 SHA-256 后通过 FontLoader 运行时注册。
+  # License 文本仍打包在 assets/fonts/licenses/ 以便离线展示。
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

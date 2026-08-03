@@ -11,6 +11,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 import 'custom_font_models.dart';
+import 'font_variation_parser.dart';
 
 typedef CustomFontDirectoryProvider = Future<Directory> Function();
 typedef CustomFontPicker = Future<FilePickerResult?> Function();
@@ -88,6 +89,26 @@ class CustomFontService {
             return record.copyWith(available: file.existsSync());
           }),
         );
+      var metadataChanged = false;
+      for (var index = 0; index < _fonts.length; index++) {
+        final record = _fonts[index];
+        if (!record.available || record.weightAxisInspected) continue;
+        final file = File(path.join(directory.path, record.relativePath));
+        try {
+          final range = parseVariableFontWeightRange(await file.readAsBytes());
+          _fonts[index] = record.copyWith(
+            variableWeightMin: range?.min,
+            variableWeightMax: range?.max,
+            weightAxisInspected: true,
+          );
+          metadataChanged = true;
+        } catch (_) {}
+      }
+      if (metadataChanged) {
+        try {
+          await _writeManifest();
+        } catch (_) {}
+      }
     } catch (_) {
       _fonts.clear();
     }
@@ -179,6 +200,7 @@ class CustomFontService {
     final shortHash = hash.substring(0, 16);
     final id = 'custom_$shortHash';
     final storedFileName = '$id$extension';
+    final weightRange = parseVariableFontWeightRange(bytes);
     final record = CustomFontRecord(
       id: id,
       displayName: path.basenameWithoutExtension(fileName).trim(),
@@ -189,6 +211,9 @@ class CustomFontService {
       sha256: hash,
       fileSize: bytes.length,
       importedAt: DateTime.now().toUtc(),
+      variableWeightMin: weightRange?.min,
+      variableWeightMax: weightRange?.max,
+      weightAxisInspected: true,
     );
     final destination = File(path.join(_fontDirectory!.path, storedFileName));
 

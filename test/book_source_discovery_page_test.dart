@@ -99,6 +99,307 @@ void main() {
     expect(merged.map((result) => result.book.title), ['B1', 'A1', 'B2', 'A2']);
   });
 
+  testWidgets('pull to refresh invalidates cached responses before reloading', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+    });
+    final client = _DiscoveryClient();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: BookSourcesPage(client: client)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await refresh.onRefresh();
+    await tester.pumpAndSettle();
+
+    expect(client.invalidatedSourceIds, [
+      ['source-a'],
+    ]);
+    expect(client.discoverySourceIds, ['source-a', 'source-a']);
+  });
+
+  test('discover layout preference is restored by a new controller', () async {
+    final first = BookSourcesPageController();
+    await first.setLayout(BookSourceDiscoverLayout.list);
+    first.dispose();
+
+    final restored = BookSourcesPageController();
+    await restored.initialize();
+    expect(restored.layout.value, BookSourceDiscoverLayout.list);
+    restored.dispose();
+  });
+
+  testWidgets('list layout expands one source and focuses the chosen channel', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final sourceA = _source('source-a', 'Source A');
+    final sourceB = _source('source-b', 'Source B');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        [sourceA, sourceB].map((source) => source.toJson()).toList(),
+      ),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+    final controller = BookSourcesPageController();
+    final client = _DiscoveryClient();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: client, controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('bookSourceListLayoutDirectory')),
+      findsOneWidget,
+    );
+    final scrollbar = tester.widget<Scrollbar>(
+      find.byKey(const Key('bookSourceDiscoverListScrollbar')),
+    );
+    final scrollView = tester.widget<CustomScrollView>(
+      find.byKey(const Key('bookSourceDiscoverScrollView')),
+    );
+    expect(scrollbar.thumbVisibility, isTrue);
+    expect(scrollbar.interactive, isTrue);
+    expect(scrollbar.controller, same(scrollView.controller));
+    expect(
+      find.byKey(const Key('bookSourceDiscoverScopeControl')),
+      findsNothing,
+    );
+    expect(client.categoryBrowseSourceIds, isEmpty);
+    expect(client.categoryLoadSourceIds, isEmpty);
+
+    await tester.tap(find.byKey(const Key('bookSourceListSource-source-b')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-a-source-a-fiction')),
+      findsNothing,
+    );
+    expect(client.categoryLoadSourceIds, ['source-b']);
+
+    await tester.tap(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('bookSourceListSelectionHeader')),
+      findsOneWidget,
+    );
+    expect(find.text('Source B category book'), findsOneWidget);
+    expect(client.categoryBrowseSourceIds, ['source-b']);
+
+    await tester.tap(find.byKey(const Key('bookSourceListChangeChannel')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListLayoutDirectory')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('list layout ignores duplicate channel ids from a source', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: _DuplicateCategoryDiscoveryClient()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bookSourceListSource-source-a')));
+    await tester.pumpAndSettle();
+
+    const categoryId = '/store/98-a-0-5-a-20-p-{{page}}-98';
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-a-$categoryId')),
+      findsOneWidget,
+    );
+    expect(find.text('First channel'), findsOneWidget);
+    expect(find.text('Duplicate channel'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('list layout searches sources and expands the first match', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final sourceA = _source('source-a', 'Source A');
+    final sourceB = _source('source-b', 'Source B');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        [sourceA, sourceB].map((source) => source.toJson()).toList(),
+      ),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+    final controller = BookSourcesPageController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(
+            client: _DiscoveryClient(),
+            controller: controller,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final search = find.byKey(const Key('bookSourceListSourceSearch'));
+    expect(search, findsOneWidget);
+    await tester.enterText(search, 'source-b');
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('bookSourceListSource-source-a')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('bookSourceListSource-source-b')),
+      findsOneWidget,
+    );
+    expect(find.text('1/2'), findsOneWidget);
+
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('bookSourceListSourceSearchClear')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListSource-source-a')),
+      findsOneWidget,
+    );
+    expect(find.text('2/2'), findsOneWidget);
+  });
+
+  testWidgets(
+    'large source libraries start scoped and build source chips lazily',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 1100);
+      addTearDown(tester.view.reset);
+
+      final sources = List.generate(
+        80,
+        (index) => _source(
+          'source-${index.toString().padLeft(3, '0')}',
+          'Source ${index.toString().padLeft(3, '0')}',
+        ),
+        growable: false,
+      );
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode(
+          sources.map((source) => source.toJson()).toList(),
+        ),
+      });
+      final client = _DiscoveryClient();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(client.discoverySourceIds, ['source-000']);
+      expect(find.byKey(const Key('bookSourceDiscoverScopeAll')), findsNothing);
+      expect(
+        find.byKey(const Key('bookSourceDiscoverScope-source-000')),
+        findsOneWidget,
+      );
+      expect(find.byType(ChoiceChip).evaluate().length, lessThan(20));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('cross-source discovery uses bounded concurrency', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+
+    final sources = List.generate(
+      20,
+      (index) => _source('bounded-$index', 'Bounded $index'),
+      growable: false,
+    );
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        sources.map((source) => source.toJson()).toList(),
+      ),
+    });
+    final client = _BoundedDiscoveryClient();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: BookSourcesPage(client: client)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(client.discoverySourceIds, hasLength(20));
+    expect(client.maxActive, lessThanOrEqualTo(8));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('request failures are not reported as unsupported capabilities', (
     tester,
   ) async {
@@ -144,6 +445,32 @@ void main() {
       find.textContaining('Source A: Source request timed out.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('channel request failures stay visible and can be retried', (
+    tester,
+  ) async {
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: _CategoryFailingDiscoveryClient()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Categories'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load channel'), findsOneWidget);
+    expect(find.textContaining('Channel endpoint failed.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
   });
 
   testWidgets('an empty capable source shows an empty state', (tester) async {
@@ -580,11 +907,22 @@ class _FakeShelfService extends BookSourceShelfService {
 
 class _DiscoveryClient extends BookSourceClient {
   final List<String> categoryBrowseSourceIds = [];
+  final List<String> categoryLoadSourceIds = [];
+  final List<String> discoverySourceIds = [];
+  final List<List<String>> invalidatedSourceIds = [];
+
+  @override
+  Future<void> invalidateResponseCaches(
+    Iterable<RegisteredBookSource> sources,
+  ) async {
+    invalidatedSourceIds.add(sources.map((source) => source.id).toList());
+  }
 
   @override
   Future<BookSourceDiscoveryPage> getDiscovery(
     RegisteredBookSource source,
   ) async {
+    discoverySourceIds.add(source.id);
     return BookSourceDiscoveryPage(
       sections: [
         BookSourceDiscoverySection(
@@ -600,6 +938,7 @@ class _DiscoveryClient extends BookSourceClient {
   Future<List<BookSourceCategory>> getCategories(
     RegisteredBookSource source,
   ) async {
+    categoryLoadSourceIds.add(source.id);
     return [BookSourceCategory(id: '${source.id}-fiction', name: 'Fiction')];
   }
 
@@ -664,6 +1003,19 @@ class _LargeCategoryDiscoveryClient extends _DiscoveryClient {
   }
 }
 
+class _DuplicateCategoryDiscoveryClient extends _DiscoveryClient {
+  @override
+  Future<List<BookSourceCategory>> getCategories(
+    RegisteredBookSource source,
+  ) async {
+    const categoryId = '/store/98-a-0-5-a-20-p-{{page}}-98';
+    return const [
+      BookSourceCategory(id: categoryId, name: 'First channel'),
+      BookSourceCategory(id: categoryId, name: 'Duplicate channel'),
+    ];
+  }
+}
+
 class _ManyShelfDiscoveryClient extends _DiscoveryClient {
   @override
   Future<BookSourceDiscoveryPage> getDiscovery(
@@ -679,6 +1031,26 @@ class _ManyShelfDiscoveryClient extends _DiscoveryClient {
         ),
       ),
     );
+  }
+}
+
+class _BoundedDiscoveryClient extends _DiscoveryClient {
+  int active = 0;
+  int maxActive = 0;
+
+  @override
+  Future<BookSourceDiscoveryPage> getDiscovery(
+    RegisteredBookSource source,
+  ) async {
+    active++;
+    if (active > maxActive) maxActive = active;
+    try {
+      final result = await super.getDiscovery(source);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      return result;
+    } finally {
+      active--;
+    }
   }
 }
 
@@ -702,6 +1074,19 @@ class _FailingDiscoveryClient extends BookSourceClient {
     int pageSize = 20,
   }) {
     throw const BookSourceProtocolException('Source request timed out.');
+  }
+}
+
+class _CategoryFailingDiscoveryClient extends _DiscoveryClient {
+  @override
+  Future<BookSourceSearchPage> browse(
+    RegisteredBookSource source, {
+    String? category,
+    String sort = 'latest',
+    int page = 1,
+    int pageSize = 20,
+  }) {
+    throw const BookSourceProtocolException('Channel endpoint failed.');
   }
 }
 

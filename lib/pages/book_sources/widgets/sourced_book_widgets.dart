@@ -21,6 +21,8 @@ import 'package:xxread/widgets/generated_book_cover.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/source_cover_image.dart';
 
+import 'book_source_text_normalizer.dart';
+
 /// 一本来自具体书源的书。
 class SourcedBook {
   final RegisteredBookSource source;
@@ -138,6 +140,7 @@ class SourcedBookListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final book = result.book;
+    final description = normalizeBookSourceDescription(book.description);
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
@@ -176,10 +179,10 @@ class SourcedBookListTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (book.description.isNotEmpty) ...[
+                  if (description.isNotEmpty) ...[
                     const SizedBox(height: 7),
                     Text(
-                      book.description,
+                      description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -322,6 +325,7 @@ class _SourcedBookDetailsLoaderState extends State<_SourcedBookDetailsLoader> {
       final book = await widget.client.getBook(
         widget.result.source,
         widget.result.book.id,
+        sourceVariables: widget.result.book.sourceVariables,
       );
       if (mounted) setState(() => _book = book);
     } catch (_) {
@@ -579,6 +583,7 @@ class _SourcedBookDetailsSheetState extends State<_SourcedBookDetailsSheet> {
   }
 
   Widget _buildDetails(BuildContext context) {
+    final description = normalizeBookSourceDescription(_book.description);
     return Column(
       key: const Key('bookSourceDetailsContent'),
       mainAxisSize: MainAxisSize.min,
@@ -588,9 +593,9 @@ class _SourcedBookDetailsSheetState extends State<_SourcedBookDetailsSheet> {
           child: SingleChildScrollView(
             key: const Key('bookSourceDetailsScroll'),
             padding: const EdgeInsets.only(bottom: 4),
-            child: _book.description.isEmpty
+            child: description.isEmpty
                 ? const SizedBox.shrink()
-                : Text(_book.description, style: const TextStyle(height: 1.5)),
+                : Text(description, style: const TextStyle(height: 1.5)),
           ),
         ),
         const SizedBox(height: 14),

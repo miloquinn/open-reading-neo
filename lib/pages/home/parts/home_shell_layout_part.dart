@@ -598,6 +598,20 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
       trailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ValueListenableBuilder<BookSourceDiscoverLayout>(
+            key: const Key('bookSourceDiscoverLayoutToggle'),
+            valueListenable: _bookSourcesController.layout,
+            builder: (context, layout, _) => _buildTopBarActionButton(
+              icon: layout == BookSourceDiscoverLayout.standard
+                  ? Icons.view_list_rounded
+                  : Icons.dashboard_outlined,
+              tooltip: layout == BookSourceDiscoverLayout.standard
+                  ? context.l10n.bookSourceListLayout
+                  : context.l10n.bookSourceStandardLayout,
+              onTap: () => unawaited(_bookSourcesController.toggleLayout()),
+            ),
+          ),
+          const SizedBox(width: 8),
           _buildTopBarActionButton(
             icon: Icons.search_rounded,
             tooltip: context.l10n.bookSourcesSearch,
@@ -646,16 +660,9 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
   }
 
   Future<void> _navigateToBookSourceSearch() async {
-    final sources = await BookSourceRegistry().loadRunnable();
-    if (!mounted) return;
-    final client = BookSourceClient();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SourceSearchPage(
-          sources: sources,
-          client: client,
-          shelfService: BookSourceShelfService(client: client),
-        ),
+        builder: (_) => const _BookSourceSearchLoaderPage(),
       ),
     );
   }
@@ -852,6 +859,92 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
           const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+}
+
+class _BookSourceSearchLoaderPage extends StatefulWidget {
+  const _BookSourceSearchLoaderPage();
+
+  @override
+  State<_BookSourceSearchLoaderPage> createState() =>
+      _BookSourceSearchLoaderPageState();
+}
+
+class _BookSourceSearchLoaderPageState
+    extends State<_BookSourceSearchLoaderPage> {
+  late final BookSourceClient _client = BookSourceClient();
+  late final BookSourceShelfService _shelfService = BookSourceShelfService(
+    client: _client,
+  );
+  late Future<List<RegisteredBookSource>> _sourcesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSources();
+  }
+
+  void _loadSources() {
+    _sourcesFuture = BookSourceRegistry().loadRunnableInBackground();
+  }
+
+  void _retry() {
+    setState(_loadSources);
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<RegisteredBookSource>>(
+      future: _sourcesFuture,
+      builder: (context, snapshot) {
+        final sources = snapshot.data;
+        if (sources != null) {
+          return SourceSearchPage(
+            sources: sources,
+            client: _client,
+            shelfService: _shelfService,
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(title: Text(context.l10n.bookSourcesSearch)),
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: PageStyleHelper.backgroundGradient(context),
+            ),
+            alignment: Alignment.center,
+            child: snapshot.hasError
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 40),
+                      const SizedBox(height: 12),
+                      Text(context.l10n.error),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _retry,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(context.l10n.retry),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 14),
+                      Text(context.l10n.loading),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 }

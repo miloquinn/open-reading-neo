@@ -2,6 +2,7 @@
 // 技术要点：Flutter UI、Icons Plus、Package Info、Provider、SharedPreferences、URL Launcher。
 
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +23,7 @@ import 'package:xxread/pages/settings/ai_settings_page.dart';
 import 'package:xxread/pages/settings/cache_management_page.dart';
 import 'package:xxread/pages/settings/floating_navigation_settings_page.dart';
 import 'package:xxread/pages/settings/library_layout_settings_page.dart';
+import 'package:xxread/pages/settings/replace_rules_page.dart';
 import 'package:xxread/pages/settings/sync/webdav_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/core/core_services.dart';
@@ -42,6 +44,7 @@ import 'package:xxread/widgets/accent_color_picker_sheet.dart';
 import 'package:xxread/widgets/contributors_view.dart';
 import 'package:xxread/widgets/developer_support_card.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
+import 'package:xxread/widgets/settings_account_card.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/update_check_gate.dart';
 
@@ -487,6 +490,8 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSettingsTopRow(l10n, useRailNavigation),
             const SizedBox(height: 24),
           ],
+          const SettingsAccountCard(),
+          const SizedBox(height: 20),
           _buildSectionCard(
             title: l10n.settingsSectionAppearanceFonts,
             icon: Icons.palette_outlined,
@@ -564,6 +569,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.travel_explore_outlined,
               ),
               _buildActionSetting(
+                title: l10n.replaceRulesTitle,
+                subtitle: l10n.replaceRulesSettingsSubtitle,
+                onTap: _openReplaceRules,
+                icon: Icons.find_replace_outlined,
+              ),
+              _buildActionSetting(
                 title: l10n.settingsWebDavSyncTitle,
                 badge: l10n.webDavBetaBadge,
                 subtitle: _webDavSyncSubtitle(webDavSync),
@@ -610,6 +621,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: _setKeepScreenOn,
                 icon: Icons.stay_current_portrait,
               ),
+              if (!kIsWeb &&
+                  (Theme.of(context).platform == TargetPlatform.android ||
+                      Theme.of(context).platform == TargetPlatform.iOS))
+                _buildSwitchSetting(
+                  key: const ValueKey('settings-power-saving-mode'),
+                  title: l10n.settingsPowerSavingModeTitle,
+                  subtitle: l10n.settingsPowerSavingModeSubtitle,
+                  value: appSettings.powerSavingMode,
+                  onChanged: appSettings.setPowerSavingMode,
+                  icon: Icons.battery_saver_outlined,
+                  persistPageSettings: false,
+                ),
               _buildSwitchSetting(
                 title: l10n.settingsAutoSaveTitle,
                 subtitle: l10n.settingsAutoSaveSubtitle,
@@ -709,6 +732,12 @@ class _SettingsPageState extends State<SettingsPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const BookSourceManagementPage()),
     );
+  }
+
+  void _openReplaceRules() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ReplaceRulesPage()));
   }
 
   Widget _buildSettingsTopRow(AppLocalizations l10n, bool useRailNavigation) {
@@ -1414,21 +1443,33 @@ class _SettingsPageState extends State<SettingsPage> {
             progress.status == OnlineFontDownloadStatus.verifying ||
             progress.status == OnlineFontDownloadStatus.registering);
     final isFailed = progress?.status == OnlineFontDownloadStatus.failed;
+    final weightDescription = option.supportsVariableWeight
+        ? l10n.fontVariableWeightRange(
+            option.variableWeightMin!,
+            option.variableWeightMax!,
+          )
+        : isOnline || option.isCustom
+        ? l10n.fontStaticWeight
+        : null;
 
     String description;
     if (option.isCustom) {
       description =
-          '${option.sourceFileName} · ${_formatFileSize(option.fileSize ?? 0)}';
+          '${option.sourceFileName} · ${_formatFileSize(option.fileSize ?? 0)}'
+          '${weightDescription == null ? '' : ' · $weightDescription'}';
     } else if (isOnline && !isDownloaded && !isDownloading) {
       description =
-          '${l10n.fontDownloadHint} · ${_formatFileSize(option.onlineTotalBytes)}';
+          '${l10n.fontDownloadHint} · ${_formatFileSize(option.onlineTotalBytes)}'
+          '${weightDescription == null ? '' : ' · $weightDescription'}';
     } else if (isOnline && isDownloading) {
       final percent = (progress.fraction * 100).round();
       description = '${l10n.fontDownloading} $percent%';
     } else if (isOnline && isFailed) {
       description = l10n.fontDownloadFailed;
     } else {
-      description = FontCatalog.descriptionFor(l10n, option);
+      description =
+          '${FontCatalog.descriptionFor(l10n, option)}'
+          '${weightDescription == null ? '' : ' · $weightDescription'}';
     }
 
     Future<void> handleTap() async {
@@ -1503,7 +1544,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(height: 3),
                 Text(
                   description,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,
@@ -1797,6 +1838,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSwitchSetting({
+    Key? key,
     required String title,
     required String subtitle,
     required bool value,
@@ -1806,6 +1848,7 @@ class _SettingsPageState extends State<SettingsPage> {
     bool persistPageSettings = true,
   }) {
     return Container(
+      key: key,
       margin: const EdgeInsets.only(bottom: 1),
       child: Material(
         color: Colors.transparent,

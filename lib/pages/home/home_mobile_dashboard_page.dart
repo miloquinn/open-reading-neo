@@ -20,6 +20,7 @@ import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_transitions.dart';
+import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/generated_book_cover.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
@@ -104,6 +105,7 @@ class HomeMobileDashboardPage extends StatefulWidget {
     required Book book,
     required BookSourceClient client,
     required BookSourceShelfService shelfService,
+    ReaderThemePalette? initialTheme,
   }) {
     if (!book.isOnline) return null;
     return BookSourceReaderPage(
@@ -111,6 +113,7 @@ class HomeMobileDashboardPage extends StatefulWidget {
       book: shelfService.sourceBookFrom(book),
       client: client,
       shelfService: shelfService,
+      initialTheme: initialTheme,
     );
   }
 
@@ -193,7 +196,9 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
         _recentBooks = recentBooks;
         _isInitialLoading = false;
       });
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('首页数据加载失败: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted || loadGeneration != _loadGeneration) return;
       setState(() => _isInitialLoading = false);
     }
@@ -202,29 +207,13 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
   Future<List<Book>> _loadRecentBooks() async {
     try {
       final orderedBookIds = await _statsDao.getRecentBookIds(limit: 6);
-      final books = <Book>[];
-      final seen = <int>{};
-
-      for (final id in orderedBookIds) {
-        final book = await _bookDao.getBookById(id);
-        if (book == null) continue;
-        books.add(book);
-        seen.add(id);
-      }
+      final books = await _bookDao.getBooksByIds(orderedBookIds);
 
       if (books.isNotEmpty) {
         return books.take(6).toList(growable: false);
       }
 
-      final allBooks = await _bookDao.getAllBooks();
-      final fallback = allBooks.where((book) => book.currentPage > 0).toList()
-        ..sort((a, b) {
-          final progressComparison = b.currentPage.compareTo(a.currentPage);
-          return progressComparison != 0
-              ? progressComparison
-              : b.importDate.compareTo(a.importDate);
-        });
-      return fallback.take(6).toList(growable: false);
+      return _bookDao.getRecentlyReadBooks(limit: 6);
     } catch (_) {
       return const [];
     }
@@ -308,11 +297,14 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
 
   Future<void> _openBook(Book book) async {
     final openingActivity = BookOpenTransition.beginActivity();
+    final initialThemeFuture = ReaderThemes.loadSavedPalette();
     try {
       final fullBook = book.id == null
           ? book
           : await _bookDao.getBookById(book.id!);
       if (fullBook == null || !mounted) return;
+      final initialTheme = await initialThemeFuture;
+      if (!mounted) return;
 
       if (fullBook.isOnline) {
         try {
@@ -320,10 +312,13 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
             book: fullBook,
             client: _sourceClient,
             shelfService: _sourceShelfService,
+            initialTheme: initialTheme,
           )!;
           final route = BookOpenTransition.createRoute<void>(
             reader,
             origin: ReaderPageTransitionOrigin.home,
+            animationPace: LibraryBookOpenAnimationPace.fast,
+            readerBackgroundColor: initialTheme.background,
             waitForReaderReady: true,
           );
           await BookOpenTransition.push<void>(context, route);
@@ -340,6 +335,7 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
         await NativeReaderService.openBook(
           context,
           fullBook,
+          initialTheme: initialTheme,
           origin: ReaderPageTransitionOrigin.home,
         );
       }

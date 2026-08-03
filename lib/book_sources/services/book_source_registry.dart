@@ -1,80 +1,95 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../source_engine/source_config.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
+import 'book_source_registry_storage.dart';
 import '../../services/core/app_settings_service.dart';
 
+export 'book_source_registry_storage.dart' show BookSourceRegistryStorage;
+
 class BookSourceRegistry {
+  BookSourceRegistry({BookSourceRegistryStorage? storage})
+    : _storage = storage ?? const DefaultBookSourceRegistryStorage();
+
   static const String _storageKey = 'open_reading_book_sources_v1';
+  static const int _backgroundDecodeThreshold = 256 * 1024;
   static final StreamController<void> _changesController =
       StreamController<void>.broadcast();
   static Future<void> _mutationTail = Future<void>.value();
 
+  final BookSourceRegistryStorage _storage;
+  Future<void>? _storagePreparation;
+
   Stream<void> get changes => _changesController.stream;
 
   Future<List<RegisteredBookSource>> load() async {
-    return _load(filterUnverified: true);
+    return loadInBackground();
   }
 
-  Future<List<RegisteredBookSource>> _load({
-    required bool filterUnverified,
-  }) async {
-    final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(_storageKey);
-    if (raw == null || raw.trim().isEmpty) return const [];
+  /// Moves the old single SharedPreferences blob to file-backed storage before
+  /// the rest of the app initializes its preference caches.
+  Future<void> prepareStorage() => _storagePreparation ??= _prepareStorage();
 
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return const [];
-      final sources = <RegisteredBookSource>[];
-      for (final item in decoded) {
-        if (item is! Map) continue;
-        try {
-          sources.add(
-            RegisteredBookSource.fromJson(
-              item.map((key, value) => MapEntry('$key', value)),
-            ),
-          );
-        } catch (_) {
-          // Skip a damaged entry instead of making the whole registry unusable.
-        }
-      }
-      sources.sort((a, b) => a.name.compareTo(b.name));
-      if (!filterUnverified) return sources;
-      return sources
-          .where(
-            (source) =>
-                source.sourceProtocol == BookSourceProtocolKind.orsp ||
-                (source.capabilities.isNotEmpty &&
-                    source.sourceConfig?['_openReadingReadingChainVerifiedAt']
-                        is String),
-          )
-          .toList(growable: false);
-    } catch (_) {
-      return const [];
+  /// Loads the complete registry without parsing a large imported source file
+  /// on the UI isolate.
+  Future<List<RegisteredBookSource>> loadInBackground() async {
+    final raw = await _readRaw();
+    if (raw == null || raw.trim().isEmpty) return const [];
+    if (raw.length < _backgroundDecodeThreshold) {
+      return _decodeStoredSources(raw);
     }
+    final maps = await compute(_decodeStoredSourceMaps, raw);
+    return maps.map(RegisteredBookSource.fromJson).toList(growable: false);
+  }
+
+  Future<List<RegisteredBookSource>> _load() async {
+    return loadInBackground();
   }
 
   /// Returns sources that may participate in runtime requests right now.
   /// Compatible sources stay stored while the global advanced feature is off.
   Future<List<RegisteredBookSource>> loadRunnable() async {
+    final loaded = await load();
     final preferences = await SharedPreferences.getInstance();
     final additionalEnabled =
         preferences.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
-    final sources = await load();
-    if (additionalEnabled) return sources;
-    return sources
+    final runnable = loaded.where((source) => source.capabilities.isNotEmpty);
+    if (additionalEnabled) return runnable.toList(growable: false);
+    return runnable
         .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
         .toList(growable: false);
   }
 
+  /// Loads the runnable set without decoding and compatibility-scanning a
+  /// large imported registry on the UI isolate.
+  Future<List<RegisteredBookSource>> loadRunnableInBackground() async {
+    final raw = await _readRaw();
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final preferences = await SharedPreferences.getInstance();
+    final additionalEnabled =
+        preferences.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
+    final arguments = <String, Object>{
+      'raw': raw,
+      'additionalEnabled': additionalEnabled,
+    };
+    // Spawning an isolate costs more than a direct parse for small source
+    // lists and does not advance inside Flutter widget-test fake async. Large
+    // imported registries still stay completely off the UI isolate.
+    final maps = raw.length < _backgroundDecodeThreshold
+        ? _decodeRunnableSourceMaps(arguments)
+        : await compute(_decodeRunnableSourceMaps, arguments);
+    return maps.map(RegisteredBookSource.fromJson).toList(growable: false);
+  }
+
   Future<List<RegisteredBookSource>> upsert(RegisteredBookSource source) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false)).toList();
+      final sources = (await _load()).toList();
       final index = sources.indexWhere((item) => item.id == source.id);
       if (index >= 0) {
         final previous = sources[index];
@@ -115,9 +130,7 @@ class BookSourceRegistry {
       } else {
         sources.add(source);
       }
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -127,15 +140,16 @@ class BookSourceRegistry {
     Iterable<RegisteredBookSource> imported,
   ) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false)).toList();
+      final sources = (await _load()).toList();
       final indexes = <String, int>{
         for (var index = 0; index < sources.length; index++)
-          sources[index].id: index,
+          _sourceIdentity(sources[index]): index,
       };
       for (final source in imported) {
-        final index = indexes[source.id];
+        final identity = _sourceIdentity(source);
+        final index = indexes[identity];
         if (index == null) {
-          indexes[source.id] = sources.length;
+          indexes[identity] = sources.length;
           sources.add(source);
           continue;
         }
@@ -151,7 +165,9 @@ class BookSourceRegistry {
           );
         }
         sources[index] = RegisteredBookSource(
-          id: source.id,
+          // Preserve the original ID when migrating imported-source naming;
+          // shelf entries and downloaded books may already reference it.
+          id: previous.id,
           name: source.name,
           description: source.description,
           manifestUrl: source.manifestUrl,
@@ -166,21 +182,19 @@ class BookSourceRegistry {
           languages: source.languages,
           capabilities: source.capabilities,
           maxCatalogPageSize: source.maxCatalogPageSize,
-          enabled: source.enabled && source.capabilities.isNotEmpty,
+          enabled: previous.enabled && source.capabilities.isNotEmpty,
           addedAt: previous.addedAt,
           sourceProtocol: source.sourceProtocol,
           sourceConfig: source.sourceConfig,
         );
       }
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
   Future<List<RegisteredBookSource>> setEnabled(String id, bool enabled) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false))
+      final sources = (await _load())
           .map((source) {
             if (source.id != id) return source;
             if (enabled && source.capabilities.isEmpty) {
@@ -191,9 +205,7 @@ class BookSourceRegistry {
             return source.copyWith(enabled: enabled);
           })
           .toList(growable: false);
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -203,7 +215,9 @@ class BookSourceRegistry {
     RegisteredBookSource source,
     BookSourceClient client,
   ) async {
-    final discovered = await client.discover(source.manifestUrl.toString());
+    final manifestInput = source.manifestUrl.toString();
+    await client.invalidateDiscoveryResponseCache(manifestInput);
+    final discovered = await client.discover(manifestInput);
     final refreshed = RegisteredBookSource.fromManifest(
       manifest: discovered.manifest,
       manifestUrl: discovered.manifestUrl,
@@ -218,24 +232,20 @@ class BookSourceRegistry {
 
   Future<List<RegisteredBookSource>> remove(String id) async {
     return _mutate(() async {
-      final sources = (await _load(
-        filterUnverified: false,
-      )).where((source) => source.id != id).toList();
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      final sources = (await _load())
+          .where((source) => source.id != id)
+          .toList();
+      return _saveAndPublish(sources);
     });
   }
 
   Future<List<RegisteredBookSource>> removeAll(Iterable<String> ids) async {
     final removed = ids.toSet();
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false))
+      final sources = (await _load())
           .where((source) => !removed.contains(source.id))
           .toList(growable: false);
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -245,16 +255,14 @@ class BookSourceRegistry {
   ) async {
     final selected = ids.toSet();
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false))
+      final sources = (await _load())
           .map((source) {
             if (!selected.contains(source.id)) return source;
             final canEnable = source.capabilities.isNotEmpty;
             return source.copyWith(enabled: enabled && canEnable);
           })
           .toList(growable: false);
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -266,16 +274,14 @@ class BookSourceRegistry {
     RegisteredBookSource source,
   ) async {
     return _mutate(() async {
-      final sources = (await _load(filterUnverified: false)).toList();
+      final sources = (await _load()).toList();
       final index = sources.indexWhere((item) => item.id == source.id);
       if (index < 0) {
         sources.add(source);
       } else {
         sources[index] = source;
       }
-      await _save(sources);
-      _changesController.add(null);
-      return load();
+      return _saveAndPublish(sources);
     });
   }
 
@@ -294,10 +300,120 @@ class BookSourceRegistry {
   }
 
   Future<void> _save(List<RegisteredBookSource> sources) async {
+    final raw = jsonEncode(sources.map((source) => source.toJson()).toList());
+    final hasExternalRegistry = await _storage.read() != null;
+    if (await _storage.write(raw)) {
+      final preferences = await SharedPreferences.getInstance();
+      if (preferences.containsKey(_storageKey)) {
+        await preferences.remove(_storageKey);
+      }
+      return;
+    }
+    if (hasExternalRegistry) {
+      throw StateError('Could not persist the book source registry.');
+    }
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(
-      _storageKey,
-      jsonEncode(sources.map((source) => source.toJson()).toList()),
+    await preferences.setString(_storageKey, raw);
+  }
+
+  Future<List<RegisteredBookSource>> _saveAndPublish(
+    List<RegisteredBookSource> sources,
+  ) async {
+    sources.sort((a, b) => a.name.compareTo(b.name));
+    await _save(sources);
+    _changesController.add(null);
+    return List.unmodifiable(sources);
+  }
+
+  Future<void> _prepareStorage() async {
+    if (await _storage.read() != null) return;
+    final preferences = await SharedPreferences.getInstance();
+    final legacy = preferences.getString(_storageKey);
+    if (legacy == null) return;
+    if (await _storage.write(legacy)) {
+      await preferences.remove(_storageKey);
+    }
+  }
+
+  Future<String?> _readRaw() async {
+    await prepareStorage();
+    final stored = await _storage.read();
+    if (stored != null) return stored;
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_storageKey);
+  }
+}
+
+String _sourceIdentity(RegisteredBookSource source) {
+  if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+    final configuredUrl = source.sourceConfig?['bookSourceUrl'];
+    if (configuredUrl is String && configuredUrl.trim().isNotEmpty) {
+      return 'reading-source:${configuredUrl.trim()}';
+    }
+  }
+  return 'protocol:${source.sourceProtocol.name}:id:${source.id}';
+}
+
+List<Map<String, dynamic>> _decodeRunnableSourceMaps(
+  Map<String, Object> request,
+) {
+  final raw = request['raw']! as String;
+  final additionalEnabled = request['additionalEnabled']! as bool;
+  final sources = _decodeStoredSources(raw).where((source) {
+    if (source.capabilities.isEmpty) return false;
+    return additionalEnabled ||
+        source.sourceProtocol == BookSourceProtocolKind.orsp;
+  });
+  return sources.map((source) => source.toJson()).toList(growable: false);
+}
+
+List<Map<String, dynamic>> _decodeStoredSourceMaps(String raw) {
+  return _decodeStoredSources(
+    raw,
+  ).map((source) => source.toJson()).toList(growable: false);
+}
+
+List<RegisteredBookSource> _decodeStoredSources(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    final sources = <RegisteredBookSource>[];
+    for (final item in decoded) {
+      if (item is! Map) continue;
+      try {
+        final stored = RegisteredBookSource.fromJson(
+          item.map((key, value) => MapEntry('$key', value)),
+        );
+        sources.add(_refreshStoredCompatibility(stored));
+      } catch (_) {
+        // One damaged record must not hide the remaining sources.
+      }
+    }
+    sources.sort((a, b) => a.name.compareTo(b.name));
+    return sources;
+  } catch (_) {
+    return const [];
+  }
+}
+
+RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
+  if (source.sourceProtocol != BookSourceProtocolKind.readingSource ||
+      source.sourceConfig == null) {
+    return source;
+  }
+  try {
+    final compatible = ReadingSourceConfig.fromJson(source.sourceConfig!);
+    final report = const SourceCompatibilityScanner().scan(compatible);
+    return compatible.toRegisteredSource(
+      id: source.id,
+      enabled: source.enabled,
+      readingChainVerified: isReadingChainVerifiedSource(source),
+      compatibilityReport: report,
+      addedAt: source.addedAt,
     );
+  } on FormatException {
+    // Keep a legacy record visible even if its raw configuration can no
+    // longer be executed. The management page can still remove or replace it.
+    return source;
   }
 }

@@ -20,7 +20,7 @@ class BackgroundDownloadBridge(
     }
 
     private val channel = MethodChannel(messenger, CHANNEL)
-    private var pendingPermissionResult: MethodChannel.Result? = null
+    private var notificationPermissionRequestPending = false
     private var pendingTap: Map<String, String>? = null
 
     init {
@@ -49,11 +49,7 @@ class BackgroundDownloadBridge(
         grantResults: IntArray,
     ): Boolean {
         if (requestCode != NOTIFICATION_PERMISSION_REQUEST) return false
-        val result = pendingPermissionResult ?: return true
-        pendingPermissionResult = null
-        result.success(
-            grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED,
-        )
+        notificationPermissionRequestPending = false
         return true
     }
 
@@ -85,15 +81,25 @@ class BackgroundDownloadBridge(
             result.success(true)
             return
         }
-        if (pendingPermissionResult != null) {
+        if (notificationPermissionRequestPending) {
             result.success(false)
             return
         }
-        pendingPermissionResult = result
-        activity.requestPermissions(
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            NOTIFICATION_PERMISSION_REQUEST,
-        )
+        notificationPermissionRequestPending = true
+        runCatching {
+            activity.requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                NOTIFICATION_PERMISSION_REQUEST,
+            )
+        }.onSuccess {
+            // Permission is optional for the download itself. Report that the
+            // request was launched immediately instead of holding the Flutter
+            // method call open until the user answers the system dialog.
+            result.success(false)
+        }.onFailure {
+            notificationPermissionRequestPending = false
+            result.error("permission_request_failed", it.message, null)
+        }
     }
 
     private fun updateTask(

@@ -20,10 +20,10 @@ const _readerIndentCharacter = '\u3164';
 /// only the projection shared by its measurement span and the rendered span.
 ///
 /// When `normalizeParagraphBreaks` is enabled, runs of two or more source line
-/// breaks are treated as paragraph separators and projected to exactly one
-/// structural line break plus the configured additional spacing. This lets
-/// EPUB rendering remove parser-generated blank rows without changing canonical
-/// source offsets.
+/// breaks, including whitespace-only blank rows, are treated as paragraph
+/// separators and projected to exactly one structural line break plus the
+/// configured additional spacing. This lets flowing-text readers remove
+/// source-owned blank rows without changing canonical source offsets.
 @immutable
 class ReaderTextLayout {
   const ReaderTextLayout._({
@@ -125,11 +125,23 @@ class ReaderTextLayout {
 
       final breakStart = sourceCursor;
       var logicalBreakCount = 0;
-      while (sourceCursor < sourceText.length &&
-          isReaderLineBreakCodeUnit(sourceText.codeUnitAt(sourceCursor))) {
-        sourceCursor += readerLineBreakLengthAt(sourceText, sourceCursor);
+      var breakCursor = sourceCursor;
+      while (breakCursor < sourceText.length) {
+        final breakLength = readerLineBreakLengthAt(sourceText, breakCursor);
+        if (breakLength == 0) break;
+        breakCursor += breakLength;
         logicalBreakCount++;
+
+        if (!normalizeParagraphBreaks) continue;
+        var nextBreak = breakCursor;
+        while (nextBreak < sourceText.length &&
+            isReaderIndentCodeUnit(sourceText.codeUnitAt(nextBreak))) {
+          nextBreak++;
+        }
+        if (readerLineBreakLengthAt(sourceText, nextBreak) == 0) break;
+        breakCursor = nextBreak;
       }
+      sourceCursor = breakCursor;
       if (normalizeParagraphBreaks && logicalBreakCount > 1) {
         // A paragraph separator at the beginning of a projection commonly
         // follows an inline EPUB image. The image/text gap already separates

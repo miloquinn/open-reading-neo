@@ -61,6 +61,7 @@ List<BookSourceTextPage> paginateBookSourceText(
     style: style,
     firstLineIndent: firstLineIndent,
     paragraphSpacing: paragraphSpacing,
+    normalizeParagraphBreaks: true,
     includeChapterTitlePage: includeChapterTitlePage,
   );
 }

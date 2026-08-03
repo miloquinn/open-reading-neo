@@ -10,7 +10,13 @@ import 'package:xxread/services/books/book_text_extraction_service.dart';
 
 /// 记录调用并按外部指令放行的假 AI 服务；可预置若干次失败。
 class _RecordingAIService implements AIService {
+  _RecordingAIService({this.maxPromptChars, this.answerForMeta});
+
   final List<String> chatCalls = <String>[];
+  final List<int> promptLengths = <int>[];
+
+  final int? maxPromptChars;
+  final String Function(AIRequestMeta meta)? answerForMeta;
 
   /// 每次 chat 调用先消费一个预置错误；耗尽后正常返回。
   final List<AIServiceException> pendingErrors = <AIServiceException>[];
@@ -22,10 +28,22 @@ class _RecordingAIService implements AIService {
     required AIRequestMeta meta,
   }) async {
     chatCalls.add(meta.chapterId);
+    final promptLength = history.fold<int>(
+      0,
+      (total, message) => total + message.content.length,
+    );
+    promptLengths.add(promptLength);
+    if (maxPromptChars != null && promptLength > maxPromptChars!) {
+      throw const AIServiceException(
+        code: 'request_failed_generic',
+        status: '400',
+        text: 'context length exceeded',
+      );
+    }
     if (pendingErrors.isNotEmpty) {
       throw pendingErrors.removeAt(0);
     }
-    return '总结：${meta.chapterId}';
+    return answerForMeta?.call(meta) ?? '总结：${meta.chapterId}';
   }
 
   @override
@@ -52,6 +70,25 @@ class _FakeExtractor extends BookTextExtractionService {
   }
 }
 
+class _ManyChaptersExtractor extends BookTextExtractionService {
+  const _ManyChaptersExtractor(this.chapterCount, this.chapterChars);
+
+  final int chapterCount;
+  final int chapterChars;
+
+  @override
+  Future<List<BookChapterText>> extractChapters(Book book) async {
+    return List<BookChapterText>.generate(
+      chapterCount,
+      (index) => BookChapterText(
+        chapterId: 'c${index + 1}',
+        title: '第${index + 1}章',
+        text: List<String>.filled(chapterChars, '文').join(),
+      ),
+    );
+  }
+}
+
 class _MemoryKnowledge extends GlobalAIReadingService {
   _MemoryKnowledge() : super.forTesting();
 
@@ -74,11 +111,12 @@ BookPreprocessService _testService({
   required _RecordingAIService ai,
   required _MemoryKnowledge knowledge,
   required AiRequestCoordinator coordinator,
+  BookTextExtractionService extractor = const _FakeExtractor(),
   List<Duration> retryDelays = const [],
 }) {
   return BookPreprocessService(
     ai: ai,
-    extractor: const _FakeExtractor(),
+    extractor: extractor,
     knowledge: knowledge,
     coordinator: coordinator,
     requestGap: Duration.zero,
@@ -233,6 +271,39 @@ void main() {
       final summary = await service.preprocessBook(book: _testBook());
       expect(ai.chatCalls, hasLength(2));
       expect(summary, isNotEmpty);
+    });
+
+    test('长书正文和最终合并都保持在受控上下文内', () async {
+      final coordinator = AiRequestCoordinator.forTesting();
+      final ai = _RecordingAIService(
+        maxPromptChars: 3400,
+        answerForMeta: (_) => List<String>.filled(500, '摘要').join(),
+      );
+      final knowledge = _MemoryKnowledge();
+      final service = _testService(
+        ai: ai,
+        knowledge: knowledge,
+        coordinator: coordinator,
+        extractor: const _ManyChaptersExtractor(24, 2800),
+      );
+      final progress = <(int, int)>[];
+
+      final summary = await service.preprocessBook(
+        book: _testBook(),
+        onProgress: (done, total) => progress.add((done, total)),
+      );
+
+      expect(summary, isNotEmpty);
+      expect(ai.promptLengths, everyElement(lessThanOrEqualTo(3400)));
+      expect(
+        ai.chatCalls.where((id) => id.startsWith('preprocess-merge-')),
+        isNotEmpty,
+        reason: '多份分段摘要应先分组归并，不能一次性塞进最终请求',
+      );
+      expect(ai.chatCalls.last, 'preprocess-merge');
+      expect(progress.last.$1, progress.last.$2);
+      expect(progress.last.$2, greaterThan(25));
+      expect(knowledge.summaries['7'], summary);
     });
   });
 

@@ -12,12 +12,14 @@ class ReaderNavigationChapter {
     required this.title,
     required this.index,
     this.id,
+    this.fragment,
     this.depth = 0,
   });
 
   final String title;
   final int index;
   final String? id;
+  final String? fragment;
   final int depth;
 }
 
@@ -31,10 +33,14 @@ class ReaderNavigationSheet extends StatefulWidget {
     required this.onChapterSelected,
     required this.onBookmarkSelected,
     required this.onBookmarkDeleted,
+    this.onNavigationChapterSelected,
     this.annotations = const [],
     this.onAnnotationSelected,
     this.onAnnotationDeleted,
     this.currentAnchorKey,
+    this.currentChapterOffset,
+    this.currentChapterText,
+    this.currentNavigationPosition,
   });
 
   final ReaderThemePalette palette;
@@ -43,7 +49,11 @@ class ReaderNavigationSheet extends StatefulWidget {
   final List<Bookmark> bookmarks;
   final List<BookNote> annotations;
   final String? currentAnchorKey;
+  final int? currentChapterOffset;
+  final String? currentChapterText;
+  final int? currentNavigationPosition;
   final ValueChanged<int> onChapterSelected;
+  final ValueChanged<ReaderNavigationChapter>? onNavigationChapterSelected;
   final ValueChanged<Bookmark> onBookmarkSelected;
   final ValueChanged<Bookmark> onBookmarkDeleted;
   final ValueChanged<BookNote>? onAnnotationSelected;
@@ -115,6 +125,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       final after = next[index];
       if (before.index != after.index ||
           before.depth != after.depth ||
+          before.fragment != after.fragment ||
           before.title != after.title) {
         return false;
       }
@@ -189,6 +200,44 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     return visible;
   }
 
+  int get _currentChapterPosition {
+    final suppliedPosition = widget.currentNavigationPosition;
+    if (suppliedPosition != null &&
+        suppliedPosition >= 0 &&
+        suppliedPosition < _treeEntries.length) {
+      return suppliedPosition;
+    }
+    final matchingPositions = <int>[
+      for (final entry in _treeEntries)
+        if (entry.chapter.index == widget.currentChapterIndex) entry.position,
+    ];
+    if (matchingPositions.length <= 1) {
+      return matchingPositions.isEmpty ? -1 : matchingPositions.single;
+    }
+
+    final text = widget.currentChapterText;
+    final offset = widget.currentChapterOffset;
+    if (text == null || offset == null || text.isEmpty) {
+      return matchingPositions.first;
+    }
+
+    final safeOffset = offset.clamp(0, text.length);
+    var selectedPosition = matchingPositions.first;
+    var searchFrom = 0;
+    for (final position in matchingPositions) {
+      final title = _treeEntries[position].chapter.title
+          .replaceAll(_chapterTitleWhitespace, ' ')
+          .trim();
+      if (title.isEmpty) continue;
+      final titleOffset = text.indexOf(title, searchFrom);
+      if (titleOffset < 0) continue;
+      searchFrom = titleOffset + title.length;
+      if (titleOffset > safeOffset) break;
+      selectedPosition = position;
+    }
+    return selectedPosition;
+  }
+
   void _toggleChapter(_ReaderNavigationTreeEntry entry) {
     setState(() {
       if (!_collapsedChapterPositions.remove(entry.position)) {
@@ -212,9 +261,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       return;
     }
     final entries = _treeEntries;
-    final currentPosition = entries.indexWhere(
-      (entry) => entry.chapter.index == widget.currentChapterIndex,
-    );
+    final currentPosition = _currentChapterPosition;
     if (currentPosition < 0) return;
     var expandedAncestor = false;
     var ancestorPosition = entries[currentPosition].parentPosition;
@@ -391,6 +438,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
 
   Widget _buildCatalog(BuildContext context) {
     final chapters = _visibleChapters;
+    final currentPosition = _currentChapterPosition;
     return Column(
       children: [
         Padding(
@@ -471,8 +519,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     itemCount: chapters.length,
                     itemBuilder: (context, visibleIndex) {
                       final entry = chapters[visibleIndex];
-                      final selected =
-                          entry.chapter.index == widget.currentChapterIndex;
+                      final selected = entry.position == currentPosition;
                       return _buildChapterTile(context, entry, selected);
                     },
                   ),
@@ -504,7 +551,15 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: InkWell(
-          onTap: () => widget.onChapterSelected(chapter.index),
+          onTap: () {
+            final onNavigationChapterSelected =
+                widget.onNavigationChapterSelected;
+            if (onNavigationChapterSelected != null) {
+              onNavigationChapterSelected(chapter);
+            } else {
+              widget.onChapterSelected(chapter.index);
+            }
+          },
           borderRadius: BorderRadius.circular(16),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),

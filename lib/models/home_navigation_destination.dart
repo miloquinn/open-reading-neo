@@ -28,6 +28,10 @@ const List<HomeNavigationDestination> defaultHomeNavigationOrder = [
   HomeNavigationDestination.settings,
 ];
 
+const Set<HomeNavigationDestination> defaultHiddenHomeNavigationDestinations = {
+  HomeNavigationDestination.ai,
+};
+
 List<HomeNavigationDestination> normalizeHomeNavigationOrder(
   Iterable<String>? storedIds,
 ) {
@@ -53,8 +57,10 @@ List<HomeNavigationDestination> normalizeHomeNavigationOrder(
 Set<HomeNavigationDestination> normalizeHiddenHomeNavigationDestinations(
   Iterable<String>? storedIds,
 ) {
+  if (storedIds == null) return defaultHiddenHomeNavigationDestinations;
+
   final hidden = <HomeNavigationDestination>{};
-  for (final id in storedIds ?? const <String>[]) {
+  for (final id in storedIds) {
     final destination = HomeNavigationDestination.fromStorageId(id);
     if (destination != null &&
         destination != HomeNavigationDestination.settings) {

@@ -37,14 +37,19 @@ class ComicReaderPage extends StatefulWidget {
     Book book, {
     BookOpenAnimation? animation,
     LibraryBookOpenAnimation? libraryAnimation,
+    LibraryBookOpenAnimationPace animationPace =
+        LibraryBookOpenAnimationPace.fast,
+    ReaderThemePalette? initialTheme,
     bool waitForReaderClose = true,
   }) async {
-    final initialTheme = await ReaderThemes.loadSavedPalette();
+    final resolvedInitialTheme =
+        initialTheme ?? await ReaderThemes.loadSavedPalette();
     if (!context.mounted) return;
     final route = BookOpenTransition.createRoute<void>(
-      ComicReaderPage(book: book, initialTheme: initialTheme),
+      ComicReaderPage(book: book, initialTheme: resolvedInitialTheme),
       animation: animation,
       libraryAnimation: libraryAnimation,
+      animationPace: animationPace,
       readerBackgroundColor: Colors.black,
     );
     final navigation = BookOpenTransition.push<void>(context, route);

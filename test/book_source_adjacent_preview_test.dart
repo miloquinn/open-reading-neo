@@ -170,8 +170,9 @@ class _AdjacentPreviewClient extends BookSourceClient {
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async => const [
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
     BookSourceChapter(id: 'chapter-1', title: '上一章', order: 1),
     BookSourceChapter(id: 'chapter-2', title: '当前章', order: 2),
   ];
@@ -181,6 +182,7 @@ class _AdjacentPreviewClient extends BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     requestedChapterIds.add(chapterId);
     final isPrevious = chapterId == 'chapter-1';

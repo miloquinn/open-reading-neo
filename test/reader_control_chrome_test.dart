@@ -134,11 +134,13 @@ void main() {
             onBookmark: () {},
             onTableOfContents: () {},
             onReadAloud: () {},
+            onReplaceRules: () {},
             onSettings: () {},
             backTooltip: 'Back',
             bookmarkTooltip: 'Bookmark',
             tableOfContentsTooltip: 'Contents',
             readAloudTooltip: 'Read aloud',
+            replaceRulesTooltip: 'Replace & clean',
             settingsTooltip: 'Settings',
             bookmarked: false,
             bottomKey: bottomKey,
@@ -165,6 +167,13 @@ void main() {
       find.descendant(
         of: bottomControls,
         matching: find.byIcon(Icons.headphones_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: bottomControls,
+        matching: find.byIcon(Icons.find_replace_outlined),
       ),
       findsOneWidget,
     );

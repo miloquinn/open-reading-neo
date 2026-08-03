@@ -1,7 +1,7 @@
 // 文件说明：原生平台在线字体下载、校验、私有存储与运行时注册服务。
 // 技术要点：Dio 断点下载、SHA-256 完整性校验、FontLoader 运行时注册、原子清单持久化。
-// 字体源：jsDelivr CDN（https://cdn.jsdelivr.net/gh/...）服务 GitHub 上游仓库；
-// NotoSerifSC 因 25MB 文件触发 jsDelivr 403，回退到 raw.githubusercontent.com。
+// 字体源：受许可的官方源，或由 jsDelivr/raw.githubusercontent.com 服务的
+// GitHub 上游仓库；NotoSerifSC 因 25MB 文件触发 jsDelivr 403，回退到 raw。
 
 import 'dart:async';
 import 'dart:convert';
@@ -50,6 +50,7 @@ class OnlineFontService {
   /// 允许的下载主机白名单（防 SSRF）。
   static const Set<String> _allowedHosts = <String>{
     'cdn.jsdelivr.net',
+    'developer.huawei.com',
     'fastly.jsdelivr.net',
     'gcore.jsdelivr.net',
     'raw.githubusercontent.com',
@@ -173,8 +174,12 @@ class OnlineFontService {
         }
         final destFile = File(path.join(fontDir.path, fileSpec.fileName));
         final tempFile = File('${destFile.path}.tmp');
+        final archiveTempFile = File('${destFile.path}.archive.tmp');
         if (await tempFile.exists()) {
           await tempFile.delete();
+        }
+        if (await archiveTempFile.exists()) {
+          await archiveTempFile.delete();
         }
 
         final fileStartBytes = downloadedBytes;
@@ -189,18 +194,12 @@ class OnlineFontService {
         );
 
         try {
-          await _dio.download(
-            fileSpec.url,
-            tempFile.path,
+          await _downloadFontFile(
+            fileSpec: fileSpec,
+            tempFile: tempFile,
+            archiveTempFile: archiveTempFile,
             cancelToken: cancelToken,
-            deleteOnError: true,
-            onReceiveProgress: (received, total) {
-              final actualTotal = total > 0 ? total : fileSpec.size;
-              if (received > actualTotal + _downloadToleranceBytes) {
-                // 超出预期大小过多，中止下载。
-                cancelToken?.cancel('Online font download exceeded size limit');
-                return;
-              }
+            onReceiveProgress: (received) {
               _emitProgress(
                 fontId: fontId,
                 status: OnlineFontDownloadStatus.downloading,
@@ -211,12 +210,9 @@ class OnlineFontService {
                 onProgress: onProgress,
               );
             },
-            options: Options(
-              validateStatus: (status) =>
-                  status != null && status >= 200 && status < 300,
-              headers: const {'Accept': 'application/octet-stream'},
-            ),
           );
+        } on OnlineFontException {
+          rethrow;
         } on DioException catch (error) {
           if (CancelToken.isCancel(error)) {
             throw const OnlineFontException(OnlineFontErrorCode.cancelled);
@@ -243,6 +239,13 @@ class OnlineFontService {
           path.extension(fileSpec.fileName),
         );
         if (!verification.signatureValid) {
+          throw const OnlineFontException(
+            OnlineFontErrorCode.fileSignatureInvalid,
+          );
+        }
+        final expectedSha256 = fileSpec.expectedSha256?.toLowerCase();
+        if (expectedSha256 != null &&
+            verification.sha256.toLowerCase() != expectedSha256) {
           throw const OnlineFontException(
             OnlineFontErrorCode.fileSignatureInvalid,
           );
@@ -278,6 +281,9 @@ class OnlineFontService {
         );
         downloadedBytes = fileStartBytes + verification.size;
         downloadedFiles++;
+        if (await archiveTempFile.exists()) {
+          await archiveTempFile.delete();
+        }
       }
 
       final record = OnlineFontRecord(
@@ -437,6 +443,86 @@ class OnlineFontService {
     final uri = Uri.tryParse(url);
     if (uri == null || uri.scheme != 'https') return false;
     return _allowedHosts.contains(uri.host.toLowerCase());
+  }
+
+  Future<void> _downloadFontFile({
+    required OnlineFontFile fileSpec,
+    required File tempFile,
+    required File archiveTempFile,
+    required CancelToken? cancelToken,
+    required void Function(int receivedBytes) onReceiveProgress,
+  }) async {
+    final zipEntry = fileSpec.zipEntry;
+    if (zipEntry == null) {
+      final effectiveCancelToken = cancelToken ?? CancelToken();
+      await _dio.download(
+        fileSpec.url,
+        tempFile.path,
+        cancelToken: effectiveCancelToken,
+        deleteOnError: true,
+        onReceiveProgress: (received, total) {
+          final actualTotal = total > 0 ? total : fileSpec.size;
+          if (received > actualTotal + _downloadToleranceBytes) {
+            effectiveCancelToken.cancel(
+              'Online font download exceeded size limit',
+            );
+            return;
+          }
+          onReceiveProgress(received.clamp(0, fileSpec.size));
+        },
+        options: Options(
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 300,
+          headers: const {'Accept': 'application/octet-stream'},
+        ),
+      );
+      return;
+    }
+
+    final rangeEnd = zipEntry.compressedOffset + zipEntry.compressedSize - 1;
+    final response = await _dio.download(
+      fileSpec.url,
+      archiveTempFile.path,
+      cancelToken: cancelToken,
+      deleteOnError: true,
+      onReceiveProgress: (received, _) {
+        final fraction = zipEntry.compressedSize == 0
+            ? 0.0
+            : (received / zipEntry.compressedSize).clamp(0.0, 1.0);
+        onReceiveProgress((fileSpec.size * fraction).round());
+      },
+      options: Options(
+        validateStatus: (status) => status == HttpStatus.partialContent,
+        headers: <String, String>{
+          'Accept': 'application/octet-stream',
+          'Range': 'bytes=${zipEntry.compressedOffset}-$rangeEnd',
+        },
+      ),
+    );
+    if (response.statusCode != HttpStatus.partialContent ||
+        !await archiveTempFile.exists() ||
+        await archiveTempFile.length() != zipEntry.compressedSize) {
+      throw const OnlineFontException(OnlineFontErrorCode.invalidResponse);
+    }
+
+    try {
+      await Isolate.run(() async {
+        final compressed = await archiveTempFile.readAsBytes();
+        final inflated = ZLibCodec(raw: true).decode(compressed);
+        if (inflated.length != fileSpec.size) {
+          throw const OnlineFontException(OnlineFontErrorCode.sizeMismatch);
+        }
+        await tempFile.writeAsBytes(inflated, flush: true);
+      });
+    } on OnlineFontException {
+      rethrow;
+    } catch (error) {
+      throw OnlineFontException(OnlineFontErrorCode.invalidResponse, error);
+    } finally {
+      if (await archiveTempFile.exists()) {
+        await archiveTempFile.delete();
+      }
+    }
   }
 
   static bool _matchesFontSignature(Uint8List bytes, String extension) {

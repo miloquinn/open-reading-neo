@@ -5,12 +5,13 @@ import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/core/app_settings_service.dart';
-import '../legado/legado_runtime.dart';
+import '../source_engine/source_runtime.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_download_cancellation.dart';
 import 'book_source_chapter_cache.dart';
 import 'book_source_network_policy.dart';
+import 'book_source_response_cache.dart';
 
 class DiscoveredBookSource {
   final Uri manifestUrl;
@@ -25,14 +26,20 @@ class DiscoveredBookSource {
 class BookSourceClient {
   final Dio _dio;
   final BookSourceChapterCache _chapterCache;
+  final BookSourceResponseCache _responseCache;
   final BookSourceNetworkPolicy _networkPolicy;
-  LegadoRuntime? _legadoRuntime;
+  SourceRuntime? _sourceRuntime;
 
   /// 单次响应体上限。书源返回的都是 JSON 元数据/章节文本，
   /// 超过该值基本可以判定为异常或恶意响应，中途截断防止 OOM。
   static const int maxResponseBytes = 8 * 1024 * 1024;
   static const int maxDownloadResponseBytes = 24 * 1024 * 1024;
   static const Duration downloadReceiveTimeout = Duration(seconds: 90);
+  static const Duration discoveryCacheTtl = Duration(hours: 1);
+  static const Duration categoriesCacheTtl = Duration(minutes: 30);
+  static const Duration browseCacheTtl = Duration(minutes: 5);
+  static const Duration searchCacheTtl = Duration(minutes: 2);
+  static const Duration bookDetailCacheTtl = Duration(minutes: 10);
 
   /// ORSP §11 章节目录默认页大小；书源未声明 maxCatalogPageSize 时使用。
   static const int _defaultChapterPageSize = 100;
@@ -48,8 +55,10 @@ class BookSourceClient {
   BookSourceClient({
     Dio? dio,
     BookSourceChapterCache? chapterCache,
+    BookSourceResponseCache? responseCache,
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
   }) : _chapterCache = chapterCache ?? const BookSourceChapterCache(),
+       _responseCache = responseCache ?? BookSourceResponseCache.instance,
        _networkPolicy = networkPolicy,
        _dio =
            dio ??
@@ -69,7 +78,7 @@ class BookSourceClient {
              ));
 
   void close({bool force = true}) {
-    _legadoRuntime?.close(force: force);
+    _sourceRuntime?.close(force: force);
     _dio.close(force: force);
   }
 
@@ -158,9 +167,14 @@ class BookSourceClient {
   Future<DiscoveredBookSource> discover(String input) async {
     final manifestUrl = normalizeManifestUri(input);
     try {
-      final manifest = BookSourceManifest.fromJson(
-        decodeBookSourceJson(await _getBounded(manifestUrl)),
+      final key = _discoveryCacheKey(manifestUrl);
+      final json = await _cachedOrspJson(
+        key: key,
+        ttl: discoveryCacheTtl,
+        uri: manifestUrl,
+        validate: BookSourceManifest.fromJson,
       );
+      final manifest = BookSourceManifest.fromJson(json);
       return DiscoveredBookSource(manifestUrl: manifestUrl, manifest: manifest);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
@@ -175,10 +189,17 @@ class BookSourceClient {
     String query, {
     int page = 1,
     int pageSize = 20,
+    BookDownloadCancellation? cancellation,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.search(source, query, page: page, pageSize: pageSize);
+      return _sourceEngine.search(
+        source,
+        query,
+        page: page,
+        pageSize: pageSize,
+        cancellation: cancellation,
+      );
     }
     if (!source.capabilities.contains('search')) {
       throw const BookSourceProtocolException(
@@ -193,9 +214,22 @@ class BookSourceClient {
       },
     );
     try {
-      return BookSourceSearchPage.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      cancellation?.throwIfCancelled();
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'search', [
+          query.trim(),
+          '$page',
+          '$pageSize',
+        ]),
+        ttl: searchCacheTtl,
+        uri: uri,
+        cancellation: cancellation,
+        deduplicateInFlight: cancellation == null,
+        persistToDisk: false,
+        validate: BookSourceSearchPage.fromJson,
       );
+      cancellation?.throwIfCancelled();
+      return BookSourceSearchPage.fromJson(json);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -214,9 +248,13 @@ class BookSourceClient {
     }
     final uri = _apiUri(source.apiBaseUrl, 'v1/discover');
     try {
-      return BookSourceDiscoveryPage.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'discovery'),
+        ttl: discoveryCacheTtl,
+        uri: uri,
+        validate: BookSourceDiscoveryPage.fromJson,
       );
+      return BookSourceDiscoveryPage.fromJson(json);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -228,6 +266,10 @@ class BookSourceClient {
   Future<List<BookSourceCategory>> getCategories(
     RegisteredBookSource source,
   ) async {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+      await _ensureAdditionalProtocolsEnabled();
+      return _sourceEngine.getExploreCategories(source);
+    }
     if (!source.capabilities.contains('categories')) {
       throw const BookSourceProtocolException(
         'This source does not support categories.',
@@ -235,7 +277,12 @@ class BookSourceClient {
     }
     final uri = _apiUri(source.apiBaseUrl, 'v1/categories');
     try {
-      final json = decodeBookSourceJson(await _getBounded(uri));
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'categories'),
+        ttl: categoriesCacheTtl,
+        uri: uri,
+        validate: _validateCategoriesJson,
+      );
       final items = json['items'];
       if (items is! List) {
         throw const BookSourceProtocolException(
@@ -262,6 +309,15 @@ class BookSourceClient {
     int page = 1,
     int pageSize = 20,
   }) async {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+      await _ensureAdditionalProtocolsEnabled();
+      return _sourceEngine.browse(
+        source,
+        category: category,
+        page: page,
+        pageSize: pageSize,
+      );
+    }
     if (!source.capabilities.contains('browse')) {
       throw const BookSourceProtocolException(
         'This source does not support browsing.',
@@ -277,9 +333,18 @@ class BookSourceClient {
       },
     );
     try {
-      return BookSourceSearchPage.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      final json = await _cachedOrspJson(
+        key: _orspCacheKey(source, 'browse', [
+          category?.trim() ?? '',
+          sort.trim(),
+          '$page',
+          '$pageSize',
+        ]),
+        ttl: browseCacheTtl,
+        uri: uri,
+        validate: BookSourceSearchPage.fromJson,
       );
+      return BookSourceSearchPage.fromJson(json);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -290,20 +355,38 @@ class BookSourceClient {
 
   Future<BookSourceBook> getBook(
     RegisteredBookSource source,
-    String bookId,
-  ) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getBook(source, bookId);
+      return _sourceEngine.getBook(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      );
     }
     final uri = _apiUri(
       source.apiBaseUrl,
       'v1/books/${Uri.encodeComponent(bookId)}',
     );
     try {
-      final book = BookSourceBook.fromJson(
-        decodeBookSourceJson(await _getBounded(uri)),
+      final key = _orspCacheKey(source, 'book', [bookId]);
+      final json = await _cachedOrspJson(
+        key: key,
+        ttl: bookDetailCacheTtl,
+        uri: uri,
+        validate: (json) {
+          final book = BookSourceBook.fromJson(json);
+          if (book.id != bookId) {
+            throw const BookSourceProtocolException(
+              'Book detail response does not match the requested book.',
+            );
+          }
+          return book;
+        },
       );
+      final book = BookSourceBook.fromJson(json);
       if (book.id != bookId) {
         throw const BookSourceProtocolException(
           'Book detail response does not match the requested book.',
@@ -320,11 +403,16 @@ class BookSourceClient {
 
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
-    String bookId,
-  ) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getChapters(source, bookId);
+      return _sourceEngine.getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      );
     }
     return _chapterCache.getChapterCatalogOrLoad(
       sourceId: source.id,
@@ -345,12 +433,17 @@ class BookSourceClient {
   Future<List<BookSourceChapter>> getChaptersForDownload(
     RegisteredBookSource source,
     String bookId, {
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       cancellation?.throwIfCancelled();
       await _ensureAdditionalProtocolsEnabled();
-      final chapters = await _legado.getChapters(source, bookId);
+      final chapters = await _sourceEngine.getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      );
       cancellation?.throwIfCancelled();
       return chapters;
     }
@@ -456,13 +549,15 @@ class BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       await _ensureAdditionalProtocolsEnabled();
-      return _legado.getChapterContent(
+      return _sourceEngine.getChapterContent(
         source,
         bookId: bookId,
         chapterId: chapterId,
+        sourceVariables: sourceVariables,
       );
     }
     return _chapterCache.getOrLoad(
@@ -496,15 +591,17 @@ class BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
-    if (source.sourceProtocol == BookSourceProtocolKind.legado) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
       cancellation?.throwIfCancelled();
       await _ensureAdditionalProtocolsEnabled();
-      final content = await _legado.getChapterContent(
+      final content = await _sourceEngine.getChapterContent(
         source,
         bookId: bookId,
         chapterId: chapterId,
+        sourceVariables: sourceVariables,
       );
       cancellation?.throwIfCancelled();
       return content;
@@ -558,15 +655,111 @@ class BookSourceClient {
     RegisteredBookSource source, {
     required String bookId,
     required String chapterId,
+    Map<String, String> sourceVariables = const {},
   }) async {
     try {
-      await getChapterContent(source, bookId: bookId, chapterId: chapterId);
+      await getChapterContent(
+        source,
+        bookId: bookId,
+        chapterId: chapterId,
+        sourceVariables: sourceVariables,
+      );
     } catch (_) {
       // Prefetching is opportunistic and must not surface reader errors.
     }
   }
 
-  LegadoRuntime get _legado => _legadoRuntime ??= LegadoRuntime();
+  /// Invalidates cached ORSP metadata for a source before a manual refresh.
+  /// Reading-source responses are deliberately not cached by this first phase.
+  Future<void> invalidateResponseCache(RegisteredBookSource source) {
+    if (source.sourceProtocol != BookSourceProtocolKind.orsp) {
+      return Future<void>.value();
+    }
+    return _responseCache.invalidatePrefix(_orspSourceCachePrefix(source));
+  }
+
+  /// Invalidates multiple source prefixes with one persistent-directory scan.
+  Future<void> invalidateResponseCaches(
+    Iterable<RegisteredBookSource> sources,
+  ) {
+    return _responseCache.invalidatePrefixes(
+      sources
+          .where(
+            (source) => source.sourceProtocol == BookSourceProtocolKind.orsp,
+          )
+          .map(_orspSourceCachePrefix),
+    );
+  }
+
+  /// Invalidates a cached ORSP manifest discovery request.
+  Future<void> invalidateDiscoveryResponseCache(String input) {
+    return _responseCache.invalidate(
+      _discoveryCacheKey(normalizeManifestUri(input)),
+    );
+  }
+
+  Future<Map<String, dynamic>> _cachedOrspJson({
+    required String key,
+    required Duration ttl,
+    required Uri uri,
+    required Object? Function(Map<String, dynamic>) validate,
+    BookDownloadCancellation? cancellation,
+    bool deduplicateInFlight = true,
+    bool persistToDisk = true,
+  }) async {
+    final json = await _responseCache.getOrLoadJson(
+      key: key,
+      ttl: ttl,
+      deduplicateInFlight: deduplicateInFlight,
+      persistToDisk: persistToDisk,
+      loader: () async {
+        final value = decodeBookSourceJson(
+          await _getBounded(uri, cancellation: cancellation),
+        );
+        validate(value);
+        return value;
+      },
+    );
+    try {
+      validate(json);
+      return json;
+    } catch (_) {
+      // Semantically invalid cached JSON must not poison later requests.
+      await _responseCache.invalidate(key);
+      rethrow;
+    }
+  }
+
+  static Object? _validateCategoriesJson(Map<String, dynamic> json) {
+    final items = json['items'];
+    if (items is! List) {
+      throw const BookSourceProtocolException(
+        'Category response must contain an items array.',
+      );
+    }
+    for (final item in items) {
+      BookSourceCategory.fromJson(decodeBookSourceJson(item));
+    }
+    return null;
+  }
+
+  static String _orspSourceCachePrefix(RegisteredBookSource source) =>
+      'orsp|${Uri.encodeComponent(source.id)}|'
+      '${Uri.encodeComponent(source.apiBaseUrl.toString())}|'
+      '${Uri.encodeComponent(source.protocolVersion)}|';
+
+  static String _orspCacheKey(
+    RegisteredBookSource source,
+    String operation, [
+    List<String> parameters = const [],
+  ]) =>
+      '${_orspSourceCachePrefix(source)}${Uri.encodeComponent(operation)}|'
+      '${parameters.map(Uri.encodeComponent).join('|')}';
+
+  static String _discoveryCacheKey(Uri manifestUrl) =>
+      'orsp-discovery|${Uri.encodeComponent(manifestUrl.toString())}';
+
+  SourceRuntime get _sourceEngine => _sourceRuntime ??= SourceRuntime();
 
   Future<void> _ensureAdditionalProtocolsEnabled() async {
     final preferences = await SharedPreferences.getInstance();

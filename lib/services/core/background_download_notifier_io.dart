@@ -84,8 +84,18 @@ class BackgroundDownloadNotifier {
   static Future<void> begin(BackgroundDownloadTask task) async {
     if (!Platform.isAndroid) return;
     await initialize();
-    await _channel.invokeMethod<void>('requestNotificationPermission');
+    // Notification permission is optional. In particular, never make the
+    // actual download wait for the user to answer Android's permission dialog.
+    unawaited(_requestNotificationPermission());
     await _channel.invokeMethod<void>('begin', _taskArguments(task));
+  }
+
+  static Future<void> _requestNotificationPermission() async {
+    try {
+      await _channel.invokeMethod<void>('requestNotificationPermission');
+    } catch (_) {
+      // A missing/denied notification capability must not affect downloads.
+    }
   }
 
   static Future<void> progress(

@@ -56,6 +56,139 @@ class AppLocalizationsJa extends AppLocalizations {
   String get discoverCategoryEmpty => 'このカテゴリには表示できる書籍がまだありません。';
 
   @override
+  String get bookSourceChannelLoadFailed => 'チャンネルを読み込めませんでした';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return 'ソースから利用可能な書籍が返されませんでした: $details';
+  }
+
+  @override
+  String get bookSourceConnectionFailed =>
+      '利用可能なネットワークアドレスを試しましたが、ソースサーバーに接続できませんでした。後でもう一度お試しください。';
+
+  @override
+  String get bookSourceRedirectFailed =>
+      'ソースサイトがリダイレクトを繰り返しました。Cookie は保持しましたが、コンテンツが返されませんでした。';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return 'ソースサイトが HTTP $status を返しました。チャンネルのアドレスが古いか、サイトに拒否された可能性があります。';
+  }
+
+  @override
+  String get bookSourceStandardLayout => '標準レイアウト';
+
+  @override
+  String get bookSourceListLayout => 'リストレイアウト';
+
+  @override
+  String get bookSourceChangeChannel => '変更';
+
+  @override
+  String get bookSourceChangeSourceTitle => 'ソースを変更';
+
+  @override
+  String get bookSourceChangeCurrentSource => '現在のソース';
+
+  @override
+  String get bookSourceChangeTargetSource => '変更先';
+
+  @override
+  String get bookSourceChangeNotSelected => '未選択';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return '現在第 $chapter 章';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => 'ほかのソースから同じ本を探す';
+
+  @override
+  String get bookSourceChangeSearchAgain => '再検索';
+
+  @override
+  String get bookSourceChangeSearchRemaining => '残りのソースをすべて検索';
+
+  @override
+  String get bookSourceChangeCheckAuthor => '著者を照合';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return '$completed / $total 件を確認';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => '利用できるほかのソースがありません';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint => '検索対応のソースを追加して有効にしてください。';
+
+  @override
+  String get bookSourceChangeSearching => 'ほかのソースを検索中';
+
+  @override
+  String get bookSourceChangeSearchingHint => '各ソースの検索が完了すると候補が表示されます。';
+
+  @override
+  String get bookSourceChangeNoMatches => '一致するソースが見つかりません';
+
+  @override
+  String get bookSourceChangeNoMatchesHint => '書名を変更するか、著者照合をオフにして再検索してください。';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count 件のソース要求が失敗しました。再検索できます。';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => '著者が異なります';
+
+  @override
+  String get bookSourceChangeValidating => '目次と現在の章を確認中…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return '確認に失敗しました: $details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => '現在の章を読めます';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count 章';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate => '選択すると目次と現在の章を確認します。';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf => 'このソース版はすでに本棚にあります。';
+
+  @override
+  String get bookSourceChangeSwitching => 'ソースを変更中…';
+
+  @override
+  String get bookSourceChangeSwitchAction => 'このソースに変更';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return '$source に変更しました';
+  }
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count チャンネル';
+  }
+
+  @override
   String get bookSourceManagementTitle => 'ソース管理';
 
   @override
@@ -111,6 +244,38 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesDisabled => '無効';
 
   @override
+  String get bookSourcesRunnable => 'すぐに使用可能';
+
+  @override
+  String get bookSourcesPendingCompatibility => '実行可能なルールなし';
+
+  @override
+  String get bookSourcesManagementSearchHint => '名前、URL、メモ、グループを検索';
+
+  @override
+  String get bookSourcesClearSearch => '検索をクリア';
+
+  @override
+  String get bookSourcesAllGroups => 'すべてのグループ';
+
+  @override
+  String get bookSourcesChooseGroup => 'ソースグループを選択';
+
+  @override
+  String get bookSourcesSearchGroups => 'グループを検索';
+
+  @override
+  String get bookSourcesNoMatchingSources => '現在の検索とフィルターに一致するソースはありません';
+
+  @override
+  String get bookSourcesResetFilters => 'リセット';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return '$total 件中 $visible 件を表示';
+  }
+
+  @override
   String get bookSourcesRemove => '削除';
 
   @override
@@ -132,7 +297,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesImportLink => 'リンクをインポート';
 
   @override
-  String get bookSourcesAnalyze => 'ソースを分析';
+  String get bookSourcesAnalyze => 'ソースを読み込む';
 
   @override
   String get bookSourcesDetectedOrsp => '検出: ORSP ソース';
@@ -201,10 +366,10 @@ class AppLocalizationsJa extends AppLocalizations {
       '関連コンテンツへのアクセス権限があり、ログイン、支払い、DRM、その他のアクセス制御を回避するためにソースを使用しないことを確認します。';
 
   @override
-  String get bookSourcesConnect => '接続して検証';
+  String get bookSourcesConnect => '読み込んでインポート';
 
   @override
-  String get bookSourcesConnecting => 'プロトコルを検証中…';
+  String get bookSourcesConnecting => 'ソースを処理中…';
 
   @override
   String get bookSourcesAdded => 'ソースを追加しました';
@@ -537,7 +702,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fontDownloadFailed => 'Download failed, tap to retry';
 
   @override
-  String get fontDownloadHint => 'First use requires download from GitHub';
+  String get fontDownloadHint => '初回使用時にオンラインでダウンロードします';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return '可変ウェイト $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => '固定ウェイト（太字はシステム合成）';
 
   @override
   String get fontDeleteDownload => 'Delete download';
@@ -678,6 +851,36 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get fontSizeLabel => '文字サイズ';
+
+  @override
+  String get readerFontWeightLabel => '文字の太さ';
+
+  @override
+  String get readerFontWeightLight => '細め';
+
+  @override
+  String get readerFontWeightRegular => '標準';
+
+  @override
+  String get readerFontWeightMedium => '中間';
+
+  @override
+  String get readerFontWeightSemiBold => 'やや太め';
+
+  @override
+  String get readerFontWeightBold => '太字';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return '読書用には 300–700 の5段階を使用します。現在のフォントの実際の全範囲は $min–$max です。';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      '読書用には 300–700 の5段階を使用します。現在のフォントは可変ウェイトを宣言していないため、システムによる近似結果はプラットフォームごとに異なる場合があります。';
+
+  @override
+  String get readerFontWeightPreview => '静かなページを、もう少し先へ · Reading';
 
   @override
   String get lineSpacingLabel => '行間';
@@ -1931,7 +2134,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      'インポートしたソースは事前確認され、有効にするまで無効のままです。';
+      'インポート時はローカルで解析と重複除去のみを行い、各ソースへの通信確認はしません。呼び出せるルールを持つソースは元の有効状態を維持し、各機能は使用時に確認します。';
 
   @override
   String get additionalSourcesChooseFile => 'JSON ファイルから追加';
@@ -1948,6 +2151,21 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '標準ルール $supported、拡張ルール $partial、高度なルール $unsupported、スキップ $skipped';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count 件をインポート可能、$skipped 件をスキップ';
+  }
+
+  @override
   String get additionalSourcesAvailable => '利用可能';
 
   @override
@@ -1957,7 +2175,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get additionalSourcesUnsupported => '未対応';
 
   @override
-  String get additionalSourcesImportConfirm => '無効のままインポート';
+  String get additionalSourcesImportConfirm => '一括インポート';
 
   @override
   String additionalSourcesImported(int count) {
@@ -1972,6 +2190,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsKeepScreenOnSubtitle => '読書中に画面が自動で消えないようにします';
+
+  @override
+  String get settingsPowerSavingModeTitle => '省電力モード';
+
+  @override
+  String get settingsPowerSavingModeSubtitle => '高リフレッシュレートを使用せず、60fps に制限します';
 
   @override
   String get settingsAutoSaveTitle => '自動保存';
@@ -2010,6 +2234,18 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsAiProviderLabel => 'プロバイダー';
+
+  @override
+  String get settingsAiCustomProvider => 'カスタム';
+
+  @override
+  String get settingsAiProtocolLabel => 'API プロトコル';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI 互換プロトコル';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic プロトコル';
 
   @override
   String get settingsAiPresetHint => 'プリセットモデルを選択';
@@ -2057,11 +2293,126 @@ class AppLocalizationsJa extends AppLocalizations {
   String get firstHomeSupportPaperSemanticLabel => '開元閲読の開発者からの任意支援についての手紙';
 
   @override
-  String get settingsSupportDevelopmentCardTitle => '継続的な開発を支援';
+  String get settingsSupportDevelopmentCardTitle => '高度な機能を支援';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      '開発と保守には多くの時間と労力がかかっています。開元閲読が役に立った場合は、任意の寄付で支援いただけます。';
+      '現在すべての機能が無料です。支援は任意で、継続的な開発に使われます。';
+
+  @override
+  String get settingsAccountGuestTitle => '開元閲読にログイン';
+
+  @override
+  String get settingsAccountGuestSubtitle => 'プロフィールとサポーター情報を管理';
+
+  @override
+  String get settingsAccountOpen => 'アカウントセンター';
+
+  @override
+  String get settingsAccountVerified => '確認済みアカウント';
+
+  @override
+  String get accountPageTitle => 'アカウント';
+
+  @override
+  String get accountPageSubtitle => 'プロフィール、ログイン方法、サポーター情報を管理します。';
+
+  @override
+  String get accountLoginTab => 'ログイン';
+
+  @override
+  String get accountRegisterTab => '登録';
+
+  @override
+  String get accountCodeTab => 'メールコード';
+
+  @override
+  String get accountResetTab => '再設定';
+
+  @override
+  String get accountEmail => 'メール';
+
+  @override
+  String get accountPassword => 'パスワード';
+
+  @override
+  String get accountConfirmPassword => 'パスワード確認';
+
+  @override
+  String get accountUsername => 'ユーザー名';
+
+  @override
+  String get accountDisplayName => '表示名';
+
+  @override
+  String get accountVerificationCode => '確認コード';
+
+  @override
+  String get accountSendCode => 'コードを送信';
+
+  @override
+  String get accountSignIn => 'ログイン';
+
+  @override
+  String get accountCreate => 'アカウントを作成';
+
+  @override
+  String get accountResetPassword => 'パスワードを再設定';
+
+  @override
+  String get accountUseGithub => 'GitHub を使用';
+
+  @override
+  String get accountUseGoogle => 'Google を使用';
+
+  @override
+  String get accountUsePasskey => 'Passkey を使用';
+
+  @override
+  String get accountExternalHint => '安全なブラウザーが開きます。承認後に App へ戻ってください。';
+
+  @override
+  String get accountProfileTitle => 'プロフィール';
+
+  @override
+  String get accountEditProfile => 'プロフィールを編集';
+
+  @override
+  String get accountSignInMethodsTitle => 'ログイン方法';
+
+  @override
+  String get accountSaveProfile => 'プロフィールを保存';
+
+  @override
+  String get accountChangeAvatar => '画像を変更';
+
+  @override
+  String get accountRemoveAvatar => '画像を削除';
+
+  @override
+  String get accountSignOut => 'ログアウト';
+
+  @override
+  String get accountSupportTitle => '高度な機能を支援';
+
+  @override
+  String get accountSupportFreeTitle => '現在すべての機能が無料です';
+
+  @override
+  String get accountSupportFreeSubtitle =>
+      '支援は任意で、WebDAV やその他の機能を解放するものではありません。';
+
+  @override
+  String get accountSupportAction => '今すぐ支援';
+
+  @override
+  String get accountSupporterBadge => 'サポーター';
+
+  @override
+  String get accountPasswordLengthHint => '12 文字以上';
+
+  @override
+  String get accountUsernameHint => '3〜30 文字の小文字、数字、アンダースコア';
 
   @override
   String get settingsDonationAction => 'WeChat で寄付';
@@ -2125,14 +2476,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get changelogHistorySubtitle => '各バージョンの変更内容を表示';
 
   @override
-  String get openSourceLicensesTitle => 'オープンソースライセンス';
+  String get openSourceLicensesTitle => 'オープンソースとフォントのライセンス';
 
   @override
   String get openSourceLicensesSubtitle => 'アプリ、内蔵フォント、サードパーティ製品のライセンスを表示';
 
   @override
   String get openSourceLicensesIntro =>
-      '以下のライセンス文はアプリ内でオフライン表示できます。Open Reading、内蔵フォント、サードパーティソフトウェアには、それぞれのライセンスが適用されます。';
+      '以下のライセンス文と告知はアプリ内でオフライン表示できます。Open Reading、オンラインフォント、サードパーティソフトウェアには、それぞれのライセンスが適用されます。';
 
   @override
   String get openSourceProjectSection => 'プロジェクト';
@@ -2141,7 +2492,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get openSourceLegacyLicenseTitle => '旧バージョン';
 
   @override
-  String get openSourceFontsSection => '内蔵フォント';
+  String get openSourceFontsSection => 'フォントライセンス';
 
   @override
   String get openSourceDependenciesSection => 'サードパーティソフトウェア';
@@ -2313,8 +2664,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLibraryOpenAnimationMinimal => 'シンプルなフェード';
 
   @override
-  String get settingsLibraryOpenAnimationMinimalHint =>
-      '方向移動のない、すばやく安定したフェードです';
+  String get settingsLibraryOpenAnimationMinimalHint => '方向移動なしで本文を安定して表示します';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => '紙面の浮上';
@@ -2330,10 +2680,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLibraryOpenAnimationPageSlideHint => '読書画面が横から短い距離だけ入ります';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => '見開き展開';
+  String get settingsLibraryOpenAnimationPaceTitle => 'アニメーションの速さ';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint => '左右の紙面が中央から外側へ開きます';
+  String get settingsLibraryOpenAnimationFast => '高速';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint => '本文の準備後、すばやくフェードインします';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => '優雅';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint =>
+      '本文をゆっくり表示し、穏やかに読書画面へ移ります';
 
   @override
   String get settingsAccentFollowTheme => 'アクセントカラー：テーマに従う';
@@ -3223,6 +3583,14 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI 互換：Base URL には通常 /v1 を含めます（例：https://example.com/v1）。アプリは /chat/completions を追加します。';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic：Base URL は /v1 を含めても省略しても構いません。アプリが重複を避けて /messages を追加します。';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';
@@ -4268,4 +4636,220 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get readerNoAnnotationsHint =>
       '文章を選択してハイライトやコメントを追加できます。下線付きのコメントをタップすると内容を確認できます。';
+
+  @override
+  String get replaceRulesTitle => '置換・クリーンアップ';
+
+  @override
+  String get replaceRulesSettingsSubtitle => '本文中の広告や宣伝など不要な文章を取り除きます';
+
+  @override
+  String get replaceRulesImport => 'ルールを読み込む';
+
+  @override
+  String get replaceRulesExport => 'ルールを書き出す';
+
+  @override
+  String get replaceRulesSearchHint => '名前、グループ、パターンを検索';
+
+  @override
+  String get replaceRulesUnnamed => '名前のないルール';
+
+  @override
+  String get replaceRulesDeleteValue => '削除';
+
+  @override
+  String get replaceRulesCreate => 'ルールを追加';
+
+  @override
+  String get replaceRulesEmptyTitle => '置換ルールはまだありません';
+
+  @override
+  String get replaceRulesEmptyBody => '書籍ソースの JSON を読み込むか、正規表現ルールを作成できます。';
+
+  @override
+  String get replaceRulesNoSearchResults => '一致するルールはありません';
+
+  @override
+  String get replaceRulesCreateTitle => '置換ルールを追加';
+
+  @override
+  String get replaceRulesEditTitle => '置換ルールを編集';
+
+  @override
+  String get replaceRulesNameLabel => 'ルール名';
+
+  @override
+  String get replaceRulesPatternLabel => '一致させる文字列 / 正規表現';
+
+  @override
+  String get replaceRulesPatternHelper => '一致した文字列を削除するには、置換後を空欄にします';
+
+  @override
+  String get replaceRulesReplacementLabel => '置換後';
+
+  @override
+  String get replaceRulesRegexLabel => '正規表現を使用';
+
+  @override
+  String get replaceRulesScopeTitleLabel => '章タイトルに適用';
+
+  @override
+  String get replaceRulesScopeContentLabel => '本文に適用';
+
+  @override
+  String get replaceRulesGroupLabel => 'グループ（任意）';
+
+  @override
+  String get replaceRulesScopeLabel => '適用範囲（任意）';
+
+  @override
+  String get replaceRulesScopeHelper => '書名または書籍ソース名をセミコロンで区切ります';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => '除外範囲（任意）';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => 'このルールを削除しますか？';
+
+  @override
+  String get replaceRulesDeleteConfirmBody => 'この端末からルールが削除されます。';
+
+  @override
+  String replaceRulesImported(int count) {
+    return '$count 件のルールを読み込みました';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return 'ルールを読み込めませんでした: $error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return 'ルールファイルは $max 以下にしてください';
+  }
+
+  @override
+  String get replaceRulesExported => 'ルールを書き出しました';
+
+  @override
+  String get replaceRulesPatternRequired => '一致させる文字列または正規表現を入力してください';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return 'パターンは $max 文字以下にしてください';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return '正規表現が無効です: $error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return 'ルールは最大 $max 件までです';
+  }
+
+  @override
+  String get accountSecurityTitle => 'アカウントのセキュリティ';
+
+  @override
+  String get accountChangeEmailTitle => 'メールアドレスを変更';
+
+  @override
+  String get accountCurrentEmail => '現在のメール';
+
+  @override
+  String get accountNewEmail => '新しいメール';
+
+  @override
+  String get accountCurrentEmailCode => '現在のメールに届いたコード';
+
+  @override
+  String get accountNewEmailCode => '新しいメールに届いたコード';
+
+  @override
+  String get accountSendBothCodes => '両方にコードを送信';
+
+  @override
+  String get accountChangeEmailAction => 'メールを変更';
+
+  @override
+  String get accountEmailChanged => 'メールを変更しました';
+
+  @override
+  String get accountChangePasswordTitle => 'パスワードを設定・変更';
+
+  @override
+  String get accountNewPassword => '新しいパスワード';
+
+  @override
+  String get accountChangePasswordAction => 'パスワードを変更';
+
+  @override
+  String get accountPasswordChanged => 'パスワードを変更しました';
+
+  @override
+  String get accountPasswordsMismatch => 'パスワードが一致しません';
+
+  @override
+  String get accountMfaTitle => '2 段階認証';
+
+  @override
+  String get accountMfaEnabled => '有効です。ログイン時に認証アプリまたは未使用の復旧コードが必要です。';
+
+  @override
+  String get accountMfaDisabledByDefault =>
+      '初期状態では無効です。有効にするとパスワードとメールコードのログインを保護できます。';
+
+  @override
+  String get accountMfaChallengeTitle => '2 段階認証';
+
+  @override
+  String get accountMfaChallengeHint =>
+      'アカウントへ進むには、認証アプリのコードまたは未使用の復旧コードを入力してください。';
+
+  @override
+  String get accountMfaCode => '認証アプリのコード';
+
+  @override
+  String get accountMfaOrRecoveryCode => '認証アプリまたは復旧コード';
+
+  @override
+  String get accountMfaVerify => '確認して続行';
+
+  @override
+  String get accountMfaSendSetupCode => '設定用メールコードを送信';
+
+  @override
+  String get accountMfaContinueSetup => '設定を続ける';
+
+  @override
+  String get accountMfaSecretWarning => 'この秘密鍵を認証アプリへ追加してください。設定中にのみ表示されます。';
+
+  @override
+  String get accountMfaOpenAuthenticator => '認証アプリを開く';
+
+  @override
+  String get accountMfaConfirm => '確認して有効化';
+
+  @override
+  String get accountMfaDisable => '2 段階認証を無効化';
+
+  @override
+  String get accountMfaDisabled => '2 段階認証を無効にしました';
+
+  @override
+  String get accountRecoveryCodesWarning =>
+      '復旧コードを今すぐ保存してください。各コードは 1 回だけ使え、この一覧は再表示されません。';
+
+  @override
+  String get accountCopyRecoveryCodes => '復旧コードをコピー';
+
+  @override
+  String get accountRecoveryCodesCopied => '復旧コードをコピーしました';
+
+  @override
+  String get accountRecoveryCodesSaved => '復旧コードを保存しました';
 }

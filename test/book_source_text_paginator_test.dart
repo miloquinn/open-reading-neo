@@ -97,6 +97,24 @@ void main() {
     expect(readerTextContentWidth(1200, 18), readerMaxTextContentWidth);
   });
 
+  testWidgets('zero paragraph spacing collapses source-owned blank rows', (
+    tester,
+  ) async {
+    const text = '第一段\n \t\n第二段\r\n　\r\n第三段';
+    final pages = paginateBookSourceText(
+      text,
+      width: 320,
+      firstPageHeight: 360,
+      pageHeight: 480,
+      style: style,
+      textDirection: TextDirection.ltr,
+      paragraphSpacing: 0,
+    );
+
+    expect(pages.skip(1).map((page) => page.text).join(), '第一段\n第二段\n第三段');
+    expectCanonicalCoverage(pages, text);
+  });
+
   testWidgets('does not split an emoji surrogate pair', (tester) async {
     final text = List.filled(120, '文字📖翻页。').join();
     final pages = paginateBookSourceText(

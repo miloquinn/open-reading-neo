@@ -58,6 +58,145 @@ class AppLocalizationsEn extends AppLocalizations {
       'There are no books to show in this category yet.';
 
   @override
+  String get bookSourceChannelLoadFailed => 'Could not load channel';
+
+  @override
+  String bookSourceChannelLoadFailedMessage(String details) {
+    return 'The source returned no usable books: $details';
+  }
+
+  @override
+  String get bookSourceConnectionFailed =>
+      'Could not connect to the source server after trying its available network addresses. Try again later.';
+
+  @override
+  String get bookSourceRedirectFailed =>
+      'The source site kept redirecting. Site cookies were retained, but the address still returned no content.';
+
+  @override
+  String bookSourceHttpFailed(int status) {
+    return 'The source site returned HTTP $status. The channel address may be stale or blocked by the site.';
+  }
+
+  @override
+  String get bookSourceStandardLayout => 'Standard layout';
+
+  @override
+  String get bookSourceListLayout => 'List layout';
+
+  @override
+  String get bookSourceChangeChannel => 'Change';
+
+  @override
+  String get bookSourceChangeSourceTitle => 'Change source';
+
+  @override
+  String get bookSourceChangeCurrentSource => 'Current source';
+
+  @override
+  String get bookSourceChangeTargetSource => 'Change to';
+
+  @override
+  String get bookSourceChangeNotSelected => 'Not selected';
+
+  @override
+  String bookSourceChangeCurrentChapter(int chapter) {
+    return 'Currently at chapter $chapter';
+  }
+
+  @override
+  String get bookSourceChangeSearchLabel => 'Find this book in other sources';
+
+  @override
+  String get bookSourceChangeSearchAgain => 'Search again';
+
+  @override
+  String get bookSourceChangeSearchRemaining => 'Search all remaining sources';
+
+  @override
+  String get bookSourceChangeCheckAuthor => 'Match author';
+
+  @override
+  String bookSourceChangeSearchProgress(int completed, int total) {
+    return 'Checked $completed of $total';
+  }
+
+  @override
+  String get bookSourceChangeNoOtherSources => 'No other sources available';
+
+  @override
+  String get bookSourceChangeNoOtherSourcesHint =>
+      'Add and enable another source that supports search first.';
+
+  @override
+  String get bookSourceChangeSearching => 'Finding other sources';
+
+  @override
+  String get bookSourceChangeSearchingHint =>
+      'Matches appear as each source finishes searching.';
+
+  @override
+  String get bookSourceChangeNoMatches => 'No matching sources found';
+
+  @override
+  String get bookSourceChangeNoMatchesHint =>
+      'Edit the title or turn off author matching, then search again.';
+
+  @override
+  String bookSourceChangeFailedSources(int count) {
+    return '$count source request(s) failed. You can search again.';
+  }
+
+  @override
+  String get bookSourceChangeAuthorDifferent => 'Different author';
+
+  @override
+  String get bookSourceChangeValidating =>
+      'Checking the catalog and current chapter…';
+
+  @override
+  String bookSourceChangeValidationFailed(String details) {
+    return 'Validation failed: $details';
+  }
+
+  @override
+  String get bookSourceChangeReadable => 'Current chapter readable';
+
+  @override
+  String bookSourceChangeChapterCount(int count) {
+    return '$count chapters';
+  }
+
+  @override
+  String bookSourceChangeResponseTime(int milliseconds) {
+    return '$milliseconds ms';
+  }
+
+  @override
+  String get bookSourceChangeTapToValidate =>
+      'Select to check the catalog and current chapter.';
+
+  @override
+  String get bookSourceChangeAlreadyOnShelf =>
+      'This source version is already on the bookshelf.';
+
+  @override
+  String get bookSourceChangeSwitching => 'Changing source…';
+
+  @override
+  String get bookSourceChangeSwitchAction => 'Change to this source';
+
+  @override
+  String bookSourceChangeSuccess(String source) {
+    return 'Changed source to $source';
+  }
+
+  @override
+  String bookSourceChannelCount(int count) {
+    return '$count channels';
+  }
+
+  @override
   String get bookSourceManagementTitle => 'Manage sources';
 
   @override
@@ -117,6 +256,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesDisabled => 'Disabled';
 
   @override
+  String get bookSourcesRunnable => 'Ready to use';
+
+  @override
+  String get bookSourcesPendingCompatibility => 'No runnable rules';
+
+  @override
+  String get bookSourcesManagementSearchHint =>
+      'Search name, URL, notes, or group';
+
+  @override
+  String get bookSourcesClearSearch => 'Clear search';
+
+  @override
+  String get bookSourcesAllGroups => 'All groups';
+
+  @override
+  String get bookSourcesChooseGroup => 'Choose a source group';
+
+  @override
+  String get bookSourcesSearchGroups => 'Search groups';
+
+  @override
+  String get bookSourcesNoMatchingSources =>
+      'No sources match the current search and filters';
+
+  @override
+  String get bookSourcesResetFilters => 'Reset';
+
+  @override
+  String bookSourcesVisibleCount(int visible, int total) {
+    return 'Showing $visible of $total';
+  }
+
+  @override
   String get bookSourcesRemove => 'Remove';
 
   @override
@@ -139,7 +312,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesImportLink => 'Import link';
 
   @override
-  String get bookSourcesAnalyze => 'Analyze';
+  String get bookSourcesAnalyze => 'Read sources';
 
   @override
   String get bookSourcesDetectedOrsp => 'Detected: ORSP';
@@ -209,10 +382,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'I confirm that I am authorized to access this content and will not use the source to bypass sign-in, payment, DRM, or other access controls.';
 
   @override
-  String get bookSourcesConnect => 'Connect and validate';
+  String get bookSourcesConnect => 'Read and import';
 
   @override
-  String get bookSourcesConnecting => 'Validating protocol…';
+  String get bookSourcesConnecting => 'Processing sources…';
 
   @override
   String get bookSourcesAdded => 'Source added';
@@ -555,7 +728,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fontDownloadFailed => 'Download failed, tap to retry';
 
   @override
-  String get fontDownloadHint => 'First use requires download from GitHub';
+  String get fontDownloadHint => 'First use requires an online download';
+
+  @override
+  String fontVariableWeightRange(int min, int max) {
+    return 'Adjustable weight $min–$max';
+  }
+
+  @override
+  String get fontStaticWeight => 'Fixed weight (bold is synthesized)';
 
   @override
   String get fontDeleteDownload => 'Delete download';
@@ -703,6 +884,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fontSizeLabel => 'Font Size';
+
+  @override
+  String get readerFontWeightLabel => 'Font Weight';
+
+  @override
+  String get readerFontWeightLight => 'Light';
+
+  @override
+  String get readerFontWeightRegular => 'Regular';
+
+  @override
+  String get readerFontWeightMedium => 'Medium';
+
+  @override
+  String get readerFontWeightSemiBold => 'Semi-bold';
+
+  @override
+  String get readerFontWeightBold => 'Bold';
+
+  @override
+  String readerFontWeightVariableHint(int min, int max) {
+    return 'Reading controls use five legible steps from 300–700. This font\'s true full range is $min–$max.';
+  }
+
+  @override
+  String get readerFontWeightSyntheticHint =>
+      'Reading controls use five steps from 300–700. This font has no declared variable weight axis, so the system approximates the result and it may differ by platform.';
+
+  @override
+  String get readerFontWeightPreview => 'A quiet page reads farther · 字里行间';
 
   @override
   String get lineSpacingLabel => 'Line Spacing';
@@ -2002,7 +2213,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get additionalSourcesImportNotice =>
-      'Imported sources are checked before use and remain disabled until you enable them.';
+      'Import only parses and deduplicates locally; it does not probe every source online. Sources with callable rules keep their imported enabled state, and each capability is checked when used.';
 
   @override
   String get additionalSourcesChooseFile => 'Add from JSON file';
@@ -2019,6 +2230,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String additionalSourcesPreviewDetails(
+    int supported,
+    int partial,
+    int unsupported,
+    int skipped,
+  ) {
+    return '$supported standard-rule, $partial extended-rule, $unsupported advanced-rule, $skipped skipped';
+  }
+
+  @override
+  String additionalSourcesQuickPreview(int count, int skipped) {
+    return '$count sources ready to import, $skipped skipped';
+  }
+
+  @override
   String get additionalSourcesAvailable => 'Available';
 
   @override
@@ -2028,7 +2254,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get additionalSourcesUnsupported => 'Not supported';
 
   @override
-  String get additionalSourcesImportConfirm => 'Import disabled';
+  String get additionalSourcesImportConfirm => 'Import all';
 
   @override
   String additionalSourcesImported(int count) {
@@ -2044,6 +2270,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsKeepScreenOnSubtitle =>
       'Prevent the screen from turning off while reading';
+
+  @override
+  String get settingsPowerSavingModeTitle => 'Power saving mode';
+
+  @override
+  String get settingsPowerSavingModeSubtitle =>
+      'Limit the app to 60 fps instead of using a high refresh rate';
 
   @override
   String get settingsAutoSaveTitle => 'Auto save';
@@ -2082,6 +2315,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAiProviderLabel => 'Provider';
+
+  @override
+  String get settingsAiCustomProvider => 'Custom';
+
+  @override
+  String get settingsAiProtocolLabel => 'API protocol';
+
+  @override
+  String get settingsAiProtocolOpenAi => 'OpenAI Compatible';
+
+  @override
+  String get settingsAiProtocolAnthropic => 'Anthropic';
 
   @override
   String get settingsAiPresetHint => 'Select a preset model';
@@ -2133,12 +2378,130 @@ class AppLocalizationsEn extends AppLocalizations {
       'A letter from the Open Reading developer asking for voluntary support';
 
   @override
-  String get settingsSupportDevelopmentCardTitle =>
-      'Support continued development';
+  String get settingsSupportDevelopmentCardTitle => 'Support advanced features';
 
   @override
   String get settingsSupportDevelopmentCardSubtitle =>
-      'Building and maintaining Open Reading takes substantial time and effort. If it helps you, voluntary donations are welcome.';
+      'All features are currently free. Support is optional and helps fund continued development.';
+
+  @override
+  String get settingsAccountGuestTitle => 'Sign in to Open Reading';
+
+  @override
+  String get settingsAccountGuestSubtitle =>
+      'Keep your account and supporter status together.';
+
+  @override
+  String get settingsAccountOpen => 'Account center';
+
+  @override
+  String get settingsAccountVerified => 'Verified account';
+
+  @override
+  String get accountPageTitle => 'Account';
+
+  @override
+  String get accountPageSubtitle =>
+      'Profile, sign-in methods, and supporter status.';
+
+  @override
+  String get accountLoginTab => 'Sign in';
+
+  @override
+  String get accountRegisterTab => 'Register';
+
+  @override
+  String get accountCodeTab => 'Email code';
+
+  @override
+  String get accountResetTab => 'Reset';
+
+  @override
+  String get accountEmail => 'Email';
+
+  @override
+  String get accountPassword => 'Password';
+
+  @override
+  String get accountConfirmPassword => 'Confirm password';
+
+  @override
+  String get accountUsername => 'Username';
+
+  @override
+  String get accountDisplayName => 'Display name';
+
+  @override
+  String get accountVerificationCode => 'Verification code';
+
+  @override
+  String get accountSendCode => 'Send code';
+
+  @override
+  String get accountSignIn => 'Sign in';
+
+  @override
+  String get accountCreate => 'Create account';
+
+  @override
+  String get accountResetPassword => 'Reset password';
+
+  @override
+  String get accountUseGithub => 'Continue with GitHub';
+
+  @override
+  String get accountUseGoogle => 'Continue with Google';
+
+  @override
+  String get accountUsePasskey => 'Continue with Passkey';
+
+  @override
+  String get accountExternalHint =>
+      'A secure browser will open. Return here after approval.';
+
+  @override
+  String get accountProfileTitle => 'Profile';
+
+  @override
+  String get accountEditProfile => 'Edit profile';
+
+  @override
+  String get accountSignInMethodsTitle => 'Sign-in methods';
+
+  @override
+  String get accountSaveProfile => 'Save profile';
+
+  @override
+  String get accountChangeAvatar => 'Change avatar';
+
+  @override
+  String get accountRemoveAvatar => 'Remove avatar';
+
+  @override
+  String get accountSignOut => 'Sign out';
+
+  @override
+  String get accountSupportTitle => 'Support advanced features';
+
+  @override
+  String get accountSupportFreeTitle => 'All features are free';
+
+  @override
+  String get accountSupportFreeSubtitle =>
+      'Support is optional and does not unlock WebDAV or any other feature.';
+
+  @override
+  String get accountSupportAction => 'Support now';
+
+  @override
+  String get accountSupporterBadge => 'Supporter';
+
+  @override
+  String get accountPasswordLengthHint => 'At least 12 characters';
+
+  @override
+  String get accountUsernameHint =>
+      '3–30 lowercase letters, numbers, or underscores';
 
   @override
   String get settingsDonationAction => 'Donate with WeChat';
@@ -2204,7 +2567,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changelogHistorySubtitle => 'View changes from every release';
 
   @override
-  String get openSourceLicensesTitle => 'Open-source licenses';
+  String get openSourceLicensesTitle => 'Open-source & font licenses';
 
   @override
   String get openSourceLicensesSubtitle =>
@@ -2212,7 +2575,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openSourceLicensesIntro =>
-      'These license texts are available offline in the app. Open Reading, bundled fonts, and third-party software remain subject to their respective licenses.';
+      'These license texts and notices are available offline in the app. Open Reading, on-demand fonts, and third-party software remain subject to their respective licenses.';
 
   @override
   String get openSourceProjectSection => 'Project licenses';
@@ -2221,7 +2584,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSourceLegacyLicenseTitle => 'Earlier releases';
 
   @override
-  String get openSourceFontsSection => 'Bundled fonts';
+  String get openSourceFontsSection => 'Font licenses';
 
   @override
   String get openSourceDependenciesSection => 'Third-party software';
@@ -2405,7 +2768,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLibraryOpenAnimationMinimalHint =>
-      'A quick, stable fade with no directional movement';
+      'Fade in the text without directional movement';
 
   @override
   String get settingsLibraryOpenAnimationPaperRise => 'Paper rise';
@@ -2422,11 +2785,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'The reading page enters with a short sideways motion';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpread => 'Book spread';
+  String get settingsLibraryOpenAnimationPaceTitle => 'Animation pace';
 
   @override
-  String get settingsLibraryOpenAnimationBookSpreadHint =>
-      'Two paper halves open outward from the center';
+  String get settingsLibraryOpenAnimationFast => 'Fast';
+
+  @override
+  String get settingsLibraryOpenAnimationFastHint =>
+      'Fade in quickly once the text is ready';
+
+  @override
+  String get settingsLibraryOpenAnimationElegant => 'Elegant';
+
+  @override
+  String get settingsLibraryOpenAnimationElegantHint =>
+      'Reveal the text more gradually for a calmer handoff';
 
   @override
   String get settingsAccentFollowTheme => 'Accent color: follow theme';
@@ -3353,6 +3726,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAiBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsAiBaseUrlHintOpenAi =>
+      'OpenAI Compatible: the Base URL usually needs to include /v1 (for example, https://example.com/v1). The app appends /chat/completions.';
+
+  @override
+  String get settingsAiBaseUrlHintAnthropic =>
+      'Anthropic: the Base URL may include /v1 or omit it. The app avoids duplicating /v1 and appends /messages.';
 
   @override
   String get settingsAiApiKeyLabel => 'API Key';
@@ -4435,4 +4816,228 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerNoAnnotationsHint =>
       'Select text to highlight or add a comment. Tap an underlined comment to read it again.';
+
+  @override
+  String get replaceRulesTitle => 'Replace & clean';
+
+  @override
+  String get replaceRulesSettingsSubtitle =>
+      'Remove ads, promotions, and other unwanted text while reading';
+
+  @override
+  String get replaceRulesImport => 'Import rules';
+
+  @override
+  String get replaceRulesExport => 'Export rules';
+
+  @override
+  String get replaceRulesSearchHint => 'Search names, groups, or patterns';
+
+  @override
+  String get replaceRulesUnnamed => 'Unnamed rule';
+
+  @override
+  String get replaceRulesDeleteValue => 'Remove';
+
+  @override
+  String get replaceRulesCreate => 'New rule';
+
+  @override
+  String get replaceRulesEmptyTitle => 'No replacement rules';
+
+  @override
+  String get replaceRulesEmptyBody =>
+      'Import a reading-source JSON file or create a regular-expression rule.';
+
+  @override
+  String get replaceRulesNoSearchResults => 'No matching rules';
+
+  @override
+  String get replaceRulesCreateTitle => 'New replacement rule';
+
+  @override
+  String get replaceRulesEditTitle => 'Edit replacement rule';
+
+  @override
+  String get replaceRulesNameLabel => 'Rule name';
+
+  @override
+  String get replaceRulesPatternLabel => 'Text or regular expression to match';
+
+  @override
+  String get replaceRulesPatternHelper =>
+      'Leave the replacement empty to remove matched text';
+
+  @override
+  String get replaceRulesReplacementLabel => 'Replace with';
+
+  @override
+  String get replaceRulesRegexLabel => 'Use a regular expression';
+
+  @override
+  String get replaceRulesScopeTitleLabel => 'Apply to chapter titles';
+
+  @override
+  String get replaceRulesScopeContentLabel => 'Apply to chapter content';
+
+  @override
+  String get replaceRulesGroupLabel => 'Group (optional)';
+
+  @override
+  String get replaceRulesScopeLabel => 'Scope (optional)';
+
+  @override
+  String get replaceRulesScopeHelper =>
+      'Separate book titles or source names with semicolons';
+
+  @override
+  String get replaceRulesExcludeScopeLabel => 'Excluded scope (optional)';
+
+  @override
+  String get replaceRulesDeleteConfirmTitle => 'Delete this rule?';
+
+  @override
+  String get replaceRulesDeleteConfirmBody =>
+      'The rule will be removed from this device.';
+
+  @override
+  String replaceRulesImported(int count) {
+    return 'Imported $count rules';
+  }
+
+  @override
+  String replaceRulesImportFailed(String error) {
+    return 'Could not import rules: $error';
+  }
+
+  @override
+  String replaceRulesImportTooLarge(String max) {
+    return 'The rule file exceeds $max';
+  }
+
+  @override
+  String get replaceRulesExported => 'Rules exported';
+
+  @override
+  String get replaceRulesPatternRequired =>
+      'Enter text or a regular expression to match';
+
+  @override
+  String replaceRulesPatternTooLong(int max) {
+    return 'The pattern exceeds $max characters';
+  }
+
+  @override
+  String replaceRulesInvalidRegex(String error) {
+    return 'Invalid regular expression: $error';
+  }
+
+  @override
+  String replaceRulesTooMany(int max) {
+    return 'A maximum of $max rules is supported';
+  }
+
+  @override
+  String get accountSecurityTitle => 'Security';
+
+  @override
+  String get accountChangeEmailTitle => 'Change email';
+
+  @override
+  String get accountCurrentEmail => 'Current email';
+
+  @override
+  String get accountNewEmail => 'New email';
+
+  @override
+  String get accountCurrentEmailCode => 'Code sent to current email';
+
+  @override
+  String get accountNewEmailCode => 'Code sent to new email';
+
+  @override
+  String get accountSendBothCodes => 'Send both codes';
+
+  @override
+  String get accountChangeEmailAction => 'Change email';
+
+  @override
+  String get accountEmailChanged => 'Email changed';
+
+  @override
+  String get accountChangePasswordTitle => 'Set or change password';
+
+  @override
+  String get accountNewPassword => 'New password';
+
+  @override
+  String get accountChangePasswordAction => 'Change password';
+
+  @override
+  String get accountPasswordChanged => 'Password changed';
+
+  @override
+  String get accountPasswordsMismatch => 'The passwords do not match';
+
+  @override
+  String get accountMfaTitle => 'Two-factor authentication';
+
+  @override
+  String get accountMfaEnabled =>
+      'Enabled. An authenticator or unused recovery code is required at sign-in.';
+
+  @override
+  String get accountMfaDisabledByDefault =>
+      'Off by default. Enable it to protect password and email-code sign-ins.';
+
+  @override
+  String get accountMfaChallengeTitle => 'Two-factor verification';
+
+  @override
+  String get accountMfaChallengeHint =>
+      'Enter the code from your authenticator or an unused recovery code to access your account.';
+
+  @override
+  String get accountMfaCode => 'Authenticator code';
+
+  @override
+  String get accountMfaOrRecoveryCode => 'Authenticator or recovery code';
+
+  @override
+  String get accountMfaVerify => 'Verify and continue';
+
+  @override
+  String get accountMfaSendSetupCode => 'Send setup email code';
+
+  @override
+  String get accountMfaContinueSetup => 'Continue setup';
+
+  @override
+  String get accountMfaSecretWarning =>
+      'Add this secret to your authenticator. It is shown only during setup.';
+
+  @override
+  String get accountMfaOpenAuthenticator => 'Open authenticator';
+
+  @override
+  String get accountMfaConfirm => 'Confirm and enable';
+
+  @override
+  String get accountMfaDisable => 'Disable two-factor authentication';
+
+  @override
+  String get accountMfaDisabled => 'Two-factor authentication disabled';
+
+  @override
+  String get accountRecoveryCodesWarning =>
+      'Save these recovery codes now. Each code works once, and this list will not be shown again.';
+
+  @override
+  String get accountCopyRecoveryCodes => 'Copy recovery codes';
+
+  @override
+  String get accountRecoveryCodesCopied => 'Recovery codes copied';
+
+  @override
+  String get accountRecoveryCodesSaved => 'I saved these codes';
 }

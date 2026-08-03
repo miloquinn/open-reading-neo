@@ -6,7 +6,7 @@ import 'package:json_path/json_path.dart';
 
 import '../protocol/book_source_protocol.dart';
 import 'source_request.dart';
-import 'source_script_engine.dart';
+import 'source_script_engine_platform.dart';
 
 class SourceRuleDocument {
   SourceRuleDocument._({

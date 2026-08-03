@@ -8,7 +8,7 @@ import 'source_config.dart';
 import 'source_explore.dart';
 import 'source_request.dart';
 import 'source_rule_engine.dart';
-import 'source_script_engine.dart';
+import 'source_script_engine_platform.dart';
 import '../services/book_download_cancellation.dart';
 
 class SourceRuntime {

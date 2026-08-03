@@ -2,31 +2,105 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.5.0",
+            "notes": {
+                "en": [
+                    "Added reader font-weight adjustment so body text can be made lighter or bolder for different fonts, screens, and reading preferences",
+                    "Added a compact List layout to Discovery alongside the Standard layout, with sources and channels loaded on demand for large source libraries",
+                    "Discovery catalogs, recommendations, categories, channels, paged lists, and book details now use layered caches with duplicate in-flight requests merged and disk writes moved off the display path",
+                    "Home recent-reading queries and library filtering now reuse batched or memoized results, while startup no longer scans and repairs the whole library in competition with imports, downloads, or sync",
+                    "Improved complex source compatibility by carrying book variables from search through detail, catalog, content, download, and source switching, preserving advanced request options, and joining multi-node content safely",
+                    "Custom AI providers can now explicitly use either the OpenAI Compatible or Anthropic protocol, with protocol-aware URLs, authentication, payloads, responses, and Base URL guidance",
+                    "Fixed page-curl content flashing during the first few turns after importing a book by keeping one stable texture set for each active turn while new snapshots warm in the background"
+                ],
+                "zh": [
+                    "新增正文字体粗细调节，可根据字体、屏幕和阅读习惯选择更轻或更醒目的显示效果",
+                    "发现页新增紧凑的列表布局，可与标准布局自由切换；书源和频道按需加载，大型书源库下仍保持流畅",
+                    "书源清单、推荐、分类、频道、分页列表和书籍详情新增分层缓存，并合并相同并发请求、将磁盘写入移出页面展示路径",
+                    "首页最近阅读改为批量查询，书库筛选与搜索复用已有结果；启动时不再扫描和修复整座书库，避免与导入、下载或同步争抢资源",
+                    "书源搜索生成的书籍变量可继续传递到详情、目录、正文、下载和换源；复杂请求选项会被保留，多节点正文按段落安全合并",
+                    "自定义 AI 服务商可明确选择 OpenAI Compatible 或 Anthropic 协议，并按协议处理地址、认证、请求体、响应和 Base URL 提示",
+                    "修复新导入书籍首次阅读前几页仿真翻页闪烁的问题；当前翻页固定使用同一组纹理，后台生成的新快照只供后续翻页使用"
+                ],
+                "zh-TW": [
+                    "新增正文字型粗細調節，可依字型、螢幕與閱讀習慣選擇更輕或更醒目的顯示效果",
+                    "發現頁新增緊湊的列表版面，可與標準版面自由切換；書源和頻道依需要載入，大型書源庫下仍保持流暢",
+                    "書源清單、推薦、分類、頻道、分頁列表與書籍詳情新增分層快取，並合併相同並行請求、將磁碟寫入移出頁面顯示路徑",
+                    "首頁最近閱讀改為批次查詢，書庫篩選與搜尋重用既有結果；啟動時不再掃描和修復整座書庫，避免與匯入、下載或同步爭用資源",
+                    "書源搜尋產生的書籍變數可繼續傳遞到詳情、目錄、正文、下載與換源；複雜請求選項會被保留，多節點正文依段落安全合併",
+                    "自訂 AI 服務商可明確選擇 OpenAI Compatible 或 Anthropic 協議，並依協議處理網址、驗證、請求內容、回應與 Base URL 提示",
+                    "修復新匯入書籍首次閱讀前幾頁仿真翻頁閃爍的問題；目前翻頁固定使用同一組紋理，背景產生的新快照只供後續翻頁使用"
+                ],
+                "ja": [
+                    "本文のフォントウェイト調整を追加し、フォント、画面、読書の好みに合わせて文字を軽くしたり太くしたりできるようにしました",
+                    "発見ページに標準レイアウトと切り替えられるコンパクトなリストレイアウトを追加し、大規模なソース環境でも必要な項目だけを読み込むようにしました",
+                    "ソース一覧、おすすめ、カテゴリ、チャンネル、ページ一覧、書籍詳細に階層キャッシュを追加し、同一の同時リクエストを統合してディスク書き込みを表示処理から分離しました",
+                    "ホームの最近読んだ本を一括取得し、ライブラリの絞り込みと検索結果を再利用するようにしました。起動時の全ライブラリ走査も廃止し、取り込み、ダウンロード、同期との競合を減らしました",
+                    "検索で生成された書籍変数を詳細、目次、本文、ダウンロード、ソース切り替えまで引き継ぎ、高度なリクエスト設定を保持して複数ノードの本文を安全に結合するようにしました",
+                    "カスタム AI プロバイダーで OpenAI Compatible または Anthropic プロトコルを明示的に選択でき、URL、認証、リクエスト、応答、Base URL の案内をプロトコルごとに処理します",
+                    "書籍を取り込んだ直後の数ページでページカールが点滅する問題を修正し、進行中のページ送りでは同じテクスチャを維持して新しいスナップショットを次回以降に使用するようにしました"
+                ]
+            }
+        },
+        {
             "version": "2.4.6",
             "notes": {
                 "en": [
                     "Import and manage large source libraries much faster with local parsing, deduplication, and batched writes instead of checking every source online during import",
                     "Native source execution now covers more search, discovery, detail, catalog, and content rules, including common scripts, CSS, XPath, JSONPath, cookies, GBK, redirects, and dynamic pages",
-                    "Discovery now offers Standard and List layouts with sources and channels loaded on demand to stay responsive with thousands of sources",
                     "Search for a source directly in Discovery or Source management, with improved filtering, expansion, retry feedback, and cleaner source descriptions"
                 ],
                 "zh": [
                     "大型书源库导入改为本地解析、去重和批量写入，不再逐条联网检测，数千个书源也能快速完成导入与管理",
                     "原生书源执行扩展到更多搜索、发现、详情、目录和正文规则，并支持常用脚本、CSS、XPath、JSONPath、Cookie、GBK、重定向与动态网页处理",
-                    "发现页新增标准布局与列表布局，书源和频道按需加载，大型书源库下仍保持流畅",
                     "发现页和书源管理页支持直接搜索书源，并改进筛选、展开、错误重试和简介文本清理"
                 ],
                 "zh-TW": [
                     "大型書源庫匯入改為本機解析、去重與批次寫入，不再逐條連線檢測，數千個書源也能快速完成匯入與管理",
                     "原生書源執行擴充到更多搜尋、發現、詳情、目錄與正文規則，並支援常用腳本、CSS、XPath、JSONPath、Cookie、GBK、重新導向與動態網頁處理",
-                    "發現頁新增標準版面與列表版面，書源和頻道依需要載入，大型書源庫下仍保持流暢",
                     "發現頁和書源管理頁支援直接搜尋書源，並改善篩選、展開、錯誤重試與簡介文字清理"
                 ],
                 "ja": [
                     "大規模な書籍ソースライブラリの取り込みをローカル解析・重複排除・一括保存に変更し、取り込み時の個別オンライン検査をなくして数千件でも高速に管理できるようにしました",
                     "検索・発見・詳細・目次・本文のより多くのルールをネイティブ実行し、一般的なスクリプト、CSS、XPath、JSONPath、Cookie、GBK、リダイレクト、動的ページ処理に対応しました",
-                    "発見ページに標準レイアウトとリストレイアウトを追加し、ソースとチャンネルを必要時に読み込むことで数千件でも滑らかに操作できます",
                     "発見ページとソース管理でソースを直接検索でき、絞り込み、展開、エラー再試行、説明文の整形を改善しました"
+                ]
+            }
+        },
+        {
+            "version": "2.4.5",
+            "notes": {
+                "en": [
+                    "Added adjustable floating navigation-bar height and side margins with a live preview in Settings",
+                    "Added multi-select deletion in the library for managing several books at once",
+                    "Raised the per-book import limit from 100 MB to 500 MB",
+                    "Reworked EPUB parsing and layout to load large books and images on demand with lower memory use and better compatibility",
+                    "Added four selectable book-opening animations with smoother transitions from cover and loading state to content",
+                    "Added import support for Legado 3 JSON sources with compatibility analysis; newly imported third-party sources stay disabled until explicitly enabled"
+                ],
+                "zh": [
+                    "悬浮导航栏支持自定义高度和左右边距，设置页面可实时预览",
+                    "书库新增多选删除，可一次选择并管理多本书籍",
+                    "单本书籍导入上限从 100 MB 提高至 500 MB",
+                    "重做 EPUB 按需解析与排版，大型书籍和图片不再一次性全部载入内存，等待时间、内存占用和兼容性均有改善",
+                    "新增四种可选书籍打开动画，优化封面、加载状态与正文之间的过渡",
+                    "支持导入 Legado 3 JSON 书源并分析兼容性；新导入的第三方书源默认关闭，需由用户确认后启用"
+                ],
+                "zh-TW": [
+                    "懸浮導覽列支援自訂高度與左右邊距，設定頁面可即時預覽",
+                    "書庫新增多選刪除，可一次選取並管理多本書籍",
+                    "單本書籍匯入上限由 100 MB 提高至 500 MB",
+                    "重做 EPUB 依需要解析與排版，大型書籍和圖片不再一次全部載入記憶體，等待時間、記憶體使用與相容性均有改善",
+                    "新增四種可選書籍開啟動畫，改善封面、載入狀態與正文之間的過渡",
+                    "支援匯入 Legado 3 JSON 書源並分析相容性；新匯入的第三方書源預設關閉，需由使用者確認後啟用"
+                ],
+                "ja": [
+                    "フローティングナビゲーションバーの高さと左右余白を設定し、設定画面でプレビューできるようにしました",
+                    "ライブラリに複数選択削除を追加し、複数の書籍をまとめて管理できるようにしました",
+                    "1冊あたりの取り込み上限を 100 MB から 500 MB に引き上げました",
+                    "EPUB の解析とレイアウトをオンデマンド方式に作り直し、大規模な書籍や画像のメモリ使用量、待ち時間、互換性を改善しました",
+                    "4種類の書籍オープンアニメーションを追加し、表紙、読み込み状態、本文の切り替えを滑らかにしました",
+                    "Legado 3 JSON ソースの取り込みと互換性分析に対応し、新しく取り込んだ第三者ソースはユーザーが確認して有効にするまで無効のままにしました"
                 ]
             }
         },

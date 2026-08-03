@@ -240,6 +240,48 @@ void main() {
     expect(preparationCalls, 1);
   });
 
+  testWidgets('idle snapshot warming does not rebuild the visible page', (
+    tester,
+  ) async {
+    final controller = ReaderPageCurlController();
+    late StateSetter updateHost;
+    var revision = 0;
+    Completer<void>? preparation;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setHostState) {
+            updateHost = setHostState;
+            return SizedBox(
+              width: 400,
+              height: 700,
+              child: ReaderShaderPageCurl(
+                controller: controller,
+                currentPage: _snapshot('current-$revision'),
+                forwardPage: _snapshot('next-$revision'),
+                backwardPage: _snapshot('previous-$revision'),
+                preparePages: () => preparation?.future ?? Future<void>.value(),
+                onTurnForward: () {},
+                onTurnBackward: () {},
+                paperColor: Colors.white,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    preparation = Completer<void>();
+    updateHost(() => revision++);
+    await tester.pump();
+    final buildsAfterPageUpdate = controller.debugBuildCount;
+    preparation.complete();
+    await tester.pumpAndSettle();
+
+    expect(controller.debugBuildCount, buildsAfterPageUpdate);
+  });
+
   testWidgets('phone leaf keeps the physical binding on the left', (
     tester,
   ) async {
@@ -799,19 +841,17 @@ void main() {
       expect(controller.debugUsesProvisionalSnapshot, isTrue);
       expect(controller.debugFoldStart, isNotNull);
       expect(controller.debugFoldEnd, isNotNull);
+      final activeSourceImage = controller.debugActiveSourceImageIdentity;
+      expect(activeSourceImage, isNotNull);
 
       preparation.complete();
-      for (
-        var frame = 0;
-        frame < 20 && controller.debugUsesProvisionalSnapshot;
-        frame++
-      ) {
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      expect(controller.debugUsesProvisionalSnapshot, isFalse);
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(controller.debugUsesProvisionalSnapshot, isTrue);
+      expect(controller.debugActiveSourceImageIdentity, activeSourceImage);
 
       await gesture.cancel();
       await tester.pumpAndSettle();
+      expect(controller.debugUsesProvisionalSnapshot, isFalse);
     },
   );
 
@@ -838,18 +878,30 @@ void main() {
         ),
       );
       await tester.pump();
+      for (
+        var frame = 0;
+        frame < 20 && !controller.debugUsesClassicFoldShader;
+        frame++
+      ) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(controller.debugUsesClassicFoldShader, isTrue);
 
       final rect = tester.getRect(find.byType(ReaderShaderPageCurl));
-      final gesture = await tester.startGesture(rect.center);
+      final gesture = await tester.startGesture(
+        Offset(rect.right - 2, rect.center.dy),
+      );
       await gesture.moveBy(const Offset(-30, 0));
       await tester.pump();
 
       expect(controller.debugAnimationReady, isTrue);
       expect(controller.debugUsesProvisionalSnapshot, isFalse);
 
+      final buildsBeforePreparation = controller.debugBuildCount;
       preparation.complete();
       await tester.pump(const Duration(milliseconds: 160));
       expect(controller.debugUsesProvisionalSnapshot, isFalse);
+      expect(controller.debugBuildCount, buildsBeforePreparation);
 
       await gesture.cancel();
       await tester.pumpAndSettle();

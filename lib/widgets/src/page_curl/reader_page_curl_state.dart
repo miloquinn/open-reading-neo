@@ -55,6 +55,9 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
   ReaderPageSnapshot? _activeSourcePage;
   ReaderPageSnapshot? _activeTargetPage;
   ReaderPageSnapshot? _activeBackPage;
+  ui.Image? _activeSourceImage;
+  ui.Image? _activeBackImage;
+  bool _activeSourceUsesProvisional = false;
   GlobalKey? _activeSourceKey;
   GlobalKey? _activeTargetKey;
   GlobalKey? _activeBackKey;
@@ -62,6 +65,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
   bool _warmScheduled = false;
   bool _warmAfterTurn = false;
   bool _routeWorkEnabled = false;
+  int _buildCount = 0;
   int _captureGeneration = 0;
   int _preparedGeneration = -1;
   int _preparingGeneration = -1;
@@ -153,6 +157,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     _forwardSpringTicker.dispose();
     _backwardSpringTicker.dispose();
     _snapshotCache.dispose();
+    _disposeActiveSnapshotPins();
     for (final image in _retiredSnapshotImages) {
       image.dispose();
     }
@@ -344,7 +349,6 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     );
     if (retired != null) _retiredSnapshotImages.add(retired);
     if (replacesProvisional) _syncSnapshotKeys.remove(page.key);
-    if (mounted) setState(() {});
     return image;
   }
 
@@ -522,6 +526,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     _selectionHoldTimer = null;
     final source = layers.source;
     final target = layers.target;
+    _disposeActiveSnapshotPins();
     _direction = direction;
     _pendingDirection = null;
     _dragOrigin = origin;
@@ -544,6 +549,12 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         refreshAfterPreparation: !_sameSnapshot(back, widget.currentPage),
       );
     }
+    _activeSourceImage = _cachedImage(source)?.clone();
+    _activeBackImage = layers.back == null
+        ? null
+        : _cachedImage(layers.back)?.clone();
+    _activeSourceUsesProvisional =
+        _activeSourceImage != null && _syncSnapshotKeys.contains(source.key);
     final initialPointer = catchUpFromEdge
         ? Offset(
             direction == ReaderPageTurnDirection.forward
@@ -700,8 +711,13 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     final sourceKey = _direction == direction && _activeSourceKey != null
         ? _activeSourceKey!
         : layers.sourceKey;
-    await _ensureSnapshot(source, sourceKey, _captureGeneration);
-    if (!mounted) return;
+    final sourceImage = await _ensureSnapshot(
+      source,
+      sourceKey,
+      _captureGeneration,
+    );
+    if (!mounted || _direction != direction) return;
+    var pinsChanged = _pinActiveSourceImage(source, sourceImage);
     final back = _direction == direction && _activeBackPage != null
         ? _activeBackPage
         : layers.back;
@@ -709,8 +725,48 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         ? _activeBackKey
         : layers.backKey;
     if (back != null && backKey != null) {
-      await _ensureSnapshot(back, backKey, _captureGeneration);
+      final backImage = await _ensureSnapshot(
+        back,
+        backKey,
+        _captureGeneration,
+      );
+      if (!mounted || _direction != direction) return;
+      pinsChanged = _pinActiveBackImage(back, backImage) || pinsChanged;
     }
+    if (pinsChanged && mounted && _direction == direction) setState(() {});
+  }
+
+  bool _pinActiveSourceImage(ReaderPageSnapshot page, ui.Image? image) {
+    final active = _activeSourcePage;
+    if (image == null ||
+        _activeSourceImage != null ||
+        active == null ||
+        !_sameSnapshot(active, page)) {
+      return false;
+    }
+    _activeSourceImage = image.clone();
+    _activeSourceUsesProvisional = _syncSnapshotKeys.contains(page.key);
+    return true;
+  }
+
+  bool _pinActiveBackImage(ReaderPageSnapshot page, ui.Image? image) {
+    final active = _activeBackPage;
+    if (image == null ||
+        _activeBackImage != null ||
+        active == null ||
+        !_sameSnapshot(active, page)) {
+      return false;
+    }
+    _activeBackImage = image.clone();
+    return true;
+  }
+
+  void _disposeActiveSnapshotPins() {
+    _activeSourceImage?.dispose();
+    _activeBackImage?.dispose();
+    _activeSourceImage = null;
+    _activeBackImage = null;
+    _activeSourceUsesProvisional = false;
   }
 
   void _onPanEnd(DragEndDetails details) {
@@ -1153,6 +1209,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     if (!mounted) return;
     final coordinator = _ownedCoordinator;
     _ownedCoordinator = null;
+    _disposeActiveSnapshotPins();
     setState(() {
       _phase = _PageTurnPhase.idle;
       _direction = null;
@@ -1190,8 +1247,8 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
 
   bool get _animationReady =>
       _geometry != null &&
-      _cachedImage(_activeSourcePage) != null &&
-      (_activeBackPage == null || _cachedImage(_activeBackPage) != null) &&
+      _activeSourceImage != null &&
+      (_activeBackPage == null || _activeBackImage != null) &&
       _activeTargetPage != null &&
       _phase != _PageTurnPhase.idle &&
       _phase != _PageTurnPhase.pointerPending;
@@ -1211,6 +1268,10 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
 
   @override
   Widget build(BuildContext context) {
+    assert(() {
+      _buildCount++;
+      return true;
+    }());
     return LayoutBuilder(
       builder: (context, constraints) {
         final nextSize = constraints.biggest;
@@ -1221,8 +1282,8 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
           _scheduleWarmSnapshots();
         }
         final geometry = _geometry;
-        final sourceImage = _cachedImage(_activeSourcePage);
-        final backImage = _cachedImage(_activeBackPage);
+        final sourceImage = _activeSourceImage;
+        final backImage = _activeBackImage;
         final animationReady = _animationReady;
         final boundaryPages = <GlobalKey, ReaderPageSnapshot>{
           _currentKey: widget.currentPage,

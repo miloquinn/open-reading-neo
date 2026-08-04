@@ -525,6 +525,64 @@ void main() {
     },
   );
 
+  testWidgets('TXT horizontal paging keeps the legacy unkeyed delegate', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
+    });
+    bookFile.writeAsStringSync(
+      List.generate(3, (chapterIndex) {
+        final chapterNumber = chapterIndex + 1;
+        final body = List.generate(
+          28,
+          (paragraphIndex) => '第$chapterNumber章第$paragraphIndex段，用于水平分页回归测试。',
+        ).join('\n\n');
+        return '第$chapterNumber章 测试章节\n\n$body';
+      }).join('\n\n'),
+    );
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: NativeReaderPage(
+          book: Book(
+            title: 'TXT 水平分页回归',
+            filePath: bookFile.path,
+            format: 'txt',
+            textEncoding: 'utf8',
+            fileModifiedTime: bookFile
+                .lastModifiedSync()
+                .millisecondsSinceEpoch,
+          ),
+        ),
+      ),
+    );
+    final pageView = find.descendant(
+      of: find.byType(NativeReaderPage),
+      matching: find.byType(PageView),
+    );
+    await tester.runAsync(() async {
+      for (var attempt = 0; attempt < 40; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await tester.pump();
+        if (pageView.evaluate().isNotEmpty) return;
+      }
+    });
+    await _pumpUntilFound(tester, pageView);
+
+    final delegate = tester.widget<PageView>(pageView).childrenDelegate;
+    expect(delegate, isA<SliverChildBuilderDelegate>());
+    expect(
+      (delegate as SliverChildBuilderDelegate).findChildIndexCallback,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('TXT initialization preloads behind the cover route', (
     tester,
   ) async {

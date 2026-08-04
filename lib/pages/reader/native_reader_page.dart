@@ -190,6 +190,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _horizontalChapterJumpRevealScheduled = false;
   bool _horizontalBackwardExpansionPending = false;
   bool _horizontalBackwardExpansionWarmPending = false;
+  bool _horizontalForwardExpansionPending = false;
   bool _horizontalForwardContractionPending = false;
   final ItemScrollController _verticalPageScrollController =
       ItemScrollController();
@@ -1253,6 +1254,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       _horizontalLastChapter = _chapterIndex + 1;
       _horizontalBackwardExpansionPending = false;
       _horizontalBackwardExpansionWarmPending = false;
+      _horizontalForwardExpansionPending = false;
       _horizontalForwardContractionPending = false;
       _controlsVisible = false;
     });
@@ -1655,6 +1657,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       _horizontalLastChapter = next + 1;
       _horizontalBackwardExpansionPending = false;
       _horizontalBackwardExpansionWarmPending = false;
+      _horizontalForwardExpansionPending = false;
       _horizontalForwardContractionPending = false;
       if (previousPageController != null) {
         _horizontalChapterJumpPending = true;
@@ -3158,7 +3161,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     }
     if (page.chapterIndex >= _horizontalLastChapter - 1 &&
         _horizontalLastChapter < chapters.length - 1) {
-      setState(() => _horizontalLastChapter++);
+      if (_pageMode == NativePageMode.horizontalSlide &&
+          widget.book.format.toLowerCase() == 'epub') {
+        _horizontalForwardExpansionPending = true;
+      } else {
+        setState(() => _horizontalLastChapter++);
+      }
     }
     _saveCanonicalProgress(
       chapters[page.chapterIndex],
@@ -3167,18 +3175,33 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     );
   }
 
-  void _commitHorizontalForwardContraction(
-    List<_BookPageRef> bookPages, {
+  int? _takeHorizontalForwardExpansion(List<_NativeChapter> chapters) {
+    if (!_horizontalForwardExpansionPending) return null;
+    _horizontalForwardExpansionPending = false;
+    if (_horizontalLastChapter >= chapters.length - 1) return null;
+    return _horizontalLastChapter + 1;
+  }
+
+  bool _commitHorizontalForwardExpansion(List<_NativeChapter> chapters) {
+    final nextLastChapter = _takeHorizontalForwardExpansion(chapters);
+    if (nextLastChapter == null) return false;
+    setState(() => _horizontalLastChapter = nextLastChapter);
+    return true;
+  }
+
+  bool _commitHorizontalForwardContraction(
+    List<_BookPageRef> bookPages,
+    List<_NativeChapter> chapters, {
     required bool usesTwoPageLayout,
   }) {
     if (!_horizontalForwardContractionPending ||
         _pageMode != NativePageMode.horizontalSlide) {
-      return;
+      return false;
     }
     final nextFirstChapter = math.max(0, _chapterIndex - 1);
     if (nextFirstChapter <= _horizontalFirstChapter) {
       _horizontalForwardContractionPending = false;
-      return;
+      return false;
     }
     final targetPage = bookPages.indexWhere(
       (page) =>
@@ -3186,7 +3209,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           page.chapterIndex == _chapterIndex &&
           page.pageIndex == _pageIndex,
     );
-    if (targetPage < 0) return;
+    if (targetPage < 0) return false;
     final removedBookPages = bookPages
         .takeWhile((page) => page.chapterIndex < nextFirstChapter)
         .length;
@@ -3200,15 +3223,22 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     );
     _pageControllerGeneration++;
     _horizontalForwardContractionPending = false;
-    setState(() => _horizontalFirstChapter = nextFirstChapter);
+    final nextLastChapter = _takeHorizontalForwardExpansion(chapters);
+    setState(() {
+      _horizontalFirstChapter = nextFirstChapter;
+      if (nextLastChapter != null) {
+        _horizontalLastChapter = nextLastChapter;
+      }
+    });
     if (previousPageController != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => previousPageController.dispose(),
       );
     }
+    return true;
   }
 
-  void _commitHorizontalBackwardExpansion(
+  bool _commitHorizontalBackwardExpansion(
     List<_NativeChapter> chapters,
     Size size,
     TextDirection direction,
@@ -3218,7 +3248,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     if (!_horizontalBackwardExpansionPending ||
         _horizontalFirstChapter <= 0 ||
         size.isEmpty) {
-      return;
+      return false;
     }
     final nextFirstChapter = _horizontalFirstChapter - 1;
     final chapter = chapters[nextFirstChapter];
@@ -3242,7 +3272,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           ),
         );
       }
-      return;
+      return false;
     }
     _horizontalBackwardExpansionPending = false;
     _horizontalBackwardExpansionWarmPending = false;
@@ -3250,7 +3280,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       // Cover mode locates the current page by identity on every build, so
       // the window can grow without preserving a scroll position.
       setState(() => _horizontalFirstChapter = nextFirstChapter);
-      return;
+      return true;
     }
     final addedPages = _pagesFor(
       chapter,
@@ -3273,12 +3303,19 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       initialPage: currentControllerPage + addedControllerPages,
     );
     _pageControllerGeneration++;
-    setState(() => _horizontalFirstChapter = nextFirstChapter);
+    final nextLastChapter = _takeHorizontalForwardExpansion(chapters);
+    setState(() {
+      _horizontalFirstChapter = nextFirstChapter;
+      if (nextLastChapter != null) {
+        _horizontalLastChapter = nextLastChapter;
+      }
+    });
     if (previousPageController != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => previousPageController.dispose(),
       );
     }
+    return true;
   }
 
   Future<void> _prepareHorizontalBackwardExpansion(
@@ -3894,48 +3931,27 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       );
     }
     if (_pageMode == NativePageMode.horizontalSlide) {
-      Key pageKeyAt(int controllerIndex) {
-        final bookPageIndex = usesTwoPageLayout
-            ? controllerIndex * 2
-            : controllerIndex;
-        final page = bookPages[bookPageIndex];
-        return ValueKey<String>(
-          usesTwoPageLayout
-              ? 'native-horizontal-spread:${page.chapterIndex}:${page.pageIndex}'
-              : 'native-horizontal-page:${page.chapterIndex}:${page.pageIndex}:${page.content.startOffset}',
-        );
-      }
-
       return NotificationListener<ScrollEndNotification>(
         onNotification: (_) {
-          _commitHorizontalBackwardExpansion(
+          final expandedBackward = _commitHorizontalBackwardExpansion(
             chapters,
             _paginationSize(viewport, usesTwoPageLayout),
             Directionality.of(context),
             readerBodyTextScaler,
             usesTwoPageLayout: usesTwoPageLayout,
           );
-          _commitHorizontalForwardContraction(
+          if (expandedBackward) return false;
+          final contractedForward = _commitHorizontalForwardContraction(
             bookPages,
+            chapters,
             usesTwoPageLayout: usesTwoPageLayout,
           );
+          if (contractedForward) return false;
+          _commitHorizontalForwardExpansion(chapters);
           return false;
         },
         child: PageView.builder(
           controller: _pageController,
-          findChildIndexCallback: (key) {
-            for (
-              var index = 0;
-              index <
-                  (usesTwoPageLayout
-                      ? (bookPages.length + 1) ~/ 2
-                      : bookPages.length);
-              index++
-            ) {
-              if (pageKeyAt(index) == key) return index;
-            }
-            return null;
-          },
           physics: _annotationInteractionActive
               ? const NeverScrollableScrollPhysics()
               : null,
@@ -3950,29 +3966,26 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           itemBuilder: (context, index) {
             if (!usesTwoPageLayout) {
               final page = bookPages[index];
-              return _buildBookPageLeaf(chapters, page, key: pageKeyAt(index));
+              return _buildBookPageLeaf(chapters, page);
             }
             final firstIndex = index * 2;
-            return KeyedSubtree(
-              key: pageKeyAt(index),
-              child: _buildSpread(
-                left: _buildBookPageLeaf(
-                  chapters,
-                  bookPages[firstIndex],
-                  pageNumberPlacement: ReaderPageNumberPlacement.bottomLeft,
-                  topInformationLayout: ReaderTopInformationLayout.spreadLeft,
-                ),
-                right: firstIndex + 1 < bookPages.length
-                    ? _buildBookPageLeaf(
-                        chapters,
-                        bookPages[firstIndex + 1],
-                        pageNumberPlacement:
-                            ReaderPageNumberPlacement.bottomRight,
-                        topInformationLayout:
-                            ReaderTopInformationLayout.spreadRight,
-                      )
-                    : null,
+            return _buildSpread(
+              left: _buildBookPageLeaf(
+                chapters,
+                bookPages[firstIndex],
+                pageNumberPlacement: ReaderPageNumberPlacement.bottomLeft,
+                topInformationLayout: ReaderTopInformationLayout.spreadLeft,
               ),
+              right: firstIndex + 1 < bookPages.length
+                  ? _buildBookPageLeaf(
+                      chapters,
+                      bookPages[firstIndex + 1],
+                      pageNumberPlacement:
+                          ReaderPageNumberPlacement.bottomRight,
+                      topInformationLayout:
+                          ReaderTopInformationLayout.spreadRight,
+                    )
+                  : null,
             );
           },
         ),
@@ -4075,6 +4088,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           ? bookPages[currentIndex + 1]
           : null;
       final backward = currentIndex > 0 ? bookPages[currentIndex - 1] : null;
+      final expandsEpubWindowAfterCurl =
+          widget.book.format.toLowerCase() == 'epub';
       void commitCurlTurn(int targetIndex) {
         _onBookPageChanged(targetIndex, bookPages, chapters);
         _commitHorizontalBackwardExpansion(
@@ -4101,8 +4116,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           if (forward != null) forward,
           if (backward != null) backward,
         ]),
-        onTurnForward: () => commitCurlTurn(currentIndex + 1),
-        onTurnBackward: () => commitCurlTurn(currentIndex - 1),
+        onTurnForward: () => expandsEpubWindowAfterCurl
+            ? commitCurlTurn(currentIndex + 1)
+            : _onBookPageChanged(currentIndex + 1, bookPages, chapters),
+        onTurnBackward: () => expandsEpubWindowAfterCurl
+            ? commitCurlTurn(currentIndex - 1)
+            : _onBookPageChanged(currentIndex - 1, bookPages, chapters),
         paperColor: _readerTheme.background,
       );
     }
@@ -4146,26 +4165,21 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Widget _buildBookPageLeaf(
     List<_NativeChapter> chapters,
     _BookPageRef page, {
-    Key? key,
     ReaderPageNumberPlacement pageNumberPlacement =
         ReaderPageNumberPlacement.bottomRight,
     ReaderTopInformationLayout topInformationLayout =
         ReaderTopInformationLayout.full,
   }) {
     if (page.isBlank) {
-      return KeyedSubtree(
-        key: key,
-        child: _buildBlankPageLeaf(
-          pageIdentity: 'chapter-${page.chapterIndex}-padding',
-          layoutFingerprint: page.layoutFingerprint,
-          topInformationLayout: topInformationLayout,
-        ),
+      return _buildBlankPageLeaf(
+        pageIdentity: 'chapter-${page.chapterIndex}-padding',
+        layoutFingerprint: page.layoutFingerprint,
+        topInformationLayout: topInformationLayout,
       );
     }
     return _buildPageLeaf(
       chapters[page.chapterIndex],
       page.content,
-      key: key,
       chapterIndex: page.chapterIndex,
       pageIndex: page.pageIndex,
       pageCount: page.pageCount,
@@ -4443,7 +4457,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Widget _buildPageLeaf(
     _NativeChapter chapter,
     _ReaderPageData page, {
-    Key? key,
     required int chapterIndex,
     required int pageIndex,
     required int pageCount,
@@ -4462,7 +4475,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       layoutFingerprint: layoutFingerprint,
     );
     return ReaderPaperPageLeaf(
-      key: key,
       palette: _readerTheme,
       safeArea: _readerSafeArea,
       metadata: metadata,
@@ -4944,18 +4956,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
                           final pageController = _pageController;
                           if (pageController == null ||
                               !pageController.hasClients) {
-                            return;
-                          }
-                          // Pagination warming and chapter-window expansion
-                          // can rebuild the reader while a horizontal turn is
-                          // in flight. Never reconcile the controller during
-                          // that gesture/ballistic activity: jumping to the
-                          // rounded saved page here briefly swaps in a
-                          // different leaf, then PageView restores the turn.
-                          if (pageController
-                              .position
-                              .isScrollingNotifier
-                              .value) {
                             return;
                           }
                           final current = pageController.page?.round();

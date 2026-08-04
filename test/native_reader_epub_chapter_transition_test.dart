@@ -48,32 +48,22 @@ void main() {
       final epub = File('${directory.path}/transition.epub');
       epub.writeAsBytesSync(_epubFixture());
       final paginationMisses = <int>[];
-      late StateSetter rebuildHost;
-      var hostRevision = 0;
 
       try {
         await tester.pumpWidget(
           MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
-            home: StatefulBuilder(
-              builder: (context, setHostState) {
-                rebuildHost = setHostState;
-                return Semantics(
-                  label: 'host-revision-$hostRevision',
-                  child: NativeReaderPage(
-                    book: Book(
-                      title: 'EPUB transition fixture',
-                      filePath: epub.path,
-                      format: 'epub',
-                      fileModifiedTime: epub
-                          .lastModifiedSync()
-                          .millisecondsSinceEpoch,
-                    ),
-                    onPaginationCacheMiss: paginationMisses.add,
-                  ),
-                );
-              },
+            home: NativeReaderPage(
+              book: Book(
+                title: 'EPUB transition fixture',
+                filePath: epub.path,
+                format: 'epub',
+                fileModifiedTime: epub
+                    .lastModifiedSync()
+                    .millisecondsSinceEpoch,
+              ),
+              onPaginationCacheMiss: paginationMisses.add,
             ),
           ),
         );
@@ -96,9 +86,9 @@ void main() {
         final pageViewWidget = tester.widget<PageView>(pageView);
         final delegate =
             pageViewWidget.childrenDelegate as SliverChildBuilderDelegate;
-        final itemCount = delegate.estimatedChildCount!;
+        final initialChildCount = delegate.estimatedChildCount!;
         final firstChapterPages = <int>[];
-        for (var index = 0; index < itemCount; index++) {
+        for (var index = 0; index < initialChildCount; index++) {
           final leaf = delegate.builder(tester.element(pageView), index)!;
           final metadata = (leaf as ReaderPaperPageLeaf).metadata;
           if (metadata.chapterTitle == 'Chapter 1') {
@@ -114,6 +104,10 @@ void main() {
         await tester.pump();
         await _pumpUntil(tester, () => paginationMisses.contains(3));
         paginationMisses.clear();
+        final settledChildCount = tester
+            .widget<PageView>(pageView)
+            .childrenDelegate
+            .estimatedChildCount!;
 
         final boundaryLeaf = find.byWidgetPredicate(
           (widget) =>
@@ -122,7 +116,6 @@ void main() {
               widget.metadata.pageNumber == firstChapterPages.length,
         );
         expect(boundaryLeaf, findsOneWidget);
-        final boundaryElement = tester.element(boundaryLeaf);
         final rect = tester.getRect(pageView);
         final gesture = await tester.startGesture(
           Offset(rect.right - 8, rect.center.dy),
@@ -138,20 +131,24 @@ void main() {
               widget.metadata.pageNumber == 1,
         );
         expect(incomingLeaf, findsOneWidget);
-        final incomingElement = tester.element(incomingLeaf);
+        expect(
+          tester
+              .widget<PageView>(pageView)
+              .childrenDelegate
+              .estimatedChildCount,
+          settledChildCount,
+        );
 
-        // A pagination/cache completion rebuild used to run the post-frame
-        // page reconciliation during this active drag. That jump briefly
-        // replaced the chapter-boundary leaf with another page, then snapped
-        // back when PageView resumed the gesture.
-        rebuildHost(() => hostRevision++);
-        await tester.pump();
-        expect(controller.page, closeTo(pageDuringTurn, 0.001));
-        expect(tester.element(boundaryLeaf), same(boundaryElement));
-        expect(tester.element(incomingLeaf), same(incomingElement));
-
-        await gesture.cancel();
+        await gesture.moveBy(Offset(-rect.width, 0));
+        await gesture.up();
         await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<PageView>(pageView)
+              .childrenDelegate
+              .estimatedChildCount,
+          greaterThan(settledChildCount),
+        );
 
         final turn = controller.nextPage(
           duration: const Duration(milliseconds: 280),

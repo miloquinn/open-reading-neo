@@ -4962,7 +4962,9 @@ class _NativeReaderPageState extends State<NativeReaderPage>
                           // through onPageChanged; forcing jumpToPage while
                           // that motion is in flight fights the user's
                           // finger and reads as a flash to another page.
-                          if (pageController.position.isScrollingNotifier
+                          if (pageController
+                              .position
+                              .isScrollingNotifier
                               .value) {
                             return;
                           }

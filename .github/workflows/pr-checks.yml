@@ -21,7 +21,7 @@ env:
 
 jobs:
   flutter-validation:
-    name: Flutter validation
+    name: Core Flutter validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -72,11 +72,13 @@ jobs:
           )
           flutter test --coverage "${test_files[@]}"
 
-          # This file mutates SharedPreferences-backed registry state across
-          # several widget trees. Flutter's combined test process can leave
-          # the sixth case waiting until the 10-minute per-test timeout, while
-          # every case completes immediately in a fresh process. Keep all
-          # assertions in the gate and isolate only this known stateful file.
+      - name: Run stateful reader tests in isolated processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These widget suites own process-global preferences, controllers,
+          # image codecs, and platform channels. Running one case per process
+          # keeps a framework leak from looking like an application failure.
           management_tests=(
             'keeps native ORSP source management available'
             'uses one add flow regardless of the advanced toggle'
@@ -127,6 +129,11 @@ jobs:
               --plain-name "$test_name"
           done
 
+      - name: Explain validation failures
+        if: ${{ failure() }}
+        run: |
+          echo '::error title=Flutter validation failed::Core tests and stateful widget tests are separate steps. Check the failing step name before treating this as a build failure.'
+
       - name: Upload coverage report
         if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -137,7 +144,7 @@ jobs:
           retention-days: 7
 
   build-smoke:
-    name: Build smoke / ${{ matrix.name }}
+    name: Product build / ${{ matrix.name }}
     needs: flutter-validation
     runs-on: ubuntu-latest
     timeout-minutes: 35

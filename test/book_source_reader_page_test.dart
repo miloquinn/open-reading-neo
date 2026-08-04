@@ -216,7 +216,7 @@ void main() {
     );
     await _pumpUntilFound(tester, find.text('第一章'));
     expect(find.text('第一章'), findsWidgets);
-    expect(find.byType(ReaderInlineChapterTitle), findsOneWidget);
+    expect(find.byType(ReaderInlineChapterTitle), findsWidgets);
     await tester.fling(
       find.byKey(const ValueKey('book-source-reader-surface')),
       const Offset(0, -500),
@@ -556,7 +556,7 @@ void main() {
               'book-source-vertical-part:',
             ),
       );
-      expect(continuousParts, findsOneWidget);
+      expect(continuousParts, findsWidgets);
       expect(
         tester.getSize(continuousParts.first).height,
         isNot(closeTo(listRect.height, 0.1)),

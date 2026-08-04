@@ -244,13 +244,13 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
   });
   globalThis.cache = {
     put: (name, value, seconds) => __host('cachePut', [String(name), value, Number(seconds || 0)]),
-    get: (name) => __host('cacheGet', [String(name)]),
+    get: (name) => __host('cacheGet', [String(name)]) ?? null,
     delete: (name) => __host('cacheDelete', [String(name)]),
     putMemory: (name, value) => __host('cachePutMemory', [String(name), value]),
-    getFromMemory: (name) => __host('cacheGetMemory', [String(name)]),
+    getFromMemory: (name) => __host('cacheGetMemory', [String(name)]) ?? null,
     deleteMemory: (name) => __host('cacheDeleteMemory', [String(name)]),
     putFile: (name, value, seconds) => __host('cachePut', [String(name), value, Number(seconds || 0)]),
-    getFile: (name) => __host('cacheGet', [String(name)])
+    getFile: (name) => __host('cacheGet', [String(name)]) ?? null
   };
   const __host = (op, args) => sendMessage(
     '$_hostChannel',

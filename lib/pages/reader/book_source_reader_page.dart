@@ -988,10 +988,12 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     future = contentFuture
         .then((content) async {
           _readableChapterText.remove(index);
-          final readable = await readableBookSourceChapterTextAsync(
-            content,
-            fallbackTitle: _chapters[index].title,
-          );
+          final readable = isImageOnlyBookSourceChapter(content)
+              ? ''
+              : await readableBookSourceChapterTextAsync(
+                  content,
+                  fallbackTitle: _chapters[index].title,
+                );
           await ReplaceRuleService.instance.load();
           _readableChapterText[index] = ReplaceRuleService.instance.apply(
             readable,

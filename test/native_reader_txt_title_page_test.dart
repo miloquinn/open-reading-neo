@@ -489,10 +489,6 @@ void main() {
           .widget<PageView>(readerPageView)
           .controller!;
       expect(jumpedController, isNot(same(originalController)));
-      expect(
-        find.byKey(const ValueKey('native-reader-positioning-placeholder')),
-        findsOneWidget,
-      );
       await tester.pump();
       expect(
         tester

@@ -67,6 +67,7 @@ jobs:
           mapfile -d '' test_files < <(
             find test -type f -name '*_test.dart' \
               ! -name 'book_source_management_page_test.dart' \
+              ! -name 'book_source_reader_page_test.dart' \
               -print0
           )
           flutter test --coverage "${test_files[@]}"
@@ -88,6 +89,41 @@ jobs:
           )
           for test_name in "${management_tests[@]}"; do
             flutter test test/book_source_management_page_test.dart \
+              --plain-name "$test_name"
+          done
+
+          # The image-reader case deliberately leaves a page load pending so
+          # it can assert the reader shell before image decoding. Run the
+          # remaining stateful source-reader cases separately to keep that
+          # fixture from holding Flutter's combined test process open.
+          reader_tests=(
+            'image-only source chapters open in the paged image reader'
+            'cover opening skips a brief loader and fades directly to content'
+            'a genuinely slow opening never overlaps loader and content'
+            'loads source chapters and navigates to the next chapter'
+            'replacement rules clean source chapter titles and content'
+            'restores the last source chapter on reopen'
+            'uses the shared reader settings with independent margins'
+            'naturally aligns source body text in verticalScroll mode'
+            'naturally aligns source body text in instantPage mode'
+            'applies persisted source alignment and letter spacing'
+            'vertical source text keeps its natural continuous height'
+            'tablet source page curl uses two leaves and a subtle center divider'
+            'tablet source reader can disable the two-page layout'
+            'tablet spread progress tracks the last visible page and restores its left page'
+            'next chapter preview is ready even while a farther prefetch is pending'
+            'prefetched chapter turn does not wait for progress persistence'
+            'horizontal slide commits a prefetched chapter only after the animation settles'
+            'horizontal slide lets a new drag take over a cross-chapter settle'
+            'tablet forward chapter curl uses prefetched page one at half-page width without refetching'
+            'tablet forward chapter curl previews title and body leaves for a short chapter'
+            'tablet backward chapter curl targets the previous final spread left page'
+            'uses the light reader theme for status bar icon contrast'
+            'uses the dark reader theme for status bar icon contrast'
+            'system reader theme uses a solid pure-black status bar without glass'
+          )
+          for test_name in "${reader_tests[@]}"; do
+            flutter test test/book_source_reader_page_test.dart \
               --plain-name "$test_name"
           done
 

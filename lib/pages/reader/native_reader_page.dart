@@ -3161,8 +3161,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     }
     if (page.chapterIndex >= _horizontalLastChapter - 1 &&
         _horizontalLastChapter < chapters.length - 1) {
-      if (_pageMode == NativePageMode.horizontalSlide &&
-          widget.book.format.toLowerCase() == 'epub') {
+      if (_pageMode == NativePageMode.horizontalSlide) {
         _horizontalForwardExpansionPending = true;
       } else {
         setState(() => _horizontalLastChapter++);
@@ -4956,6 +4955,15 @@ class _NativeReaderPageState extends State<NativeReaderPage>
                           final pageController = _pageController;
                           if (pageController == null ||
                               !pageController.hasClients) {
+                            return;
+                          }
+                          // A live drag or fling already drives the
+                          // controller toward the page that will report
+                          // through onPageChanged; forcing jumpToPage while
+                          // that motion is in flight fights the user's
+                          // finger and reads as a flash to another page.
+                          if (pageController.position.isScrollingNotifier
+                              .value) {
                             return;
                           }
                           final current = pageController.page?.round();

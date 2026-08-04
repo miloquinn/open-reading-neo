@@ -122,10 +122,32 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     return FloatingSubpageScaffold(
       title: context.l10n.bookSourceManagementTitle,
       actions: [
-        FloatingSubpageMenuAction<_BookSourceHeaderAction>(
+        FloatingSubpageMenuButton<_BookSourceHeaderAction>(
           key: const Key('bookSourcesToolButton'),
           tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
           icon: Icons.more_horiz_rounded,
+          items: [
+            FloatingSubpageMenuItem(
+              value: _BookSourceHeaderAction.add,
+              itemKey: const Key('bookSourcesAddButton'),
+              child: ListTile(
+                leading: const Icon(Icons.add_link_rounded),
+                title: Text(context.l10n.bookSourcesAdd),
+              ),
+            ),
+            FloatingSubpageMenuItem(
+              value: _BookSourceHeaderAction.select,
+              itemKey: const Key('bookSourcesSelectionModeButton'),
+              child: ListTile(
+                leading: Icon(
+                  _selectionMode
+                      ? Icons.close_rounded
+                      : Icons.checklist_rounded,
+                ),
+                title: Text(context.l10n.bookSourcesSelect),
+              ),
+            ),
+          ],
           onSelected: (action) {
             switch (action) {
               case _BookSourceHeaderAction.add:
@@ -137,30 +159,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 });
             }
           },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              key: const Key('bookSourcesAddButton'),
-              value: _BookSourceHeaderAction.add,
-              child: ListTile(
-                leading: const Icon(Icons.add_link_rounded),
-                title: Text(context.l10n.bookSourcesAdd),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem(
-              key: const Key('bookSourcesSelectionModeButton'),
-              value: _BookSourceHeaderAction.select,
-              child: ListTile(
-                leading: Icon(
-                  _selectionMode
-                      ? Icons.close_rounded
-                      : Icons.checklist_rounded,
-                ),
-                title: Text(context.l10n.bookSourcesSelect),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
         ),
       ],
       body: Align(

@@ -19,6 +19,7 @@ class ReplaceRulesPage extends StatefulWidget {
 
 class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
   final _service = ReplaceRuleService.instance;
+  final _searchController = TextEditingController();
   String _query = '';
 
   @override
@@ -31,6 +32,7 @@ class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
   @override
   void dispose() {
     _service.removeListener(_onRulesChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -173,19 +175,36 @@ class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
     return FloatingSubpageScaffold(
       title: l10n.replaceRulesTitle,
       actions: [
-        FloatingSubpageAction(
-          tooltip: l10n.replaceRulesImport,
-          onPressed: _import,
-          icon: Icons.file_upload_outlined,
-        ),
-        FloatingSubpageAction(
-          tooltip: l10n.replaceRulesExport,
-          onPressed: _service.rules.isEmpty ? null : _export,
-          icon: Icons.file_download_outlined,
+        FloatingSubpageMenuButton<_ReplaceRulesMenuAction>(
+          key: const ValueKey('replaceRulesToolButton'),
+          tooltip: l10n.replaceRulesTitle,
+          icon: Icons.tune_rounded,
+          items: [
+            FloatingSubpageMenuItem(
+              value: _ReplaceRulesMenuAction.import,
+              child: ListTile(
+                leading: const Icon(Icons.file_upload_outlined),
+                title: Text(l10n.replaceRulesImport),
+              ),
+            ),
+            FloatingSubpageMenuItem(
+              value: _ReplaceRulesMenuAction.export,
+              enabled: _service.rules.isNotEmpty,
+              child: ListTile(
+                leading: const Icon(Icons.file_download_outlined),
+                title: Text(l10n.replaceRulesExport),
+              ),
+            ),
+          ],
+          onSelected: (action) => switch (action) {
+            _ReplaceRulesMenuAction.import => _import(),
+            _ReplaceRulesMenuAction.export => _export(),
+          },
         ),
       ],
-      tools: SearchBar(
-        leading: const Icon(Icons.search),
+      tools: _ReplaceRulesSearchField(
+        controller: _searchController,
+        query: _query,
         hintText: l10n.replaceRulesSearchHint,
         onChanged: (value) => setState(() => _query = value),
       ),
@@ -286,6 +305,72 @@ class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _ReplaceRulesMenuAction { import, export }
+
+class _ReplaceRulesSearchField extends StatelessWidget {
+  const _ReplaceRulesSearchField({
+    required this.controller,
+    required this.query,
+    required this.hintText,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 48,
+      child: TextField(
+        key: const ValueKey('replaceRulesSearchField'),
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: hintText,
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.78),
+          ),
+          suffixIcon: query.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: MaterialLocalizations.of(context).clearButtonTooltip,
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+          filled: true,
+          fillColor: scheme.surfaceContainerLow.withValues(alpha: 0.72),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.46),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.46),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: scheme.primary, width: 1.2),
+          ),
         ),
       ),
     );

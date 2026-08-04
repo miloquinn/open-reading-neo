@@ -58,4 +58,36 @@ void main() {
       expect(tester.getRect(save).bottom, lessThanOrEqualTo(580));
     },
   );
+
+  testWidgets('uses one shared glass tools menu and a compact search field', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ReplaceRulesPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('replaceRulesToolButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('replaceRulesSearchField')),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.file_upload_outlined), findsNothing);
+    expect(find.byIcon(Icons.file_download_outlined), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('replaceRulesToolButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('导入规则'), findsOneWidget);
+    expect(find.text('导出规则'), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsWidgets);
+  });
 }

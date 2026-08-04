@@ -142,4 +142,39 @@ void main() {
     expect(titleWidget.overflow, TextOverflow.ellipsis);
     expect(titleRect.left, greaterThanOrEqualTo(backRect.right + 8));
   });
+
+  testWidgets('shared menu springs from its anchor and returns selection', (
+    tester,
+  ) async {
+    String? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topRight,
+            child: FloatingSubpageMenuButton<String>(
+              key: const ValueKey('test-glass-menu'),
+              icon: Icons.more_horiz_rounded,
+              tooltip: 'More',
+              items: const [
+                FloatingSubpageMenuItem(value: 'import', child: Text('Import')),
+              ],
+              onSelected: (value) => selected = value,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('test-glass-menu')));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.text('Import'), findsOneWidget);
+    expect(find.byType(ScaleTransition), findsWidgets);
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import'));
+    await tester.pumpAndSettle();
+    expect(selected, 'import');
+  });
 }

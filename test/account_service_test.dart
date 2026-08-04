@@ -171,6 +171,68 @@ void main() {
     },
   );
 
+  test(
+    'failed initialization clears cached identity and can retry provider config',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      const cache = MemberAccountSummaryCache();
+      await cache.save(
+        const MemberAccountSummary(
+          userId: 'stale-user',
+          username: 'stale',
+          effectiveName: 'Stale Reader',
+          premium: true,
+        ),
+      );
+      var online = false;
+      final adapter = _RouteAdapter((options) {
+        if (!online) throw const SocketException('offline');
+        return switch (options.uri.path) {
+          '/api/v1/auth/config' => _json({
+            'providers': {
+              'apple': true,
+              'google': true,
+              'github': true,
+              'passkey': true,
+            },
+            'username': {'min_length': 3, 'max_length': 30},
+            'password': {'min_length': 12, 'max_length': 128},
+          }),
+          '/api/v1/membership/config' => _json({
+            'product': 'premium_lifetime',
+            'purchase_url': '/support',
+            'features': <String>[],
+          }),
+          _ => throw StateError('Unexpected route ${options.uri.path}'),
+        };
+      });
+      final controller = MemberAccountController(
+        api: _client(adapter, _MemoryTokenStore()),
+        summaryCache: cache,
+      );
+
+      await expectLater(
+        controller.initialize(),
+        throwsA(isA<MemberAccountException>()),
+      );
+
+      expect(controller.initialized, isFalse);
+      expect(controller.summary, isNull);
+      expect(await cache.load(), isNull);
+      expect(controller.isAuthenticated, isFalse);
+
+      online = true;
+      await controller.initialize();
+
+      expect(controller.initialized, isTrue);
+      expect(controller.providers.apple, isTrue);
+      expect(controller.providers.google, isTrue);
+      expect(controller.providers.github, isTrue);
+      expect(controller.providers.passkey, isTrue);
+      expect(controller.isAuthenticated, isFalse);
+    },
+  );
+
   test('referral API loads and binds a single invite code', () async {
     final storage = _MemoryTokenStore(
       accessToken: 'access-1',

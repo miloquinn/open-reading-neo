@@ -7,30 +7,37 @@ import 'package:flutter/material.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
+import 'package:xxread/book_sources/services/book_source_search_settings.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
+import 'widgets/source_search_settings_sheet.dart';
 import 'widgets/sourced_book_widgets.dart';
 
 /// 跨已启用书源的聚合搜索页。
 ///
 /// 搜索范围与分页状态都在本页内维护；发现页只负责展示书籍。
 class SourceSearchPage extends StatefulWidget {
-  final List<RegisteredBookSource> sources;
-  final BookSourceClient client;
-  final BookSourceShelfService shelfService;
-  final int maxConcurrentSearches;
-  final Duration perSourceSearchTimeout;
+  final List<RegisteredBookSource>? sources;
+  final Future<List<RegisteredBookSource>>? sourcesFuture;
+  final BookSourceClient? client;
+  final BookSourceShelfService? shelfService;
+
+  /// 显式传入时覆盖用户在设置面板里保存的并发数/超时；主要供测试使用。
+  final int? maxConcurrentSearches;
+  final Duration? perSourceSearchTimeout;
 
   const SourceSearchPage({
     super.key,
-    required this.sources,
-    required this.client,
-    required this.shelfService,
-    this.maxConcurrentSearches = 8,
-    this.perSourceSearchTimeout = const Duration(seconds: 6),
-  }) : assert(maxConcurrentSearches > 0);
+    this.sources,
+    this.sourcesFuture,
+    this.client,
+    this.shelfService,
+    this.maxConcurrentSearches,
+    this.perSourceSearchTimeout,
+  }) : assert(maxConcurrentSearches == null || maxConcurrentSearches > 0),
+       assert(sources != null || sourcesFuture != null);
 
   /// 解析实际参与搜索的书源集合；发现页与测试也复用这份规则。
   static List<RegisteredBookSource> searchTargets(
@@ -56,12 +63,23 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   final List<SourcedBook> _results = [];
   final Set<String> _resultKeys = {};
   final Map<String, _SearchPageState> _pageStates = {};
+  late final BookSourceClient _client = widget.client ?? BookSourceClient();
+  late final BookSourceShelfService _shelfService =
+      widget.shelfService ?? BookSourceShelfService(client: _client);
+  bool get _ownsClient => widget.client == null;
   late final SourcedBookActions _actions = SourcedBookActions(
     context: context,
-    client: widget.client,
-    shelfService: widget.shelfService,
+    client: _client,
+    shelfService: _shelfService,
   );
 
+  final BookSourceSearchSettingsStore _settingsStore =
+      const BookSourceSearchSettingsStore();
+  late BookSourceSearchSettings _settings;
+
+  List<RegisteredBookSource> _sources = const [];
+  bool _preparingSources = true;
+  Object? _sourcesError;
   String? _selectedSourceId;
   bool _searching = false;
   bool _hasSearched = false;
@@ -78,11 +96,78 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   @override
   void initState() {
     super.initState();
+    _settings = BookSourceSearchSettings.defaults.copyWith(
+      maxConcurrentSearches: widget.maxConcurrentSearches,
+      perSourceSearchTimeout: widget.perSourceSearchTimeout,
+    );
+    unawaited(_loadPersistedSettings());
     _scrollController.addListener(_handleScroll);
+    if (widget.sources != null) {
+      _sources = widget.sources!;
+      _preparingSources = false;
+    } else {
+      unawaited(_loadSources());
+    }
     // 进入搜索页直接聚焦输入框，用户可立即输入。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _queryFocus.requestFocus();
     });
+  }
+
+  /// 用持久化的用户偏好补齐设置；显式通过构造函数传入的值（主要用于测试）
+  /// 优先于持久化偏好。不阻塞首帧渲染——搜索发生前完成即可。
+  Future<void> _loadPersistedSettings() async {
+    final stored = await _settingsStore.load();
+    if (!mounted) return;
+    setState(() {
+      _settings = _settings.copyWith(
+        maxConcurrentSearches:
+            widget.maxConcurrentSearches ?? stored.maxConcurrentSearches,
+        perSourceSearchTimeout:
+            widget.perSourceSearchTimeout ?? stored.perSourceSearchTimeout,
+        sourceLimit: stored.sourceLimit,
+      );
+    });
+  }
+
+  void _applySettings(BookSourceSearchSettings updated) {
+    setState(() => _settings = updated);
+    unawaited(_settingsStore.save(updated));
+  }
+
+  Future<void> _openSettingsSheet() async {
+    await showSourceSearchSettingsSheet(
+      context: context,
+      settings: _settings,
+      enabledSourceCount: _sources.where((source) => source.enabled).length,
+      onChanged: _applySettings,
+    );
+  }
+
+  Future<void> _loadSources() async {
+    try {
+      final sources = await widget.sourcesFuture!;
+      if (!mounted) return;
+      setState(() {
+        _sources = sources;
+        _preparingSources = false;
+        _sourcesError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _preparingSources = false;
+        _sourcesError = error;
+      });
+    }
+  }
+
+  void _retryLoadSources() {
+    setState(() {
+      _preparingSources = true;
+      _sourcesError = null;
+    });
+    unawaited(_loadSources());
   }
 
   @override
@@ -93,6 +178,7 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       ..dispose();
     _queryController.dispose();
     _queryFocus.dispose();
+    if (_ownsClient) _client.close();
     super.dispose();
   }
 
@@ -106,7 +192,18 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   }
 
   List<RegisteredBookSource> get _targets =>
-      SourceSearchPage.searchTargets(widget.sources, _selectedSourceId);
+      SourceSearchPage.searchTargets(_sources, _selectedSourceId);
+
+  /// 实际参与本次搜索的书源：单一书源范围不设上限；"全部"范围按注册顺序
+  /// 只取前 [BookSourceSearchSettings.sourceLimit] 个，避免书源库很大（用户
+  /// 一次性导入几千个书源的情况并不少见）时同时打开海量并发请求。
+  List<RegisteredBookSource> get _searchTargets {
+    final targets = _targets;
+    if (_selectedSourceId != null || targets.length <= _settings.sourceLimit) {
+      return targets;
+    }
+    return targets.take(_settings.sourceLimit).toList(growable: false);
+  }
 
   void _cancelActiveSearches() {
     for (final cancellation in _activeSearchCancellations.toList()) {
@@ -123,10 +220,10 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
     final cancellation = BookDownloadCancellation();
     _activeSearchCancellations.add(cancellation);
     try {
-      final result = await widget.client
+      final result = await _client
           .search(source, query, page: page, cancellation: cancellation)
           .timeout(
-            widget.perSourceSearchTimeout,
+            _settings.perSourceSearchTimeout,
             onTimeout: () {
               cancellation.cancel();
               throw TimeoutException(
@@ -165,7 +262,7 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
 
   Future<void> _search() async {
     final query = _queryController.text.trim();
-    final targetSources = _targets;
+    final targetSources = _searchTargets;
     if (query.isEmpty || targetSources.isEmpty) {
       _searchGeneration++;
       _cancelActiveSearches();
@@ -208,9 +305,9 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       }
     }
 
-    final concurrency = targetSources.length < widget.maxConcurrentSearches
+    final concurrency = targetSources.length < _settings.maxConcurrentSearches
         ? targetSources.length
-        : widget.maxConcurrentSearches;
+        : _settings.maxConcurrentSearches;
     await Future.wait(List.generate(concurrency, (_) => worker()));
 
     if (!mounted || generation != _searchGeneration) return;
@@ -262,9 +359,9 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       }
     }
 
-    final concurrency = targets.length < widget.maxConcurrentSearches
+    final concurrency = targets.length < _settings.maxConcurrentSearches
         ? targets.length
-        : widget.maxConcurrentSearches;
+        : _settings.maxConcurrentSearches;
     await Future.wait(List.generate(concurrency, (_) => worker()));
 
     if (!mounted || generation != _searchGeneration || query != _activeQuery) {
@@ -295,17 +392,63 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final enabledSources = widget.sources
+    final enabledSources = _sources
         .where((source) => source.enabled)
         .toList(growable: false);
+    // 一旦开始搜索就让位给结果/进度展示，不再占用空间。
+    final overLimit =
+        !_hasSearched &&
+        _selectedSourceId == null &&
+        enabledSources.length > _settings.sourceLimit;
     return FloatingSubpageScaffold(
       title: context.l10n.bookSourcesSearch,
       tools: _buildQueryField(enabledSources),
+      actions: [
+        FloatingSubpageAction(
+          key: const Key('bookSourceSearchSettingsButton'),
+          tooltip: context.l10n.bookSourcesSearchSettingsTooltip,
+          icon: Icons.tune_rounded,
+          onPressed: _openSettingsSheet,
+        ),
+      ],
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (enabledSources.isNotEmpty) _buildScopeChips(enabledSources),
+          if (overLimit) _buildSourceLimitBanner(enabledSources.length),
           Expanded(child: _buildBody(enabledSources)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceLimitBanner(int enabledCount) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      key: const Key('bookSourceSearchLimitBanner'),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 15,
+            color: scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              context.l10n.bookSourcesSearchSourceLimitWarning(
+                enabledCount,
+                _settings.sourceLimit,
+              ),
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                height: 1.35,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -390,6 +533,12 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
 
   Widget _buildBody(List<RegisteredBookSource> enabledSources) {
     final scheme = Theme.of(context).colorScheme;
+    if (_preparingSources) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_sourcesError != null) {
+      return _buildSourcesErrorMessage();
+    }
     if (enabledSources.isEmpty) {
       return _buildMessage(
         icon: Icons.travel_explore_outlined,
@@ -508,7 +657,7 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   }
 
   String _scopeLabel() {
-    for (final source in widget.sources) {
+    for (final source in _sources) {
       if (source.id == _selectedSourceId) return source.name;
     }
     return context.l10n.statsRangeAll;
@@ -563,6 +712,39 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
                 style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourcesErrorMessage() {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 42,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.55),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              context.l10n.error,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _retryLoadSources,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(context.l10n.retry),
+            ),
           ],
         ),
       ),

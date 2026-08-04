@@ -86,6 +86,24 @@
       }
     }
   },
+  "bookSourcesSearchSettingsTooltip": "検索設定",
+  "bookSourcesSearchSettingsTitle": "検索設定",
+  "bookSourcesSearchConcurrencyLabel": "同時リクエスト数",
+  "bookSourcesSearchTimeoutLabel": "ソースごとのタイムアウト（秒）",
+  "bookSourcesSearchSourceLimitLabel": "検索するソース数の上限",
+  "bookSourcesSearchSourceLimitDescription": "有効なソースが多い場合、リスト順で先頭からこの件数だけを検索し、通信量や端末負荷を抑えます。",
+  "bookSourcesSearchSourceLimitWarning": "有効なソースは{enabledCount}件あり、現在の上限{limit}件を超えています。上限を超えた分は検索されません。",
+  "@bookSourcesSearchSourceLimitWarning": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesSearchResetDefaults": "既定値に戻す",
   "bookSourcesSearchPrompt": "ソースを追加して有効化すると、ここでまとめて検索できます",
   "bookSourcesNoResults": "該当する書籍が見つかりません",
   "bookSourcesNoSourcesTitle": "ソースがまだありません",
@@ -2007,6 +2025,8 @@
   "settingsCacheSourceCoversSubtitle": "ダウンロード済みの表紙 · {size}",
   "settingsCacheSourceData": "ソース章キャッシュ",
   "settingsCacheSourceDataSubtitle": "安全に削除できるオンライン章キャッシュ · {size}",
+  "settingsCacheReadingCache": "ローカル読書キャッシュ",
+  "settingsCacheReadingCacheSubtitle": "ローカルEPUB/TXTの解析で生成される再構築可能なキャッシュ · {size}",
   "settingsCacheTemporaryFiles": "一時ファイル",
   "settingsCacheTemporaryFilesSubtitle": "破棄可能な更新・一時ファイル · {size}",
   "settingsCacheClearAll": "安全なキャッシュをすべて消去",

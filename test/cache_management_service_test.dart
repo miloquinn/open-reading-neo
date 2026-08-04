@@ -14,13 +14,26 @@ void main() {
   test('reports and clears only allowlisted cache categories', () async {
     final root = await Directory.systemTemp.createTemp('cache-manager-');
     addTearDown(() => root.delete(recursive: true));
+    final support = await Directory.systemTemp.createTemp('cache-support-');
+    addTearDown(() => support.delete(recursive: true));
+    final legacyPaginationCache = await Directory.systemTemp.createTemp(
+      'cache-legacy-pagination-',
+    );
+    addTearDown(() async {
+      if (await legacyPaginationCache.exists()) {
+        await legacyPaginationCache.delete(recursive: true);
+      }
+    });
     final covers = Directory(path.join(root.path, 'cover-cache'));
     final avatars = Directory(path.join(root.path, 'avatar-cache'));
     final chapters = Directory(
       path.join(root.path, BookSourceChapterCache.directoryName),
     );
-    final nativeReader = Directory(
+    final nativeReaderEpub = Directory(
       path.join(root.path, AppCacheManager.nativeReaderDirectoryName),
+    );
+    final nativeReaderTxt = Directory(
+      path.join(support.path, AppCacheManager.nativeReaderDirectoryName),
     );
     final responses = Directory(
       path.join(root.path, BookSourceResponseCache.directoryName),
@@ -33,10 +46,12 @@ void main() {
       covers,
       avatars,
       chapters,
-      nativeReader,
+      nativeReaderEpub,
+      nativeReaderTxt,
       responses,
       updates,
       userDocuments,
+      legacyPaginationCache,
     ]) {
       await directory.create(recursive: true);
     }
@@ -47,14 +62,20 @@ void main() {
       path.join(chapters.path, 'chapter.json'),
     ).writeAsBytes(List.filled(7, 1));
     await File(
-      path.join(nativeReader.path, 'epub-index.json'),
+      path.join(nativeReaderEpub.path, 'epub-index.json'),
     ).writeAsBytes(List.filled(11, 1));
+    await File(
+      path.join(nativeReaderTxt.path, 'txt-chapters.json'),
+    ).writeAsBytes(List.filled(9, 1));
     await File(
       path.join(responses.path, 'response.json'),
     ).writeAsBytes(List.filled(3, 1));
     await File(
       path.join(updates.path, 'update.part'),
     ).writeAsBytes(List.filled(13, 1));
+    await File(
+      path.join(legacyPaginationCache.path, 'legacy.bin'),
+    ).writeAsBytes(List.filled(23, 1));
     final book = File(path.join(userDocuments.path, 'book.epub'));
     await book.writeAsBytes(List.filled(17, 1));
     var imageCacheClears = 0;
@@ -73,15 +94,18 @@ void main() {
       accountAvatarCache: avatarCache,
       sourceResponseCache: BookSourceResponseCache(cacheDirectory: responses),
       temporaryDirectory: root,
+      applicationSupportDirectory: support,
+      legacyPaginationCacheDirectory: () async => legacyPaginationCache,
       clearFlutterImageCache: () async => imageCacheClears++,
       imageCacheBytesReader: () => 19,
     );
 
     final usage = await manager.usage();
     expect(usage.bytesFor(AppCacheCategory.sourceCovers), 34);
-    expect(usage.bytesFor(AppCacheCategory.sourceData), 21);
+    expect(usage.bytesFor(AppCacheCategory.sourceData), 10);
+    expect(usage.bytesFor(AppCacheCategory.readingCache), 43);
     expect(usage.bytesFor(AppCacheCategory.temporaryFiles), 13);
-    expect(usage.totalBytes, 68);
+    expect(usage.totalBytes, 100);
 
     await manager.clear(AppCacheCategory.sourceCovers);
     expect(await covers.exists(), isFalse);
@@ -92,7 +116,9 @@ void main() {
 
     await manager.clearAll();
     expect(await chapters.exists(), isFalse);
-    expect(await nativeReader.exists(), isFalse);
+    expect(await nativeReaderEpub.exists(), isFalse);
+    expect(await nativeReaderTxt.exists(), isFalse);
+    expect(await legacyPaginationCache.exists(), isFalse);
     expect(await responses.exists(), isFalse);
     expect(await updates.exists(), isFalse);
     expect(await book.exists(), isTrue);

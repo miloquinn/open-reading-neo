@@ -380,6 +380,7 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
   };
   globalThis.book = __entity('book:', __payload.book || {});
   globalThis.chapter = __entity('chapter:', __payload.chapter || {});
+  globalThis.title = globalThis.chapter.title || '';
   globalThis.src = typeof result === 'string' ? result : '';
   globalThis.cookie = {
     getKey: (url, key) => __host('cookieGetKey', [String(url), String(key)]),

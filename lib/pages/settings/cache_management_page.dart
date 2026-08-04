@@ -134,6 +134,7 @@ class _CacheManagementPageState extends State<CacheManagementPage> {
   String _categoryTitle(AppCacheCategory category) => switch (category) {
     AppCacheCategory.sourceCovers => context.l10n.settingsCacheSourceCovers,
     AppCacheCategory.sourceData => context.l10n.settingsCacheSourceData,
+    AppCacheCategory.readingCache => context.l10n.settingsCacheReadingCache,
     AppCacheCategory.temporaryFiles => context.l10n.settingsCacheTemporaryFiles,
   };
 
@@ -146,6 +147,8 @@ class _CacheManagementPageState extends State<CacheManagementPage> {
         context.l10n.settingsCacheSourceCoversSubtitle(size),
       AppCacheCategory.sourceData =>
         context.l10n.settingsCacheSourceDataSubtitle(size),
+      AppCacheCategory.readingCache =>
+        context.l10n.settingsCacheReadingCacheSubtitle(size),
       AppCacheCategory.temporaryFiles =>
         context.l10n.settingsCacheTemporaryFilesSubtitle(size),
     };
@@ -154,6 +157,7 @@ class _CacheManagementPageState extends State<CacheManagementPage> {
   IconData _categoryIcon(AppCacheCategory category) => switch (category) {
     AppCacheCategory.sourceCovers => Icons.image_outlined,
     AppCacheCategory.sourceData => Icons.travel_explore_outlined,
+    AppCacheCategory.readingCache => Icons.auto_stories_outlined,
     AppCacheCategory.temporaryFiles => Icons.folder_delete_outlined,
   };
 
@@ -161,6 +165,7 @@ class _CacheManagementPageState extends State<CacheManagementPage> {
     scheme.primary,
     scheme.tertiary,
     scheme.secondary,
+    scheme.outline,
   ];
 
   @override
@@ -357,6 +362,7 @@ class _CacheUsageCard extends StatelessWidget {
       switch (category) {
         AppCacheCategory.sourceCovers => context.l10n.settingsCacheSourceCovers,
         AppCacheCategory.sourceData => context.l10n.settingsCacheSourceData,
+        AppCacheCategory.readingCache => context.l10n.settingsCacheReadingCache,
         AppCacheCategory.temporaryFiles =>
           context.l10n.settingsCacheTemporaryFiles,
       };

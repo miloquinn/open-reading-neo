@@ -233,6 +233,33 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesSearchSettingsTooltip => 'Search settings';
+
+  @override
+  String get bookSourcesSearchSettingsTitle => 'Search settings';
+
+  @override
+  String get bookSourcesSearchConcurrencyLabel => 'Concurrent requests';
+
+  @override
+  String get bookSourcesSearchTimeoutLabel => 'Per-source timeout (s)';
+
+  @override
+  String get bookSourcesSearchSourceLimitLabel => 'Source limit';
+
+  @override
+  String get bookSourcesSearchSourceLimitDescription =>
+      'When many sources are enabled, only this many (in list order) are searched at once, to limit network and battery use.';
+
+  @override
+  String bookSourcesSearchSourceLimitWarning(int enabledCount, int limit) {
+    return '$enabledCount sources are enabled, over the current limit of $limit. Sources beyond the limit won\'t be searched.';
+  }
+
+  @override
+  String get bookSourcesSearchResetDefaults => 'Reset to defaults';
+
+  @override
   String get bookSourcesSearchPrompt =>
       'Add and enable a source to search it here';
 
@@ -4624,6 +4651,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String settingsCacheSourceDataSubtitle(String size) {
     return 'Safely removable online chapter cache · $size';
+  }
+
+  @override
+  String get settingsCacheReadingCache => 'Local reading cache';
+
+  @override
+  String settingsCacheReadingCacheSubtitle(String size) {
+    return 'Rebuildable EPUB/TXT parsing cache · $size';
   }
 
   @override

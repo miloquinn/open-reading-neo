@@ -473,6 +473,54 @@ abstract class AppLocalizations {
   /// **'{count} source request(s) failed'**
   String bookSourcesFailedCount(int count);
 
+  /// No description provided for @bookSourcesSearchSettingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings'**
+  String get bookSourcesSearchSettingsTooltip;
+
+  /// No description provided for @bookSourcesSearchSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings'**
+  String get bookSourcesSearchSettingsTitle;
+
+  /// No description provided for @bookSourcesSearchConcurrencyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Concurrent requests'**
+  String get bookSourcesSearchConcurrencyLabel;
+
+  /// No description provided for @bookSourcesSearchTimeoutLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-source timeout (s)'**
+  String get bookSourcesSearchTimeoutLabel;
+
+  /// No description provided for @bookSourcesSearchSourceLimitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Source limit'**
+  String get bookSourcesSearchSourceLimitLabel;
+
+  /// No description provided for @bookSourcesSearchSourceLimitDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When many sources are enabled, only this many (in list order) are searched at once, to limit network and battery use.'**
+  String get bookSourcesSearchSourceLimitDescription;
+
+  /// No description provided for @bookSourcesSearchSourceLimitWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{enabledCount} sources are enabled, over the current limit of {limit}. Sources beyond the limit won\'t be searched.'**
+  String bookSourcesSearchSourceLimitWarning(int enabledCount, int limit);
+
+  /// No description provided for @bookSourcesSearchResetDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to defaults'**
+  String get bookSourcesSearchResetDefaults;
+
   /// No description provided for @bookSourcesSearchPrompt.
   ///
   /// In en, this message translates to:
@@ -8144,6 +8192,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Safely removable online chapter cache · {size}'**
   String settingsCacheSourceDataSubtitle(String size);
+
+  /// No description provided for @settingsCacheReadingCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Local reading cache'**
+  String get settingsCacheReadingCache;
+
+  /// No description provided for @settingsCacheReadingCacheSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rebuildable EPUB/TXT parsing cache · {size}'**
+  String settingsCacheReadingCacheSubtitle(String size);
 
   /// No description provided for @settingsCacheTemporaryFiles.
   ///

@@ -10,6 +10,7 @@ class _FakeCacheManager extends AppCacheManager {
     : _usage = const AppCacheUsage({
         AppCacheCategory.sourceCovers: 3 * 1024 * 1024,
         AppCacheCategory.sourceData: 5 * 1024 * 1024,
+        AppCacheCategory.readingCache: 4 * 1024 * 1024,
         AppCacheCategory.temporaryFiles: 2 * 1024 * 1024,
       });
 
@@ -35,6 +36,7 @@ class _FakeCacheManager extends AppCacheManager {
     _usage = const AppCacheUsage({
       AppCacheCategory.sourceCovers: 0,
       AppCacheCategory.sourceData: 0,
+      AppCacheCategory.readingCache: 0,
       AppCacheCategory.temporaryFiles: 0,
     });
   }
@@ -67,10 +69,14 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.byKey(const ValueKey('cache-category-readingCache')),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const ValueKey('cache-category-temporaryFiles')),
       findsOneWidget,
     );
-    expect(find.text('10.00 MB'), findsOneWidget);
+    expect(find.text('14.00 MB'), findsOneWidget);
     expect(find.byKey(const ValueKey('cache-clear-all')), findsOneWidget);
   });
 
@@ -85,7 +91,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(cacheManager.clearedCategories, [AppCacheCategory.sourceCovers]);
-    expect(find.text('7.00 MB'), findsOneWidget);
+    expect(find.text('11.00 MB'), findsOneWidget);
   });
 
   testWidgets('clears all safe cache categories from the bottom action', (

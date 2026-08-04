@@ -93,35 +93,45 @@ class MemberAccountController extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (_initialized || _loading) return;
-    await _run(() async {
-      await _restorePendingDeviceAuthorization();
-      unawaited(_initializeAuthCallbackBridge());
-      _summary = await _summaryCache.load();
-      if (_summary != null) notifyListeners();
-      final configs = await Future.wait<Object?>([
-        _api.authConfig(),
-        _api.membershipConfig(),
-      ]);
-      _authConfig = configs[0] as MemberAuthConfig;
-      _membershipConfig = configs[1] as MemberMembershipConfig;
-      try {
-        final session = await _api.restoreSession();
-        _acceptSession(session);
-        if (session.mfaRequired) {
+    try {
+      await _run(() async {
+        await _restorePendingDeviceAuthorization();
+        unawaited(_initializeAuthCallbackBridge());
+        _summary = await _summaryCache.load();
+        if (_summary != null) notifyListeners();
+        final configs = await Future.wait<Object?>([
+          _api.authConfig(),
+          _api.membershipConfig(),
+        ]);
+        _authConfig = configs[0] as MemberAuthConfig;
+        _membershipConfig = configs[1] as MemberMembershipConfig;
+        try {
+          final session = await _api.restoreSession();
+          _acceptSession(session);
+          if (session.mfaRequired) {
+            await _clearSummary();
+          } else {
+            await _loadAccountValues();
+            await _persistSummary();
+          }
+        } on MemberAccountException catch (error) {
+          if (error.statusCode != 401) rethrow;
+          _user = null;
+          _pendingSession = null;
+          _membership = null;
+          _mfaStatus = null;
           await _clearSummary();
-        } else {
-          await _loadAccountValues();
-          await _persistSummary();
         }
-      } on MemberAccountException catch (error) {
-        if (error.statusCode != 401) rethrow;
-        _user = null;
-        _pendingSession = null;
-        _membership = null;
-        _mfaStatus = null;
-        await _clearSummary();
-      }
-    }, markInitialized: true);
+      });
+      _initialized = true;
+    } catch (_) {
+      _user = null;
+      _pendingSession = null;
+      _membership = null;
+      _mfaStatus = null;
+      await _clearSummary();
+      rethrow;
+    }
   }
 
   Future<void> loginPassword(String email, String password) =>
@@ -591,10 +601,7 @@ class MemberAccountController extends ChangeNotifier {
     }
   }
 
-  Future<void> _run(
-    Future<void> Function() action, {
-    bool markInitialized = false,
-  }) async {
+  Future<void> _run(Future<void> Function() action) async {
     if (_loading) {
       throw const MemberAccountException('账号操作正在进行，请稍候');
     }
@@ -611,7 +618,6 @@ class MemberAccountController extends ChangeNotifier {
       _error = error.message;
       throw error;
     } finally {
-      if (markInitialized) _initialized = true;
       _loading = false;
       notifyListeners();
     }

@@ -219,6 +219,33 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesSearchSettingsTooltip => '搜索设置';
+
+  @override
+  String get bookSourcesSearchSettingsTitle => '搜索设置';
+
+  @override
+  String get bookSourcesSearchConcurrencyLabel => '并发请求数';
+
+  @override
+  String get bookSourcesSearchTimeoutLabel => '单源超时（秒）';
+
+  @override
+  String get bookSourcesSearchSourceLimitLabel => '书源数量上限';
+
+  @override
+  String get bookSourcesSearchSourceLimitDescription =>
+      '启用的书源较多时，只按书源列表顺序搜索前面这些数量，避免同时发起过多网络请求，明显消耗流量和设备资源。';
+
+  @override
+  String bookSourcesSearchSourceLimitWarning(int enabledCount, int limit) {
+    return '已启用 $enabledCount 个书源，超过当前上限 $limit，超出部分不会被搜索。';
+  }
+
+  @override
+  String get bookSourcesSearchResetDefaults => '恢复默认值';
+
+  @override
   String get bookSourcesSearchPrompt => '添加并启用书源后，即可在这里统一搜索';
 
   @override
@@ -4407,6 +4434,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsCacheReadingCache => '本地阅读缓存';
+
+  @override
+  String settingsCacheReadingCacheSubtitle(String size) {
+    return '解析本地 EPUB/TXT 生成的可重建缓存 · $size';
+  }
+
+  @override
   String get settingsCacheTemporaryFiles => '临时文件';
 
   @override
@@ -5388,6 +5423,33 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String bookSourcesFailedCount(int count) {
     return '$count 個書源請求失敗';
   }
+
+  @override
+  String get bookSourcesSearchSettingsTooltip => '搜尋設定';
+
+  @override
+  String get bookSourcesSearchSettingsTitle => '搜尋設定';
+
+  @override
+  String get bookSourcesSearchConcurrencyLabel => '並發請求數';
+
+  @override
+  String get bookSourcesSearchTimeoutLabel => '單源逾時（秒）';
+
+  @override
+  String get bookSourcesSearchSourceLimitLabel => '書源數量上限';
+
+  @override
+  String get bookSourcesSearchSourceLimitDescription =>
+      '啟用的書源較多時，只按書源列表順序搜尋前面這些數量，避免同時發出過多網路請求，明顯消耗流量與裝置資源。';
+
+  @override
+  String bookSourcesSearchSourceLimitWarning(int enabledCount, int limit) {
+    return '已啟用 $enabledCount 個書源，超過目前上限 $limit，超出的部分不會被搜尋。';
+  }
+
+  @override
+  String get bookSourcesSearchResetDefaults => '恢復預設值';
 
   @override
   String get bookSourcesSearchPrompt => '新增並啟用書源後，即可在這裡統一搜尋';
@@ -9535,6 +9597,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String settingsCacheSourceDataSubtitle(String size) {
     return '可安全刪除的線上章節快取 · $size';
+  }
+
+  @override
+  String get settingsCacheReadingCache => '本機閱讀快取';
+
+  @override
+  String settingsCacheReadingCacheSubtitle(String size) {
+    return '解析本機 EPUB/TXT 產生的可重建快取 · $size';
   }
 
   @override

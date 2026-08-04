@@ -186,6 +186,24 @@ void main() {
     expect(chapter['title'], 'Chapter');
   });
 
+  test('QuickJS exposes a bare title global matching chapter.title', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Legado-style source',
+      'bookSourceUrl': 'https://legado.test',
+    });
+    final chapter = <String, Object?>{'title': 'Chapter 12'};
+
+    expect(
+      evaluator.evaluate(
+        'title',
+        SourceScriptContext(source: source, chapter: chapter),
+      ),
+      'Chapter 12',
+    );
+  });
+
   test('setContent changes the default input for later DOM helpers', () {
     final evaluator = QuickJsSourceScriptEvaluator();
     addTearDown(evaluator.dispose);

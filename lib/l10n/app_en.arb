@@ -98,6 +98,24 @@
       }
     }
   },
+  "bookSourcesSearchSettingsTooltip": "Search settings",
+  "bookSourcesSearchSettingsTitle": "Search settings",
+  "bookSourcesSearchConcurrencyLabel": "Concurrent requests",
+  "bookSourcesSearchTimeoutLabel": "Per-source timeout (s)",
+  "bookSourcesSearchSourceLimitLabel": "Source limit",
+  "bookSourcesSearchSourceLimitDescription": "When many sources are enabled, only this many (in list order) are searched at once, to limit network and battery use.",
+  "bookSourcesSearchSourceLimitWarning": "{enabledCount} sources are enabled, over the current limit of {limit}. Sources beyond the limit won't be searched.",
+  "@bookSourcesSearchSourceLimitWarning": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesSearchResetDefaults": "Reset to defaults",
   "bookSourcesSearchPrompt": "Add and enable a source to search it here",
   "bookSourcesNoResults": "No matching books found",
   "bookSourcesNoSourcesTitle": "No sources yet",
@@ -4392,6 +4410,11 @@
   "settingsCacheSourceData": "Source chapter cache",
   "settingsCacheSourceDataSubtitle": "Safely removable online chapter cache · {size}",
   "@settingsCacheSourceDataSubtitle": {
+    "placeholders": {"size": {"type": "String"}}
+  },
+  "settingsCacheReadingCache": "Local reading cache",
+  "settingsCacheReadingCacheSubtitle": "Rebuildable EPUB/TXT parsing cache · {size}",
+  "@settingsCacheReadingCacheSubtitle": {
     "placeholders": {"size": {"type": "String"}}
   },
   "settingsCacheTemporaryFiles": "Temporary files",

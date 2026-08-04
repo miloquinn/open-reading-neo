@@ -8,8 +8,9 @@ import '../../book_sources/services/book_source_chapter_cache.dart';
 import '../../book_sources/services/book_source_response_cache.dart';
 import '../../book_sources/services/source_cover_cache.dart';
 import '../account/account_avatar_cache.dart';
+import 'database_service.dart';
 
-enum AppCacheCategory { sourceCovers, sourceData, temporaryFiles }
+enum AppCacheCategory { sourceCovers, sourceData, readingCache, temporaryFiles }
 
 class AppCacheUsage {
   const AppCacheUsage(this.bytesByCategory);
@@ -32,6 +33,8 @@ class AppCacheManager {
     AccountAvatarCache? accountAvatarCache,
     BookSourceResponseCache? sourceResponseCache,
     Directory? temporaryDirectory,
+    Directory? applicationSupportDirectory,
+    Future<Directory> Function()? legacyPaginationCacheDirectory,
     Future<void> Function()? clearFlutterImageCache,
     int Function()? imageCacheBytesReader,
   }) : _sourceCoverCache = sourceCoverCache ?? SourceCoverCache.instance,
@@ -39,6 +42,10 @@ class AppCacheManager {
        _sourceResponseCache =
            sourceResponseCache ?? BookSourceResponseCache.instance,
        _temporaryDirectory = temporaryDirectory,
+       _applicationSupportDirectory = applicationSupportDirectory,
+       _legacyPaginationCacheDirectory =
+           legacyPaginationCacheDirectory ??
+           _defaultLegacyPaginationCacheDirectory,
        _clearFlutterImageCache =
            clearFlutterImageCache ?? _defaultClearFlutterImageCache,
        _imageCacheBytesReader =
@@ -47,10 +54,17 @@ class AppCacheManager {
   static const String updateDirectoryName = 'updates';
   static const String nativeReaderDirectoryName = 'native_reader_cache';
 
+  /// Root of the retired per-book pagination cache. The service that wrote
+  /// here was removed, but installs upgraded from older versions may still
+  /// carry leftover per-book folders that nothing else surfaces or clears.
+  static const String paginationCacheDirectoryName = 'pagination_cache';
+
   final SourceCoverCache _sourceCoverCache;
   final AccountAvatarCache _accountAvatarCache;
   final BookSourceResponseCache _sourceResponseCache;
   final Directory? _temporaryDirectory;
+  final Directory? _applicationSupportDirectory;
+  final Future<Directory> Function() _legacyPaginationCacheDirectory;
   final Future<void> Function() _clearFlutterImageCache;
   final int Function() _imageCacheBytesReader;
 
@@ -84,6 +98,7 @@ class AppCacheManager {
         BookSourceChapterCache.clearMemory();
         await _sourceResponseCache.clear();
         break;
+      case AppCacheCategory.readingCache:
       case AppCacheCategory.temporaryFiles:
         break;
     }
@@ -101,11 +116,17 @@ class AppCacheManager {
 
   Future<Map<AppCacheCategory, List<Directory>>> _directories() async {
     final temp = _temporaryDirectory ?? await getTemporaryDirectory();
+    final support =
+        _applicationSupportDirectory ?? await getApplicationSupportDirectory();
     return {
       AppCacheCategory.sourceCovers: [await _sourceCoverCache.directory()],
       AppCacheCategory.sourceData: [
         Directory(path.join(temp.path, BookSourceChapterCache.directoryName)),
+      ],
+      AppCacheCategory.readingCache: [
         Directory(path.join(temp.path, nativeReaderDirectoryName)),
+        Directory(path.join(support.path, nativeReaderDirectoryName)),
+        await _legacyPaginationCacheDirectory(),
       ],
       AppCacheCategory.temporaryFiles: [
         Directory(path.join(temp.path, updateDirectoryName)),
@@ -140,6 +161,12 @@ class AppCacheManager {
 
   Future<void> _deleteDirectory(Directory directory) async {
     if (await directory.exists()) await directory.delete(recursive: true);
+  }
+
+  static Future<Directory> _defaultLegacyPaginationCacheDirectory() async {
+    final database = await DatabaseService().database;
+    final parent = Directory(database.path).parent;
+    return Directory(path.join(parent.path, paginationCacheDirectoryName));
   }
 
   static Future<void> _defaultClearFlutterImageCache() async {

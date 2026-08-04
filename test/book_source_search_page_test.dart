@@ -73,6 +73,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('search settings sheet persists the concurrency change', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 1000);
+    addTearDown(tester.view.reset);
+
+    final client = _PagingBookSourceClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SourceSearchPage(
+          sources: [_source()],
+          client: client,
+          shelfService: BookSourceShelfService(client: client),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bookSourceSearchSettingsButton')));
+    await tester.pumpAndSettle();
+
+    final concurrencySlider = find.byKey(
+      const Key('bookSourceSearchConcurrencySlider'),
+    );
+    expect(concurrencySlider, findsOneWidget);
+    expect(
+      find.byKey(const Key('bookSourceSearchSourceLimitSlider')),
+      findsOneWidget,
+    );
+
+    tester.widget<Slider>(concurrencySlider).onChanged!(4);
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('book_source_search_concurrency_v1'), 4);
+  });
+
   testWidgets('loads the next source page when search results reach the end', (
     tester,
   ) async {
@@ -225,6 +265,58 @@ void main() {
     expect(find.byType(ChoiceChip).evaluate().length, lessThan(20));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'caps concurrent search targets when enabled sources exceed the limit',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+
+      final sources = List.generate(
+        600,
+        (index) => _sourceWithId('cap-$index', 'Cap Source $index'),
+        growable: false,
+      );
+      final client = _ScopeTrackingClient();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SourceSearchPage(
+            sources: sources,
+            client: client,
+            shelfService: BookSourceShelfService(client: client),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Warning banner shows up front, before a search even runs.
+      expect(
+        find.byKey(const Key('bookSourceSearchLimitBanner')),
+        findsOneWidget,
+      );
+
+      final queryField = find.byKey(const Key('bookSourceQueryControl'));
+      await tester.enterText(queryField, 'test');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      // Once a search starts, the banner gives way to results/progress.
+      expect(
+        find.byKey(const Key('bookSourceSearchLimitBanner')),
+        findsNothing,
+      );
+
+      // Default limit is 300; only the first 300 sources (list order) run.
+      expect(client.searchedSourceIds.length, 300);
+      expect(client.searchedSourceIds, contains('cap-0'));
+      expect(client.searchedSourceIds, contains('cap-299'));
+      expect(client.searchedSourceIds, isNot(contains('cap-300')));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'all-source search uses bounded concurrency and streams results',

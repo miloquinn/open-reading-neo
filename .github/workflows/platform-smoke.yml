@@ -130,6 +130,9 @@ jobs:
       - name: Install locked dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Patch passkeys_darwin for Xcode 16
+        run: python3 tool/patch_passkeys_darwin.py
+
       - name: Generate localizations
         run: flutter gen-l10n
 

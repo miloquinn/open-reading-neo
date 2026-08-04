@@ -222,6 +222,33 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesSearchSettingsTooltip => '検索設定';
+
+  @override
+  String get bookSourcesSearchSettingsTitle => '検索設定';
+
+  @override
+  String get bookSourcesSearchConcurrencyLabel => '同時リクエスト数';
+
+  @override
+  String get bookSourcesSearchTimeoutLabel => 'ソースごとのタイムアウト（秒）';
+
+  @override
+  String get bookSourcesSearchSourceLimitLabel => '検索するソース数の上限';
+
+  @override
+  String get bookSourcesSearchSourceLimitDescription =>
+      '有効なソースが多い場合、リスト順で先頭からこの件数だけを検索し、通信量や端末負荷を抑えます。';
+
+  @override
+  String bookSourcesSearchSourceLimitWarning(int enabledCount, int limit) {
+    return '有効なソースは$enabledCount件あり、現在の上限$limit件を超えています。上限を超えた分は検索されません。';
+  }
+
+  @override
+  String get bookSourcesSearchResetDefaults => '既定値に戻す';
+
+  @override
   String get bookSourcesSearchPrompt => 'ソースを追加して有効化すると、ここでまとめて検索できます';
 
   @override
@@ -4454,6 +4481,14 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String settingsCacheSourceDataSubtitle(String size) {
     return '安全に削除できるオンライン章キャッシュ · $size';
+  }
+
+  @override
+  String get settingsCacheReadingCache => 'ローカル読書キャッシュ';
+
+  @override
+  String settingsCacheReadingCacheSubtitle(String size) {
+    return 'ローカルEPUB/TXTの解析で生成される再構築可能なキャッシュ · $size';
   }
 
   @override

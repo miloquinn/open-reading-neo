@@ -26,6 +26,7 @@
 
 | 开始时间（Asia/Shanghai） | 版本 | 基础构建号 | 平台/类型 | 状态 | 实际版本码 | 产物与验证 |
 | --- | --- | ---: | --- | --- | --- | --- |
+| 2026-08-04 18:41 | 2.5.2 | 260804010 | Android arm64-v8a release，Origo 签名；PKT110 真机测试包（含拉取 origin/main 后的书源交互登录/头像裁剪等新增改动） | 成功 | arm64-v8a `260806010` | `output/releases/v2.5.2/OpenReading-Android-arm64-v8a-2.5.2-260804010.apk`；包名 `com.niki.xxread`、versionName `2.5.2`；APK V2 签名与 Origo 证书身份（SHA-256 `52dbbe537026932720315fbffcab797ad4315347da0660ff357f6ca885e4d984`）通过；文件大小 `38812233` 字节，SHA-256 `C813FB2B56C169B44B391E9A3D50388A4F074C37C16AA6C7B0269A88143BEEDA`。首次构建因 Gradle wrapper 分发包下载不完整（`zip END header not found`）及后续 SSL 握手中断失败，清理损坏缓存后由 Flutter 自动重试下载成功。按用户要求未执行测试。已保留数据覆盖安装 PKT110（USB），设备回报 `2.5.2` / `260806010`，`MainActivity` 前台运行，启动后 logcat 无 FATAL/AndroidRuntime 异常。 |
 | 2026-08-04 11:56 | 2.5.2 | 260804009 | Android arm64-v8a release，Origo 签名；PKT110 快速更新包 | 成功 | arm64-v8a `260806009` | `output/releases/v2.5.2/OpenReading-Android-arm64-v8a-2.5.2-260804009.apk`；包名 `com.niki.xxread`、versionName `2.5.2`，APK V2 签名与 Origo 证书身份通过；文件大小 `37897728` 字节，SHA-256 `592867C67FD33EA7A724A8BE5D72DD41B0FEFCCE8015425F0508E678FE92904E`。按用户要求未执行测试；已保留数据覆盖安装 PKT110，设备回报 `2.5.2` / `260806009`，进程正常。 |
 | 2026-08-04 11:51 | 2.5.2 | 260804008 | Android arm64-v8a release，Origo 签名；PKT110 快速更新包 | 构建中 | 待确认 | `260804007` 构建期间源码继续变化；本编号直接构建当前工作区，不执行测试。 |
 | 2026-08-04 11:48 | 2.5.2 | 260804007 | Android arm64-v8a release，Origo 签名；PKT110 快速更新包 | 构建成功但源码继续变化，未安装 | arm64-v8a `260806007` | 构建期间账户、书源、通用二级页面及本地化文件继续变化，产物未安装，由 `260804008` 接替。按用户要求未执行测试。 |

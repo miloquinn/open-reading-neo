@@ -86,6 +86,24 @@
       }
     }
   },
+  "bookSourcesSearchSettingsTooltip": "搜尋設定",
+  "bookSourcesSearchSettingsTitle": "搜尋設定",
+  "bookSourcesSearchConcurrencyLabel": "並發請求數",
+  "bookSourcesSearchTimeoutLabel": "單源逾時（秒）",
+  "bookSourcesSearchSourceLimitLabel": "書源數量上限",
+  "bookSourcesSearchSourceLimitDescription": "啟用的書源較多時，只按書源列表順序搜尋前面這些數量，避免同時發出過多網路請求，明顯消耗流量與裝置資源。",
+  "bookSourcesSearchSourceLimitWarning": "已啟用 {enabledCount} 個書源，超過目前上限 {limit}，超出的部分不會被搜尋。",
+  "@bookSourcesSearchSourceLimitWarning": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesSearchResetDefaults": "恢復預設值",
   "bookSourcesSearchPrompt": "新增並啟用書源後，即可在這裡統一搜尋",
   "bookSourcesNoResults": "沒有找到符合的書籍",
   "bookSourcesNoSourcesTitle": "還沒有書源",
@@ -2007,6 +2025,8 @@
   "settingsCacheSourceCoversSubtitle": "已下載的書源封面 · {size}",
   "settingsCacheSourceData": "書源章節快取",
   "settingsCacheSourceDataSubtitle": "可安全刪除的線上章節快取 · {size}",
+  "settingsCacheReadingCache": "本機閱讀快取",
+  "settingsCacheReadingCacheSubtitle": "解析本機 EPUB/TXT 產生的可重建快取 · {size}",
   "settingsCacheTemporaryFiles": "暫存檔案",
   "settingsCacheTemporaryFilesSubtitle": "可丟棄的更新與暫存檔案 · {size}",
   "settingsCacheClearAll": "清除全部安全快取",

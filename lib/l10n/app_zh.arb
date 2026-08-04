@@ -98,6 +98,24 @@
       }
     }
   },
+  "bookSourcesSearchSettingsTooltip": "搜索设置",
+  "bookSourcesSearchSettingsTitle": "搜索设置",
+  "bookSourcesSearchConcurrencyLabel": "并发请求数",
+  "bookSourcesSearchTimeoutLabel": "单源超时（秒）",
+  "bookSourcesSearchSourceLimitLabel": "书源数量上限",
+  "bookSourcesSearchSourceLimitDescription": "启用的书源较多时，只按书源列表顺序搜索前面这些数量，避免同时发起过多网络请求，明显消耗流量和设备资源。",
+  "bookSourcesSearchSourceLimitWarning": "已启用 {enabledCount} 个书源，超过当前上限 {limit}，超出部分不会被搜索。",
+  "@bookSourcesSearchSourceLimitWarning": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesSearchResetDefaults": "恢复默认值",
   "bookSourcesSearchPrompt": "添加并启用书源后，即可在这里统一搜索",
   "bookSourcesNoResults": "没有找到匹配的书籍",
   "bookSourcesNoSourcesTitle": "还没有书源",
@@ -2278,6 +2296,8 @@
   "settingsCacheSourceCoversSubtitle": "已下载的书源封面 · {size}",
   "settingsCacheSourceData": "书源章节缓存",
   "settingsCacheSourceDataSubtitle": "可安全删除的在线章节缓存 · {size}",
+  "settingsCacheReadingCache": "本地阅读缓存",
+  "settingsCacheReadingCacheSubtitle": "解析本地 EPUB/TXT 生成的可重建缓存 · {size}",
   "settingsCacheTemporaryFiles": "临时文件",
   "settingsCacheTemporaryFilesSubtitle": "可丢弃的更新与临时文件 · {size}",
   "settingsCacheClearAll": "清理全部安全缓存",

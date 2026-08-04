@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import 'account_models.dart';
 import 'account_token_store.dart';
+import 'avatar_image_processor.dart';
 
 class MemberAccountException implements Exception {
   const MemberAccountException(
@@ -292,13 +293,16 @@ class MemberAccountApiClient {
     return MemberUser.fromJson(_map(json['user']), baseUri: baseUri);
   }
 
-  Future<MemberUser> uploadAvatar(String path) async {
-    final name = path.split(RegExp(r'[/\\]')).last;
+  Future<MemberUser> uploadAvatar(AvatarUploadData upload) async {
     final json = await _jsonRequest(
       'POST',
       '$authRoot/avatar',
       data: FormData.fromMap({
-        'avatar': await MultipartFile.fromFile(path, filename: name),
+        'avatar': MultipartFile.fromBytes(
+          upload.bytes,
+          filename: upload.filename,
+          contentType: DioMediaType.parse(upload.contentType),
+        ),
       }),
     );
     return MemberUser.fromJson(_map(json['user']), baseUri: baseUri);

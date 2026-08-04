@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'account_api_client.dart';
 import 'account_models.dart';
+import 'avatar_image_processor.dart';
 
 class MemberAccountController extends ChangeNotifier {
   MemberAccountController({MemberAccountApiClient? api})
@@ -216,8 +217,8 @@ class MemberAccountController extends ChangeNotifier {
         );
       });
 
-  Future<void> uploadAvatar(String path) => _run(() async {
-    _user = await _api.uploadAvatar(path);
+  Future<void> uploadAvatar(AvatarUploadData upload) => _run(() async {
+    _user = await _api.uploadAvatar(upload);
   });
 
   Future<void> deleteAvatar() => _run(() async {

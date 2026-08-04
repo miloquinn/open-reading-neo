@@ -51,13 +51,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.byType(AccountPage), findsOneWidget);
+    expect(find.text('邮箱'), findsOneWidget);
+    expect(find.text('下一步'), findsOneWidget);
+    expect(find.text('没有账号？注册'), findsOneWidget);
+    expect(find.text('忘记密码'), findsOneWidget);
+    expect(find.text('使用邮箱验证码登录'), findsNothing);
     expect(find.text('使用 GitHub'), findsOneWidget);
     expect(find.text('使用 Passkey'), findsOneWidget);
     expect(find.text('使用 Google'), findsOneWidget);
-    expect(find.text('登录'), findsWidgets);
-    expect(find.text('注册'), findsOneWidget);
-    expect(find.text('验证码'), findsOneWidget);
-    expect(find.text('找回'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'reader@example.com');
+    await tester.tap(find.byKey(const ValueKey('account-email-continue')));
+    await tester.pump();
+
+    expect(find.text('使用密码登录'), findsOneWidget);
+    expect(find.text('使用邮箱验证码登录'), findsOneWidget);
+    expect(find.text('reader@example.com'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-change-email')), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pump();
     expect(find.text('当前所有功能免费'), findsOneWidget);

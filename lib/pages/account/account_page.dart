@@ -10,7 +10,7 @@ import '../../services/account/account.dart';
 import '../../utils/localization_extension.dart';
 import '../../widgets/side_toast.dart';
 
-enum _AccountMode { login, register, code, reset }
+enum _AccountMode { email, password, register, code, reset }
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -20,6 +20,7 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
+  static const _avatarProcessor = AvatarImageProcessor();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
@@ -34,7 +35,7 @@ class _AccountPageState extends State<AccountPage> {
   final _securityConfirmPassword = TextEditingController();
   final _securityPasswordCode = TextEditingController();
   final _mfaCode = TextEditingController();
-  _AccountMode _mode = _AccountMode.login;
+  _AccountMode _mode = _AccountMode.email;
   MemberEmailChallenge? _challenge;
   DeviceAuthorization? _deviceAuthorization;
   bool _polling = false;
@@ -98,11 +99,32 @@ class _AccountPageState extends State<AccountPage> {
     showSideToast(context, error.toString(), kind: SideToastKind.error);
   }
 
+  void _switchMode(_AccountMode mode) {
+    setState(() {
+      _mode = mode;
+      _challenge = null;
+      _code.clear();
+      _password.clear();
+      _confirmPassword.clear();
+    });
+  }
+
+  void _continueWithEmail() {
+    if (_email.text.trim().isEmpty) {
+      _showError(MemberAccountException(context.l10n.accountEmailRequired));
+      return;
+    }
+    _switchMode(_AccountMode.password);
+  }
+
   Future<void> _submit() async {
     final account = context.read<MemberAccountController>();
     try {
       switch (_mode) {
-        case _AccountMode.login:
+        case _AccountMode.email:
+          _continueWithEmail();
+          return;
+        case _AccountMode.password:
           await account.loginPassword(_email.text, _password.text);
         case _AccountMode.code:
           final challenge = _challenge;
@@ -379,11 +401,13 @@ class _AccountPageState extends State<AccountPage> {
     final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
+      withData: true,
     );
-    final path = result?.files.single.path;
-    if (path == null) return;
+    final bytes = result?.files.single.bytes;
+    if (bytes == null) return;
     try {
-      await account.uploadAvatar(path);
+      final upload = await _avatarProcessor.compress(bytes);
+      await account.uploadAvatar(upload);
     } catch (error) {
       _showError(error);
     }
@@ -426,6 +450,8 @@ class _AccountPageState extends State<AccountPage> {
   List<Widget> _buildSignedOut(MemberAccountController account) => [
     _AccountIntroCard(),
     const SizedBox(height: 16),
+    _formCard(account),
+    const SizedBox(height: 16),
     _ExternalLoginCard(
       account: account,
       polling: _polling,
@@ -433,8 +459,6 @@ class _AccountPageState extends State<AccountPage> {
       onLogin: _externalLogin,
       onCancel: () => setState(() => _polling = false),
     ),
-    const SizedBox(height: 16),
-    _formCard(account),
     const SizedBox(height: 16),
     _SupportCard(account: account),
   ];
@@ -555,44 +579,113 @@ class _AccountPageState extends State<AccountPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SegmentedButton<_AccountMode>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: _AccountMode.login,
-                label: Text(l10n.accountLoginTab),
+          if (_mode == _AccountMode.email) ...[
+            Text(
+              l10n.accountLoginTab,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              l10n.accountEmailFirstHint,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              ButtonSegment(
-                value: _AccountMode.register,
-                label: Text(l10n.accountRegisterTab),
+            ),
+            const SizedBox(height: 18),
+            _field(
+              _email,
+              l10n.accountEmail,
+              Icons.mail_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              key: const ValueKey('account-email-continue'),
+              onPressed: account.loading ? null : _continueWithEmail,
+              child: Text(l10n.accountContinue),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  key: const ValueKey('account-open-register'),
+                  onPressed: account.loading
+                      ? null
+                      : () => _switchMode(_AccountMode.register),
+                  child: Text(l10n.accountNoAccount),
+                ),
+                TextButton(
+                  key: const ValueKey('account-open-reset'),
+                  onPressed: account.loading
+                      ? null
+                      : () => _switchMode(_AccountMode.reset),
+                  child: Text(l10n.accountForgotPassword),
+                ),
+              ],
+            ),
+          ] else ...[
+            InkWell(
+              key: const ValueKey('account-change-email'),
+              borderRadius: BorderRadius.circular(14),
+              onTap: account.loading
+                  ? null
+                  : () => _switchMode(_AccountMode.email),
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.52),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.mail_outline_rounded,
+                      size: 19,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _email.text.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      l10n.accountChangeEmail,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              ButtonSegment(
-                value: _AccountMode.code,
-                label: Text(l10n.accountCodeTab),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              _modeTitle(),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              _modeHint(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              ButtonSegment(
-                value: _AccountMode.reset,
-                label: Text(l10n.accountResetTab),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: account.loading
-                ? null
-                : (value) => setState(() {
-                    _mode = value.first;
-                    _challenge = null;
-                    _code.clear();
-                  }),
-          ),
-          const SizedBox(height: 18),
-          _field(
-            _email,
-            l10n.accountEmail,
-            Icons.mail_outline_rounded,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          if (_mode == _AccountMode.register) ...[
-            const SizedBox(height: 12),
+            ),
+          ],
+          if (_mode == _AccountMode.register && _challenge != null) ...[
+            const SizedBox(height: 18),
             _field(
               _username,
               l10n.accountUsername,
@@ -615,14 +708,17 @@ class _AccountPageState extends State<AccountPage> {
               keyboardType: TextInputType.number,
             ),
           ],
-          if (_mode != _AccountMode.code) ...[
+          if (_mode == _AccountMode.password ||
+              (_challenge != null &&
+                  (_mode == _AccountMode.register ||
+                      _mode == _AccountMode.reset))) ...[
             const SizedBox(height: 12),
             _field(
               _password,
               l10n.accountPassword,
               Icons.lock_outline_rounded,
               obscure: _obscurePassword,
-              helper: _mode == _AccountMode.login
+              helper: _mode == _AccountMode.password
                   ? null
                   : l10n.accountPasswordLengthHint,
               suffix: IconButton(
@@ -636,8 +732,9 @@ class _AccountPageState extends State<AccountPage> {
               ),
             ),
           ],
-          if (_mode == _AccountMode.register ||
-              _mode == _AccountMode.reset) ...[
+          if (_challenge != null &&
+              (_mode == _AccountMode.register ||
+                  _mode == _AccountMode.reset)) ...[
             const SizedBox(height: 12),
             _field(
               _confirmPassword,
@@ -646,28 +743,88 @@ class _AccountPageState extends State<AccountPage> {
               obscure: _obscurePassword,
             ),
           ],
-          const SizedBox(height: 18),
-          FilledButton(
-            onPressed: account.loading ? null : _submit,
-            child: account.loading
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(_submitLabel()),
-          ),
+          if (_mode != _AccountMode.email) ...[
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: account.loading ? null : _submit,
+              child: account.loading
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_submitLabel()),
+            ),
+            if (_mode == _AccountMode.password) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('account-use-email-code'),
+                onPressed: account.loading
+                    ? null
+                    : () => _switchMode(_AccountMode.code),
+                icon: const Icon(Icons.mark_email_read_outlined, size: 19),
+                label: Text(l10n.accountUseEmailCode),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: account.loading
+                        ? null
+                        : () => _switchMode(_AccountMode.register),
+                    child: Text(l10n.accountNoAccount),
+                  ),
+                  TextButton(
+                    onPressed: account.loading
+                        ? null
+                        : () => _switchMode(_AccountMode.reset),
+                    child: Text(l10n.accountForgotPassword),
+                  ),
+                ],
+              ),
+            ] else
+              TextButton(
+                onPressed: account.loading
+                    ? null
+                    : () => _switchMode(_AccountMode.password),
+                child: Text(
+                  _mode == _AccountMode.register
+                      ? l10n.accountHaveAccount
+                      : l10n.accountBackToPassword,
+                ),
+              ),
+          ],
         ],
       ),
     );
   }
 
+  String _modeTitle() => switch (_mode) {
+    _AccountMode.email => context.l10n.accountLoginTab,
+    _AccountMode.password => context.l10n.accountPasswordLoginTitle,
+    _AccountMode.register => context.l10n.accountRegisterTab,
+    _AccountMode.code => context.l10n.accountCodeTab,
+    _AccountMode.reset => context.l10n.accountResetTab,
+  };
+
+  String _modeHint() => switch (_mode) {
+    _AccountMode.email => context.l10n.accountEmailFirstHint,
+    _AccountMode.password => context.l10n.accountPasswordLoginHint,
+    _AccountMode.register => context.l10n.accountRegisterHint,
+    _AccountMode.code => context.l10n.accountCodeLoginHint,
+    _AccountMode.reset => context.l10n.accountResetHint,
+  };
+
   String _submitLabel() {
     final l10n = context.l10n;
-    if (_challenge == null && _mode != _AccountMode.login) {
+    if (_challenge == null &&
+        _mode != _AccountMode.email &&
+        _mode != _AccountMode.password) {
       return l10n.accountSendCode;
     }
     return switch (_mode) {
-      _AccountMode.login => l10n.accountSignIn,
+      _AccountMode.email => l10n.accountContinue,
+      _AccountMode.password => l10n.accountSignIn,
       _AccountMode.register => l10n.accountCreate,
       _AccountMode.code => l10n.accountSignIn,
       _AccountMode.reset => l10n.accountResetPassword,

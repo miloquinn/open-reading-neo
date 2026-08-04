@@ -4339,6 +4339,90 @@ abstract class AppLocalizations {
   /// **'Email'**
   String get accountEmail;
 
+  /// Validation shown when the email-first step is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address'**
+  String get accountEmailRequired;
+
+  /// Email-first sign-in introduction
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email to continue. Password sign-in is the default.'**
+  String get accountEmailFirstHint;
+
+  /// Continue from the email-first step
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get accountContinue;
+
+  /// Password sign-in step title
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with password'**
+  String get accountPasswordLoginTitle;
+
+  /// Password sign-in step explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password or use an email code instead.'**
+  String get accountPasswordLoginHint;
+
+  /// Switch from password to email code sign-in
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with an email code'**
+  String get accountUseEmailCode;
+
+  /// Open account registration
+  ///
+  /// In en, this message translates to:
+  /// **'No account? Register'**
+  String get accountNoAccount;
+
+  /// Open password recovery
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password'**
+  String get accountForgotPassword;
+
+  /// Return from registration to sign in
+  ///
+  /// In en, this message translates to:
+  /// **'Already registered? Return to sign in'**
+  String get accountHaveAccount;
+
+  /// Return to password sign-in
+  ///
+  /// In en, this message translates to:
+  /// **'Back to password sign-in'**
+  String get accountBackToPassword;
+
+  /// Change the email selected for sign-in
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get accountChangeEmail;
+
+  /// Registration step explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email, then create an account and password.'**
+  String get accountRegisterHint;
+
+  /// Email code sign-in explanation
+  ///
+  /// In en, this message translates to:
+  /// **'We will send a code to the selected email.'**
+  String get accountCodeLoginHint;
+
+  /// Password recovery explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email, then choose a new password.'**
+  String get accountResetHint;
+
   /// Account password field
   ///
   /// In en, this message translates to:

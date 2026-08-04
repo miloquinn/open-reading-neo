@@ -2316,6 +2316,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountEmail => '邮箱';
 
   @override
+  String get accountEmailRequired => '请输入邮箱地址';
+
+  @override
+  String get accountEmailFirstHint => '输入邮箱后继续，默认使用密码登录。';
+
+  @override
+  String get accountContinue => '下一步';
+
+  @override
+  String get accountPasswordLoginTitle => '使用密码登录';
+
+  @override
+  String get accountPasswordLoginHint => '输入密码，或改用邮箱验证码登录。';
+
+  @override
+  String get accountUseEmailCode => '使用邮箱验证码登录';
+
+  @override
+  String get accountNoAccount => '没有账号？注册';
+
+  @override
+  String get accountForgotPassword => '忘记密码';
+
+  @override
+  String get accountHaveAccount => '已有账号？返回登录';
+
+  @override
+  String get accountBackToPassword => '返回密码登录';
+
+  @override
+  String get accountChangeEmail => '更换';
+
+  @override
+  String get accountRegisterHint => '验证邮箱后创建账号并设置密码。';
+
+  @override
+  String get accountCodeLoginHint => '验证码将发送到当前邮箱。';
+
+  @override
+  String get accountResetHint => '验证邮箱后设置一个新密码。';
+
+  @override
   String get accountPassword => '密码';
 
   @override
@@ -7074,6 +7116,48 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountEmail => '電子郵件';
+
+  @override
+  String get accountEmailRequired => '請輸入電子郵件地址';
+
+  @override
+  String get accountEmailFirstHint => '輸入電子郵件後繼續，預設使用密碼登入。';
+
+  @override
+  String get accountContinue => '下一步';
+
+  @override
+  String get accountPasswordLoginTitle => '使用密碼登入';
+
+  @override
+  String get accountPasswordLoginHint => '輸入密碼，或改用電子郵件驗證碼登入。';
+
+  @override
+  String get accountUseEmailCode => '使用電子郵件驗證碼登入';
+
+  @override
+  String get accountNoAccount => '沒有帳號？註冊';
+
+  @override
+  String get accountForgotPassword => '忘記密碼';
+
+  @override
+  String get accountHaveAccount => '已有帳號？返回登入';
+
+  @override
+  String get accountBackToPassword => '返回密碼登入';
+
+  @override
+  String get accountChangeEmail => '更換';
+
+  @override
+  String get accountRegisterHint => '驗證電子郵件後建立帳號並設定密碼。';
+
+  @override
+  String get accountCodeLoginHint => '驗證碼將傳送到目前的電子郵件。';
+
+  @override
+  String get accountResetHint => '驗證電子郵件後設定新密碼。';
 
   @override
   String get accountPassword => '密碼';

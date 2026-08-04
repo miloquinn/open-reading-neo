@@ -2333,6 +2333,48 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountEmail => 'メール';
 
   @override
+  String get accountEmailRequired => 'メールアドレスを入力してください';
+
+  @override
+  String get accountEmailFirstHint => 'メールアドレスを入力して続行します。通常はパスワードでログインします。';
+
+  @override
+  String get accountContinue => '次へ';
+
+  @override
+  String get accountPasswordLoginTitle => 'パスワードでログイン';
+
+  @override
+  String get accountPasswordLoginHint => 'パスワードを入力するか、メールコードを使用します。';
+
+  @override
+  String get accountUseEmailCode => 'メールコードでログイン';
+
+  @override
+  String get accountNoAccount => 'アカウントがない場合は登録';
+
+  @override
+  String get accountForgotPassword => 'パスワードを忘れた場合';
+
+  @override
+  String get accountHaveAccount => '登録済みの場合はログインに戻る';
+
+  @override
+  String get accountBackToPassword => 'パスワードログインに戻る';
+
+  @override
+  String get accountChangeEmail => '変更';
+
+  @override
+  String get accountRegisterHint => 'メールを確認してアカウントとパスワードを作成します。';
+
+  @override
+  String get accountCodeLoginHint => '現在のメールアドレスに確認コードを送信します。';
+
+  @override
+  String get accountResetHint => 'メールを確認して新しいパスワードを設定します。';
+
+  @override
   String get accountPassword => 'パスワード';
 
   @override

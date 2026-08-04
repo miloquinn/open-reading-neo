@@ -2420,6 +2420,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountEmail => 'Email';
 
   @override
+  String get accountEmailRequired => 'Enter your email address';
+
+  @override
+  String get accountEmailFirstHint =>
+      'Enter your email to continue. Password sign-in is the default.';
+
+  @override
+  String get accountContinue => 'Continue';
+
+  @override
+  String get accountPasswordLoginTitle => 'Sign in with password';
+
+  @override
+  String get accountPasswordLoginHint =>
+      'Enter your password or use an email code instead.';
+
+  @override
+  String get accountUseEmailCode => 'Sign in with an email code';
+
+  @override
+  String get accountNoAccount => 'No account? Register';
+
+  @override
+  String get accountForgotPassword => 'Forgot password';
+
+  @override
+  String get accountHaveAccount => 'Already registered? Return to sign in';
+
+  @override
+  String get accountBackToPassword => 'Back to password sign-in';
+
+  @override
+  String get accountChangeEmail => 'Change';
+
+  @override
+  String get accountRegisterHint =>
+      'Verify your email, then create an account and password.';
+
+  @override
+  String get accountCodeLoginHint =>
+      'We will send a code to the selected email.';
+
+  @override
+  String get accountResetHint =>
+      'Verify your email, then choose a new password.';
+
+  @override
   String get accountPassword => 'Password';
 
   @override

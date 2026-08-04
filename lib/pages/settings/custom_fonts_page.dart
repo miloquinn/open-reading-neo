@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:xxread/services/core/core_services.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 enum _CustomFontAction { app, reader, both, rename, delete }
@@ -20,58 +20,50 @@ class CustomFontsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.customFonts),
-        actions: [
-          Consumer<AppSettingsNotifier>(
-            builder: (context, settings, _) => IconButton(
-              tooltip: l10n.importFont,
-              onPressed: settings.customFontImportSupported
-                  ? () => unawaited(_importFont(context, settings))
-                  : null,
-              icon: const Icon(Icons.add_rounded),
-            ),
+    return FloatingSubpageScaffold(
+      title: l10n.customFonts,
+      actions: [
+        Consumer<AppSettingsNotifier>(
+          builder: (context, settings, _) => FloatingSubpageAction(
+            tooltip: l10n.importFont,
+            onPressed: settings.customFontImportSupported
+                ? () => unawaited(_importFont(context, settings))
+                : null,
+            icon: Icons.add_rounded,
           ),
-        ],
-      ),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
         ),
-        child: Consumer<AppSettingsNotifier>(
-          builder: (context, settings, _) {
-            final fonts = settings.customFonts;
-            if (fonts.isEmpty) {
-              return _EmptyFontLibrary(
-                importSupported: settings.customFontImportSupported,
-                onImport: () => unawaited(_importFont(context, settings)),
-              );
-            }
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              children: [
-                Text(
-                  l10n.customFontsLocalOnly,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                for (final font in fonts)
-                  _CustomFontCard(
-                    font: font,
-                    appInUse: settings.isAppFont(font.id),
-                    readerInUse: settings.isReaderFont(font.id),
-                    onAction: (action) => unawaited(
-                      _handleAction(context, settings, font, action),
-                    ),
-                  ),
-              ],
+      ],
+      body: Consumer<AppSettingsNotifier>(
+        builder: (context, settings, _) {
+          final fonts = settings.customFonts;
+          if (fonts.isEmpty) {
+            return _EmptyFontLibrary(
+              importSupported: settings.customFontImportSupported,
+              onImport: () => unawaited(_importFont(context, settings)),
             );
-          },
-        ),
+          }
+          return ListView(
+            padding: floatingSubpagePadding(context),
+            children: [
+              Text(
+                l10n.customFontsLocalOnly,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              for (final font in fonts)
+                _CustomFontCard(
+                  font: font,
+                  appInUse: settings.isAppFont(font.id),
+                  readerInUse: settings.isReaderFont(font.id),
+                  onAction: (action) =>
+                      unawaited(_handleAction(context, settings, font, action)),
+                ),
+            ],
+          );
+        },
       ),
       floatingActionButton: Consumer<AppSettingsNotifier>(
         builder: (context, settings, _) => FloatingActionButton.extended(

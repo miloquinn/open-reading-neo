@@ -5,6 +5,7 @@ import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 import 'webdav_setup_page.dart';
 import 'book_file_sync_page.dart';
@@ -17,78 +18,70 @@ class WebDavSyncPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sync = context.watch<WebDavSyncController>();
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.webDavPageTitle)),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 820;
-              final sections = <Widget>[
-                _StatusCard(sync: sync),
-                _AutomaticSyncCard(sync: sync),
-                _ScopeCard(sync: sync),
-                _BookFilesCard(sync: sync),
-                _ConnectionCard(sync: sync),
-                _SecurityCard(),
-              ];
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-                children: [
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1080),
-                      child: wide
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 4,
-                                  child: Column(
-                                    children: [
-                                      sections[0],
-                                      const SizedBox(height: 16),
-                                      sections[5],
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  flex: 6,
-                                  child: Column(
-                                    children: [
-                                      sections[1],
-                                      const SizedBox(height: 16),
-                                      sections[2],
-                                      const SizedBox(height: 16),
-                                      sections[3],
-                                      const SizedBox(height: 16),
-                                      sections[4],
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              children: [
-                                for (var i = 0; i < sections.length; i++) ...[
-                                  sections[i],
-                                  if (i != sections.length - 1)
-                                    const SizedBox(height: 16),
+    return FloatingSubpageScaffold(
+      title: context.l10n.webDavPageTitle,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 820;
+          final sections = <Widget>[
+            _StatusCard(sync: sync),
+            _AutomaticSyncCard(sync: sync),
+            _ScopeCard(sync: sync),
+            _BookFilesCard(sync: sync),
+            _ConnectionCard(sync: sync),
+            _SecurityCard(),
+          ];
+          return ListView(
+            padding: floatingSubpagePadding(context, top: 20, bottom: 40),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1080),
+                  child: wide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: Column(
+                                children: [
+                                  sections[0],
+                                  const SizedBox(height: 16),
+                                  sections[5],
                                 ],
-                              ],
+                              ),
                             ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              flex: 6,
+                              child: Column(
+                                children: [
+                                  sections[1],
+                                  const SizedBox(height: 16),
+                                  sections[2],
+                                  const SizedBox(height: 16),
+                                  sections[3],
+                                  const SizedBox(height: 16),
+                                  sections[4],
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            for (var i = 0; i < sections.length; i++) ...[
+                              sections[i],
+                              if (i != sections.length - 1)
+                                const SizedBox(height: 16),
+                            ],
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

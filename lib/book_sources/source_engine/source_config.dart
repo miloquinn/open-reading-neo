@@ -35,12 +35,9 @@ class ReadingSourceConfig {
         'Reading source requires bookSourceUrl and bookSourceName.',
       );
     }
-    final uri = Uri.tryParse(_string(raw['bookSourceUrl']).split('#').first);
-    if (uri == null ||
-        !uri.hasAuthority ||
-        (uri.scheme != 'http' && uri.scheme != 'https')) {
+    if (_sourceBaseUri(raw) == null) {
       throw const FormatException(
-        'Reading source bookSourceUrl must be an absolute HTTP(S) URL.',
+        'Reading source must expose an absolute HTTP(S) request target.',
       );
     }
     return ReadingSourceConfig._(raw);
@@ -52,16 +49,18 @@ class ReadingSourceConfig {
   String get name => _string(raw['bookSourceName']);
   String get group => _string(raw['bookSourceGroup']);
   String get comment => _string(raw['bookSourceComment']);
+  String get jsLib => _string(raw['jsLib']);
   int get type => _integer(raw['bookSourceType']);
   String get searchUrl => _string(raw['searchUrl']);
   String get exploreUrl => _string(raw['exploreUrl']);
+  String get loginCheckJs => _string(raw['loginCheckJs']);
   bool get enabledExplore => raw['enabledExplore'] != false;
   bool get enabled => raw['enabled'] != false;
   bool get enabledCookieJar => raw['enabledCookieJar'] == true;
   int get lastUpdateTime => _integer(raw['lastUpdateTime']);
   int get respondTime => _integer(raw['respondTime']);
 
-  Uri get baseUri => Uri.parse(url.split('#').first);
+  Uri get baseUri => _sourceBaseUri(raw)!;
 
   SourceExploreCatalog get exploreCatalog => parseSourceExploreCatalog(raw);
 
@@ -365,3 +364,38 @@ int _integer(Object? value) => switch (value) {
   String text => int.tryParse(text) ?? 0,
   _ => 0,
 };
+
+Uri? _sourceBaseUri(Map<String, dynamic> raw) {
+  final declared = Uri.tryParse(_string(raw['bookSourceUrl']).split('#').first);
+  if (declared != null &&
+      declared.hasAuthority &&
+      (declared.scheme == 'http' || declared.scheme == 'https')) {
+    return declared;
+  }
+  final serialized = <String>[
+    for (final key in const [
+      'searchUrl',
+      'exploreUrl',
+      'jsLib',
+      'header',
+      'loginUrl',
+      'loginUi',
+      'loginCheckJs',
+      'ruleSearch',
+      'ruleExplore',
+      'ruleBookInfo',
+      'ruleToc',
+      'ruleContent',
+    ])
+      if (raw[key] != null) '${raw[key]}',
+  ].join('\n');
+  final match = RegExp(r'''https?://[^\s"'<>`\\]+''').firstMatch(serialized);
+  if (match == null) return null;
+  final candidate = Uri.tryParse(match.group(0)!);
+  if (candidate == null || !candidate.hasAuthority) return null;
+  return Uri(
+    scheme: candidate.scheme,
+    host: candidate.host,
+    port: candidate.hasPort ? candidate.port : null,
+  );
+}

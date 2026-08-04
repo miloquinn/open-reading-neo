@@ -1,4 +1,4 @@
-﻿// 文件说明：AI 对话历史页，从 AI 页左上角进入；点选会话返回并继续对话。
+// 文件说明：AI 对话历史页，从 AI 页左上角进入；点选会话返回并继续对话。
 // 技术要点：AiChatHistoryStore 监听、Dismissible 删除、Navigator 结果回传。
 
 import 'dart:async';
@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 String _formatSessionTime(BuildContext context, DateTime time) {
   final locale = Localizations.localeOf(context).toString();
@@ -57,42 +57,35 @@ class _AiHistoryPageState extends State<AiHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.aiHistoryTitle),
-        actions: [
-          IconButton(
-            key: const ValueKey('ai-history-clear-all'),
-            tooltip: l10n.aiHistoryClearAll,
-            onPressed: () => unawaited(_confirmClearAll()),
-            icon: const Icon(Icons.delete_sweep_outlined),
-          ),
-        ],
-      ),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
+    return FloatingSubpageScaffold(
+      title: l10n.aiHistoryTitle,
+      actions: [
+        FloatingSubpageAction(
+          key: const ValueKey('ai-history-clear-all'),
+          tooltip: l10n.aiHistoryClearAll,
+          onPressed: () => unawaited(_confirmClearAll()),
+          icon: Icons.delete_sweep_outlined,
         ),
-        child: ListenableBuilder(
-          listenable: _store,
-          builder: (context, _) {
-            final sessions = _store.sessions;
-            if (sessions.isEmpty) {
-              return _buildEmptyState(context);
-            }
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-                  itemCount: sessions.length,
-                  itemBuilder: (context, index) =>
-                      _buildSessionTile(context, sessions[index]),
-                ),
+      ],
+      body: ListenableBuilder(
+        listenable: _store,
+        builder: (context, _) {
+          final sessions = _store.sessions;
+          if (sessions.isEmpty) {
+            return _buildEmptyState(context);
+          }
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: ListView.builder(
+                padding: floatingSubpagePadding(context, top: 14, bottom: 28),
+                itemCount: sessions.length,
+                itemBuilder: (context, index) =>
+                    _buildSessionTile(context, sessions[index]),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

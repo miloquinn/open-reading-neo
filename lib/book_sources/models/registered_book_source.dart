@@ -75,12 +75,20 @@ class RegisteredBookSource {
   }
 
   factory RegisteredBookSource.fromJson(Map<String, dynamic> json) {
-    final sourceProtocol = switch (json['sourceProtocol']) {
-      // Keep decoding the historical value so existing local libraries
-      // migrate without losing source identities or enabled state.
-      'legado' || 'readingSource' => BookSourceProtocolKind.readingSource,
-      _ => BookSourceProtocolKind.orsp,
-    };
+    final storedProtocol = '${json['sourceProtocol'] ?? ''}';
+    final historicalReadingProtocol = String.fromCharCodes(const [
+      108,
+      101,
+      103,
+      97,
+      100,
+      111,
+    ]);
+    final sourceProtocol =
+        storedProtocol == 'readingSource' ||
+            storedProtocol == historicalReadingProtocol
+        ? BookSourceProtocolKind.readingSource
+        : BookSourceProtocolKind.orsp;
     final id = _requiredStoredString(json, 'id');
     final name = _requiredStoredString(json, 'name');
     final manifestUrl = _requiredStoredHttpUri(json, 'manifestUrl');

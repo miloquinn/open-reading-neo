@@ -1,12 +1,9 @@
 // 文件说明：移动端首页顶部栏组件，承载品牌展示与顶部操作入口。
 // 技术要点：Flutter UI、渲染层。
 
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
-import 'package:xxread/utils/glass_config.dart';
-import 'package:xxread/utils/ui_style.dart';
+import 'package:xxread/widgets/glass_top_bar.dart';
 
 import '../home_mobile_chrome.dart';
 
@@ -32,73 +29,14 @@ class HomeMobileTopBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final metrics = HomeMobileChromeScope.of(context);
-    final isMaterial3Style =
-        Theme.of(
-          context,
-        ).extension<UiStyleThemeExtension>()?.isMaterial3Style ??
-        false;
-    final useBlur = !isMaterial3Style && !GlassEffectConfig.shouldDisableBlur;
-    final content = Container(
-      height: metrics.topBarHeight,
-      decoration: BoxDecoration(
-        color: isMaterial3Style
-            ? scheme.surfaceContainerHigh
-            : GlassEffectConfig.chromeSurfaceColor(context),
-        border: Border(
-          bottom: BorderSide(
-            color: (isMaterial3Style ? scheme.outline : scheme.primary)
-                .withValues(
-                  alpha: isMaterial3Style
-                      ? 0.24
-                      : (scheme.brightness == Brightness.light ? 0.08 : 0.12),
-                ),
-            width: isMaterial3Style ? 0.7 : 0.5,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          horizontalPadding,
-          metrics.systemTopInset + 8,
-          horizontalPadding,
-          8,
-        ),
-        child: Row(
-          children: [
-            if (leading != null) ...[leading!, const SizedBox(width: 8)],
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: titleFontSize,
-                  fontWeight: titleFontWeight,
-                  color: scheme.onSurface,
-                  height: 1.0,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            ?trailing,
-          ],
-        ),
-      ),
-    );
-
-    return ClipRRect(
-      child: useBlur
-          ? BackdropFilter(
-              enabled: useBlur,
-              filter: ImageFilter.blur(
-                sigmaX: GlassEffectConfig.appBarBlur,
-                sigmaY: GlassEffectConfig.appBarBlur,
-              ),
-              child: content,
-            )
-          : content,
-    );
-  }
+  Widget build(BuildContext context) => GlassTopBar(
+    title: title,
+    leading: leading,
+    trailing: trailing,
+    systemTopInset: HomeMobileChromeScope.of(context).systemTopInset,
+    contentHeight: HomeMobileChromeScope.of(context).topBarContentHeight,
+    titleFontSize: titleFontSize,
+    titleFontWeight: titleFontWeight,
+    horizontalPadding: horizontalPadding,
+  );
 }

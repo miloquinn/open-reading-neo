@@ -879,6 +879,102 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get bookSourcesClose;
 
+  /// No description provided for @sourceLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source sign-in'**
+  String get sourceLoginTitle;
+
+  /// No description provided for @sourceLoginSecureStorageNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in details stay in this device\'s secure system storage.'**
+  String get sourceLoginSecureStorageNotice;
+
+  /// No description provided for @sourceLoginNoForm.
+  ///
+  /// In en, this message translates to:
+  /// **'This source does not provide a sign-in form. Browser-based sign-in is not available yet.'**
+  String get sourceLoginNoForm;
+
+  /// No description provided for @sourceLoginSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in and save session'**
+  String get sourceLoginSave;
+
+  /// No description provided for @sourceLoginClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear sign-in session'**
+  String get sourceLoginClear;
+
+  /// No description provided for @sourceLoginSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Source sign-in session updated'**
+  String get sourceLoginSaved;
+
+  /// No description provided for @sourceLoginCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Source sign-in session cleared'**
+  String get sourceLoginCleared;
+
+  /// No description provided for @sourceLoginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the source sign-in session: {details}'**
+  String sourceLoginFailed(String details);
+
+  /// No description provided for @sourceVerificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source verification'**
+  String get sourceVerificationTitle;
+
+  /// No description provided for @sourceVerificationBrowserHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete the site check in the secure browser, then choose Verification complete. The page address and cookies return only to this source task.'**
+  String get sourceVerificationBrowserHint;
+
+  /// No description provided for @sourceVerificationCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the image and enter its code to continue this source task.'**
+  String get sourceVerificationCodeHint;
+
+  /// No description provided for @sourceVerificationCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Image code'**
+  String get sourceVerificationCodeLabel;
+
+  /// No description provided for @sourceVerificationSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get sourceVerificationSubmit;
+
+  /// No description provided for @sourceVerificationRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Open browser again'**
+  String get sourceVerificationRetry;
+
+  /// No description provided for @sourceVerificationCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel verification'**
+  String get sourceVerificationCancel;
+
+  /// No description provided for @sourceVerificationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open source verification: {details}'**
+  String sourceVerificationFailed(String details);
+
   /// Settings tab label
   ///
   /// In en, this message translates to:
@@ -4282,7 +4378,7 @@ abstract class AppLocalizations {
   /// Guest account card subtitle in settings
   ///
   /// In en, this message translates to:
-  /// **'Keep your account and supporter status together.'**
+  /// **'Sync your profile and security settings.'**
   String get settingsAccountGuestSubtitle;
 
   /// Action that opens the account center
@@ -4303,16 +4399,22 @@ abstract class AppLocalizations {
   /// **'Account'**
   String get accountPageTitle;
 
+  /// Signed-out account introduction card title
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountIntroTitle;
+
   /// Member account page subtitle
   ///
   /// In en, this message translates to:
-  /// **'Profile, sign-in methods, and supporter status.'**
+  /// **'Sign in to sync your profile and account settings.'**
   String get accountPageSubtitle;
 
   /// Password sign-in tab
   ///
   /// In en, this message translates to:
-  /// **'Sign in'**
+  /// **'Email sign in'**
   String get accountLoginTab;
 
   /// Account registration tab
@@ -4480,7 +4582,7 @@ abstract class AppLocalizations {
   /// GitHub account login
   ///
   /// In en, this message translates to:
-  /// **'Continue with GitHub'**
+  /// **'GitHub sign in'**
   String get accountUseGithub;
 
   /// Google account login
@@ -4494,6 +4596,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue with Passkey'**
   String get accountUsePasskey;
+
+  /// Expand less prominent account login providers
+  ///
+  /// In en, this message translates to:
+  /// **'More sign-in methods'**
+  String get accountMoreSignInMethods;
 
   /// External device authorization explanation
   ///
@@ -7593,6 +7701,114 @@ abstract class AppLocalizations {
   /// **'Terms version {version}'**
   String agreementV2VersionLabel(String version);
 
+  /// First onboarding flow step label
+  ///
+  /// In en, this message translates to:
+  /// **'Introduction'**
+  String get agreementFlowStepIntroduction;
+
+  /// Terms onboarding flow step label
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get agreementFlowStepTerms;
+
+  /// Privacy onboarding flow step label
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get agreementFlowStepPrivacy;
+
+  /// Button that advances the agreement onboarding flow
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get agreementFlowNext;
+
+  /// Button that goes back in the agreement onboarding flow
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get agreementFlowBack;
+
+  /// Terms step heading
+  ///
+  /// In en, this message translates to:
+  /// **'Use OpenReading with clear boundaries'**
+  String get agreementFlowTermsTitle;
+
+  /// Terms step supporting text
+  ///
+  /// In en, this message translates to:
+  /// **'Review the terms and the boundary for content and third-party sources.'**
+  String get agreementFlowTermsSubtitle;
+
+  /// Terms-only consent checkbox label
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and agree to the Terms of Use.'**
+  String get agreementFlowTermsConsent;
+
+  /// Privacy step heading
+  ///
+  /// In en, this message translates to:
+  /// **'Your data stays under your control'**
+  String get agreementFlowPrivacyTitle;
+
+  /// Privacy step supporting text
+  ///
+  /// In en, this message translates to:
+  /// **'Review what remains local, when network requests happen, and how download records are retained.'**
+  String get agreementFlowPrivacySubtitle;
+
+  /// Privacy-only consent checkbox label
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and agree to the Privacy Notice.'**
+  String get agreementFlowPrivacyConsent;
+
+  /// Final onboarding button that enters the app
+  ///
+  /// In en, this message translates to:
+  /// **'Enter OpenReading'**
+  String get agreementFlowEnterApp;
+
+  /// Privacy summary card title for local storage
+  ///
+  /// In en, this message translates to:
+  /// **'Local by default'**
+  String get agreementFlowPrivacyLocalTitle;
+
+  /// Privacy summary card body for local storage
+  ///
+  /// In en, this message translates to:
+  /// **'Books, progress, notes, and settings normally remain on this device.'**
+  String get agreementFlowPrivacyLocalBody;
+
+  /// Privacy summary card title for network access
+  ///
+  /// In en, this message translates to:
+  /// **'Network use is explicit'**
+  String get agreementFlowPrivacyNetworkTitle;
+
+  /// Privacy summary card body for network access
+  ///
+  /// In en, this message translates to:
+  /// **'Local reading does not upload book text. Update checks contact GitHub and the official site; sources, AI, and sync connect only when their features are used.'**
+  String get agreementFlowPrivacyNetworkBody;
+
+  /// Privacy summary card title for retention
+  ///
+  /// In en, this message translates to:
+  /// **'Limited download records'**
+  String get agreementFlowPrivacyRetentionTitle;
+
+  /// Privacy summary card body for retention
+  ///
+  /// In en, this message translates to:
+  /// **'Official-site download records containing a raw IP are kept for no more than 30 days, then deleted.'**
+  String get agreementFlowPrivacyRetentionBody;
+
   /// User agreement V2 panel title
   ///
   /// In en, this message translates to:
@@ -8769,11 +8985,41 @@ abstract class AppLocalizations {
   /// **'Security'**
   String get accountSecurityTitle;
 
+  /// No description provided for @accountSecurityLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading security status…'**
+  String get accountSecurityLoading;
+
   /// No description provided for @accountChangeEmailTitle.
   ///
   /// In en, this message translates to:
   /// **'Change email'**
   String get accountChangeEmailTitle;
+
+  /// No description provided for @accountChangeEmailEnterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new email'**
+  String get accountChangeEmailEnterTitle;
+
+  /// No description provided for @accountChangeEmailEnterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'We will send one code to your current email and one to the new address.'**
+  String get accountChangeEmailEnterHint;
+
+  /// No description provided for @accountChangeEmailVerifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify both email addresses'**
+  String get accountChangeEmailVerifyTitle;
+
+  /// No description provided for @accountChangeEmailVerifyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the two codes to finish changing your sign-in email.'**
+  String get accountChangeEmailVerifyHint;
 
   /// No description provided for @accountCurrentEmail.
   ///
@@ -8823,6 +9069,30 @@ abstract class AppLocalizations {
   /// **'Set or change password'**
   String get accountChangePasswordTitle;
 
+  /// No description provided for @accountPasswordEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify by email'**
+  String get accountPasswordEmailTitle;
+
+  /// No description provided for @accountPasswordEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a code to your current email before choosing a new password.'**
+  String get accountPasswordEmailHint;
+
+  /// No description provided for @accountPasswordNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new password'**
+  String get accountPasswordNewTitle;
+
+  /// No description provided for @accountPasswordNewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the email code and set the password you will use next time.'**
+  String get accountPasswordNewHint;
+
   /// No description provided for @accountNewPassword.
   ///
   /// In en, this message translates to:
@@ -8864,6 +9134,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off by default. Enable it to protect password and email-code sign-ins.'**
   String get accountMfaDisabledByDefault;
+
+  /// No description provided for @accountMfaOnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-factor authentication is on'**
+  String get accountMfaOnTitle;
+
+  /// No description provided for @accountMfaEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email first'**
+  String get accountMfaEmailTitle;
+
+  /// No description provided for @accountMfaEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'We will send a setup code to {email}.'**
+  String accountMfaEmailHint(String email);
+
+  /// No description provided for @accountMfaEmailCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the email code'**
+  String get accountMfaEmailCodeTitle;
+
+  /// No description provided for @accountMfaEmailCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After verification, the authenticator QR code and secret will open on the next page.'**
+  String get accountMfaEmailCodeHint;
+
+  /// No description provided for @accountMfaAuthenticatorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Open Reading to your authenticator'**
+  String get accountMfaAuthenticatorTitle;
+
+  /// No description provided for @accountMfaAuthenticatorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code or enter the secret manually, then enter the six-digit code from the authenticator.'**
+  String get accountMfaAuthenticatorHint;
+
+  /// No description provided for @accountMfaQrCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator setup QR code'**
+  String get accountMfaQrCodeLabel;
+
+  /// No description provided for @accountMfaSecretLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup secret'**
+  String get accountMfaSecretLabel;
+
+  /// No description provided for @accountMfaSecretCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup secret copied'**
+  String get accountMfaSecretCopied;
+
+  /// No description provided for @accountMfaRecoveryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your recovery codes'**
+  String get accountMfaRecoveryTitle;
 
   /// No description provided for @accountMfaChallengeTitle.
   ///
@@ -8960,6 +9296,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I saved these codes'**
   String get accountRecoveryCodesSaved;
+
+  /// No description provided for @accountPremiumLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime Premium unlocked'**
+  String get accountPremiumLifetime;
+
+  /// No description provided for @accountPremiumLifetimeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium is linked to this account and syncs across supported platforms.'**
+  String get accountPremiumLifetimeSubtitle;
+
+  /// No description provided for @accountRedemptionCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime Premium code'**
+  String get accountRedemptionCode;
+
+  /// No description provided for @accountRedeemPremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem and unlock forever'**
+  String get accountRedeemPremium;
+
+  /// No description provided for @accountApplePurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock forever with App Store'**
+  String get accountApplePurchase;
+
+  /// No description provided for @accountApplePurchaseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.'**
+  String get accountApplePurchaseHint;
+
+  /// No description provided for @accountAppleRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore purchases'**
+  String get accountAppleRestore;
+
+  /// No description provided for @accountApplePurchasePending.
+  ///
+  /// In en, this message translates to:
+  /// **'The purchase is waiting for App Store approval'**
+  String get accountApplePurchasePending;
+
+  /// No description provided for @accountApplePurchaseSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase submitted; verifying Premium access'**
+  String get accountApplePurchaseSubmitted;
+
+  /// No description provided for @accountAppleRestoreSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase restoration requested'**
+  String get accountAppleRestoreSubmitted;
+
+  /// No description provided for @accountPremiumUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime Premium unlocked'**
+  String get accountPremiumUnlocked;
+
+  /// No description provided for @accountPremiumUnlockedReferral.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeemed: you and your inviter both unlocked Lifetime Premium'**
+  String get accountPremiumUnlockedReferral;
+
+  /// No description provided for @accountInviteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite friends'**
+  String get accountInviteTitle;
+
+  /// No description provided for @accountInviteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When a friend binds your code and redeems a Lifetime Premium code, both of you unlock Premium forever.'**
+  String get accountInviteSubtitle;
+
+  /// No description provided for @accountInviteMyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'My invite code'**
+  String get accountInviteMyCode;
+
+  /// No description provided for @accountInviteCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invite code'**
+  String get accountInviteCopyCode;
+
+  /// No description provided for @accountInviteCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invite link'**
+  String get accountInviteCopyLink;
+
+  /// No description provided for @accountInviteShareAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invite link to share'**
+  String get accountInviteShareAction;
+
+  /// No description provided for @accountInviteCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite details copied'**
+  String get accountInviteCopied;
+
+  /// No description provided for @accountInviteStats.
+  ///
+  /// In en, this message translates to:
+  /// **'{invited} invited · {rewarded} successful'**
+  String accountInviteStats(int invited, int rewarded);
+
+  /// No description provided for @accountInviteStatsInvited.
+  ///
+  /// In en, this message translates to:
+  /// **'Codes bound'**
+  String get accountInviteStatsInvited;
+
+  /// No description provided for @accountInviteStatsRewarded.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards unlocked'**
+  String get accountInviteStatsRewarded;
+
+  /// No description provided for @accountInviterBound.
+  ///
+  /// In en, this message translates to:
+  /// **'Invited by {name}'**
+  String accountInviterBound(String name);
+
+  /// No description provided for @accountInviteRewarded.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite completed'**
+  String get accountInviteRewarded;
+
+  /// No description provided for @accountInviteWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for code redemption'**
+  String get accountInviteWaiting;
+
+  /// No description provided for @accountInviteBindLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Friend\'s invite code'**
+  String get accountInviteBindLabel;
+
+  /// No description provided for @accountInviteBindHint.
+  ///
+  /// In en, this message translates to:
+  /// **'An account can bind once and cannot change it later'**
+  String get accountInviteBindHint;
+
+  /// No description provided for @accountInviteBindAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind invite code'**
+  String get accountInviteBindAction;
+
+  /// No description provided for @accountInviteBound.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code bound'**
+  String get accountInviteBound;
+
+  /// No description provided for @accountInviteHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get accountInviteHowItWorks;
+
+  /// No description provided for @accountInviteStepShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share the link'**
+  String get accountInviteStepShareTitle;
+
+  /// No description provided for @accountInviteStepShareBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the link or code to a friend. They open it and create an account.'**
+  String get accountInviteStepShareBody;
+
+  /// No description provided for @accountInviteStepBindTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind the code'**
+  String get accountInviteStepBindTitle;
+
+  /// No description provided for @accountInviteStepBindBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your friend enters your code in Account. Each account can bind once.'**
+  String get accountInviteStepBindBody;
+
+  /// No description provided for @accountInviteStepRedeemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem a code'**
+  String get accountInviteStepRedeemTitle;
+
+  /// No description provided for @accountInviteStepRedeemBody.
+  ///
+  /// In en, this message translates to:
+  /// **'When they redeem a Lifetime Premium code, both accounts unlock Premium immediately.'**
+  String get accountInviteStepRedeemBody;
+
+  /// No description provided for @accountInviteMyBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'My invite relationship'**
+  String get accountInviteMyBinding;
+
+  /// No description provided for @accountInviteBindIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'If someone invited you, bind their code here to keep the reward attached to your account.'**
+  String get accountInviteBindIntro;
+
+  /// No description provided for @accountInviteBindingNotNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'This account already has Premium, so no invite code is needed.'**
+  String get accountInviteBindingNotNeeded;
 }
 
 class _AppLocalizationsDelegate

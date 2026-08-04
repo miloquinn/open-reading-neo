@@ -322,6 +322,32 @@ class MemberAccountApiClient {
         ),
       );
 
+  Future<MemberReferral> referral() async => MemberReferral.fromJson(
+    await _jsonRequest('GET', '$membershipRoot/referral'),
+  );
+
+  Future<MemberReferral> bindReferral(String code) async =>
+      MemberReferral.fromJson(
+        await _jsonRequest(
+          'POST',
+          '$membershipRoot/referral/bind',
+          data: {'code': code.trim()},
+        ),
+      );
+
+  Future<MemberMembership> submitApplePurchase({
+    required String productId,
+    required String verificationData,
+    String? purchaseId,
+    String? transactionDate,
+  }) async => MemberMembership.fromJson(
+    await _jsonRequest(
+      'POST',
+      '$membershipRoot/apple/purchase',
+      data: {'signed_transaction_info': verificationData},
+    ),
+  );
+
   Future<void> logout() async {
     try {
       final token = await _tokenStore.readAccessToken();

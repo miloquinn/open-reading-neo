@@ -11,6 +11,7 @@ import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/ai/book_preprocess_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 class AiSettingsPage extends StatefulWidget {
@@ -183,37 +184,32 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = PageStyleHelper.palette(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.settingsAiAssistantTitle)),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: !_aiSettingsLoaded
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                children: [
-                  Text(
-                    l10n.settingsAiQuickCardSubtitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
+    return FloatingSubpageScaffold(
+      title: l10n.settingsAiAssistantTitle,
+      body: !_aiSettingsLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: floatingSubpagePadding(context),
+              children: [
+                Text(
+                  l10n.settingsAiQuickCardSubtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
                   ),
-                  const SizedBox(height: 16),
-                  _buildCard(
-                    palette,
-                    children: [
-                      for (final item in _aiQuickModels) _buildAiModelRow(item),
-                      _buildAddAiModelRow(),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildCard(palette, children: [_buildPreprocessSwitch()]),
-                ],
-              ),
-      ),
+                ),
+                const SizedBox(height: 16),
+                _buildCard(
+                  palette,
+                  children: [
+                    for (final item in _aiQuickModels) _buildAiModelRow(item),
+                    _buildAddAiModelRow(),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildCard(palette, children: [_buildPreprocessSwitch()]),
+              ],
+            ),
     );
   }
 

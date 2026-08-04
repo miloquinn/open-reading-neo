@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../book_sources/services/source_cover_cache.dart';
@@ -10,6 +11,7 @@ class SourceCoverImage extends StatefulWidget {
     required this.url,
     required this.fallback,
     this.cache,
+    this.headers = const {},
     this.width,
     this.height,
     this.fit = BoxFit.cover,
@@ -21,6 +23,7 @@ class SourceCoverImage extends StatefulWidget {
   final Uri url;
   final Widget fallback;
   final SourceCoverCache? cache;
+  final Map<String, String> headers;
   final double? width;
   final double? height;
   final BoxFit fit;
@@ -42,16 +45,18 @@ class _SourceCoverImageState extends State<SourceCoverImage> {
   @override
   void initState() {
     super.initState();
-    _bytes = _cache.load(widget.url);
+    _bytes = _cache.load(widget.url, headers: widget.headers);
   }
 
   @override
   void didUpdateWidget(covariant SourceCoverImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url || oldWidget.cache != widget.cache) {
+    if (oldWidget.url != widget.url ||
+        oldWidget.cache != widget.cache ||
+        !mapEquals(oldWidget.headers, widget.headers)) {
       _decodeRetryCount = 0;
       _decodeRetryScheduled = false;
-      _bytes = _cache.load(widget.url);
+      _bytes = _cache.load(widget.url, headers: widget.headers);
     }
   }
 
@@ -62,11 +67,11 @@ class _SourceCoverImageState extends State<SourceCoverImage> {
       if (!mounted) return;
       _decodeRetryCount++;
       try {
-        await _cache.evict(widget.url);
+        await _cache.evict(widget.url, headers: widget.headers);
         if (!mounted) return;
         setState(() {
           _decodeRetryScheduled = false;
-          _bytes = _cache.load(widget.url);
+          _bytes = _cache.load(widget.url, headers: widget.headers);
         });
       } catch (_) {
         _decodeRetryScheduled = false;

@@ -81,6 +81,27 @@ void main() {
     expect(nested.sourceUrls, hasLength(2));
   });
 
+  test(
+    'keeps identifier-based sources when their rules expose a web target',
+    () {
+      final parsed = parseReadingSources(
+        jsonEncode([
+          {
+            ..._source(url: 'Source identity only'),
+            'searchUrl': 'https://mirror.example/search?q={{key}}',
+          },
+        ]),
+      );
+
+      expect(parsed.errors, isEmpty);
+      expect(parsed.sources.single.url, 'Source identity only');
+      expect(
+        parsed.sources.single.baseUri,
+        Uri.parse('https://mirror.example'),
+      );
+    },
+  );
+
   test('preflight distinguishes runnable and blocked sources', () {
     const scanner = SourceCompatibilityScanner();
     final supported = scanner.scan(ReadingSourceConfig.fromJson(_source()));

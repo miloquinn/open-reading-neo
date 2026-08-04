@@ -1381,6 +1381,7 @@ class _LibraryPageState extends State<LibraryPage> {
     if (sourceCover != null) {
       return SourceCoverImage(
         url: sourceCover,
+        headers: _sourceCoverHeaders(book),
         fit: LayoutHelper.bookCoverFit,
         cacheWidth: (64 * MediaQuery.of(context).devicePixelRatio).round(),
         fallback: _buildListDefaultCover(context, book),
@@ -2727,6 +2728,7 @@ Widget _gridCoverArt(BuildContext context, Book book) {
   if (sourceCover != null) {
     return SourceCoverImage(
       url: sourceCover,
+      headers: _sourceCoverHeaders(book),
       width: double.infinity,
       height: double.infinity,
       fit: LayoutHelper.bookCoverFit,
@@ -2753,6 +2755,23 @@ Uri? _sourceCoverUrl(Book book) {
     return value is String && value.isNotEmpty ? Uri.tryParse(value) : null;
   } catch (_) {
     return null;
+  }
+}
+
+Map<String, String> _sourceCoverHeaders(Book book) {
+  final raw = book.sourceBookJson;
+  if (raw == null || raw.isEmpty) return const {};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return const {};
+    final headers = decoded['coverHeaders'];
+    if (headers is! Map) return const {};
+    return {
+      for (final entry in headers.entries)
+        '${entry.key}': '${entry.value ?? ''}',
+    };
+  } catch (_) {
+    return const {};
   }
 }
 

@@ -27,6 +27,7 @@ class MainActivity : FlutterActivity() {
     private var backgroundDownloadBridge: BackgroundDownloadBridge? = null
     private var readerAloudBridge: ReaderAloudBridge? = null
     private var sourceWebViewBridge: SourceWebViewBridge? = null
+    private var sourceInteractiveBrowserBridge: SourceInteractiveBrowserBridge? = null
     @Volatile private var volumePagingEnabled: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,7 +109,7 @@ class MainActivity : FlutterActivity() {
             this,
             flutterEngine.dartExecutor.binaryMessenger,
         ).also { bridge ->
-            bridge.handleIntent(intent)
+            if (!isAuthCallback(intent)) bridge.handleIntent(intent)
         }
         appUpdateBridge = AppUpdateBridge(
             this,
@@ -126,6 +127,10 @@ class MainActivity : FlutterActivity() {
             this,
             flutterEngine.dartExecutor.binaryMessenger,
         )
+        sourceInteractiveBrowserBridge = SourceInteractiveBrowserBridge(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
 
     }
 
@@ -135,6 +140,9 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (sourceInteractiveBrowserBridge?.onActivityResult(requestCode, resultCode, data) == true) {
+            return
+        }
         if (safDirectoryBridge?.onActivityResult(requestCode, resultCode, data) == true) {
             return
         }
@@ -162,7 +170,15 @@ class MainActivity : FlutterActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         backgroundDownloadBridge?.onNewIntent(intent)
-        incomingBookIntentBridge?.handleIntent(intent)
+        if (!isAuthCallback(intent)) incomingBookIntentBridge?.handleIntent(intent)
+    }
+
+    private fun isAuthCallback(intent: Intent?): Boolean {
+        val uri = intent?.data ?: return false
+        return intent.action == Intent.ACTION_VIEW &&
+            uri.scheme.equals("xxread", ignoreCase = true) &&
+            uri.host.equals("auth", ignoreCase = true) &&
+            uri.path == "/device"
     }
 
     override fun onDestroy() {
@@ -174,6 +190,8 @@ class MainActivity : FlutterActivity() {
         readerAloudBridge = null
         sourceWebViewBridge?.dispose()
         sourceWebViewBridge = null
+        sourceInteractiveBrowserBridge?.dispose()
+        sourceInteractiveBrowserBridge = null
         super.onDestroy()
     }
 

@@ -1,14 +1,43 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'account_api_client.dart';
+import 'account_avatar_cache.dart';
 import 'account_models.dart';
+import 'account_summary_cache.dart';
+import 'apple_purchase_service.dart';
 import 'avatar_image_processor.dart';
 
 class MemberAccountController extends ChangeNotifier {
-  MemberAccountController({MemberAccountApiClient? api})
-    : _api = api ?? MemberAccountApiClient();
+  MemberAccountController({
+    MemberAccountApiClient? api,
+    AccountAvatarCache? avatarCache,
+    MemberAccountSummaryCache? summaryCache,
+  }) : _api = api ?? MemberAccountApiClient(),
+       _avatarCache = avatarCache ?? AccountAvatarCache.instance,
+       _summaryCache = summaryCache ?? const MemberAccountSummaryCache() {
+    _applePurchase = ApplePremiumPurchaseService(
+      productId: appleProductId,
+      verify: (purchase) => _api.submitApplePurchase(
+        productId: purchase.productID,
+        verificationData: purchase.verificationData.serverVerificationData,
+      ),
+      onMembership: (membership) {
+        _membership = membership;
+        _updateSummaryFromAccount();
+        unawaited(_persistSummary());
+        notifyListeners();
+      },
+    );
+  }
+
+  static const appleProductId = 'com.niki.xxread.premium.lifetime';
 
   final MemberAccountApiClient _api;
+  final AccountAvatarCache _avatarCache;
+  final MemberAccountSummaryCache _summaryCache;
+  late final ApplePremiumPurchaseService _applePurchase;
 
   bool _initialized = false;
   bool _loading = false;
@@ -17,6 +46,8 @@ class MemberAccountController extends ChangeNotifier {
   MemberAuthConfig? _authConfig;
   MemberMembershipConfig? _membershipConfig;
   MemberMembership? _membership;
+  MemberAccountSummary? _summary;
+  MemberReferral? _referral;
   MemberMfaStatus? _mfaStatus;
   String? _error;
 
@@ -31,8 +62,11 @@ class MemberAccountController extends ChangeNotifier {
       _authConfig?.providers ?? const MemberAuthProviders();
   MemberMembershipConfig? get membershipConfig => _membershipConfig;
   MemberMembership? get membership => _membership;
+  MemberAccountSummary? get summary => _summary;
+  MemberReferral? get referral => _referral;
   MemberMfaStatus? get mfaStatus => _mfaStatus;
   String? get error => _error;
+  ApplePremiumPurchaseService get applePurchase => _applePurchase;
 
   void clearError() {
     if (_error == null) return;
@@ -43,6 +77,8 @@ class MemberAccountController extends ChangeNotifier {
   Future<void> initialize() async {
     if (_initialized || _loading) return;
     await _run(() async {
+      _summary = await _summaryCache.load();
+      if (_summary != null) notifyListeners();
       final configs = await Future.wait<Object?>([
         _api.authConfig(),
         _api.membershipConfig(),
@@ -52,13 +88,19 @@ class MemberAccountController extends ChangeNotifier {
       try {
         final session = await _api.restoreSession();
         _acceptSession(session);
-        if (!session.mfaRequired) await _loadMembershipValue();
+        if (session.mfaRequired) {
+          await _clearSummary();
+        } else {
+          await _loadAccountValues();
+          await _persistSummary();
+        }
       } on MemberAccountException catch (error) {
         if (error.statusCode != 401) rethrow;
         _user = null;
         _pendingSession = null;
         _membership = null;
         _mfaStatus = null;
+        await _clearSummary();
       }
     }, markInitialized: true);
   }
@@ -133,6 +175,7 @@ class MemberAccountController extends ChangeNotifier {
       newCode: newCode,
     );
     _acceptAuthenticatedSession(session);
+    await _persistSummary();
   });
 
   Future<MemberEmailChallenge> requestPasswordChangeCode() =>
@@ -149,6 +192,7 @@ class MemberAccountController extends ChangeNotifier {
       password: password,
     );
     _acceptAuthenticatedSession(session);
+    await _persistSummary();
   });
 
   Future<void> loadMfaStatus() => _run(() async {
@@ -188,7 +232,8 @@ class MemberAccountController extends ChangeNotifier {
       pendingAccessToken: pending.accessToken,
     );
     _acceptAuthenticatedSession(session);
-    await _loadMembershipValue();
+    await _loadAccountValues();
+    await _persistSummary();
   });
 
   Future<DeviceAuthorization> beginExternalLogin(
@@ -203,7 +248,12 @@ class MemberAccountController extends ChangeNotifier {
       final session = await _api.pollDeviceAuthorization(authorization);
       if (session == null) return;
       _acceptSession(session);
-      if (!session.mfaRequired) await _loadMembershipValue();
+      if (session.mfaRequired) {
+        await _clearSummary();
+      } else {
+        await _loadAccountValues();
+        await _persistSummary();
+      }
       completed = true;
     });
     return completed;
@@ -215,21 +265,53 @@ class MemberAccountController extends ChangeNotifier {
           username: username,
           displayName: displayName,
         );
+        _updateSummaryFromAccount();
+        await _persistSummary();
       });
 
   Future<void> uploadAvatar(AvatarUploadData upload) => _run(() async {
-    _user = await _api.uploadAvatar(upload);
+    final previousUrl = _avatarUri(_user?.avatarUrl);
+    final updated = await _api.uploadAvatar(upload);
+    final updatedUrl = _avatarUri(updated.avatarUrl);
+    await _evictAvatar(previousUrl);
+    if (updatedUrl != previousUrl) await _evictAvatar(updatedUrl);
+    _user = updated;
+    _updateSummaryFromAccount();
+    await _persistSummary();
   });
 
   Future<void> deleteAvatar() => _run(() async {
+    final previousUrl = _avatarUri(_user?.avatarUrl);
     await _api.deleteAvatar();
-    _user = await _api.currentUser();
+    final updated = await _api.currentUser();
+    await _evictAvatar(previousUrl);
+    final updatedUrl = _avatarUri(updated.avatarUrl);
+    if (updatedUrl != previousUrl) await _evictAvatar(updatedUrl);
+    _user = updated;
+    _updateSummaryFromAccount();
+    await _persistSummary();
   });
 
-  Future<void> loadMembership() => _run(_loadMembershipValue);
+  Future<void> loadMembership() => _run(() async {
+    await _loadMembershipValue();
+    await _persistSummary();
+  });
+
+  Future<void> purchaseApplePremium() => _applePurchase.purchase();
+
+  Future<void> restoreApplePremium() => _applePurchase.restore();
+
+  Future<void> loadReferral() => _run(_loadReferralValue);
 
   Future<void> redeemMembership(String code) => _run(() async {
     _membership = await _api.redeemMembership(code);
+    _updateSummaryFromAccount();
+    await _persistSummary();
+    await _loadReferralValue();
+  });
+
+  Future<void> bindReferral(String code) => _run(() async {
+    _referral = await _api.bindReferral(code);
   });
 
   Future<void> logout() => _run(() async {
@@ -239,15 +321,28 @@ class MemberAccountController extends ChangeNotifier {
       _user = null;
       _pendingSession = null;
       _membership = null;
+      _referral = null;
       _mfaStatus = null;
+      await _clearSummary();
     }
   });
+
+  @override
+  void dispose() {
+    _applePurchase.dispose();
+    super.dispose();
+  }
 
   Future<void> _authenticate(Future<MemberSession> Function() action) =>
       _run(() async {
         final session = await action();
         _acceptSession(session);
-        if (!session.mfaRequired) await _loadMembershipValue();
+        if (!session.mfaRequired) {
+          await _loadAccountValues();
+          await _persistSummary();
+        } else {
+          await _clearSummary();
+        }
       });
 
   void _acceptSession(MemberSession session) {
@@ -255,6 +350,8 @@ class MemberAccountController extends ChangeNotifier {
       _pendingSession = session;
       _user = null;
       _membership = null;
+      _summary = null;
+      _referral = null;
       _mfaStatus = null;
       return;
     }
@@ -264,10 +361,84 @@ class MemberAccountController extends ChangeNotifier {
   void _acceptAuthenticatedSession(MemberSession session) {
     _pendingSession = null;
     _user = session.user;
+    _updateSummaryFromAccount();
+  }
+
+  void _updateSummaryFromAccount() {
+    final user = _user;
+    if (user == null) return;
+    final cachedPremium = _summary?.userId == user.id
+        ? _summary!.premium
+        : false;
+    _summary = MemberAccountSummary.fromAccount(
+      user,
+      premium: _membership?.premium ?? cachedPremium,
+    );
+  }
+
+  Future<void> _persistSummary() async {
+    _updateSummaryFromAccount();
+    final summary = _summary;
+    if (summary == null) return;
+    try {
+      await _summaryCache.save(summary);
+    } catch (_) {
+      // The account remains usable if a best-effort UI cache cannot be saved.
+    }
+  }
+
+  Future<void> _clearSummary() async {
+    _summary = null;
+    try {
+      await _summaryCache.clear();
+    } catch (_) {
+      // Authentication state is authoritative even if cache cleanup fails.
+    }
+  }
+
+  Uri? _avatarUri(String? value) {
+    if (value == null || value.isEmpty) return null;
+    return Uri.tryParse(value);
+  }
+
+  Future<void> _evictAvatar(Uri? uri) async {
+    if (uri == null) return;
+    try {
+      await _avatarCache.evict(uri);
+    } catch (_) {
+      // Cache invalidation must not turn a completed account update into an
+      // error. A changed URL still causes the avatar widget to reload.
+    }
   }
 
   Future<void> _loadMembershipValue() async {
     _membership = await _api.membership();
+    _updateSummaryFromAccount();
+  }
+
+  Future<void> _loadReferralValue() async {
+    _referral = await _api.referral();
+  }
+
+  Future<void> _loadAccountValues() async {
+    await _loadMembershipValue();
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      try {
+        await _applePurchase.initialize();
+      } catch (_) {
+        // StoreKit availability is independent from account authentication;
+        // the account page can still offer a retry or restore action.
+      }
+    }
+    try {
+      await _loadReferralValue();
+    } on MemberAccountException {
+      // Referral is additive. Older servers or a temporary referral endpoint
+      // failure must not prevent an otherwise valid account session.
+      _referral = null;
+    }
   }
 
   Future<void> _run(

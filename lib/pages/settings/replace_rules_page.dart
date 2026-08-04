@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 class ReplaceRulesPage extends StatefulWidget {
@@ -170,53 +170,43 @@ class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
   Widget build(BuildContext context) {
     final rules = _visibleRules;
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.replaceRulesTitle),
-        actions: [
-          IconButton(
-            tooltip: l10n.replaceRulesImport,
-            onPressed: _import,
-            icon: const Icon(Icons.file_upload_outlined),
-          ),
-          IconButton(
-            tooltip: l10n.replaceRulesExport,
-            onPressed: _service.rules.isEmpty ? null : _export,
-            icon: const Icon(Icons.file_download_outlined),
+    return FloatingSubpageScaffold(
+      title: l10n.replaceRulesTitle,
+      actions: [
+        FloatingSubpageAction(
+          tooltip: l10n.replaceRulesImport,
+          onPressed: _import,
+          icon: Icons.file_upload_outlined,
+        ),
+        FloatingSubpageAction(
+          tooltip: l10n.replaceRulesExport,
+          onPressed: _service.rules.isEmpty ? null : _export,
+          icon: Icons.file_download_outlined,
+        ),
+      ],
+      tools: SearchBar(
+        leading: const Icon(Icons.search),
+        hintText: l10n.replaceRulesSearchHint,
+        onChanged: (value) => setState(() => _query = value),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: !_service.isLoaded
+                ? const Center(child: CircularProgressIndicator())
+                : rules.isEmpty
+                ? _EmptyRules(
+                    title: _query.trim().isEmpty
+                        ? l10n.replaceRulesEmptyTitle
+                        : l10n.replaceRulesNoSearchResults,
+                    body: _query.trim().isEmpty
+                        ? l10n.replaceRulesEmptyBody
+                        : null,
+                    onCreate: _query.trim().isEmpty ? () => _edit() : null,
+                  )
+                : _buildRuleList(rules),
           ),
         ],
-      ),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: SearchBar(
-                leading: const Icon(Icons.search),
-                hintText: l10n.replaceRulesSearchHint,
-                onChanged: (value) => setState(() => _query = value),
-              ),
-            ),
-            Expanded(
-              child: !_service.isLoaded
-                  ? const Center(child: CircularProgressIndicator())
-                  : rules.isEmpty
-                  ? _EmptyRules(
-                      title: _query.trim().isEmpty
-                          ? l10n.replaceRulesEmptyTitle
-                          : l10n.replaceRulesNoSearchResults,
-                      body: _query.trim().isEmpty
-                          ? l10n.replaceRulesEmptyBody
-                          : null,
-                      onCreate: _query.trim().isEmpty ? () => _edit() : null,
-                    )
-                  : _buildRuleList(rules),
-            ),
-          ],
-        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(),

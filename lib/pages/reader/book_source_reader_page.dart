@@ -11,6 +11,7 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_change_service.dart';
 import 'package:xxread/book_sources/services/book_source_chapter_text.dart';
+import 'package:xxread/book_sources/services/source_cover_cache.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
@@ -71,6 +72,8 @@ import 'package:xxread/widgets/reader_theme_background.dart';
 import 'package:xxread/widgets/reader_top_information_bar.dart';
 import 'package:xxread/widgets/reader_vertical_paging_surface.dart';
 import 'package:xxread/widgets/side_toast.dart';
+
+import 'paged_image_reader.dart';
 
 import 'themes/reader_custom_themes_page.dart';
 
@@ -601,6 +604,10 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         _loadingCatalog ||
         _loadingContent ||
         _pageMode == BookSourcePageMode.verticalScroll) {
+      return;
+    }
+    final imageContent = _content;
+    if (imageContent != null && isImageOnlyBookSourceChapter(imageContent)) {
       return;
     }
     if (_pageMode == BookSourcePageMode.pageCurl) {
@@ -1337,6 +1344,16 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   }
 
   Future<void> _turnForward() async {
+    final imageContent = _content;
+    if (imageContent != null && isImageOnlyBookSourceChapter(imageContent)) {
+      if (_pageIndex + 1 < imageContent.images.length) return;
+      if (_chapterIndex + 1 < _chapters.length) {
+        await _loadChapter(_chapterIndex + 1, restoreProgress: 0);
+      } else {
+        _showControlsTemporarily();
+      }
+      return;
+    }
     final pageStep = _usesTwoPageLayout ? 2 : 1;
     if (_pageIndex + pageStep < _pageCount) {
       _setPagedIndex(_pageIndex + pageStep, jumpPageView: true);
@@ -1348,6 +1365,16 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   }
 
   Future<void> _turnBackward() async {
+    final imageContent = _content;
+    if (imageContent != null && isImageOnlyBookSourceChapter(imageContent)) {
+      if (_pageIndex > 0) return;
+      if (_chapterIndex > 0) {
+        await _loadChapter(_chapterIndex - 1, restoreProgress: 1);
+      } else {
+        _showControlsTemporarily();
+      }
+      return;
+    }
     final pageStep = _usesTwoPageLayout ? 2 : 1;
     if (_pageIndex >= pageStep) {
       _setPagedIndex(_pageIndex - pageStep, jumpPageView: true);
@@ -2526,6 +2553,9 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     }
 
     final content = _content!;
+    if (isImageOnlyBookSourceChapter(content)) {
+      return _buildImageOnlyChapterReader(content);
+    }
     if (_pageMode == BookSourcePageMode.verticalScroll) {
       return LayoutBuilder(
         builder: (context, constraints) {
@@ -2564,6 +2594,27 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
           ),
           BookSourcePageMode.verticalScroll => const SizedBox.shrink(),
         };
+      },
+    );
+  }
+
+  Widget _buildImageOnlyChapterReader(BookSourceChapterContent content) {
+    final images = content.images;
+    if (images.isEmpty) return const SizedBox.shrink();
+    return PagedImageReader(
+      title: _chapters[_chapterIndex].title,
+      pageCount: images.length,
+      initialPage: _pageIndex.clamp(0, images.length - 1),
+      loadPage: (index) => SourceCoverCache.instance.load(
+        images[index].url,
+        headers: images[index].headers,
+      ),
+      onPageChanged: (index) {
+        if (!mounted) return;
+        _pageIndex = index;
+        _pageCount = images.length;
+        _scrollProgress.value = _pagedReadingProgress(index, images.length);
+        _scheduleProgressSave();
       },
     );
   }

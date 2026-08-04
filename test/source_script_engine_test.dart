@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
 import 'package:xxread/book_sources/source_engine/source_rule_engine.dart';
 import 'package:xxread/book_sources/source_engine/source_script_engine.dart';
@@ -22,6 +23,13 @@ void main() {
     expect(
       value,
       'https://books.test#variant:3:900150983cd24fb0d6963f7d28e17f72',
+    );
+    expect(
+      evaluator.evaluate(
+        "java.md5Encode16('abc')",
+        SourceScriptContext(source: source),
+      ),
+      '3cd24fb0d6963f7d',
     );
     expect(
       evaluator.evaluate(
@@ -55,6 +63,239 @@ void main() {
     expect(value, 'ready:saved:7:/c2');
   });
 
+  test('QuickJS exposes source cache helpers with expiry and memory aliases', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Cache source',
+      'bookSourceUrl': 'https://cache.test',
+    });
+    final context = SourceScriptContext(source: source);
+
+    expect(
+      evaluator.evaluate(
+        "cache.put('persistent','value',60); cache.putMemory('memory',7); "
+        "cache.get('persistent')+':' + cache.getFromMemory('memory')",
+        context,
+      ),
+      'value:7',
+    );
+    evaluator.evaluate(
+      "cache.delete('persistent'); cache.deleteMemory('memory')",
+      context,
+    );
+    expect(
+      evaluator.evaluate(
+        "String(cache.get('persistent'))+':' + String(cache.getFromMemory('memory'))",
+        context,
+      ),
+      'null:null',
+    );
+  });
+
+  test('QuickJS evaluates inline shared source scripts before rules', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Library source',
+      'bookSourceUrl': 'https://library.test',
+      'jsLib':
+          "const prefix='['; function decorate(value){ return prefix+value+']'; }",
+    });
+
+    expect(
+      evaluator.evaluate(
+        "decorate('ready')",
+        SourceScriptContext(source: source),
+      ),
+      '[ready]',
+    );
+    expect(
+      evaluator.evaluate(
+        "decorate('again')",
+        SourceScriptContext(source: source),
+      ),
+      '[again]',
+    );
+    final other = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Other library source',
+      'bookSourceUrl': 'https://other-library.test',
+      'jsLib': "function decorate(value){ return '<'+value+'>'; }",
+    });
+    expect(
+      evaluator.evaluate(
+        "decorate('isolated')",
+        SourceScriptContext(source: other),
+      ),
+      '<isolated>',
+    );
+  });
+
+  test('QuickJS exposes persistent source values and source metadata', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Metadata source',
+      'bookSourceUrl': 'https://metadata.test',
+      'bookSourceType': 0,
+    });
+
+    expect(
+      evaluator.evaluate(
+        "source.put('cursor', 'next-2'); source.bookSourceName + ':' + "
+        "source.bookSourceType + ':' + source.get('cursor')",
+        SourceScriptContext(source: source),
+      ),
+      'Metadata source:0:next-2',
+    );
+    expect(
+      evaluator.evaluate(
+        "source.get('cursor')",
+        SourceScriptContext(source: source),
+      ),
+      'next-2',
+    );
+  });
+
+  test('QuickJS exposes rule groups and mutable book chapter contexts', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Context source',
+      'bookSourceUrl': 'https://context.test',
+      'ruleExplore': {'author': '@js:\'Author\''},
+    });
+    final book = <String, Object?>{'name': 'Before'};
+    final chapter = <String, Object?>{'index': 3};
+
+    final value = evaluator.evaluate(
+      "book.name='After'; chapter.title='Chapter'; "
+      "source.ruleExplore.author + ':' + java.androidId().length + ':' + "
+      "book.name + ':' + chapter.index",
+      SourceScriptContext(
+        source: source,
+        book: book,
+        chapter: chapter,
+        bookWriter: book.addAll,
+        chapterWriter: chapter.addAll,
+      ),
+    );
+
+    expect(value, "@js:'Author':16:After:3");
+    expect(book['name'], 'After');
+    expect(chapter['title'], 'Chapter');
+  });
+
+  test('setContent changes the default input for later DOM helpers', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Mutable content source',
+      'bookSourceUrl': 'https://content.test',
+    });
+
+    expect(
+      evaluator.evaluate(
+        "java.setContent('<div id=\"value\">Changed</div>'); "
+        "java.getString('#value@text')",
+        SourceScriptContext(source: source, result: '<p>Before</p>'),
+      ),
+      'Changed',
+    );
+  });
+
+  test(
+    'QuickJS exposes optional source configuration without account access',
+    () {
+      final evaluator = QuickJsSourceScriptEvaluator();
+      addTearDown(evaluator.dispose);
+      final source = ReadingSourceConfig.fromJson({
+        'bookSourceName': 'Configured source',
+        'bookSourceUrl': 'https://configured.test',
+        'bookSourceGroup': 'Public',
+        'lastUpdateTime': 123,
+        'exploreUrl': '/browse',
+        'loginUrl': 'function publicBase(){ return "https://public.test"; }',
+        'header': '{"User-Agent":"Configured UA"}',
+      });
+      final context = SourceScriptContext(source: source);
+
+      expect(
+        evaluator.evaluate(
+          "eval(String(source.loginUrl)); publicBase() + ':' + "
+          "source.bookSourceGroup + ':' + source.lastUpdateTime + ':' + "
+          "source.exploreUrl",
+          context,
+        ),
+        'https://public.test:Public:123:/browse',
+      );
+      expect(
+        evaluator.evaluate(
+          "JSON.parse(String(source.header))['User-Agent'] + ':' + "
+          "java.getWebViewUA() + ':' + java.bytesToStr([104,105])",
+          context,
+        ),
+        'Configured UA:Configured UA:hi',
+      );
+      expect(
+        evaluator.evaluate(
+          "var info=source.getLoginInfoMap(); info.put('page','2'); "
+          "source.putLoginInfo(info); source.getLoginInfoMap().get('page')",
+          context,
+        ),
+        '2',
+      );
+      expect(
+        evaluator.evaluate("source.getLoginInfo()", context),
+        '{"page":"2"}',
+      );
+    },
+  );
+
+  test('QuickJS cookie helpers use the source cookie bridge', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Cookie source',
+      'bookSourceUrl': 'https://cookies.test',
+    });
+    final cookies = <String, String>{
+      'https://cookies.test/path': 'sid=abc; theme=dark',
+    };
+    final context = SourceScriptContext(
+      source: source,
+      cookieReader: (uri) => cookies[uri.toString()] ?? '',
+      cookieWriter: (uri, value) => cookies[uri.toString()] = value,
+      cookieRemover: (uri) => cookies.remove(uri.toString()),
+    );
+
+    expect(
+      evaluator.evaluate(
+        "cookie.getKey('https://cookies.test/path', 'sid') + ':' + "
+        "cookie.getCookie('https://cookies.test/path')",
+        context,
+      ),
+      'abc:sid=abc; theme=dark',
+    );
+    evaluator.evaluate(
+      "cookie.setCookie('https://cookies.test/new', 'token=xyz')",
+      context,
+    );
+    expect(cookies['https://cookies.test/new'], 'token=xyz');
+    expect(
+      evaluator.evaluate(
+        "java.getCookie('https://cookies.test/new', 'token')",
+        context,
+      ),
+      'xyz',
+    );
+    evaluator.evaluate(
+      "cookie.removeCookie('https://cookies.test/new')",
+      context,
+    );
+    expect(cookies.containsKey('https://cookies.test/new'), isFalse);
+  });
+
   test('QuickJS exposes source headers, dates, bytes, and DOM element helpers', () {
     final evaluator = QuickJsSourceScriptEvaluator();
     addTearDown(evaluator.dispose);
@@ -81,6 +322,31 @@ void main() {
         context,
       ),
       '/one',
+    );
+    expect(
+      evaluator.evaluate(
+        "var items=java.getElements('li'); "
+        "items.select('a').text()+':' + items.select('a').attr('href') + ':' + "
+        "items.first().text()+':' + items.last().text()",
+        context,
+      ),
+      'First:/one:First:First',
+    );
+    expect(
+      evaluator.evaluate(
+        "var links=java.getElements('a'); links.remove(); links.size()",
+        context,
+      ),
+      0,
+    );
+    expect(
+      evaluator.evaluate(
+        "var values=java.getStringList('li@text'); "
+        "values.size() + ':' + values.get(0) + ':' + values.isEmpty() + ':' + "
+        "values.toArray().join('|')",
+        context,
+      ),
+      '1:First:false:First',
     );
     expect(
       evaluator.evaluate(
@@ -133,6 +399,23 @@ void main() {
           result;
           ''', context),
       'hello',
+    );
+  });
+
+  test('QuickJS converts common traditional and simplified source labels', () {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Conversion source',
+      'bookSourceUrl': 'https://conversion.test',
+    });
+
+    expect(
+      evaluator.evaluate(
+        "java.t2s('韓漫與熱門漫畫') + ':' + java.s2t('书源验证') + ':' + traditionalToSimplified('劇情')",
+        SourceScriptContext(source: source),
+      ),
+      '韩漫与热门漫画:書源驗證:剧情',
     );
   });
 
@@ -227,6 +510,43 @@ void main() {
       expect(requests.last.body, 'id=7');
       expect(requests.last.headers, {'X-Test': 'yes'});
 
+      final metadata = await evaluator.evaluateAsync(
+        "var response=java.connect('/metadata'); "
+        "response.statusCode()+':' + response.headers('Location') + ':' + "
+        "response.cookies().sid + ':' + response.body()",
+        SourceScriptContext(
+          source: source,
+          networkHandler: (request) async => const SourceScriptNetworkResult(
+            body: 'metadata-body',
+            finalUrl: 'https://network.test/final',
+            statusCode: 302,
+            headers: {'Location': '/final'},
+            cookies: {'sid': 'abc'},
+          ),
+        ),
+      );
+      expect(metadata, '302:/final:abc:metadata-body');
+
+      SourceScriptNetworkRequest? headRequest;
+      final head = await evaluator.evaluateAsync(
+        "var response=java.head('/probe', {'X-Probe':'1'}); "
+        "response.statusCode()+':' + response.headers('X-Head')",
+        SourceScriptContext(
+          source: source,
+          networkHandler: (request) async {
+            headRequest = request;
+            return const SourceScriptNetworkResult(
+              body: '',
+              finalUrl: 'https://network.test/probe',
+              statusCode: 204,
+              headers: {'x-head': 'yes'},
+            );
+          },
+        ),
+      );
+      expect(head, '204:yes');
+      expect(headRequest?.method, 'HEAD');
+
       final redirected = await evaluator.evaluateAsync(
         "java.connect('/redirect').raw().request().url()",
         SourceScriptContext(
@@ -300,4 +620,81 @@ void main() {
 
     expect(values, ['https://first.test:one', 'https://second.test:two']);
   });
+
+  test(
+    'interactive source calls pause once and resume with host results',
+    () async {
+      final evaluator = QuickJsSourceScriptEvaluator();
+      addTearDown(evaluator.dispose);
+      final source = ReadingSourceConfig.fromJson({
+        'bookSourceName': 'Interactive source',
+        'bookSourceUrl': 'https://verify.test',
+      });
+      final requests = <SourceScriptInteractionRequest>[];
+
+      final browserValue = await evaluator.evaluateAsync(
+        "var response=java.startBrowserAwait('/gate','Check',false); "
+        "response.url()+':' + response.body()+':' + response.cookies().sid",
+        SourceScriptContext(
+          source: source,
+          interactionHandler: (request) async {
+            requests.add(request);
+            return const SourceScriptInteractionResult(
+              body: '<html>ready</html>',
+              finalUrl: 'https://verify.test/ready',
+              cookieHeader: 'sid=ok',
+            );
+          },
+        ),
+      );
+
+      expect(browserValue, 'https://verify.test/ready:<html>ready</html>:ok');
+      expect(requests, hasLength(1));
+      expect(requests.single.kind, SourceScriptInteractionKind.browserAwait);
+      expect(requests.single.url, '/gate');
+
+      final code = await evaluator.evaluateAsync(
+        "java.getVerificationCode('/image') + '-accepted'",
+        SourceScriptContext(
+          source: source,
+          interactionHandler: (request) async {
+            requests.add(request);
+            return const SourceScriptInteractionResult(value: '7391');
+          },
+        ),
+      );
+      expect(code, '7391-accepted');
+      expect(requests.last.kind, SourceScriptInteractionKind.verificationCode);
+    },
+  );
+
+  test(
+    'cancelled interactive source calls unblock with a clear error',
+    () async {
+      final evaluator = QuickJsSourceScriptEvaluator();
+      addTearDown(evaluator.dispose);
+      final source = ReadingSourceConfig.fromJson({
+        'bookSourceName': 'Cancelled source',
+        'bookSourceUrl': 'https://cancel.test',
+      });
+
+      await expectLater(
+        evaluator.evaluateAsync(
+          "java.startBrowserAwait('/gate','Check')",
+          SourceScriptContext(
+            source: source,
+            interactionHandler: (_) async =>
+                const SourceScriptInteractionResult(cancelled: true),
+          ),
+        ),
+        throwsA(
+          isA<BookSourceProtocolException>().having(
+            (error) => error.message,
+            'message',
+            contains('cancelled'),
+          ),
+        ),
+      );
+    },
+  );
 }

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 
 import 'package:xxread/services/core/cache_management_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 class CacheManagementPage extends StatefulWidget {
@@ -166,60 +166,55 @@ class _CacheManagementPageState extends State<CacheManagementPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.settingsCacheManagementTitle)),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: RefreshIndicator(
-          onRefresh: _refreshUsage,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 620),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _CacheUsageCard(
-                        usage: _usage,
-                        loading: _loading,
-                        categoryColors: _categoryColors(
-                          Theme.of(context).colorScheme,
-                        ),
+    return FloatingSubpageScaffold(
+      title: l10n.settingsCacheManagementTitle,
+      body: RefreshIndicator(
+        onRefresh: _refreshUsage,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: floatingSubpagePadding(context),
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CacheUsageCard(
+                      usage: _usage,
+                      loading: _loading,
+                      categoryColors: _categoryColors(
+                        Theme.of(context).colorScheme,
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        l10n.settingsCacheSafeHint,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          height: 1.4,
-                        ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      l10n.settingsCacheSafeHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.4,
                       ),
-                      const SizedBox(height: 10),
-                      _CacheActionsCard(
-                        usage: _usage,
-                        categoryColors: _categoryColors(
-                          Theme.of(context).colorScheme,
-                        ),
-                        categoryTitle: _categoryTitle,
-                        categorySubtitle: _categorySubtitle,
-                        categoryIcon: _categoryIcon,
-                        clearingCategories: _clearingCategories,
-                        clearingAll: _clearingAll,
-                        onClearCategory: (category) =>
-                            unawaited(_clearCategory(category)),
-                        onClearAll: () => unawaited(_clearAll()),
+                    ),
+                    const SizedBox(height: 10),
+                    _CacheActionsCard(
+                      usage: _usage,
+                      categoryColors: _categoryColors(
+                        Theme.of(context).colorScheme,
                       ),
-                    ],
-                  ),
+                      categoryTitle: _categoryTitle,
+                      categorySubtitle: _categorySubtitle,
+                      categoryIcon: _categoryIcon,
+                      clearingCategories: _clearingCategories,
+                      clearingAll: _clearingAll,
+                      onClearCategory: (category) =>
+                          unawaited(_clearCategory(category)),
+                      onClearAll: () => unawaited(_clearAll()),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

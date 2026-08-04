@@ -86,6 +86,7 @@ class SourcedBookCard extends StatelessWidget {
                           )
                         : SourceCoverImage(
                             url: result.book.coverUrl!,
+                            headers: result.book.coverHeaders,
                             fit: BoxFit.cover,
                             cacheWidth:
                                 (132 * MediaQuery.devicePixelRatioOf(context))
@@ -221,6 +222,7 @@ class _BookCoverThumb extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       child: SourceCoverImage(
         url: book.coverUrl!,
+        headers: book.coverHeaders,
         width: 58,
         height: 78,
         fit: BoxFit.cover,

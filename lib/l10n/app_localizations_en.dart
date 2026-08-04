@@ -459,6 +459,62 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesClose => 'Close';
 
   @override
+  String get sourceLoginTitle => 'Source sign-in';
+
+  @override
+  String get sourceLoginSecureStorageNotice =>
+      'Sign-in details stay in this device\'s secure system storage.';
+
+  @override
+  String get sourceLoginNoForm =>
+      'This source does not provide a sign-in form. Browser-based sign-in is not available yet.';
+
+  @override
+  String get sourceLoginSave => 'Sign in and save session';
+
+  @override
+  String get sourceLoginClear => 'Clear sign-in session';
+
+  @override
+  String get sourceLoginSaved => 'Source sign-in session updated';
+
+  @override
+  String get sourceLoginCleared => 'Source sign-in session cleared';
+
+  @override
+  String sourceLoginFailed(String details) {
+    return 'Could not update the source sign-in session: $details';
+  }
+
+  @override
+  String get sourceVerificationTitle => 'Source verification';
+
+  @override
+  String get sourceVerificationBrowserHint =>
+      'Complete the site check in the secure browser, then choose Verification complete. The page address and cookies return only to this source task.';
+
+  @override
+  String get sourceVerificationCodeHint =>
+      'Read the image and enter its code to continue this source task.';
+
+  @override
+  String get sourceVerificationCodeLabel => 'Image code';
+
+  @override
+  String get sourceVerificationSubmit => 'Continue';
+
+  @override
+  String get sourceVerificationRetry => 'Open browser again';
+
+  @override
+  String get sourceVerificationCancel => 'Cancel verification';
+
+  @override
+  String sourceVerificationFailed(String details) {
+    return 'Could not open source verification: $details';
+  }
+
+  @override
   String get settings => 'Settings';
 
   @override
@@ -2389,7 +2445,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountGuestSubtitle =>
-      'Keep your account and supporter status together.';
+      'Sync your profile and security settings.';
 
   @override
   String get settingsAccountOpen => 'Account center';
@@ -2401,11 +2457,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountPageTitle => 'Account';
 
   @override
-  String get accountPageSubtitle =>
-      'Profile, sign-in methods, and supporter status.';
+  String get accountIntroTitle => 'Account';
 
   @override
-  String get accountLoginTab => 'Sign in';
+  String get accountPageSubtitle =>
+      'Sign in to sync your profile and account settings.';
+
+  @override
+  String get accountLoginTab => 'Email sign in';
 
   @override
   String get accountRegisterTab => 'Register';
@@ -2494,13 +2553,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountResetPassword => 'Reset password';
 
   @override
-  String get accountUseGithub => 'Continue with GitHub';
+  String get accountUseGithub => 'GitHub sign in';
 
   @override
   String get accountUseGoogle => 'Continue with Google';
 
   @override
   String get accountUsePasskey => 'Continue with Passkey';
+
+  @override
+  String get accountMoreSignInMethods => 'More sign-in methods';
 
   @override
   String get accountExternalHint =>
@@ -4306,6 +4368,67 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get agreementFlowStepIntroduction => 'Introduction';
+
+  @override
+  String get agreementFlowStepTerms => 'Terms';
+
+  @override
+  String get agreementFlowStepPrivacy => 'Privacy';
+
+  @override
+  String get agreementFlowNext => 'Next';
+
+  @override
+  String get agreementFlowBack => 'Back';
+
+  @override
+  String get agreementFlowTermsTitle => 'Use OpenReading with clear boundaries';
+
+  @override
+  String get agreementFlowTermsSubtitle =>
+      'Review the terms and the boundary for content and third-party sources.';
+
+  @override
+  String get agreementFlowTermsConsent =>
+      'I have read and agree to the Terms of Use.';
+
+  @override
+  String get agreementFlowPrivacyTitle => 'Your data stays under your control';
+
+  @override
+  String get agreementFlowPrivacySubtitle =>
+      'Review what remains local, when network requests happen, and how download records are retained.';
+
+  @override
+  String get agreementFlowPrivacyConsent =>
+      'I have read and agree to the Privacy Notice.';
+
+  @override
+  String get agreementFlowEnterApp => 'Enter OpenReading';
+
+  @override
+  String get agreementFlowPrivacyLocalTitle => 'Local by default';
+
+  @override
+  String get agreementFlowPrivacyLocalBody =>
+      'Books, progress, notes, and settings normally remain on this device.';
+
+  @override
+  String get agreementFlowPrivacyNetworkTitle => 'Network use is explicit';
+
+  @override
+  String get agreementFlowPrivacyNetworkBody =>
+      'Local reading does not upload book text. Update checks contact GitHub and the official site; sources, AI, and sync connect only when their features are used.';
+
+  @override
+  String get agreementFlowPrivacyRetentionTitle => 'Limited download records';
+
+  @override
+  String get agreementFlowPrivacyRetentionBody =>
+      'Official-site download records containing a raw IP are kept for no more than 30 days, then deleted.';
+
+  @override
   String get agreementV2Title => 'Terms of Use & Privacy Notice';
 
   @override
@@ -4988,7 +5111,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountSecurityTitle => 'Security';
 
   @override
+  String get accountSecurityLoading => 'Loading security status…';
+
+  @override
   String get accountChangeEmailTitle => 'Change email';
+
+  @override
+  String get accountChangeEmailEnterTitle => 'Choose a new email';
+
+  @override
+  String get accountChangeEmailEnterHint =>
+      'We will send one code to your current email and one to the new address.';
+
+  @override
+  String get accountChangeEmailVerifyTitle => 'Verify both email addresses';
+
+  @override
+  String get accountChangeEmailVerifyHint =>
+      'Enter the two codes to finish changing your sign-in email.';
 
   @override
   String get accountCurrentEmail => 'Current email';
@@ -5015,6 +5155,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountChangePasswordTitle => 'Set or change password';
 
   @override
+  String get accountPasswordEmailTitle => 'Verify by email';
+
+  @override
+  String get accountPasswordEmailHint =>
+      'Send a code to your current email before choosing a new password.';
+
+  @override
+  String get accountPasswordNewTitle => 'Choose a new password';
+
+  @override
+  String get accountPasswordNewHint =>
+      'Enter the email code and set the password you will use next time.';
+
+  @override
   String get accountNewPassword => 'New password';
 
   @override
@@ -5036,6 +5190,44 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountMfaDisabledByDefault =>
       'Off by default. Enable it to protect password and email-code sign-ins.';
+
+  @override
+  String get accountMfaOnTitle => 'Two-factor authentication is on';
+
+  @override
+  String get accountMfaEmailTitle => 'Verify your email first';
+
+  @override
+  String accountMfaEmailHint(String email) {
+    return 'We will send a setup code to $email.';
+  }
+
+  @override
+  String get accountMfaEmailCodeTitle => 'Enter the email code';
+
+  @override
+  String get accountMfaEmailCodeHint =>
+      'After verification, the authenticator QR code and secret will open on the next page.';
+
+  @override
+  String get accountMfaAuthenticatorTitle =>
+      'Add Open Reading to your authenticator';
+
+  @override
+  String get accountMfaAuthenticatorHint =>
+      'Scan the QR code or enter the secret manually, then enter the six-digit code from the authenticator.';
+
+  @override
+  String get accountMfaQrCodeLabel => 'Authenticator setup QR code';
+
+  @override
+  String get accountMfaSecretLabel => 'Setup secret';
+
+  @override
+  String get accountMfaSecretCopied => 'Setup secret copied';
+
+  @override
+  String get accountMfaRecoveryTitle => 'Save your recovery codes';
 
   @override
   String get accountMfaChallengeTitle => 'Two-factor verification';
@@ -5087,4 +5279,137 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountRecoveryCodesSaved => 'I saved these codes';
+
+  @override
+  String get accountPremiumLifetime => 'Lifetime Premium unlocked';
+
+  @override
+  String get accountPremiumLifetimeSubtitle =>
+      'Premium is linked to this account and syncs across supported platforms.';
+
+  @override
+  String get accountRedemptionCode => 'Lifetime Premium code';
+
+  @override
+  String get accountRedeemPremium => 'Redeem and unlock forever';
+
+  @override
+  String get accountApplePurchase => 'Unlock forever with App Store';
+
+  @override
+  String get accountApplePurchaseHint =>
+      'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.';
+
+  @override
+  String get accountAppleRestore => 'Restore purchases';
+
+  @override
+  String get accountApplePurchasePending =>
+      'The purchase is waiting for App Store approval';
+
+  @override
+  String get accountApplePurchaseSubmitted =>
+      'Purchase submitted; verifying Premium access';
+
+  @override
+  String get accountAppleRestoreSubmitted => 'Purchase restoration requested';
+
+  @override
+  String get accountPremiumUnlocked => 'Lifetime Premium unlocked';
+
+  @override
+  String get accountPremiumUnlockedReferral =>
+      'Redeemed: you and your inviter both unlocked Lifetime Premium';
+
+  @override
+  String get accountInviteTitle => 'Invite friends';
+
+  @override
+  String get accountInviteSubtitle =>
+      'When a friend binds your code and redeems a Lifetime Premium code, both of you unlock Premium forever.';
+
+  @override
+  String get accountInviteMyCode => 'My invite code';
+
+  @override
+  String get accountInviteCopyCode => 'Copy invite code';
+
+  @override
+  String get accountInviteCopyLink => 'Copy invite link';
+
+  @override
+  String get accountInviteShareAction => 'Copy invite link to share';
+
+  @override
+  String get accountInviteCopied => 'Invite details copied';
+
+  @override
+  String accountInviteStats(int invited, int rewarded) {
+    return '$invited invited · $rewarded successful';
+  }
+
+  @override
+  String get accountInviteStatsInvited => 'Codes bound';
+
+  @override
+  String get accountInviteStatsRewarded => 'Rewards unlocked';
+
+  @override
+  String accountInviterBound(String name) {
+    return 'Invited by $name';
+  }
+
+  @override
+  String get accountInviteRewarded => 'Invite completed';
+
+  @override
+  String get accountInviteWaiting => 'Waiting for code redemption';
+
+  @override
+  String get accountInviteBindLabel => 'Friend\'s invite code';
+
+  @override
+  String get accountInviteBindHint =>
+      'An account can bind once and cannot change it later';
+
+  @override
+  String get accountInviteBindAction => 'Bind invite code';
+
+  @override
+  String get accountInviteBound => 'Invite code bound';
+
+  @override
+  String get accountInviteHowItWorks => 'How it works';
+
+  @override
+  String get accountInviteStepShareTitle => 'Share the link';
+
+  @override
+  String get accountInviteStepShareBody =>
+      'Send the link or code to a friend. They open it and create an account.';
+
+  @override
+  String get accountInviteStepBindTitle => 'Bind the code';
+
+  @override
+  String get accountInviteStepBindBody =>
+      'Your friend enters your code in Account. Each account can bind once.';
+
+  @override
+  String get accountInviteStepRedeemTitle => 'Redeem a code';
+
+  @override
+  String get accountInviteStepRedeemBody =>
+      'When they redeem a Lifetime Premium code, both accounts unlock Premium immediately.';
+
+  @override
+  String get accountInviteMyBinding => 'My invite relationship';
+
+  @override
+  String get accountInviteBindIntro =>
+      'If someone invited you, bind their code here to keep the reward attached to your account.';
+
+  @override
+  String get accountInviteBindingNotNeeded =>
+      'This account already has Premium, so no invite code is needed.';
 }

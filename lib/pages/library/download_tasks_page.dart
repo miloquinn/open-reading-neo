@@ -9,6 +9,7 @@ import 'package:xxread/services/ai/ai_preprocess_task_controller.dart';
 import 'package:xxread/services/books/book_text_extraction_service.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 class DownloadTasksPage extends StatelessWidget {
   const DownloadTasksPage({super.key});
@@ -18,15 +19,13 @@ class DownloadTasksPage extends StatelessWidget {
     final l10n = context.l10n;
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.downloadTasksTitle),
-          bottom: TabBar(
-            tabs: [
-              Tab(text: l10n.downloadTasksTabDownloads),
-              Tab(text: l10n.libraryAiPreprocess),
-            ],
-          ),
+      child: FloatingSubpageScaffold(
+        title: l10n.downloadTasksTitle,
+        tools: TabBar(
+          tabs: [
+            Tab(text: l10n.downloadTasksTabDownloads),
+            Tab(text: l10n.libraryAiPreprocess),
+          ],
         ),
         body: const TabBarView(
           children: [_DownloadTaskList(), _AiPreprocessTaskList()],

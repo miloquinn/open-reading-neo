@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:xxread/services/core/changelog_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 class ChangelogPage extends StatefulWidget {
   const ChangelogPage({super.key, this.service});
@@ -36,60 +37,47 @@ class _ChangelogPageState extends State<ChangelogPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.changelogPageTitle),
-        scrolledUnderElevation: 0,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: FutureBuilder<List<ChangelogEntry>>(
-            future: _entries,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return Center(
-                  child: CircularProgressIndicator(
-                    semanticsLabel: l10n.loading,
+    return FloatingSubpageScaffold(
+      title: l10n.changelogPageTitle,
+      body: FutureBuilder<List<ChangelogEntry>>(
+        future: _entries,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return Center(
+              child: CircularProgressIndicator(semanticsLabel: l10n.loading),
+            );
+          }
+          final entries = snapshot.data;
+          if (snapshot.hasError || entries == null || entries.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, size: 32),
+                  const SizedBox(height: 12),
+                  Text(l10n.changelogLoadFailed),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _retry,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text(l10n.retry),
                   ),
-                );
-              }
-              final entries = snapshot.data;
-              if (snapshot.hasError || entries == null || entries.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline_rounded, size: 32),
-                      const SizedBox(height: 12),
-                      Text(l10n.changelogLoadFailed),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: _retry,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(l10n.retry),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                itemCount: entries.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) => _VersionCard(
-                  key: ValueKey('changelog-entry-${entries[index].version}'),
-                  entry: entries[index],
-                  current: index == 0,
-                  currentLabel: l10n.changelogCurrentVersion,
-                ),
-              );
-            },
-          ),
-        ),
+                ],
+              ),
+            );
+          }
+          return ListView.separated(
+            padding: floatingSubpagePadding(context),
+            itemCount: entries.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _VersionCard(
+              key: ValueKey('changelog-entry-${entries[index].version}'),
+              entry: entries[index],
+              current: index == 0,
+              currentLabel: l10n.changelogCurrentVersion,
+            ),
+          );
+        },
       ),
     );
   }

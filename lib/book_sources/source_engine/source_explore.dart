@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import '../protocol/book_source_protocol.dart';
 import 'source_request.dart';
-import 'source_rule_engine.dart';
 
 /// A safe, declarative discovery channel extracted from a reading source.
 ///
@@ -35,9 +34,8 @@ class SourceExploreCatalog {
 /// - `title::url` entries separated by `&&` or newlines;
 /// - JSON arrays whose entries are `type: "url"` (or omit `type`).
 ///
-/// The returned catalog is also preflighted against the existing bounded
-/// request and rule engines, so advertising `categories`/`browse` never opts a
-/// source into JavaScript, stateful actions, XPath, or complex JSONPath.
+/// Each returned URL is checked by the bounded request parser before the
+/// catalog is advertised to callers.
 SourceExploreCatalog parseSourceExploreCatalog(Map<String, dynamic> raw) {
   if (raw['enabledExplore'] == false) {
     return const SourceExploreCatalog(entries: []);
@@ -76,7 +74,7 @@ SourceExploreCatalog parseSourceExploreCatalog(Map<String, dynamic> raw) {
         hasUnsupportedEntries = true;
       }
     }
-    _ensureExploreRulesSupported(raw);
+    _ensureExploreRulesPresent(raw);
     return SourceExploreCatalog(
       entries: List.unmodifiable(safeEntries),
       hasUnsupportedEntries: hasUnsupportedEntries,
@@ -160,7 +158,7 @@ SourceExploreCatalog _parseLegacyEntries(String input) {
   );
 }
 
-void _ensureExploreRulesSupported(Map<String, dynamic> raw) {
+void _ensureExploreRulesPresent(Map<String, dynamic> raw) {
   final exploreRules = _ruleMap(raw['ruleExplore']);
   final searchRules = _ruleMap(raw['ruleSearch']);
   final activeRules = _string(exploreRules['bookList']).isEmpty
@@ -170,15 +168,6 @@ void _ensureExploreRulesSupported(Map<String, dynamic> raw) {
     throw const BookSourceProtocolException(
       'Compatible discovery is missing the bookList rule.',
     );
-  }
-  for (final entry in activeRules.entries) {
-    final value = entry.value;
-    if (value is String) {
-      SourceRuleEngine.ensureSupported(
-        value,
-        field: 'ruleExplore.${entry.key}',
-      );
-    }
   }
 }
 

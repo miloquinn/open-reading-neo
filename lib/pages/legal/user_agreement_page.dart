@@ -1,4 +1,6 @@
-// 用户首次启动时展示的欢迎页、使用条款与隐私说明。
+// 用户首次启动时展示的软件介绍、使用条款与隐私说明。
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,39 +22,108 @@ class UserAgreementPage extends StatefulWidget {
   State<UserAgreementPage> createState() => _UserAgreementPageState();
 }
 
-class _UserAgreementPageState extends State<UserAgreementPage>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
+enum _AgreementStep { introduction, terms, privacy }
+
+class _UserAgreementPageState extends State<UserAgreementPage> {
+  _AgreementStep _step = _AgreementStep.introduction;
+  int _transitionDirection = 1;
   bool _termsConfirmed = false;
   bool _sourceBoundaryConfirmed = false;
+  bool _privacyConfirmed = false;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 520),
-    )..forward();
-    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.025),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  bool _exiting = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    final content = SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 840;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1160),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  wide ? 48 : 20,
+                  wide ? 30 : 18,
+                  wide ? 48 : 20,
+                  wide ? 28 : 18,
+                ),
+                child: Column(
+                  children: [
+                    _buildTopBar(scheme, wide: wide),
+                    SizedBox(height: wide ? 24 : 18),
+                    _buildStepIndicator(scheme),
+                    SizedBox(height: wide ? 22 : 16),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 520),
+                        reverseDuration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 390),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        layoutBuilder: (currentChild, previousChildren) =>
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [...previousChildren, ?currentChild],
+                            ),
+                        transitionBuilder: (child, animation) {
+                          if (reduceMotion) return child;
+                          final childStep =
+                              (child.key as ValueKey<_AgreementStep>).value;
+                          final incoming = childStep == _step;
+                          final horizontalOffset = incoming
+                              ? _transitionDirection * 0.075
+                              : -_transitionDirection * 0.045;
+                          final slide = Tween<Offset>(
+                            begin: Offset(horizontalOffset, 0),
+                            end: Offset.zero,
+                          ).animate(animation);
+                          final scale = Tween<double>(
+                            begin: incoming ? 0.985 : 0.995,
+                            end: 1,
+                          ).animate(animation);
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: slide,
+                              child: ScaleTransition(
+                                scale: scale,
+                                child: child,
+                              ),
+                            ),
+                          );
+                        },
+                        child: KeyedSubtree(
+                          key: ValueKey(_step),
+                          child: switch (_step) {
+                            _AgreementStep.introduction => _buildIntroduction(
+                              scheme,
+                              wide: wide,
+                            ),
+                            _AgreementStep.terms => _buildTermsPage(scheme),
+                            _AgreementStep.privacy => _buildPrivacyPage(scheme),
+                          },
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: wide ? 18 : 14),
+                    _buildNavigation(scheme, wide: wide),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
 
     return Scaffold(
       backgroundColor: isDark
@@ -63,54 +134,32 @@ class _UserAgreementPageState extends State<UserAgreementPage>
           Positioned.fill(
             child: CustomPaint(painter: _PaperGrainPainter(isDark)),
           ),
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fade,
-              child: SlideTransition(
-                position: _slide,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 880;
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1160),
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            wide ? 48 : 20,
-                            wide ? 40 : 18,
-                            wide ? 48 : 20,
-                            wide ? 32 : 18,
-                          ),
-                          child: wide
-                              ? Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      flex: 4,
-                                      child: _buildIntroduction(scheme),
-                                    ),
-                                    const SizedBox(width: 52),
-                                    Expanded(
-                                      flex: 6,
-                                      child: _buildAgreementPanel(scheme),
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  children: [
-                                    _buildCompactHeader(scheme),
-                                    const SizedBox(height: 18),
-                                    Expanded(
-                                      child: _buildAgreementPanel(scheme),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    );
-                  },
+          AnimatedOpacity(
+            opacity: _exiting ? 0 : 1,
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 280),
+            curve: Curves.easeInOutCubic,
+            child: AnimatedScale(
+              scale: _exiting ? 0.985 : 1,
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 280),
+              curve: Curves.easeInOutCubic,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: reduceMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 620),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) => Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - value) * 12),
+                    child: child,
+                  ),
                 ),
+                child: content,
               ),
             ),
           ),
@@ -119,64 +168,22 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     );
   }
 
-  Widget _buildIntroduction(ColorScheme scheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildBrand(scheme, compact: false),
-          const Spacer(),
-          Text(
-            context.l10n.agreementV2HeroTitle,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-              height: 1.08,
-              letterSpacing: -1.4,
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            context.l10n.agreementV2HeroBody,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              height: 1.75,
-              color: scheme.onSurface.withValues(alpha: 0.68),
-            ),
-          ),
-          const SizedBox(height: 30),
-          _buildPrinciple(
-            scheme,
-            Icons.folder_outlined,
-            context.l10n.agreementV2LocalTitle,
-            context.l10n.agreementV2LocalBody,
-          ),
-          const SizedBox(height: 16),
-          _buildPrinciple(
-            scheme,
-            Icons.code_rounded,
-            context.l10n.agreementV2OpenSourceTitle,
-            context.l10n.agreementV2OpenSourceBody,
-          ),
-          const Spacer(flex: 2),
+  Widget _buildTopBar(ColorScheme scheme, {required bool wide}) {
+    return Row(
+      children: [
+        _buildBrand(scheme, compact: !wide),
+        const Spacer(),
+        if (wide)
           Text(
             context.l10n.agreementV2VersionLabel(
               UserAgreementService.currentAgreementVersion,
             ),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: scheme.onSurface.withValues(alpha: 0.42),
+              color: scheme.onSurface.withValues(alpha: 0.44),
               letterSpacing: 0.4,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactHeader(ColorScheme scheme) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: _buildBrand(scheme, compact: true),
+      ],
     );
   }
 
@@ -184,10 +191,13 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppBrandIcon(
-          size: compact ? 42 : 52,
-          borderRadius: compact ? 11 : 14,
-          border: Border.all(color: scheme.outline.withValues(alpha: 0.18)),
+        Hero(
+          tag: 'agreementBrandIcon',
+          child: AppBrandIcon(
+            size: compact ? 42 : 48,
+            borderRadius: compact ? 11 : 13,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.18)),
+          ),
         ),
         SizedBox(width: compact ? 12 : 14),
         Column(
@@ -215,6 +225,336 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     );
   }
 
+  Widget _buildStepIndicator(ColorScheme scheme) {
+    final motionDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 360);
+    final labels = [
+      context.l10n.agreementFlowStepIntroduction,
+      context.l10n.agreementFlowStepTerms,
+      context.l10n.agreementFlowStepPrivacy,
+    ];
+    return Semantics(
+      key: const Key('agreementStepIndicator'),
+      label: labels[_step.index],
+      child: Row(
+        children: [
+          for (var index = 0; index < labels.length; index++) ...[
+            Expanded(
+              child: _buildStepItem(scheme, index: index, label: labels[index]),
+            ),
+            if (index != labels.length - 1)
+              Expanded(
+                child: AnimatedContainer(
+                  duration: motionDuration,
+                  curve: Curves.easeOutCubic,
+                  height: 2,
+                  color: index < _step.index
+                      ? scheme.primary
+                      : scheme.outline.withValues(alpha: 0.18),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepItem(
+    ColorScheme scheme, {
+    required int index,
+    required String label,
+  }) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final active = index == _step.index;
+    final completed = index < _step.index;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 360),
+          curve: Curves.easeOutCubic,
+          width: active ? 30 : 24,
+          height: active ? 30 : 24,
+          decoration: BoxDecoration(
+            color: completed || active
+                ? scheme.primary
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.54),
+            shape: BoxShape.circle,
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.22),
+                      blurRadius: 14,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
+              child: completed
+                  ? Icon(
+                      Icons.check_rounded,
+                      key: const ValueKey('done'),
+                      size: 15,
+                      color: scheme.onPrimary,
+                    )
+                  : Text(
+                      '${index + 1}',
+                      key: const ValueKey('number'),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: active
+                            ? scheme.onPrimary
+                            : scheme.onSurface.withValues(alpha: 0.56),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        AnimatedDefaultTextStyle(
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 260),
+          style: Theme.of(context).textTheme.labelMedium!.copyWith(
+            color: active || completed
+                ? scheme.onSurface.withValues(alpha: active ? 0.88 : 0.62)
+                : scheme.onSurface.withValues(alpha: 0.38),
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+          ),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIntroduction(ColorScheme scheme, {required bool wide}) {
+    final text = _buildIntroductionText(scheme);
+    final visual = _buildReadingVisual(scheme);
+    return SingleChildScrollView(
+      key: const Key('agreementIntroductionPage'),
+      physics: const BouncingScrollPhysics(),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 430),
+        child: wide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(flex: 6, child: text),
+                  const SizedBox(width: 56),
+                  Expanded(flex: 5, child: visual),
+                ],
+              )
+            : Column(children: [text, const SizedBox(height: 28), visual]),
+      ),
+    );
+  }
+
+  Widget _buildIntroductionText(ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer.withValues(alpha: 0.54),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            context.l10n.agreementFlowStepIntroduction,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: scheme.onPrimaryContainer,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          context.l10n.agreementV2HeroTitle,
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            height: 1.08,
+            letterSpacing: -1.4,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          context.l10n.agreementV2HeroBody,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            height: 1.72,
+            color: scheme.onSurface.withValues(alpha: 0.68),
+          ),
+        ),
+        const SizedBox(height: 28),
+        _buildPrinciple(
+          scheme,
+          Icons.folder_outlined,
+          context.l10n.agreementV2LocalTitle,
+          context.l10n.agreementV2LocalBody,
+        ),
+        const SizedBox(height: 14),
+        _buildPrinciple(
+          scheme,
+          Icons.code_rounded,
+          context.l10n.agreementV2OpenSourceTitle,
+          context.l10n.agreementV2OpenSourceBody,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadingVisual(ColorScheme scheme) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AspectRatio(
+      aspectRatio: 1.15,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 900),
+        curve: Curves.easeOutBack,
+        builder: (context, value, child) => Transform.scale(
+          scale: 0.9 + value * 0.1,
+          child: Opacity(opacity: value.clamp(0, 1), child: child),
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1A17) : const Color(0xFFFBF9F3),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.14)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.07),
+                blurRadius: 34,
+                offset: const Offset(0, 18),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(painter: _ReadingOrbitPainter(scheme)),
+                ),
+                Transform.translate(
+                  offset: const Offset(-52, 4),
+                  child: Transform.rotate(
+                    angle: -0.12,
+                    child: _buildBookShape(
+                      scheme,
+                      color: scheme.secondaryContainer,
+                      width: 116,
+                      height: 158,
+                    ),
+                  ),
+                ),
+                Transform.translate(
+                  offset: const Offset(52, 4),
+                  child: Transform.rotate(
+                    angle: 0.12,
+                    child: _buildBookShape(
+                      scheme,
+                      color: scheme.tertiaryContainer,
+                      width: 116,
+                      height: 158,
+                    ),
+                  ),
+                ),
+                _buildBookShape(
+                  scheme,
+                  color: scheme.surface,
+                  width: 126,
+                  height: 174,
+                  child: AppBrandIcon(size: 64, borderRadius: 17),
+                ),
+                Positioned(
+                  bottom: 24,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.surface.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: scheme.outline.withValues(alpha: 0.14),
+                      ),
+                    ),
+                    child: Text(
+                      'EPUB  ·  PDF  ·  TXT  ·  MOBI',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurface.withValues(alpha: 0.58),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookShape(
+    ColorScheme scheme, {
+    required Color color,
+    required double width,
+    required double height,
+    Widget? child,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(8),
+          topRight: Radius.circular(18),
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(18),
+        ),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 10,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 1,
+              color: scheme.outline.withValues(alpha: 0.13),
+            ),
+          ),
+          ?child,
+        ],
+      ),
+    );
+  }
+
   Widget _buildPrinciple(
     ColorScheme scheme,
     IconData icon,
@@ -225,16 +565,16 @@ class _UserAgreementPageState extends State<UserAgreementPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
-            color: scheme.onSurface.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(10),
+            color: scheme.onSurface.withValues(alpha: 0.055),
+            borderRadius: BorderRadius.circular(11),
           ),
           child: Icon(
             icon,
-            size: 18,
-            color: scheme.onSurface.withValues(alpha: 0.74),
+            size: 19,
+            color: scheme.onSurface.withValues(alpha: 0.72),
           ),
         ),
         const SizedBox(width: 13),
@@ -258,134 +598,245 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     );
   }
 
-  Widget _buildAgreementPanel(ColorScheme scheme) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sections = <(String, String)>[
+  Widget _buildTermsPage(ColorScheme scheme) {
+    final sections = <(int, String, String)>[
       (
+        1,
         context.l10n.agreementV2Section1Title,
         context.l10n.agreementV2Section1Body,
       ),
       (
+        2,
         context.l10n.agreementV2Section2Title,
         context.l10n.agreementV2Section2Body,
       ),
       (
+        3,
         context.l10n.agreementV2Section3Title,
         context.l10n.agreementV2Section3Body,
       ),
       (
+        4,
         context.l10n.agreementV2Section4Title,
         context.l10n.agreementV2Section4Body,
       ),
       (
+        5,
         context.l10n.agreementV2Section5Title,
         context.l10n.agreementV2Section5Body,
       ),
       (
-        context.l10n.agreementV2Section6Title,
-        context.l10n.agreementV2Section6Body,
-      ),
-      (
+        7,
         context.l10n.agreementV2Section7Title,
         context.l10n.agreementV2Section7Body,
       ),
       (
+        8,
         context.l10n.agreementV2Section8Title,
         context.l10n.agreementV2Section8Body,
       ),
       (
+        9,
         context.l10n.agreementV2Section9Title,
         context.l10n.agreementV2Section9Body,
       ),
       (
+        10,
         context.l10n.agreementV2Section10Title,
         context.l10n.agreementV2Section10Body,
       ),
       (
+        11,
         context.l10n.agreementV2Section11Title,
         context.l10n.agreementV2Section11Body,
       ),
     ];
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B1B18) : const Color(0xFFFCFBF7),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: scheme.outline.withValues(alpha: 0.16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.07),
-            blurRadius: 34,
-            offset: const Offset(0, 18),
+    return _buildDocumentPanel(
+      key: const Key('agreementTermsPage'),
+      scheme: scheme,
+      icon: Icons.article_outlined,
+      title: context.l10n.agreementFlowTermsTitle,
+      subtitle: context.l10n.agreementFlowTermsSubtitle,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildImportantNotice(scheme),
+          const SizedBox(height: 16),
+          _buildSourceBoundary(scheme),
+          const SizedBox(height: 12),
+          _buildConsentCheckbox(
+            key: const Key('agreementSourceConsent'),
+            scheme: scheme,
+            value: _sourceBoundaryConfirmed,
+            label: context.l10n.agreementV2SourceConfirmLabel,
+            emphasized: true,
+            onChanged: (value) =>
+                setState(() => _sourceBoundaryConfirmed = value),
+          ),
+          const SizedBox(height: 26),
+          for (var i = 0; i < sections.length; i++) ...[
+            _buildLegalSection(
+              scheme,
+              sections[i].$1,
+              sections[i].$2,
+              sections[i].$3,
+            ),
+            if (i != sections.length - 1) const SizedBox(height: 24),
+          ],
+        ],
+      ),
+      footer: _buildConsentCheckbox(
+        key: const Key('agreementTermsConsent'),
+        scheme: scheme,
+        value: _termsConfirmed,
+        label: context.l10n.agreementFlowTermsConsent,
+        onChanged: (value) => setState(() => _termsConfirmed = value),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyPage(ColorScheme scheme) {
+    return _buildDocumentPanel(
+      key: const Key('agreementPrivacyPage'),
+      scheme: scheme,
+      icon: Icons.shield_outlined,
+      title: context.l10n.agreementFlowPrivacyTitle,
+      subtitle: context.l10n.agreementFlowPrivacySubtitle,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildPrivacySummary(
+            scheme,
+            icon: Icons.devices_outlined,
+            title: context.l10n.agreementFlowPrivacyLocalTitle,
+            body: context.l10n.agreementFlowPrivacyLocalBody,
+          ),
+          const SizedBox(height: 12),
+          _buildPrivacySummary(
+            scheme,
+            icon: Icons.wifi_outlined,
+            title: context.l10n.agreementFlowPrivacyNetworkTitle,
+            body: context.l10n.agreementFlowPrivacyNetworkBody,
+          ),
+          const SizedBox(height: 12),
+          _buildPrivacySummary(
+            scheme,
+            icon: Icons.schedule_outlined,
+            title: context.l10n.agreementFlowPrivacyRetentionTitle,
+            body: context.l10n.agreementFlowPrivacyRetentionBody,
+          ),
+          const SizedBox(height: 26),
+          _buildLegalSection(
+            scheme,
+            6,
+            context.l10n.agreementV2Section6Title,
+            context.l10n.agreementV2Section6Body,
           ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        context.l10n.agreementV2Title,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.6,
-                            ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        context.l10n.agreementV2Subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurface.withValues(alpha: 0.52),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Icon(
-                  Icons.article_outlined,
-                  color: scheme.onSurface.withValues(alpha: 0.34),
-                ),
-              ],
-            ),
+      footer: _buildConsentCheckbox(
+        key: const Key('agreementPrivacyConsent'),
+        scheme: scheme,
+        value: _privacyConfirmed,
+        label: context.l10n.agreementFlowPrivacyConsent,
+        emphasized: true,
+        onChanged: (value) => setState(() => _privacyConfirmed = value),
+      ),
+    );
+  }
+
+  Widget _buildDocumentPanel({
+    required Key key,
+    required ColorScheme scheme,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget body,
+    required Widget footer,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 920),
+        child: Container(
+          key: key,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1B1B18) : const Color(0xFFFCFBF7),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.16)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.07),
+                blurRadius: 34,
+                offset: const Offset(0, 18),
+              ),
+            ],
           ),
-          Divider(height: 1, color: scheme.outline.withValues(alpha: 0.13)),
-          Expanded(
-            child: Scrollbar(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
-                child: Column(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 17),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildImportantNotice(scheme),
-                    const SizedBox(height: 16),
-                    _buildSourceBoundary(scheme),
-                    const SizedBox(height: 26),
-                    for (var i = 0; i < sections.length; i++) ...[
-                      _buildLegalSection(
-                        scheme,
-                        i + 1,
-                        sections[i].$1,
-                        sections[i].$2,
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: scheme.primaryContainer.withValues(alpha: 0.52),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      if (i != sections.length - 1) const SizedBox(height: 24),
-                    ],
+                      child: Icon(icon, size: 21, color: scheme.primary),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  height: 1.45,
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.54,
+                                  ),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
+              Divider(height: 1, color: scheme.outline.withValues(alpha: 0.13)),
+              Expanded(
+                child: Scrollbar(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+                    child: body,
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: scheme.outline.withValues(alpha: 0.13)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+                child: footer,
+              ),
+            ],
           ),
-          Divider(height: 1, color: scheme.outline.withValues(alpha: 0.13)),
-          _buildConsentArea(scheme),
-        ],
+        ),
       ),
     );
   }
@@ -489,6 +940,58 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     );
   }
 
+  Widget _buildPrivacySummary(
+    ColorScheme scheme, {
+    required IconData icon,
+    required String title,
+    required String body,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.11)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer.withValues(alpha: 0.62),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: scheme.primary),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    height: 1.55,
+                    color: scheme.onSurface.withValues(alpha: 0.64),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLegalSection(
     ColorScheme scheme,
     int index,
@@ -502,7 +1005,7 @@ class _UserAgreementPageState extends State<UserAgreementPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 28,
+              width: 32,
               child: Text(
                 index.toString().padLeft(2, '0'),
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -524,7 +1027,7 @@ class _UserAgreementPageState extends State<UserAgreementPage>
         ),
         const SizedBox(height: 9),
         Padding(
-          padding: const EdgeInsets.only(left: 28),
+          padding: const EdgeInsets.only(left: 32),
           child: Text(
             body,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -537,63 +1040,6 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     );
   }
 
-  Widget _buildConsentArea(ColorScheme scheme) {
-    final canContinue = _termsConfirmed && _sourceBoundaryConfirmed && !_saving;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-      child: Column(
-        children: [
-          _buildConsentCheckbox(
-            key: const Key('agreementTermsConsent'),
-            scheme: scheme,
-            value: _termsConfirmed,
-            label: context.l10n.agreementV2ConfirmLabel,
-            onChanged: (value) => setState(() => _termsConfirmed = value),
-          ),
-          const SizedBox(height: 6),
-          _buildConsentCheckbox(
-            key: const Key('agreementSourceConsent'),
-            scheme: scheme,
-            value: _sourceBoundaryConfirmed,
-            label: context.l10n.agreementV2SourceConfirmLabel,
-            emphasized: true,
-            onChanged: (value) =>
-                setState(() => _sourceBoundaryConfirmed = value),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              TextButton(
-                onPressed: _saving ? null : _onDisagreePressed,
-                child: Text(context.l10n.agreementV2ExitLabel),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  key: const Key('agreementContinueButton'),
-                  onPressed: canContinue ? _onAgreePressed : null,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                  ),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(context.l10n.agreementV2ContinueLabel),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildConsentCheckbox({
     required Key key,
     required ColorScheme scheme,
@@ -602,57 +1048,203 @@ class _UserAgreementPageState extends State<UserAgreementPage>
     required ValueChanged<bool> onChanged,
     bool emphasized = false,
   }) {
-    return Material(
-      color: emphasized
-          ? scheme.primaryContainer.withValues(alpha: 0.24)
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        key: key,
-        onTap: _saving ? null : () => onChanged(!value),
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Checkbox(
-                value: value,
-                onChanged: _saving
-                    ? null
-                    : (nextValue) => onChanged(nextValue ?? false),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    height: 1.45,
-                    fontWeight: emphasized
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                    color: scheme.onSurface.withValues(alpha: 0.76),
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return AnimatedContainer(
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 240),
+      decoration: BoxDecoration(
+        color: emphasized || value
+            ? scheme.primaryContainer.withValues(alpha: value ? 0.4 : 0.22)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+        child: InkWell(
+          key: key,
+          onTap: _saving ? null : () => onChanged(!value),
+          borderRadius: BorderRadius.circular(11),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: value,
+                  onChanged: _saving
+                      ? null
+                      : (nextValue) => onChanged(nextValue ?? false),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      height: 1.45,
+                      fontWeight: emphasized
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: scheme.onSurface.withValues(alpha: 0.78),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildNavigation(ColorScheme scheme, {required bool wide}) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final canAdvance = switch (_step) {
+      _AgreementStep.introduction => true,
+      _AgreementStep.terms =>
+        _termsConfirmed && _sourceBoundaryConfirmed && !_saving,
+      _AgreementStep.privacy => _privacyConfirmed && !_saving,
+    };
+    final primaryLabel = switch (_step) {
+      _AgreementStep.introduction => context.l10n.agreementFlowNext,
+      _AgreementStep.terms => context.l10n.agreementFlowNext,
+      _AgreementStep.privacy => context.l10n.agreementFlowEnterApp,
+    };
+    final primaryKey = switch (_step) {
+      _AgreementStep.introduction => const Key(
+        'agreementIntroductionNextButton',
+      ),
+      _AgreementStep.terms => const Key('agreementTermsNextButton'),
+      _AgreementStep.privacy => const Key('agreementContinueButton'),
+    };
+
+    return Row(
+      children: [
+        if (_step == _AgreementStep.introduction)
+          TextButton(
+            onPressed: _saving ? null : _onDisagreePressed,
+            child: Text(context.l10n.agreementV2ExitLabel),
+          )
+        else
+          TextButton.icon(
+            key: const Key('agreementBackButton'),
+            onPressed: _saving ? null : _goBack,
+            icon: const Icon(Icons.arrow_back_rounded, size: 18),
+            label: Text(context.l10n.agreementFlowBack),
+          ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: wide ? 224 : double.infinity,
+              child: FilledButton(
+                key: primaryKey,
+                onPressed: canAdvance ? _goForward : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                ),
+                child: AnimatedSwitcher(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 220),
+                  child: _saving
+                      ? const SizedBox(
+                          key: ValueKey('saving'),
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Row(
+                          key: ValueKey(primaryLabel),
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                primaryLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _step == _AgreementStep.privacy
+                                  ? Icons.check_rounded
+                                  : Icons.arrow_forward_rounded,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _goForward() {
+    switch (_step) {
+      case _AgreementStep.introduction:
+        _setStep(_AgreementStep.terms);
+      case _AgreementStep.terms:
+        if (_termsConfirmed && _sourceBoundaryConfirmed) {
+          _setStep(_AgreementStep.privacy);
+        }
+      case _AgreementStep.privacy:
+        if (_privacyConfirmed) _onAgreePressed();
+    }
+  }
+
+  void _goBack() {
+    switch (_step) {
+      case _AgreementStep.introduction:
+        return;
+      case _AgreementStep.terms:
+        _setStep(_AgreementStep.introduction);
+      case _AgreementStep.privacy:
+        _setStep(_AgreementStep.terms);
+    }
+  }
+
+  void _setStep(_AgreementStep nextStep) {
+    if (_saving || nextStep == _step) return;
+    setState(() {
+      _transitionDirection = nextStep.index > _step.index ? 1 : -1;
+      _step = nextStep;
+    });
+  }
+
   Future<void> _onAgreePressed() async {
-    if (!_termsConfirmed || !_sourceBoundaryConfirmed || _saving) return;
+    if (!_termsConfirmed ||
+        !_sourceBoundaryConfirmed ||
+        !_privacyConfirmed ||
+        _saving) {
+      return;
+    }
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     setState(() => _saving = true);
     try {
       await UserAgreementService.acceptAgreement(
         locale: Localizations.localeOf(context).toLanguageTag(),
       );
+      if (!mounted) return;
+      setState(() => _exiting = true);
+      if (!reduceMotion) {
+        await Future<void>.delayed(const Duration(milliseconds: 260));
+      }
       if (mounted) widget.onAgreed();
     } catch (error) {
       debugPrint('保存用户协议状态失败: $error');
       if (!mounted) return;
-      setState(() => _saving = false);
+      setState(() {
+        _saving = false;
+        _exiting = false;
+      });
       showSideToast(
         context,
         context.l10n.agreementV2SaveFailed,
@@ -711,6 +1303,49 @@ class _PaperGrainPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PaperGrainPainter oldDelegate) =>
       oldDelegate.isDark != isDark;
+}
+
+class _ReadingOrbitPainter extends CustomPainter {
+  final ColorScheme scheme;
+  const _ReadingOrbitPainter(this.scheme);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2 - 8);
+    final orbitPaint = Paint()
+      ..color = scheme.primary.withValues(alpha: 0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: size.width * 0.78,
+        height: size.height * 0.52,
+      ),
+      orbitPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: size.width * 0.54,
+        height: size.height * 0.78,
+      ),
+      orbitPaint,
+    );
+
+    final dotPaint = Paint()..color = scheme.primary.withValues(alpha: 0.52);
+    for (final angle in [-0.28, 2.42, 4.8]) {
+      final point = Offset(
+        center.dx + math.cos(angle) * size.width * 0.39,
+        center.dy + math.sin(angle) * size.height * 0.26,
+      );
+      canvas.drawCircle(point, 3.2, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReadingOrbitPainter oldDelegate) =>
+      oldDelegate.scheme != scheme;
 }
 
 class UserAgreementService {

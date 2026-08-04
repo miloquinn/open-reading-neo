@@ -87,9 +87,10 @@ class SourceCoverCache {
   int get activeRequests => _active;
   int get memorySizeBytes => _memoryBytes;
 
-  Future<Uint8List> load(Uri uri) {
+  Future<Uint8List> load(Uri uri, {Map<String, String> headers = const {}}) {
     _validateUri(uri);
-    final key = _key(uri);
+    final normalizedHeaders = Map<String, String>.unmodifiable(headers);
+    final key = _key(uri, normalizedHeaders);
     final memory = _memory.remove(key);
     if (memory != null) {
       _memory[key] = memory;
@@ -101,7 +102,10 @@ class SourceCoverCache {
     late final Future<Uint8List> tracked;
     tracked = () async {
       try {
-        return await _load(uri, key, (_cacheEpoch, _keyEpochs[key] ?? 0));
+        return await _load(uri, key, normalizedHeaders, (
+          _cacheEpoch,
+          _keyEpochs[key] ?? 0,
+        ));
       } finally {
         if (identical(_inFlight[key], tracked)) _inFlight.remove(key);
       }
@@ -110,7 +114,12 @@ class SourceCoverCache {
     return tracked;
   }
 
-  Future<Uint8List> _load(Uri uri, String key, (int, int) epoch) async {
+  Future<Uint8List> _load(
+    Uri uri,
+    String key,
+    Map<String, String> headers,
+    (int, int) epoch,
+  ) async {
     final disk = await _readDisk(key);
     if (disk != null) {
       if (_isCurrent(key, epoch)) _remember(key, disk);
@@ -121,7 +130,9 @@ class SourceCoverCache {
     StackTrace? lastStack;
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        final bytes = await _withPermit(() => _loader(uri));
+        final bytes = await _withPermit(
+          () => headers.isEmpty ? _loader(uri) : _download(uri, headers),
+        );
         _validateBytes(bytes);
         if (_isCurrent(key, epoch)) {
           _remember(key, bytes);
@@ -170,7 +181,10 @@ class SourceCoverCache {
     _active--;
   }
 
-  Future<Uint8List> _download(Uri uri) async {
+  Future<Uint8List> _download(
+    Uri uri, [
+    Map<String, String> requestHeaders = const {},
+  ]) async {
     try {
       var current = uri;
       for (var redirects = 0; redirects <= 5; redirects++) {
@@ -179,6 +193,7 @@ class SourceCoverCache {
           current.toString(),
           options: Options(
             responseType: ResponseType.stream,
+            headers: requestHeaders,
             followRedirects: false,
             validateStatus: (status) =>
                 status != null && status >= 200 && status < 400,
@@ -328,15 +343,27 @@ class SourceCoverCache {
   Future<File> _fileFor(String key) async =>
       File(path.join((await directory()).path, '$key.img'));
 
-  String _key(Uri uri) =>
-      sha256.convert(utf8.encode(uri.toString())).toString();
+  String _key(Uri uri, [Map<String, String> headers = const {}]) {
+    final entries = headers.entries.toList()
+      ..sort(
+        (left, right) =>
+            left.key.toLowerCase().compareTo(right.key.toLowerCase()),
+      );
+    return sha256
+        .convert(
+          utf8.encode(
+            '${uri.toString()}\u0000${entries.map((entry) => '${entry.key}:${entry.value}').join('\u0001')}',
+          ),
+        )
+        .toString();
+  }
 
   bool _isCurrent(String key, (int, int) epoch) =>
       epoch.$1 == _cacheEpoch && epoch.$2 == (_keyEpochs[key] ?? 0);
 
-  Future<void> evict(Uri uri) async {
+  Future<void> evict(Uri uri, {Map<String, String> headers = const {}}) async {
     _validateUri(uri);
-    final key = _key(uri);
+    final key = _key(uri, headers);
     _keyEpochs[key] = (_keyEpochs[key] ?? 0) + 1;
     _inFlight.remove(key);
     final memory = _memory.remove(key);

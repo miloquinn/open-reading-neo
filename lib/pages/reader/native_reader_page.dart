@@ -4528,17 +4528,58 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     return Scaffold(
       key: key,
       backgroundColor: Colors.transparent,
-      appBar: showAppBar ? AppBar(title: Text(widget.book.title)) : null,
       body: ReaderThemeBackground(
         palette: _readerTheme,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: _readerTheme.text, height: 1.4),
-            ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (showAppBar) ...[
+                        Text(
+                          widget.book.title,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _readerTheme.text,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: _readerTheme.text, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (showAppBar)
+                Positioned(
+                  left: 20,
+                  top: 10,
+                  child: Material(
+                    color: _readerTheme.surface.withValues(alpha: 0.88),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      onPressed: () => unawaited(_exitReader()),
+                      icon: Icon(
+                        Icons.arrow_back_rounded,
+                        color: _readerTheme.text,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

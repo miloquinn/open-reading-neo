@@ -11,6 +11,7 @@ import 'package:xxread/services/sync/webdav_book_file_service.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 import 'webdav_sync_translator.dart';
@@ -290,98 +291,91 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final sync = context.watch<WebDavSyncController>();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.webDavBookFilesTitle),
-        actions: [
-          IconButton(
-            tooltip: MaterialLocalizations.of(
-              context,
-            ).refreshIndicatorSemanticLabel,
-            onPressed: _loading || _transferring
-                ? null
-                : () => _load(synchronize: true),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          IconButton(
-            tooltip: MaterialLocalizations.of(context).selectAllButtonLabel,
-            onPressed: _loading || _transferring ? null : _selectAll,
-            icon: const Icon(Icons.select_all_rounded),
-          ),
+    return FloatingSubpageScaffold(
+      title: l10n.webDavBookFilesTitle,
+      actions: [
+        FloatingSubpageAction(
+          tooltip: MaterialLocalizations.of(
+            context,
+          ).refreshIndicatorSemanticLabel,
+          onPressed: _loading || _transferring
+              ? null
+              : () => _load(synchronize: true),
+          icon: Icons.refresh_rounded,
+        ),
+        FloatingSubpageAction(
+          tooltip: MaterialLocalizations.of(context).selectAllButtonLabel,
+          onPressed: _loading || _transferring ? null : _selectAll,
+          icon: Icons.select_all_rounded,
+        ),
+      ],
+      tools: TabBar(
+        controller: _tabController,
+        tabs: [
+          Tab(text: l10n.webDavFilesPendingUpload),
+          Tab(text: l10n.webDavFilesAvailableDownload),
+          Tab(text: l10n.webDavFilesSynced),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(text: l10n.webDavFilesPendingUpload),
-            Tab(text: l10n.webDavFilesAvailableDownload),
-            Tab(text: l10n.webDavFilesSynced),
-          ],
-        ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _loadError != null
-            ? _LoadFailure(
-                message: webDavSyncErrorText(context, _loadError!),
-                onRetry: () => _load(synchronize: true),
-              )
-            : Column(
-                children: [
-                  if (_hasLegacyRemoteFiles)
-                    _LegacyBookDirectoryNotice(
-                      title: l10n.webDavLegacyBookDirectoryTitle,
-                      message: l10n.webDavLegacyBookDirectoryMessage,
-                    ),
-                  if (_tabController.index == 0)
-                    _UploadPermissionCard(
-                      enabled: sync.scope.bookFiles,
-                      policy: sync.newBookUploadPolicy,
-                      onChanged: _transferring
-                          ? null
-                          : (enabled) async {
-                              if (!enabled) setState(_selected.clear);
-                              await sync.setScope(
-                                sync.scope.copyWith(bookFiles: enabled),
-                              );
-                            },
-                      onPolicyTap: _transferring || !sync.scope.bookFiles
-                          ? null
-                          : () => _pickNewBookPolicy(sync),
-                    ),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _LocalFilesList(
-                          items: _pendingUpload,
-                          selected: _selected,
-                          onToggle: _toggle,
-                          emptyText: l10n.webDavFilesEmpty,
-                          selectable: sync.scope.bookFiles,
-                        ),
-                        _RemoteFilesList(
-                          items: _availableDownload,
-                          selected: _selected,
-                          onToggle: _toggle,
-                          emptyText: l10n.webDavFilesEmpty,
-                        ),
-                        _LocalFilesList(
-                          items: _synced,
-                          selected: const {},
-                          onToggle: (_, __) {},
-                          emptyText: l10n.webDavFilesEmpty,
-                          selectable: false,
-                        ),
-                      ],
-                    ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? _LoadFailure(
+              message: webDavSyncErrorText(context, _loadError!),
+              onRetry: () => _load(synchronize: true),
+            )
+          : Column(
+              children: [
+                if (_hasLegacyRemoteFiles)
+                  _LegacyBookDirectoryNotice(
+                    title: l10n.webDavLegacyBookDirectoryTitle,
+                    message: l10n.webDavLegacyBookDirectoryMessage,
                   ),
-                ],
-              ),
-      ),
+                if (_tabController.index == 0)
+                  _UploadPermissionCard(
+                    enabled: sync.scope.bookFiles,
+                    policy: sync.newBookUploadPolicy,
+                    onChanged: _transferring
+                        ? null
+                        : (enabled) async {
+                            if (!enabled) setState(_selected.clear);
+                            await sync.setScope(
+                              sync.scope.copyWith(bookFiles: enabled),
+                            );
+                          },
+                    onPolicyTap: _transferring || !sync.scope.bookFiles
+                        ? null
+                        : () => _pickNewBookPolicy(sync),
+                  ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _LocalFilesList(
+                        items: _pendingUpload,
+                        selected: _selected,
+                        onToggle: _toggle,
+                        emptyText: l10n.webDavFilesEmpty,
+                        selectable: sync.scope.bookFiles,
+                      ),
+                      _RemoteFilesList(
+                        items: _availableDownload,
+                        selected: _selected,
+                        onToggle: _toggle,
+                        emptyText: l10n.webDavFilesEmpty,
+                      ),
+                      _LocalFilesList(
+                        items: _synced,
+                        selected: const {},
+                        onToggle: (_, __) {},
+                        emptyText: l10n.webDavFilesEmpty,
+                        selectable: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
       bottomNavigationBar: _selected.isEmpty && !_transferring
           ? null
           : SafeArea(

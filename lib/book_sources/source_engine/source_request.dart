@@ -10,9 +10,10 @@ import '../../utils/fast_gbk_decoder.dart';
 import '../protocol/book_source_protocol.dart';
 import '../services/book_download_cancellation.dart';
 import '../services/book_source_network_policy.dart';
+import 'source_cookie_utils.dart';
 import 'source_webview_loader.dart';
 
-enum SourceRequestMethod { get, post }
+enum SourceRequestMethod { get, head, post }
 
 const sourceDefaultUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -93,6 +94,7 @@ class SourceRequestTemplate {
     final methodText = '${options['method'] ?? 'GET'}'.trim().toUpperCase();
     final method = switch (methodText) {
       'GET' => SourceRequestMethod.get,
+      'HEAD' => SourceRequestMethod.head,
       'POST' => SourceRequestMethod.post,
       _ => throw BookSourceProtocolException(
         'Unsupported reading source request method: $methodText.',
@@ -104,11 +106,11 @@ class SourceRequestTemplate {
         'reading source request body must be text.',
       );
     }
-    if (method == SourceRequestMethod.get &&
+    if (method != SourceRequestMethod.post &&
         body is String &&
         body.isNotEmpty) {
       throw const BookSourceProtocolException(
-        'GET reading source requests cannot contain a body.',
+        'GET and HEAD reading source requests cannot contain a body.',
       );
     }
 
@@ -280,10 +282,19 @@ Object? _decodeOptions(String input) {
 }
 
 class SourceResponse {
-  const SourceResponse({required this.body, required this.finalUri});
+  const SourceResponse({
+    required this.body,
+    required this.finalUri,
+    this.statusCode = HttpStatus.ok,
+    this.headers = const {},
+    this.cookies = const {},
+  });
 
   final String body;
   final Uri finalUri;
+  final int statusCode;
+  final Map<String, String> headers;
+  final Map<String, String> cookies;
 }
 
 abstract interface class SourceTransport {
@@ -296,6 +307,7 @@ abstract interface class SourceTransport {
 class SourceHttpTransport implements SourceTransport {
   SourceHttpTransport({
     Dio? dio,
+    Dio? systemDio,
     this._webViewLoader = const SourceWebViewLoader(),
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(
       allowSyntheticDns: true,
@@ -304,7 +316,7 @@ class SourceHttpTransport implements SourceTransport {
     this.requestTimeout = const Duration(seconds: 8),
   }) : _networkPolicy = networkPolicy,
        _dio = dio ?? _createDio(networkPolicy, requestTimeout),
-       _systemDio = dio ?? _createDio(null, requestTimeout);
+       _systemDio = systemDio ?? dio ?? _createDio(null, requestTimeout);
 
   final Dio _dio;
   final Dio _systemDio;
@@ -340,6 +352,103 @@ class SourceHttpTransport implements SourceTransport {
       _systemDio.close(force: force);
     }
   }
+
+  String scriptCookieHeader(String jarKey, Uri uri) =>
+      _cookieHeader(jarKey, uri) ?? '';
+
+  void setScriptCookies(String jarKey, Uri uri, String cookieHeader) {
+    final jar = _cookieJars.putIfAbsent(jarKey, () => {});
+    jar.removeWhere(
+      (_, cookie) => _cookieDomainMatches(
+        uri.host,
+        cookie.domain,
+        hostOnly: cookie.hostOnly,
+      ),
+    );
+    _storeBrowserCookies(jarKey, uri, cookieHeader);
+  }
+
+  void removeScriptCookies(String jarKey, Uri uri) {
+    final jar = _cookieJars[jarKey];
+    if (jar == null) return;
+    jar.removeWhere(
+      (_, cookie) => _cookieDomainMatches(
+        uri.host,
+        cookie.domain,
+        hostOnly: cookie.hostOnly,
+      ),
+    );
+    if (jar.isEmpty) _cookieJars.remove(jarKey);
+  }
+
+  Future<Uint8List> fetchInteractionBytes({
+    required Uri uri,
+    required Map<String, String> headers,
+    String? cookieJarKey,
+    int maxBytes = 2 * 1024 * 1024,
+  }) async {
+    var current = uri;
+    var requestHeaders = Map<String, String>.from(headers);
+    for (var redirects = 0; redirects <= 5; redirects++) {
+      await _networkPolicy.validate(current);
+      final outgoing = Map<String, String>.from(requestHeaders);
+      String? configuredCookie;
+      outgoing.removeWhere((name, value) {
+        if (name.toLowerCase() != HttpHeaders.cookieHeader) return false;
+        configuredCookie = value;
+        return true;
+      });
+      final cookie = _mergeCookieHeaders(
+        configuredCookie,
+        _cookieHeader(cookieJarKey, current),
+      );
+      if (cookie != null) outgoing[HttpHeaders.cookieHeader] = cookie;
+      final response = await _dio.getUri<List<int>>(
+        current,
+        options: Options(
+          headers: outgoing,
+          responseType: ResponseType.bytes,
+          followRedirects: false,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 400,
+        ),
+      );
+      _storeCookies(cookieJarKey, current, response.headers);
+      final status = response.statusCode ?? 0;
+      if (status < 300) {
+        final bytes = response.data ?? const <int>[];
+        if (bytes.length > maxBytes) {
+          throw BookSourceProtocolException(
+            'Verification image exceeds $maxBytes bytes.',
+          );
+        }
+        return Uint8List.fromList(bytes);
+      }
+      if (redirects == 5) {
+        throw const BookSourceProtocolException(
+          'Verification image redirected too many times.',
+        );
+      }
+      final next = BookSourceNetworkPolicy.redirectTarget(
+        current,
+        response.headers.value(HttpHeaders.locationHeader),
+      );
+      if (current.authority != next.authority) {
+        requestHeaders.removeWhere((name, _) {
+          final normalized = name.toLowerCase();
+          return normalized == 'authorization' ||
+              normalized == HttpHeaders.cookieHeader ||
+              normalized == 'host';
+        });
+      }
+      current = next;
+    }
+    throw const BookSourceProtocolException(
+      'Verification image request failed.',
+    );
+  }
+
+  Future<void> validateInteractionUri(Uri uri) => _networkPolicy.validate(uri);
 
   @override
   Future<SourceResponse> send(
@@ -383,7 +492,11 @@ class SourceHttpTransport implements SourceTransport {
         loaded.finalUri,
         loaded.cookieHeader,
       );
-      return SourceResponse(body: loaded.body, finalUri: loaded.finalUri);
+      return SourceResponse(
+        body: loaded.body,
+        finalUri: loaded.finalUri,
+        cookies: _cookieMapFromHeader(loaded.cookieHeader),
+      );
     }
     const maxRedirects = 20;
     var current = request.url;
@@ -397,6 +510,7 @@ class SourceHttpTransport implements SourceTransport {
     final redirectCookies = <String, _StoredCookie>{};
     final redirectStates = <String>{};
     final connectionRetries = <Uri, int>{};
+    final systemFallbacks = <Uri>{};
     CancelToken? activeCancelToken;
     void cancelRequest() =>
         activeCancelToken?.cancel('reading source request cancelled.');
@@ -412,7 +526,10 @@ class SourceHttpTransport implements SourceTransport {
         // pinned sockets for ordinary public DNS, but use the system client
         // for this explicitly allowed synthetic range after validation.
         final requestClient =
-            resolvedAddresses.any(BookSourceNetworkPolicy.isSyntheticDnsAddress)
+            systemFallbacks.contains(current) ||
+                resolvedAddresses.any(
+                  BookSourceNetworkPolicy.isSyntheticDnsAddress,
+                )
             ? _systemDio
             : _dio;
         final cancelToken = CancelToken();
@@ -450,7 +567,11 @@ class SourceHttpTransport implements SourceTransport {
                 ? Uint8List.fromList(_encode(body ?? '', request.charset))
                 : null,
             options: Options(
-              method: method == SourceRequestMethod.post ? 'POST' : 'GET',
+              method: switch (method) {
+                SourceRequestMethod.get => 'GET',
+                SourceRequestMethod.head => 'HEAD',
+                SourceRequestMethod.post => 'POST',
+              },
               headers: requestHeaders,
               responseType: ResponseType.bytes,
               followRedirects: false,
@@ -477,6 +598,9 @@ class SourceHttpTransport implements SourceTransport {
             return SourceResponse(
               body: _decode(bytes, request.charset, response.headers),
               finalUri: current,
+              statusCode: status,
+              headers: _responseHeaders(response.headers),
+              cookies: _responseCookies(response.headers),
             );
           }
           const redirectStatuses = {
@@ -527,8 +651,16 @@ class SourceHttpTransport implements SourceTransport {
             );
           }
           final retries = connectionRetries[current] ?? 0;
+          if (error.response?.statusCode == HttpStatus.badRequest &&
+              identical(requestClient, _dio) &&
+              method != SourceRequestMethod.post &&
+              systemFallbacks.add(current)) {
+            if (redirectState != null) redirectStates.remove(redirectState);
+            redirects--;
+            continue;
+          }
           if (error.response == null &&
-              method == SourceRequestMethod.get &&
+              method != SourceRequestMethod.post &&
               retries < 2) {
             connectionRetries[current] = retries + 1;
             if (redirectState != null) {
@@ -632,12 +764,9 @@ class SourceHttpTransport implements SourceTransport {
     }
     final jar = _cookieJars.putIfAbsent(jarKey, () => {});
     final domain = uri.host.toLowerCase();
-    for (final part in cookieHeader.split(';')) {
-      final separator = part.indexOf('=');
-      if (separator <= 0) continue;
-      final name = part.substring(0, separator).trim();
-      if (name.isEmpty) continue;
-      final cookie = Cookie(name, part.substring(separator + 1).trim());
+    for (final entry in parseSourceCookieHeader(cookieHeader).entries) {
+      final cookie = Cookie(entry.key, entry.value);
+      final name = entry.key;
       final id = '$domain\u0000/\u0000$name';
       jar[id] = _StoredCookie(
         cookie: cookie,
@@ -694,19 +823,39 @@ String _defaultCookiePath(String requestPath) {
 String? _mergeCookieHeaders(String? configured, String? stored) {
   final values = <String, String>{};
   for (final header in [configured, stored]) {
-    if (header == null) continue;
-    for (final part in header.split(';')) {
-      final separator = part.indexOf('=');
-      if (separator <= 0) continue;
-      final name = part.substring(0, separator).trim();
-      if (name.isEmpty) continue;
-      values[name] = part.substring(separator + 1).trim();
-    }
+    values.addAll(parseSourceCookieHeader(header));
   }
   if (values.isEmpty) return null;
   return values.entries
       .map((entry) => '${entry.key}=${entry.value}')
       .join('; ');
+}
+
+Map<String, String> _responseHeaders(Headers headers) {
+  final result = <String, String>{};
+  for (final entry in headers.map.entries) {
+    result[entry.key.toLowerCase()] = entry.value.join(', ');
+  }
+  return Map.unmodifiable(result);
+}
+
+Map<String, String> _responseCookies(Headers headers) {
+  final values = headers[HttpHeaders.setCookieHeader];
+  if (values == null) return const {};
+  final result = <String, String>{};
+  for (final value in values) {
+    try {
+      final cookie = Cookie.fromSetCookieValue(value);
+      result[cookie.name] = cookie.value;
+    } on FormatException {
+      // Ignore one malformed response cookie without losing other metadata.
+    }
+  }
+  return Map.unmodifiable(result);
+}
+
+Map<String, String> _cookieMapFromHeader(String? cookieHeader) {
+  return Map.unmodifiable(parseSourceCookieHeader(cookieHeader));
 }
 
 const _supportedCharsets = {'utf-8', 'utf8', 'gbk', 'gb2312', 'gb18030'};

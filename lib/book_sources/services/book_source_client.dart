@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/core/app_settings_service.dart';
 import '../source_engine/source_runtime.dart';
+import '../source_engine/source_login_ui.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_download_cancellation.dart';
@@ -80,6 +81,26 @@ class BookSourceClient {
   void close({bool force = true}) {
     _sourceRuntime?.close(force: force);
     _dio.close(force: force);
+  }
+
+  Future<List<SourceLoginField>> loadLoginFields(
+    RegisteredBookSource source,
+  ) async {
+    await _ensureAdditionalProtocolsEnabled();
+    return _sourceEngine.loadLoginFields(source);
+  }
+
+  Future<void> loginSource(
+    RegisteredBookSource source,
+    Map<String, String> values,
+  ) async {
+    await _ensureAdditionalProtocolsEnabled();
+    await _sourceEngine.login(source, values);
+  }
+
+  Future<void> clearSourceLogin(RegisteredBookSource source) async {
+    await _ensureAdditionalProtocolsEnabled();
+    await _sourceEngine.clearLoginSession(source);
   }
 
   static void ensureSafeTarget(Uri uri) {

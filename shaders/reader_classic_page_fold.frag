@@ -5,6 +5,8 @@ uniform vec2 uPosA;
 uniform vec2 uPosB;
 uniform float uBindingOnRight;
 uniform float uHasBackPage;
+uniform vec3 uPaperColor;
+uniform float uPhoneBackInkOpacity;
 uniform sampler2D uSourcePage;
 uniform sampler2D uBackPage;
 
@@ -85,7 +87,17 @@ vec4 sampleSource(vec2 canonical) {
 
 vec4 sampleFoldedBack(vec2 canonical) {
     if (uHasBackPage <= 0.5) {
-        return sampleSource(canonical);
+        vec4 mirroredInk = sampleSource(canonical);
+        // The single-page phone reader has no separately authored reverse
+        // texture. Treat its mirrored source as ink showing through opaque
+        // paper instead of exposing the full-strength front-page image.
+        mirroredInk.rgb = mix(
+            uPaperColor,
+            mirroredInk.rgb,
+            uPhoneBackInkOpacity
+        );
+        mirroredInk.a = 1.0;
+        return mirroredInk;
     }
     // curlTransform already reflects the visible folded polygon back into the
     // front texture. A separately authored reverse page needs one more

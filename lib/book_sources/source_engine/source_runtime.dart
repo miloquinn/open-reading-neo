@@ -9,16 +9,20 @@ import 'source_explore.dart';
 import 'source_request.dart';
 import 'source_rule_engine.dart';
 import 'source_script_engine_platform.dart';
+import 'source_login_session.dart';
+import 'source_login_ui.dart';
+import 'source_interaction_coordinator.dart';
 import '../services/book_download_cancellation.dart';
 
 class SourceRuntime {
-  // Public parameter name intentionally differs from the private mutable field.
   SourceRuntime({
     SourceTransport? transport,
     SourceScriptEvaluator? scriptEvaluator,
-  }) : _transport = transport ?? SourceHttpTransport(),
-       // ignore: prefer_initializing_formals
-       _scriptEvaluator = scriptEvaluator;
+    SourceLoginSessionStore? loginSessionStore,
+  }) : _transport = transport ?? SourceHttpTransport() {
+    _scriptEvaluator = scriptEvaluator;
+    _loginSessionStore = loginSessionStore ?? SecureSourceLoginSessionStore();
+  }
 
   static const int _maxSearchItems = 100;
   static const int _maxChapters = 30000;
@@ -30,13 +34,18 @@ class SourceRuntime {
     scriptEvaluatorProvider: () => _scripts,
   );
   SourceScriptEvaluator? _scriptEvaluator;
+  late final SourceLoginSessionStore _loginSessionStore;
   final Map<String, Map<String, Object?>> _bookRuleStates = {};
+  final Map<String, SourceLoginSession> _loginSessions = {};
+  final Set<String> _dirtyLoginSessions = {};
 
   SourceScriptEvaluator get _scripts =>
       _scriptEvaluator ??= QuickJsSourceScriptEvaluator();
 
   void close({bool force = true}) {
     _bookRuleStates.clear();
+    _loginSessions.clear();
+    _dirtyLoginSessions.clear();
     _scriptEvaluator?.dispose();
     _scriptEvaluator = null;
     final transport = _transport;
@@ -51,7 +60,6 @@ class SourceRuntime {
     BookDownloadCancellation? cancellation,
   }) async {
     final source = _source(registered);
-    _ensureRulesSupported(source, const ['ruleSearch']);
     final response = await _request(
       source,
       source.searchUrl,
@@ -86,6 +94,7 @@ class SourceRuntime {
         'name and URL. The source rule may be outdated.',
       );
     }
+    await _flushLoginSession(source);
     return BookSourceSearchPage(
       items: books.take(pageSize).toList(growable: false),
       page: page,
@@ -104,6 +113,7 @@ class SourceRuntime {
         catalog.error ?? 'This compatible source has no discovery channels.',
       );
     }
+    await _flushLoginSession(source);
     return catalog.entries
         .map((entry) => BookSourceCategory(id: entry.url, name: entry.title))
         .toList(growable: false);
@@ -140,12 +150,6 @@ class SourceRuntime {
     final rule = _optionalRule(exploreRule, 'bookList').isEmpty
         ? source.rule('ruleSearch')
         : exploreRule;
-    _ensureRulesSupported(
-      source,
-      _optionalRule(exploreRule, 'bookList').isEmpty
-          ? const ['ruleSearch']
-          : const ['ruleExplore'],
-    );
     final contexts = await _rules.evaluateListAsync(
       document,
       null,
@@ -156,6 +160,7 @@ class SourceRuntime {
       final book = await _bookFromRules(source, document, context, rule);
       if (book != null) books.add(book);
     }
+    await _flushLoginSession(source);
     return BookSourceSearchPage(
       items: books,
       page: page,
@@ -173,47 +178,67 @@ class SourceRuntime {
     Map<String, String> sourceVariables = const {},
   }) async {
     final source = _source(registered);
-    _ensureRulesSupported(source, const ['ruleBookInfo']);
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
+    final bookContext = <String, Object?>{'bookUrl': bookId, ...ruleState};
+    final requestTarget = _decodeSourceDataTarget(bookId) ?? bookId;
     final response = await _request(
       source,
-      bookId,
+      requestTarget,
       variables: _requestVariables(ruleState, {'bookUrl': bookId}),
     );
     final document = _document(
       source,
       response,
       variables: {'bookUrl': bookId},
+      book: bookContext,
       ruleState: ruleState,
+    );
+    final contextualDocument = document.withScriptEntities(
+      book: bookContext,
+      bookWriter: (value) => bookContext.addAll(value),
     );
     final rule = source.rule('ruleBookInfo');
     final init = _optionalRule(rule, 'init');
     final context = init.isEmpty
         ? null
-        : (await _rules.evaluateListAsync(document, null, init)).firstOrNull;
-    final title = await _value(document, context, rule, 'name');
+        : (await _rules.evaluateListAsync(
+            contextualDocument,
+            null,
+            init,
+          )).firstOrNull;
+    final title = await _value(contextualDocument, context, rule, 'name');
     if (title.isEmpty) {
       throw const BookSourceProtocolException(
         'Compatible source did not return a book title.',
       );
     }
+    final cover = await _remoteAssetValue(
+      contextualDocument,
+      context,
+      rule,
+      'coverUrl',
+    );
     final book = BookSourceBook(
-      id: response.finalUri.toString(),
+      id: bookId,
       title: title,
-      author: await _value(document, context, rule, 'author'),
-      description: await _value(document, context, rule, 'intro'),
-      coverUrl: await _uriValue(document, context, rule, 'coverUrl'),
+      author: await _value(contextualDocument, context, rule, 'author'),
+      description: await _value(contextualDocument, context, rule, 'intro'),
+      coverUrl: cover?.url,
+      coverHeaders: cover?.headers ?? const {},
       categories: _splitCategories(
-        await _value(document, context, rule, 'kind'),
+        await _value(contextualDocument, context, rule, 'kind'),
       ),
-      status: _nullable(await _value(document, context, rule, 'status')),
+      status: _nullable(
+        await _value(contextualDocument, context, rule, 'status'),
+      ),
       latestChapter: _nullable(
-        await _value(document, context, rule, 'lastChapter'),
+        await _value(contextualDocument, context, rule, 'lastChapter'),
       ),
-      sourceVariables: _sourceVariables(document.ruleState),
+      sourceVariables: _sourceVariables(contextualDocument.ruleState),
     );
     _rememberRuleState(source, bookId, document.ruleState);
     _rememberRuleState(source, book.id, document.ruleState);
+    await _flushLoginSession(source);
     return book;
   }
 
@@ -223,8 +248,8 @@ class SourceRuntime {
     Map<String, String> sourceVariables = const {},
   }) async {
     final source = _source(registered);
-    _ensureRulesSupported(source, const ['ruleBookInfo', 'ruleToc']);
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
+    final bookContext = <String, Object?>{'bookUrl': bookId, ...ruleState};
     final tocUrl = await _tocUrl(source, bookId, ruleState);
     final rule = source.rule('ruleToc');
     final chapters = <BookSourceChapter>[];
@@ -233,25 +258,42 @@ class SourceRuntime {
     var nextUrl = tocUrl;
     for (var hop = 0; hop < _maxPageHops && nextUrl.isNotEmpty; hop++) {
       if (!seenPages.add(nextUrl)) break;
+      final requestTarget = _decodeSourceDataTarget(nextUrl) ?? nextUrl;
       final response = await _request(
         source,
-        nextUrl,
+        requestTarget,
         variables: _requestVariables(ruleState, {'bookUrl': bookId}),
       );
       final document = _document(
         source,
         response,
         variables: {'bookUrl': bookId},
+        book: bookContext,
         ruleState: ruleState,
       );
+      final chapterContext = <String, Object?>{};
+      final contextualDocument = document.withScriptEntities(
+        book: bookContext,
+        chapter: chapterContext,
+        bookWriter: (value) => bookContext.addAll(value),
+        chapterWriter: (value) => chapterContext.addAll(value),
+      );
       final contexts = await _rules.evaluateListAsync(
-        document,
+        contextualDocument,
         null,
         _requiredRule(rule, 'chapterList'),
       );
       for (final context in contexts) {
-        final title = await _value(document, context, rule, 'chapterName');
-        final url = await _url(document, context, rule, 'chapterUrl');
+        chapterContext
+          ..clear()
+          ..addAll({'index': chapters.length, 'url': nextUrl});
+        final title = await _value(
+          contextualDocument,
+          context,
+          rule,
+          'chapterName',
+        );
+        final url = await _url(contextualDocument, context, rule, 'chapterUrl');
         if (title.isEmpty || url.isEmpty || !seenChapters.add(url)) continue;
         if (chapters.length >= _maxChapters) {
           throw const BookSourceProtocolException(
@@ -262,7 +304,7 @@ class SourceRuntime {
           BookSourceChapter(id: url, title: title, order: chapters.length),
         );
       }
-      nextUrl = await _url(document, null, rule, 'nextTocUrl');
+      nextUrl = await _url(contextualDocument, null, rule, 'nextTocUrl');
     }
     if (chapters.isEmpty) {
       throw const BookSourceProtocolException(
@@ -270,6 +312,7 @@ class SourceRuntime {
       );
     }
     _rememberRuleState(source, bookId, ruleState);
+    await _flushLoginSession(source);
     return chapters;
   }
 
@@ -280,17 +323,18 @@ class SourceRuntime {
     Map<String, String> sourceVariables = const {},
   }) async {
     final source = _source(registered);
-    _ensureRulesSupported(source, const ['ruleContent']);
     final rule = source.rule('ruleContent');
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
+    final bookContext = <String, Object?>{'bookUrl': bookId, ...ruleState};
     final parts = <String>[];
     final seenPages = <String>{};
     var nextUrl = chapterId;
     for (var hop = 0; hop < _maxPageHops && nextUrl.isNotEmpty; hop++) {
       if (!seenPages.add(nextUrl)) break;
+      final requestTarget = _decodeSourceDataTarget(nextUrl) ?? nextUrl;
       final response = await _request(
         source,
-        nextUrl,
+        requestTarget,
         variables: _requestVariables(ruleState, {
           'bookUrl': bookId,
           'chapterUrl': chapterId,
@@ -300,10 +344,22 @@ class SourceRuntime {
         source,
         response,
         variables: {'bookUrl': bookId, 'chapterUrl': chapterId},
+        book: bookContext,
         ruleState: ruleState,
       );
+      final chapterContext = <String, Object?>{
+        'url': nextUrl,
+        'chapterUrl': chapterId,
+        'index': hop,
+      };
+      final contextualDocument = document.withScriptEntities(
+        book: bookContext,
+        chapter: chapterContext,
+        bookWriter: (value) => bookContext.addAll(value),
+        chapterWriter: (value) => chapterContext.addAll(value),
+      );
       var content = await _value(
-        document,
+        contextualDocument,
         null,
         rule,
         'content',
@@ -316,7 +372,7 @@ class SourceRuntime {
         _optionalRule(rule, 'replaceRegex'),
       );
       if (content.trim().isNotEmpty) parts.add(content.trim());
-      nextUrl = await _url(document, null, rule, 'nextContentUrl');
+      nextUrl = await _url(contextualDocument, null, rule, 'nextContentUrl');
     }
     if (parts.isEmpty) {
       throw const BookSourceProtocolException(
@@ -324,12 +380,16 @@ class SourceRuntime {
       );
     }
     _rememberRuleState(source, bookId, ruleState);
+    await _flushLoginSession(source);
+    final joinedContent = parts.join('\n\n');
+    final imageHeaders = await _sourceHeaders(source);
     return BookSourceChapterContent(
       bookId: bookId,
       chapterId: chapterId,
       title: '',
-      content: parts.join('\n\n'),
+      content: joinedContent,
       contentType: 'text/html',
+      images: _chapterImages(source, joinedContent, imageHeaders),
     );
   }
 
@@ -343,7 +403,7 @@ class SourceRuntime {
     if (tocRule.isEmpty) return bookId;
     final response = await _request(
       source,
-      bookId,
+      _decodeSourceDataTarget(bookId) ?? bookId,
       variables: _requestVariables(ruleState, {'bookUrl': bookId}),
     );
     final document = _document(
@@ -373,12 +433,14 @@ class SourceRuntime {
     final title = await _value(document, context, rule, 'name');
     final url = await _url(document, context, rule, 'bookUrl');
     if (title.isEmpty || url.isEmpty) return null;
+    final cover = await _remoteAssetValue(document, context, rule, 'coverUrl');
     final book = BookSourceBook(
       id: url,
       title: title,
       author: await _value(document, context, rule, 'author'),
       description: await _value(document, context, rule, 'intro'),
-      coverUrl: await _uriValue(document, context, rule, 'coverUrl'),
+      coverUrl: cover?.url,
+      coverHeaders: cover?.headers ?? const {},
       categories: _splitCategories(
         await _value(document, context, rule, 'kind'),
       ),
@@ -397,12 +459,13 @@ class SourceRuntime {
     Map<String, String> variables = const {},
     BookDownloadCancellation? cancellation,
   }) async {
+    await _ensureLoginSession(source);
     final expandedTemplate = await _expandScriptTemplate(
       source,
       template,
       variables,
     );
-    return _transport.send(
+    final response = await _transport.send(
       SourceRequestTemplate.parse(
         expandedTemplate,
         baseUri: source.baseUri,
@@ -412,12 +475,335 @@ class SourceRuntime {
       ),
       cancellation: cancellation,
     );
+    return _applyLoginCheck(source, response);
+  }
+
+  Future<void> _ensureLoginSession(ReadingSourceConfig source) async {
+    if (_loginSessions.containsKey(source.stableId)) return;
+    try {
+      _loginSessions[source.stableId] = await _loginSessionStore.read(
+        source.stableId,
+      );
+    } on Object {
+      // Platform secure storage can be unavailable before the host platform
+      // initializes. Keep only an in-memory empty session in that case.
+      _loginSessions[source.stableId] = const SourceLoginSession();
+    }
+  }
+
+  SourceLoginSession _loginSession(ReadingSourceConfig source) =>
+      _loginSessions[source.stableId] ?? const SourceLoginSession();
+
+  Future<void> saveLoginSession(
+    RegisteredBookSource registered, {
+    Map<String, String> loginInfo = const {},
+    Map<String, String> loginHeaders = const {},
+  }) async {
+    final source = _source(registered);
+    final session = SourceLoginSession(
+      loginInfo: Map.unmodifiable(loginInfo),
+      loginHeaders: Map.unmodifiable(loginHeaders),
+    );
+    _loginSessions[source.stableId] = session;
+    await _loginSessionStore.write(source.stableId, session);
+  }
+
+  Future<void> clearLoginSession(RegisteredBookSource registered) async {
+    final source = _source(registered);
+    _loginSessions.remove(source.stableId);
+    await _loginSessionStore.clear(source.stableId);
+    final transport = _transport;
+    if (transport is SourceHttpTransport) {
+      transport.removeScriptCookies(source.stableId, source.baseUri);
+    }
+  }
+
+  Future<List<SourceLoginField>> loadLoginFields(
+    RegisteredBookSource registered,
+  ) async {
+    final source = _source(registered);
+    await _ensureLoginSession(source);
+    final raw = source.raw['loginUi'];
+    if (raw is! String || raw.trim().isEmpty) return const [];
+    final body = _scriptBody(raw);
+    if (body == null) return parseSourceLoginFields(raw);
+    final loginSource = '${source.raw['loginUrl'] ?? ''}';
+    final loginScript = _scriptBody(loginSource) ?? loginSource;
+    final value = await _scripts.evaluateAsync(
+      '$loginScript\n$body',
+      _scriptContext(source, result: _loginSession(source).loginInfo),
+    );
+    return parseSourceLoginFields(value);
+  }
+
+  Future<void> login(
+    RegisteredBookSource registered,
+    Map<String, String> values,
+  ) async {
+    final source = _source(registered);
+    await _ensureLoginSession(source);
+    final fields = await loadLoginFields(registered);
+    final loginInfo = <String, String>{
+      ..._loginSession(source).loginInfo,
+      for (final field in fields)
+        if (!field.isButton)
+          field.name: values[field.name] ?? field.defaultValue ?? '',
+      ...values,
+    };
+    await saveLoginSession(registered, loginInfo: loginInfo);
+    final loginSource = '${source.raw['loginUrl'] ?? ''}';
+    final loginScript = _scriptBody(loginSource) ?? loginSource;
+    if (loginScript.trim().isEmpty) {
+      throw const BookSourceProtocolException(
+        'This source does not define a login script.',
+      );
+    }
+    await _scripts.evaluateAsync(
+      '$loginScript\nif (typeof login === \'function\') login();',
+      _scriptContext(source, result: loginInfo),
+    );
+    await _flushLoginSession(source);
+  }
+
+  void _updateLoginInfo(
+    ReadingSourceConfig source,
+    Map<String, String> loginInfo,
+  ) {
+    final previous = _loginSession(source);
+    if (_sameStringMap(previous.loginInfo, loginInfo)) return;
+    final next = SourceLoginSession(
+      loginInfo: Map.unmodifiable(loginInfo),
+      loginHeaders: previous.loginHeaders,
+    );
+    _loginSessions[source.stableId] = next;
+    _dirtyLoginSessions.add(source.stableId);
+  }
+
+  void _updateLoginHeaders(
+    ReadingSourceConfig source,
+    Map<String, String> loginHeaders,
+  ) {
+    final previous = _loginSession(source);
+    if (_sameStringMap(previous.loginHeaders, loginHeaders)) return;
+    final next = SourceLoginSession(
+      loginInfo: previous.loginInfo,
+      loginHeaders: Map.unmodifiable(loginHeaders),
+    );
+    _loginSessions[source.stableId] = next;
+    final cookie = loginHeaders.entries
+        .where((entry) => entry.key.toLowerCase() == 'cookie')
+        .map((entry) => entry.value)
+        .firstOrNull;
+    if (cookie != null && source.enabledCookieJar) {
+      final transport = _transport;
+      if (transport is SourceHttpTransport) {
+        transport.setScriptCookies(source.stableId, source.baseUri, cookie);
+      }
+    }
+    _dirtyLoginSessions.add(source.stableId);
+  }
+
+  Future<void> _flushLoginSession(ReadingSourceConfig source) async {
+    if (!_dirtyLoginSessions.remove(source.stableId)) return;
+    try {
+      await _loginSessionStore.write(source.stableId, _loginSession(source));
+    } on Object {
+      _dirtyLoginSessions.add(source.stableId);
+      rethrow;
+    }
+  }
+
+  SourceScriptContext _scriptContext(
+    ReadingSourceConfig source, {
+    Object? result,
+    Uri? baseUrl,
+    Map<String, String> variables = const {},
+    Map<String, Object?> book = const {},
+    Map<String, Object?> chapter = const {},
+    bool includeSourceHeaders = true,
+  }) {
+    final loginSession = _loginSession(source);
+    return SourceScriptContext(
+      source: source,
+      result: result,
+      baseUrl: baseUrl,
+      variables: variables,
+      book: book,
+      chapter: chapter,
+      networkHandler: (request) => _sendScriptNetwork(
+        source,
+        request,
+        includeSourceHeaders: includeSourceHeaders,
+      ),
+      cookieReader: (uri) => _scriptCookieHeader(source, uri),
+      cookieWriter: (uri, cookie) => _setScriptCookies(source, uri, cookie),
+      cookieRemover: (uri) => _removeScriptCookies(source, uri),
+      loginInfo: loginSession.loginInfo,
+      loginHeaders: loginSession.loginHeaders,
+      loginInfoWriter: (value) => _updateLoginInfo(source, value),
+      loginHeaderWriter: (value) => _updateLoginHeaders(source, value),
+      interactionHandler: (request) =>
+          _handleScriptInteraction(source, request),
+    );
+  }
+
+  Future<SourceScriptInteractionResult> _handleScriptInteraction(
+    ReadingSourceConfig source,
+    SourceScriptInteractionRequest request,
+  ) async {
+    var target = source.baseUri.resolve(request.url);
+    var interaction = request;
+    if (request.kind != SourceScriptInteractionKind.verificationCode &&
+        request.url.startsWith('data:text/html')) {
+      final decoded = _decodeInteractionHtml(request.url);
+      if (decoded != null) {
+        target = source.baseUri;
+        interaction = SourceScriptInteractionRequest(
+          signature: request.signature,
+          kind: request.kind,
+          url: target.toString(),
+          title: request.title,
+          html: decoded,
+          refetchAfterSuccess: request.refetchAfterSuccess,
+        );
+      }
+    }
+    final headers = await _interactionHeaders(source, target);
+    var prepared = interaction.copyWith(headers: headers);
+    final transport = _transport;
+    if (transport is SourceHttpTransport) {
+      await transport.validateInteractionUri(target);
+    }
+    if (request.kind == SourceScriptInteractionKind.verificationCode) {
+      if (transport is! SourceHttpTransport) {
+        return const SourceScriptInteractionResult(
+          error:
+              'Verification images require the reading source network transport.',
+        );
+      }
+      final bytes = await transport.fetchInteractionBytes(
+        uri: target,
+        headers: headers,
+        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+      );
+      prepared = prepared.copyWith(imageBytes: bytes);
+    }
+    final result = await SourceInteractionCoordinator.instance.request(
+      sourceId: source.stableId,
+      sourceName: source.name,
+      interaction: prepared,
+    );
+    final finalUri = Uri.tryParse(result.finalUrl);
+    if (finalUri != null && transport is SourceHttpTransport) {
+      await transport.validateInteractionUri(finalUri);
+    }
+    if (result.cookieHeader?.trim().isNotEmpty == true &&
+        source.enabledCookieJar) {
+      if (finalUri != null &&
+          source.enabledCookieJar &&
+          transport is SourceHttpTransport) {
+        transport.setScriptCookies(
+          source.stableId,
+          finalUri,
+          result.cookieHeader!,
+        );
+      }
+      _updateLoginHeaders(source, {
+        ..._loginSession(source).loginHeaders,
+        'Cookie': result.cookieHeader!,
+      });
+      await _flushLoginSession(source);
+    }
+    if (request.refetchAfterSuccess &&
+        request.kind == SourceScriptInteractionKind.browserAwait &&
+        !result.cancelled &&
+        result.error == null) {
+      final response = await _sendScriptNetwork(
+        source,
+        SourceScriptNetworkRequest(
+          signature: '',
+          method: 'GET',
+          url: result.finalUrl.isEmpty ? request.url : result.finalUrl,
+        ),
+      );
+      return SourceScriptInteractionResult(
+        body: response.body,
+        finalUrl: response.finalUrl,
+        cookieHeader: result.cookieHeader,
+      );
+    }
+    return result;
+  }
+
+  Future<Map<String, String>> _interactionHeaders(
+    ReadingSourceConfig source,
+    Uri uri,
+  ) async {
+    await _ensureLoginSession(source);
+    final headers = <String, String>{..._loginSession(source).loginHeaders};
+    final raw = source.raw['header'];
+    Object? decoded = raw;
+    if (raw is String && raw.trim().startsWith('{')) {
+      try {
+        decoded = jsonDecode(raw);
+      } on FormatException {
+        decoded = null;
+      }
+    }
+    if (decoded is Map) {
+      for (final entry in decoded.entries) {
+        if (entry.value is String) {
+          headers['${entry.key}'] = _expandSourceHeaderValue(
+            entry.value as String,
+            source,
+          );
+        }
+      }
+    }
+    final cookie = _scriptCookieHeader(source, uri);
+    if (cookie.isNotEmpty) headers['Cookie'] = cookie;
+    return headers;
+  }
+
+  Future<SourceResponse> _applyLoginCheck(
+    ReadingSourceConfig source,
+    SourceResponse response,
+  ) async {
+    final script = _scriptBody(source.loginCheckJs) ?? source.loginCheckJs;
+    if (script.isEmpty) return response;
+    final result = SourceScriptNetworkResult(
+      body: response.body,
+      finalUrl: response.finalUri.toString(),
+      statusCode: response.statusCode,
+      headers: response.headers,
+      cookies: response.cookies,
+    );
+    final checked = await _scripts.evaluateAsync(
+      script,
+      _scriptContext(source, result: result, baseUrl: response.finalUri),
+    );
+    await _flushLoginSession(source);
+    if (checked is! Map) return response;
+    final body = '${checked['body'] ?? response.body}';
+    final finalUri = Uri.tryParse('${checked['finalUrl'] ?? ''}');
+    final statusCode = checked['statusCode'] is num
+        ? (checked['statusCode'] as num).toInt()
+        : response.statusCode;
+    return SourceResponse(
+      body: body,
+      finalUri: finalUri ?? response.finalUri,
+      statusCode: statusCode,
+      headers: _responseStringMap(checked['headers'], response.headers),
+      cookies: _responseStringMap(checked['cookies'], response.cookies),
+    );
   }
 
   SourceRuleDocument _document(
     ReadingSourceConfig source,
     SourceResponse response, {
     Map<String, String> variables = const {},
+    Map<String, Object?> book = const {},
+    Map<String, Object?> chapter = const {},
     Map<String, Object?>? ruleState,
   }) {
     final state = ruleState ?? <String, Object?>{};
@@ -425,11 +811,12 @@ class SourceRuntime {
       response.body,
       response.finalUri,
       ruleState: state,
-      scriptContext: SourceScriptContext(
-        source: source,
+      scriptContext: _scriptContext(
+        source,
         baseUrl: response.finalUri,
         variables: _requestVariables(state, variables),
-        networkHandler: (request) => _sendScriptNetwork(source, request),
+        book: book,
+        chapter: chapter,
       ),
     );
   }
@@ -539,8 +926,10 @@ class SourceRuntime {
       Map.unmodifiable(_requestVariables(state, const {}));
 
   Future<Map<String, String>> _sourceHeaders(ReadingSourceConfig source) async {
+    await _ensureLoginSession(source);
     final raw = source.raw['header'];
-    if (raw == null || '$raw'.trim().isEmpty) return const {};
+    final loginHeaders = _loginSession(source).loginHeaders;
+    if (raw == null || '$raw'.trim().isEmpty) return loginHeaders;
     Object? decoded = raw;
     if (raw is String) {
       try {
@@ -549,14 +938,10 @@ class SourceRuntime {
         final script = _scriptBody(raw) ?? 'JSON.stringify(($raw))';
         decoded = await _scripts.evaluateAsync(
           script,
-          SourceScriptContext(
-            source: source,
+          _scriptContext(
+            source,
             baseUrl: source.baseUri,
-            networkHandler: (request) => _sendScriptNetwork(
-              source,
-              request,
-              includeSourceHeaders: false,
-            ),
+            includeSourceHeaders: false,
           ),
         );
         if (decoded is String) {
@@ -585,6 +970,7 @@ class SourceRuntime {
       }
       headers[name] = _expandSourceHeaderValue(entry.value as String, source);
     }
+    headers.addAll(loginHeaders);
     return headers;
   }
 
@@ -610,12 +996,10 @@ class SourceRuntime {
     String template,
     Map<String, String> variables,
   ) async {
-    SourceScriptContext context() => SourceScriptContext(
-      source: source,
-      baseUrl: source.baseUri,
-      variables: variables,
-      networkHandler: (request) => _sendScriptNetwork(source, request),
-    );
+    await _ensureLoginSession(source);
+    SourceScriptContext context() =>
+        _scriptContext(source, baseUrl: source.baseUri, variables: variables);
+
     final trimmed = template.trimLeft();
     final directScript = _scriptBody(template);
     if (directScript != null &&
@@ -642,6 +1026,30 @@ class SourceRuntime {
     return expanded;
   }
 
+  String _scriptCookieHeader(ReadingSourceConfig source, Uri uri) {
+    if (!source.enabledCookieJar) return '';
+    final transport = _transport;
+    return transport is SourceHttpTransport
+        ? transport.scriptCookieHeader(source.stableId, uri)
+        : '';
+  }
+
+  void _setScriptCookies(ReadingSourceConfig source, Uri uri, String cookie) {
+    if (!source.enabledCookieJar) return;
+    final transport = _transport;
+    if (transport is SourceHttpTransport) {
+      transport.setScriptCookies(source.stableId, uri, cookie);
+    }
+  }
+
+  void _removeScriptCookies(ReadingSourceConfig source, Uri uri) {
+    if (!source.enabledCookieJar) return;
+    final transport = _transport;
+    if (transport is SourceHttpTransport) {
+      transport.removeScriptCookies(source.stableId, uri);
+    }
+  }
+
   Future<SourceExploreCatalog> _exploreCatalog(
     ReadingSourceConfig source,
   ) async {
@@ -665,22 +1073,6 @@ class SourceRuntime {
       );
     }
     return ReadingSourceConfig.fromJson(registered.sourceConfig!);
-  }
-
-  void _ensureRulesSupported(
-    ReadingSourceConfig source,
-    Iterable<String> groupNames,
-  ) {
-    for (final groupName in groupNames) {
-      for (final entry in source.rule(groupName).entries) {
-        if (entry.value is String) {
-          SourceRuleEngine.ensureSupported(
-            entry.value as String,
-            field: '$groupName.${entry.key}',
-          );
-        }
-      }
-    }
   }
 
   Future<String> _value(
@@ -721,14 +1113,60 @@ class SourceRuntime {
     );
   }
 
-  Future<Uri?> _uriValue(
+  Future<_SourceRemoteAsset?> _remoteAssetValue(
     SourceRuleDocument document,
     Object? context,
     Map<String, dynamic> rules,
     String key,
   ) async {
     final value = await _url(document, context, rules, key);
-    return value.isEmpty ? null : Uri.tryParse(value);
+    if (value.isEmpty) return null;
+    final source = document.scriptContext?.source;
+    final asset = _parseRemoteAsset(
+      value,
+      document.baseUri,
+      source == null ? const {} : await _sourceHeaders(source),
+    );
+    if (asset == null || source == null) return asset;
+    final headers = <String, String>{...asset.headers};
+    final cookie = _scriptCookieHeader(source, asset.url);
+    if (cookie.isNotEmpty) headers['Cookie'] = cookie;
+    return _SourceRemoteAsset(
+      url: asset.url,
+      headers: Map.unmodifiable(headers),
+    );
+  }
+
+  List<BookSourceRemoteImage> _chapterImages(
+    ReadingSourceConfig source,
+    String content,
+    Map<String, String> sourceHeaders,
+  ) {
+    final images = <BookSourceRemoteImage>[];
+    final seen = <String>{};
+    final pattern = RegExp(
+      r'''(?:src|data-src|data-original)\s*=\s*(["'])(.*?)\1(?=\s*(?:/?>|[A-Za-z_:][\w:.-]*\s*=))''',
+      caseSensitive: false,
+      dotAll: true,
+    );
+    for (final match in pattern.allMatches(content)) {
+      final asset = _parseRemoteAsset(
+        match.group(2)!,
+        source.baseUri,
+        sourceHeaders,
+      );
+      if (asset == null || !seen.add(asset.url.toString())) continue;
+      final headers = <String, String>{...asset.headers};
+      final cookie = _scriptCookieHeader(source, asset.url);
+      if (cookie.isNotEmpty) headers['Cookie'] = cookie;
+      images.add(
+        BookSourceRemoteImage(
+          url: asset.url,
+          headers: Map.unmodifiable(headers),
+        ),
+      );
+    }
+    return images;
   }
 
   Future<SourceScriptNetworkResult> _sendScriptNetwork(
@@ -737,7 +1175,10 @@ class SourceRuntime {
     bool includeSourceHeaders = true,
   }) async {
     final method = request.method.toUpperCase();
-    if (method != 'GET' && method != 'POST' && method != 'WEBVIEW') {
+    if (method != 'GET' &&
+        method != 'HEAD' &&
+        method != 'POST' &&
+        method != 'WEBVIEW') {
       throw BookSourceProtocolException(
         'Source script requested unsupported HTTP method $method.',
       );
@@ -768,12 +1209,19 @@ class SourceRuntime {
       return SourceScriptNetworkResult(
         body: response.body,
         finalUrl: response.finalUri.toString(),
+        statusCode: response.statusCode,
+        headers: response.headers,
+        cookies: response.cookies,
       );
     }
     var template = request.url;
     if (method == 'POST') {
       template =
           '$template,${jsonEncode({'method': 'POST', 'body': request.body ?? '', if (headers.isNotEmpty) 'headers': headers})}';
+      headers.clear();
+    } else if (method == 'HEAD') {
+      template =
+          '$template,${jsonEncode({'method': 'HEAD', if (headers.isNotEmpty) 'headers': headers})}';
       headers.clear();
     }
     final response = await _transport.send(
@@ -787,8 +1235,135 @@ class SourceRuntime {
     return SourceScriptNetworkResult(
       body: response.body,
       finalUrl: response.finalUri.toString(),
+      statusCode: response.statusCode,
+      headers: response.headers,
+      cookies: response.cookies,
     );
   }
+}
+
+String? _decodeInteractionHtml(String value) {
+  final comma = value.indexOf(',');
+  if (comma < 0) return null;
+  final metadata = value.substring(0, comma).toLowerCase();
+  final payload = value.substring(comma + 1);
+  try {
+    if (metadata.contains(';base64')) {
+      return utf8.decode(base64Decode(payload), allowMalformed: true);
+    }
+    return Uri.decodeComponent(payload);
+  } on Object {
+    return null;
+  }
+}
+
+String? _decodeSourceDataTarget(String value) {
+  final optionsStart = value.lastIndexOf(RegExp(r',\s*\{'));
+  final dataPart = optionsStart < 0 ? value : value.substring(0, optionsStart);
+  if (!dataPart.startsWith('data:')) return null;
+  final comma = dataPart.indexOf(',');
+  if (comma < 0) return null;
+  final metadata = dataPart.substring(0, comma).toLowerCase();
+  final payload = dataPart.substring(comma + 1);
+  try {
+    final decoded = metadata.contains(';base64')
+        ? utf8.decode(base64Decode(payload), allowMalformed: true)
+        : Uri.decodeComponent(payload);
+    final uri = Uri.tryParse(decoded.trim());
+    if (uri == null ||
+        !uri.hasAuthority ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    return optionsStart < 0
+        ? decoded.trim()
+        : '$decoded${value.substring(optionsStart)}';
+  } on Object {
+    return null;
+  }
+}
+
+_SourceRemoteAsset? _parseRemoteAsset(
+  String value,
+  Uri baseUri, [
+  Map<String, String> fallbackHeaders = const {},
+]) {
+  var urlText = value.trim();
+  final headers = <String, String>{...fallbackHeaders};
+  final optionsStart = urlText.lastIndexOf(RegExp(r',\s*\{'));
+  if (optionsStart >= 0) {
+    final optionsText = urlText.substring(optionsStart + 1).trim();
+    urlText = urlText.substring(0, optionsStart).trim();
+    final decoded = _decodeRemoteAssetOptions(optionsText);
+    final optionHeaders = decoded?['headers'];
+    if (optionHeaders is Map) {
+      for (final entry in optionHeaders.entries) {
+        final name = '${entry.key}'.trim();
+        final headerValue = entry.value;
+        if (name.isNotEmpty && headerValue is String) {
+          headers[name] = headerValue;
+        }
+      }
+    }
+  }
+  if (urlText.startsWith('//')) urlText = '${baseUri.scheme}:$urlText';
+  final uri = baseUri.resolve(urlText);
+  if (!uri.hasAuthority || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    return null;
+  }
+  return _SourceRemoteAsset(url: uri, headers: Map.unmodifiable(headers));
+}
+
+Map<String, dynamic>? _decodeRemoteAssetOptions(String value) {
+  try {
+    final decoded = jsonDecode(value);
+    return decoded is Map
+        ? decoded.map((key, value) => MapEntry('$key', value))
+        : null;
+  } on FormatException {
+    try {
+      final normalized = value
+          .replaceAllMapped(
+            RegExp(r'''([,{]\s*)([A-Za-z_$][\w$-]*)(\s*:)'''),
+            (match) => '${match.group(1)}"${match.group(2)}"${match.group(3)}',
+          )
+          .replaceAllMapped(
+            RegExp(r'''(['"])(.*?)\1'''),
+            (match) => jsonEncode(match.group(2) ?? ''),
+          );
+      final decoded = jsonDecode(normalized);
+      return decoded is Map
+          ? decoded.map((key, value) => MapEntry('$key', value))
+          : null;
+    } on FormatException {
+      return null;
+    }
+  }
+}
+
+class _SourceRemoteAsset {
+  const _SourceRemoteAsset({required this.url, required this.headers});
+
+  final Uri url;
+  final Map<String, String> headers;
+}
+
+Map<String, String> _responseStringMap(
+  Object? value,
+  Map<String, String> fallback,
+) {
+  if (value is! Map) return fallback;
+  return {
+    for (final entry in value.entries) '${entry.key}': '${entry.value ?? ''}',
+  };
+}
+
+bool _sameStringMap(Map<String, String> left, Map<String, String> right) {
+  if (left.length != right.length) return false;
+  for (final entry in left.entries) {
+    if (right[entry.key] != entry.value) return false;
+  }
+  return true;
 }
 
 Future<String> _replaceAsync(

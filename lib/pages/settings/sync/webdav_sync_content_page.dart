@@ -4,6 +4,7 @@ import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 import 'webdav_sync_translator.dart';
@@ -60,114 +61,100 @@ class _WebDavSyncContentPageState extends State<WebDavSyncContentPage> {
     final l10n = context.l10n;
     final sync = context.watch<WebDavSyncController>();
     final palette = PageStyleHelper.palette(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.webDavSyncContent),
-        actions: [
-          if (_saving)
-            const Padding(
-              padding: EdgeInsets.only(right: 20),
-              child: Center(
-                child: SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
+    return FloatingSubpageScaffold(
+      title: l10n.webDavSyncContent,
+      actions: [
+        if (_saving)
+          const Padding(
+            padding: EdgeInsets.all(10),
+            child: SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: Material(
-                    color: palette.card,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: palette.border),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 8,
+          ),
+      ],
+      body: ListView(
+        padding: floatingSubpagePadding(context, top: 20, bottom: 40),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Material(
+                color: palette.card,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: palette.border),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    children: [
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeBookSources,
+                        icon: Icons.hub_outlined,
+                        value: _scope.bookSources,
+                        enabled: !_saving,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(bookSources: value)),
                       ),
-                      child: Column(
-                        children: [
-                          _ScopeSwitch(
-                            title: l10n.webDavScopeBookSources,
-                            icon: Icons.hub_outlined,
-                            value: _scope.bookSources,
-                            enabled: !_saving,
-                            onChanged: (value) => _updateScope(
-                              _scope.copyWith(bookSources: value),
-                            ),
-                          ),
-                          _ScopeSwitch(
-                            title: l10n.webDavScopeBooks,
-                            icon: Icons.library_books_outlined,
-                            value: _scope.books,
-                            enabled: !_saving,
-                            onChanged: (value) =>
-                                _updateScope(_scope.copyWith(books: value)),
-                          ),
-                          _ScopeSwitch(
-                            title: l10n.webDavScopeProgress,
-                            icon: Icons.auto_stories_outlined,
-                            value: _scope.progress,
-                            enabled: !_saving,
-                            onChanged: (value) =>
-                                _updateScope(_scope.copyWith(progress: value)),
-                          ),
-                          _ScopeSwitch(
-                            title: l10n.webDavScopeBookmarks,
-                            icon: Icons.bookmark_border_rounded,
-                            value: _scope.bookmarks,
-                            enabled: !_saving,
-                            onChanged: (value) =>
-                                _updateScope(_scope.copyWith(bookmarks: value)),
-                          ),
-                          _ScopeSwitch(
-                            title: l10n.webDavScopeReadingSessions,
-                            icon: Icons.bar_chart_rounded,
-                            value: _scope.readingSessions,
-                            enabled: !_saving,
-                            onChanged: (value) => _updateScope(
-                              _scope.copyWith(readingSessions: value),
-                            ),
-                          ),
-                          _ScopeSwitch(
-                            title: l10n.webDavScopeBookFiles,
-                            subtitle: sync.fileCapabilities.uploadSupported
-                                ? l10n.webDavBookFilesHint
-                                : l10n.webDavBookFilesUnavailable,
-                            icon: Icons.cloud_upload_outlined,
-                            value:
-                                _scope.bookFiles &&
-                                sync.fileCapabilities.uploadSupported,
-                            enabled:
-                                !_saving &&
-                                sync.fileCapabilities.uploadSupported,
-                            onChanged: (value) =>
-                                _updateScope(_scope.copyWith(bookFiles: value)),
-                          ),
-                        ],
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeBooks,
+                        icon: Icons.library_books_outlined,
+                        value: _scope.books,
+                        enabled: !_saving,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(books: value)),
                       ),
-                    ),
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeProgress,
+                        icon: Icons.auto_stories_outlined,
+                        value: _scope.progress,
+                        enabled: !_saving,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(progress: value)),
+                      ),
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeBookmarks,
+                        icon: Icons.bookmark_border_rounded,
+                        value: _scope.bookmarks,
+                        enabled: !_saving,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(bookmarks: value)),
+                      ),
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeReadingSessions,
+                        icon: Icons.bar_chart_rounded,
+                        value: _scope.readingSessions,
+                        enabled: !_saving,
+                        onChanged: (value) => _updateScope(
+                          _scope.copyWith(readingSessions: value),
+                        ),
+                      ),
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeBookFiles,
+                        subtitle: sync.fileCapabilities.uploadSupported
+                            ? l10n.webDavBookFilesHint
+                            : l10n.webDavBookFilesUnavailable,
+                        icon: Icons.cloud_upload_outlined,
+                        value:
+                            _scope.bookFiles &&
+                            sync.fileCapabilities.uploadSupported,
+                        enabled:
+                            !_saving && sync.fileCapabilities.uploadSupported,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(bookFiles: value)),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

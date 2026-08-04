@@ -14,8 +14,8 @@ import 'package:xxread/pages/home/widgets/home_navigation_item.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/utils/ui_style.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 class FloatingNavigationSettingsPage extends StatelessWidget {
@@ -24,220 +24,212 @@ class FloatingNavigationSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.settingsFloatingNavigationTitle)),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: Consumer<AppSettingsNotifier>(
-          builder: (context, settings, _) => ReorderableListView.builder(
-            key: const ValueKey('floating-navigation-order-list'),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            buildDefaultDragHandles: false,
-            itemCount: settings.homeNavigationOrder.length,
-            onReorderStart: (_) => HapticFeedback.mediumImpact(),
-            onReorderItem: (oldIndex, newIndex) => _reorder(
-              settings: settings,
-              oldIndex: oldIndex,
-              newIndex: newIndex,
+    return FloatingSubpageScaffold(
+      title: l10n.settingsFloatingNavigationTitle,
+      body: Consumer<AppSettingsNotifier>(
+        builder: (context, settings, _) => ReorderableListView.builder(
+          key: const ValueKey('floating-navigation-order-list'),
+          padding: floatingSubpagePadding(context),
+          buildDefaultDragHandles: false,
+          itemCount: settings.homeNavigationOrder.length,
+          onReorderStart: (_) => HapticFeedback.mediumImpact(),
+          onReorderItem: (oldIndex, newIndex) => _reorder(
+            settings: settings,
+            oldIndex: oldIndex,
+            newIndex: newIndex,
+          ),
+          proxyDecorator: (child, _, animation) => AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) => Material(
+              color: Colors.transparent,
+              elevation: 10 * animation.value,
+              borderRadius: BorderRadius.circular(18),
+              child: child,
             ),
-            proxyDecorator: (child, _, animation) => AnimatedBuilder(
-              animation: animation,
-              builder: (context, _) => Material(
-                color: Colors.transparent,
-                elevation: 10 * animation.value,
-                borderRadius: BorderRadius.circular(18),
-                child: child,
+          ),
+          header: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionLabel(label: l10n.floatingNavigationPreviewTitle),
+              const SizedBox(height: 10),
+              _NavigationPreview(settings: settings),
+              const SizedBox(height: 24),
+              _SectionLabel(label: l10n.floatingNavigationSizeTitle),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  key: const ValueKey('floating-navigation-size-mode'),
+                  showSelectedIcon: false,
+                  expandedInsets: EdgeInsets.zero,
+                  segments: [
+                    ButtonSegment(
+                      value: false,
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: Text(l10n.floatingNavigationSizeAutomatic),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      icon: const Icon(Icons.tune_rounded),
+                      label: Text(l10n.floatingNavigationSizeCustom),
+                    ),
+                  ],
+                  selected: {settings.customizeFloatingNavigationSize},
+                  onSelectionChanged: (selection) {
+                    if (selection.isEmpty) return;
+                    unawaited(
+                      settings.setCustomizeFloatingNavigationSize(
+                        selection.first,
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            header: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionLabel(label: l10n.floatingNavigationPreviewTitle),
-                const SizedBox(height: 10),
-                _NavigationPreview(settings: settings),
-                const SizedBox(height: 24),
-                _SectionLabel(label: l10n.floatingNavigationSizeTitle),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<bool>(
-                    key: const ValueKey('floating-navigation-size-mode'),
-                    showSelectedIcon: false,
-                    expandedInsets: EdgeInsets.zero,
-                    segments: [
-                      ButtonSegment(
-                        value: false,
-                        icon: const Icon(Icons.auto_awesome_outlined),
-                        label: Text(l10n.floatingNavigationSizeAutomatic),
-                      ),
-                      ButtonSegment(
-                        value: true,
-                        icon: const Icon(Icons.tune_rounded),
-                        label: Text(l10n.floatingNavigationSizeCustom),
-                      ),
-                    ],
-                    selected: {settings.customizeFloatingNavigationSize},
-                    onSelectionChanged: (selection) {
-                      if (selection.isEmpty) return;
-                      unawaited(
-                        settings.setCustomizeFloatingNavigationSize(
-                          selection.first,
-                        ),
-                      );
-                    },
+              if (settings.customizeFloatingNavigationSize) ...[
+                const SizedBox(height: 14),
+                _NavigationSizeSlider(
+                  sliderKey: const ValueKey(
+                    'floating-navigation-height-slider',
                   ),
+                  icon: Icons.height_rounded,
+                  label: l10n.floatingNavigationHeightLabel,
+                  value: settings.floatingNavigationHeight,
+                  min: kHomeMobileFloatingNavMinHeight,
+                  max: kHomeMobileFloatingNavMaxHeight,
+                  onChanged: settings.setFloatingNavigationHeight,
                 ),
-                if (settings.customizeFloatingNavigationSize) ...[
-                  const SizedBox(height: 14),
-                  _NavigationSizeSlider(
-                    sliderKey: const ValueKey(
-                      'floating-navigation-height-slider',
-                    ),
-                    icon: Icons.height_rounded,
-                    label: l10n.floatingNavigationHeightLabel,
-                    value: settings.floatingNavigationHeight,
-                    min: kHomeMobileFloatingNavMinHeight,
-                    max: kHomeMobileFloatingNavMaxHeight,
-                    onChanged: settings.setFloatingNavigationHeight,
+                _NavigationSizeSlider(
+                  sliderKey: const ValueKey(
+                    'floating-navigation-margin-slider',
                   ),
-                  _NavigationSizeSlider(
-                    sliderKey: const ValueKey(
-                      'floating-navigation-margin-slider',
-                    ),
-                    icon: Icons.horizontal_distribute_rounded,
-                    label: l10n.floatingNavigationSideMarginLabel,
-                    value: settings.floatingNavigationHorizontalMargin,
-                    min: kHomeMobileFloatingNavMinHorizontalMargin,
-                    max: kHomeMobileFloatingNavMaxHorizontalMargin,
-                    onChanged: settings.setFloatingNavigationHorizontalMargin,
-                  ),
-                ],
-                const SizedBox(height: 24),
-                _SectionLabel(label: l10n.floatingNavigationDisplayModeTitle),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<bool>(
-                    key: const ValueKey('floating-navigation-display-mode'),
-                    showSelectedIcon: false,
-                    expandedInsets: EdgeInsets.zero,
-                    segments: [
-                      ButtonSegment(
-                        value: false,
-                        icon: const Icon(Icons.apps_rounded),
-                        label: Text(l10n.floatingNavigationIconsOnly),
-                      ),
-                      ButtonSegment(
-                        value: true,
-                        icon: const Icon(Icons.label_outline_rounded),
-                        label: Text(l10n.floatingNavigationIconsAndLabels),
-                      ),
-                    ],
-                    selected: {settings.showNavigationLabels},
-                    onSelectionChanged: (selection) {
-                      if (selection.isEmpty) return;
-                      unawaited(
-                        settings.setShowNavigationLabels(selection.first),
-                      );
-                    },
-                  ),
+                  icon: Icons.horizontal_distribute_rounded,
+                  label: l10n.floatingNavigationSideMarginLabel,
+                  value: settings.floatingNavigationHorizontalMargin,
+                  min: kHomeMobileFloatingNavMinHorizontalMargin,
+                  max: kHomeMobileFloatingNavMaxHorizontalMargin,
+                  onChanged: settings.setFloatingNavigationHorizontalMargin,
                 ),
-                const SizedBox(height: 24),
-                _SectionLabel(label: l10n.floatingNavigationOrderTitle),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.drag_indicator_rounded,
-                      size: 17,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        l10n.floatingNavigationOrderHint,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.visibility_off_outlined,
-                      size: 17,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        l10n.floatingNavigationVisibilityHint,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
               ],
-            ),
-            footer: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
+              const SizedBox(height: 24),
+              _SectionLabel(label: l10n.floatingNavigationDisplayModeTitle),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  key: const ValueKey('floating-navigation-display-mode'),
+                  showSelectedIcon: false,
+                  expandedInsets: EdgeInsets.zero,
+                  segments: [
+                    ButtonSegment(
+                      value: false,
+                      icon: const Icon(Icons.apps_rounded),
+                      label: Text(l10n.floatingNavigationIconsOnly),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      icon: const Icon(Icons.label_outline_rounded),
+                      label: Text(l10n.floatingNavigationIconsAndLabels),
+                    ),
+                  ],
+                  selected: {settings.showNavigationLabels},
+                  onSelectionChanged: (selection) {
+                    if (selection.isEmpty) return;
+                    unawaited(
+                      settings.setShowNavigationLabels(selection.first),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              _SectionLabel(label: l10n.floatingNavigationOrderTitle),
+              const SizedBox(height: 6),
+              Row(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.sync_alt_rounded,
-                        size: 17,
+                  Icon(
+                    Icons.drag_indicator_rounded,
+                    size: 17,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.floatingNavigationOrderHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.floatingNavigationSyncHint,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                height: 1.4,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextButton.icon(
-                    key: const ValueKey('floating-navigation-reset-order'),
-                    onPressed: () => unawaited(_reset(context, settings)),
-                    icon: const Icon(Icons.restart_alt_rounded),
-                    label: Text(l10n.floatingNavigationResetOrder),
+                    ),
                   ),
                 ],
               ),
-            ),
-            itemBuilder: (context, index) {
-              final destination = settings.homeNavigationOrder[index];
-              return Padding(
-                key: ValueKey(
-                  'floating-navigation-order-${destination.storageId}',
-                ),
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _NavigationOrderTile(
-                  destination: destination,
-                  index: index,
-                ),
-              );
-            },
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.visibility_off_outlined,
+                    size: 17,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.floatingNavigationVisibilityHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
           ),
+          footer: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.sync_alt_rounded,
+                      size: 17,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.floatingNavigationSyncHint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  key: const ValueKey('floating-navigation-reset-order'),
+                  onPressed: () => unawaited(_reset(context, settings)),
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: Text(l10n.floatingNavigationResetOrder),
+                ),
+              ],
+            ),
+          ),
+          itemBuilder: (context, index) {
+            final destination = settings.homeNavigationOrder[index];
+            return Padding(
+              key: ValueKey(
+                'floating-navigation-order-${destination.storageId}',
+              ),
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _NavigationOrderTile(
+                destination: destination,
+                index: index,
+              ),
+            );
+          },
         ),
       ),
     );

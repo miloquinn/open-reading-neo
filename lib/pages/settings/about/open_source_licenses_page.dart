@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 class OpenSourceLicensesPage extends StatelessWidget {
   const OpenSourceLicensesPage({required this.appVersion, super.key});
@@ -43,88 +44,98 @@ class OpenSourceLicensesPage extends StatelessWidget {
     ),
   ];
 
+  static const _bundledCodeLicenses = [
+    _BundledLicense(
+      name: 'Dart QR encoder adaptation',
+      assetPath: 'assets/fonts/licenses/DartQr-BSD-3-Clause.txt',
+      subtitle: 'BSD 3-Clause License',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.openSourceLicensesTitle),
-        scrolledUnderElevation: 0,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              _IntroCard(text: l10n.openSourceLicensesIntro),
-              const SizedBox(height: 22),
-              _SectionTitle(title: l10n.openSourceProjectSection),
-              const SizedBox(height: 8),
-              _LicenseEntryCard(
-                key: const ValueKey('open-reading-agpl-license'),
-                title: 'Open Reading',
-                subtitle: 'GNU Affero General Public License v3.0',
-                icon: Icons.code_rounded,
-                onTap: () => _openBundledLicense(
-                  context,
-                  title: 'Open Reading · AGPL-3.0',
-                  assetPath: 'LICENSE',
-                ),
-              ),
-              const SizedBox(height: 10),
-              _LicenseEntryCard(
-                title: l10n.openSourceLegacyLicenseTitle,
-                subtitle: 'MIT License · v1.0.0 and earlier',
-                icon: Icons.history_rounded,
-                onTap: () => _openBundledLicense(
-                  context,
-                  title: '${l10n.openSourceLegacyLicenseTitle} · MIT',
-                  assetPath: 'LICENSE-MIT-LEGACY',
-                ),
-              ),
-              const SizedBox(height: 22),
-              _SectionTitle(title: l10n.openSourceFontsSection),
-              const SizedBox(height: 8),
-              for (var index = 0; index < _fontLicenses.length; index++) ...[
-                _LicenseEntryCard(
-                  key: ValueKey('font-license-${_fontLicenses[index].name}'),
-                  title: _fontLicenses[index].name,
-                  subtitle: _fontLicenses[index].subtitle,
-                  icon: Icons.font_download_outlined,
-                  onTap: () => _openBundledLicense(
-                    context,
-                    title: _fontLicenses[index].name,
-                    assetPath: _fontLicenses[index].assetPath,
-                  ),
-                ),
-                if (index != _fontLicenses.length - 1)
-                  const SizedBox(height: 10),
-              ],
-              const SizedBox(height: 22),
-              _SectionTitle(title: l10n.openSourceDependenciesSection),
-              const SizedBox(height: 8),
-              _LicenseEntryCard(
-                key: const ValueKey('flutter-package-licenses'),
-                title: l10n.openSourceDependenciesTitle,
-                subtitle: l10n.openSourceDependenciesSubtitle,
-                icon: Icons.widgets_outlined,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => LicensePage(
-                      applicationName: l10n.settingsAppName,
-                      applicationVersion: appVersion,
-                      applicationLegalese: l10n.openSourceLicenseLegalese,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    return FloatingSubpageScaffold(
+      title: l10n.openSourceLicensesTitle,
+      body: ListView(
+        padding: floatingSubpagePadding(context),
+        children: [
+          _IntroCard(text: l10n.openSourceLicensesIntro),
+          const SizedBox(height: 22),
+          _SectionTitle(title: l10n.openSourceProjectSection),
+          const SizedBox(height: 8),
+          _LicenseEntryCard(
+            key: const ValueKey('open-reading-agpl-license'),
+            title: 'Open Reading',
+            subtitle: 'GNU Affero General Public License v3.0',
+            icon: Icons.code_rounded,
+            onTap: () => _openBundledLicense(
+              context,
+              title: 'Open Reading · AGPL-3.0',
+              assetPath: 'LICENSE',
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+          _LicenseEntryCard(
+            title: l10n.openSourceLegacyLicenseTitle,
+            subtitle: 'MIT License · v1.0.0 and earlier',
+            icon: Icons.history_rounded,
+            onTap: () => _openBundledLicense(
+              context,
+              title: '${l10n.openSourceLegacyLicenseTitle} · MIT',
+              assetPath: 'LICENSE-MIT-LEGACY',
+            ),
+          ),
+          const SizedBox(height: 22),
+          _SectionTitle(title: l10n.openSourceFontsSection),
+          const SizedBox(height: 8),
+          for (var index = 0; index < _fontLicenses.length; index++) ...[
+            _LicenseEntryCard(
+              key: ValueKey('font-license-${_fontLicenses[index].name}'),
+              title: _fontLicenses[index].name,
+              subtitle: _fontLicenses[index].subtitle,
+              icon: Icons.font_download_outlined,
+              onTap: () => _openBundledLicense(
+                context,
+                title: _fontLicenses[index].name,
+                assetPath: _fontLicenses[index].assetPath,
+              ),
+            ),
+            if (index != _fontLicenses.length - 1) const SizedBox(height: 10),
+          ],
+          const SizedBox(height: 22),
+          _SectionTitle(title: l10n.openSourceDependenciesSection),
+          const SizedBox(height: 8),
+          for (final license in _bundledCodeLicenses) ...[
+            _LicenseEntryCard(
+              key: ValueKey('bundled-code-license-${license.name}'),
+              title: license.name,
+              subtitle: license.subtitle,
+              icon: Icons.qr_code_2_rounded,
+              onTap: () => _openBundledLicense(
+                context,
+                title: license.name,
+                assetPath: license.assetPath,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          _LicenseEntryCard(
+            key: const ValueKey('flutter-package-licenses'),
+            title: l10n.openSourceDependenciesTitle,
+            subtitle: l10n.openSourceDependenciesSubtitle,
+            icon: Icons.widgets_outlined,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LicensePage(
+                  applicationName: l10n.settingsAppName,
+                  applicationVersion: appVersion,
+                  applicationLegalese: l10n.openSourceLicenseLegalese,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -287,52 +298,44 @@ class _LicenseTextPageState extends State<_LicenseTextPage> {
   @override
   Widget build(BuildContext context) {
     final palette = PageStyleHelper.palette(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title), scrolledUnderElevation: 0),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: FutureBuilder<String>(
-            future: _licenseText,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(context.l10n.openSourceLicenseLoadFailed),
-                  ),
-                );
-              }
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: palette.card,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: palette.border),
-                  ),
-                  child: SelectableText(
-                    snapshot.data ?? '',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: defaultTargetPlatform == TargetPlatform.iOS
-                          ? 'Menlo'
-                          : 'monospace',
-                      height: 1.55,
-                    ),
-                  ),
+    return FloatingSubpageScaffold(
+      title: widget.title,
+      body: FutureBuilder<String>(
+        future: _licenseText,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(context.l10n.openSourceLicenseLoadFailed),
+              ),
+            );
+          }
+          return SingleChildScrollView(
+            padding: floatingSubpagePadding(context),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: palette.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: palette.border),
+              ),
+              child: SelectableText(
+                snapshot.data ?? '',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontFamily: defaultTargetPlatform == TargetPlatform.iOS
+                      ? 'Menlo'
+                      : 'monospace',
+                  height: 1.55,
                 ),
-              );
-            },
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -147,6 +147,34 @@ void main() {
       expect(restored.sourceVariables, {'book': '7'});
     });
 
+    test('preserves cover headers and remote chapter images', () {
+      final book = BookSourceBook.fromJson({
+        'id': 'book',
+        'title': 'Book',
+        'coverUrl': 'https://images.test/cover.jpg',
+        'coverHeaders': {'Referer': 'https://books.test/'},
+      });
+      final content = BookSourceChapterContent.fromJson({
+        'bookId': 'book',
+        'chapterId': 'chapter',
+        'contentType': 'text/html',
+        'content': '<img>',
+        'images': [
+          {
+            'url': 'https://images.test/1.jpg',
+            'headers': {'Referer': 'https://books.test/'},
+          },
+        ],
+      });
+
+      expect(book.coverHeaders['Referer'], 'https://books.test/');
+      expect(
+        BookSourceBook.fromJson(book.toJson()).coverHeaders,
+        book.coverHeaders,
+      );
+      expect(content.images.single.url, Uri.parse('https://images.test/1.jpg'));
+    });
+
     test('parses optional discovery and category responses', () {
       final discovery = BookSourceDiscoveryPage.fromJson({
         'sections': [

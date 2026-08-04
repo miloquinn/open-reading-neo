@@ -41,8 +41,42 @@ void main() {
     expect(await BookSourceRegistry().load(), isEmpty);
     expect(find.text('Manage sources'), findsOneWidget);
     expect(find.text('Connected sources'), findsOneWidget);
-    expect(find.text('Add source'), findsOneWidget);
+    expect(find.byKey(const Key('bookSourcesToolButton')), findsOneWidget);
     expect(find.text('Open Reading Source Protocol'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('centers the title between matching glass controls', (
+    tester,
+  ) async {
+    unmountPage(tester);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceManagementPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final backRect = tester.getRect(
+      find.byKey(const ValueKey('floating-subpage-back')),
+    );
+    final titleRect = tester.getRect(find.text('书源管理'));
+    final toolRect = tester.getRect(
+      find.byKey(const Key('bookSourcesToolButton')),
+    );
+    final screenCenter =
+        tester.getSize(find.byType(BookSourceManagementPage)).width / 2;
+
+    expect((titleRect.center.dx - screenCenter).abs(), lessThan(1));
+    expect((titleRect.center.dy - backRect.center.dy).abs(), lessThan(8));
+    expect(backRect.size, toolRect.size);
     expect(tester.takeException(), isNull);
   });
 
@@ -75,7 +109,7 @@ void main() {
       find.byKey(const Key('additionalSourcesImportButton')),
       findsNothing,
     );
-    expect(find.widgetWithText(FilledButton, 'Add source'), findsOneWidget);
+    expect(find.byKey(const Key('bookSourcesToolButton')), findsOneWidget);
 
     await settings.setAdditionalSourceProtocolsEnabled(true);
     await tester.pump();
@@ -84,7 +118,7 @@ void main() {
       find.byKey(const Key('additionalSourcesImportButton')),
       findsNothing,
     );
-    expect(find.widgetWithText(FilledButton, 'Add source'), findsOneWidget);
+    expect(find.byKey(const Key('bookSourcesToolButton')), findsOneWidget);
   });
 
   testWidgets('keeps dense source metadata readable on narrow phones', (
@@ -221,7 +255,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Add source'));
+    await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourcesAddButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('Import link'), findsOneWidget);
@@ -273,6 +309,8 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesSelectionModeButton')));
     await tester.pump();
 
@@ -423,6 +461,8 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesSelectionModeButton')));
     await tester.pump();
     await tester.tap(find.widgetWithText(OutlinedButton, 'Select all'));

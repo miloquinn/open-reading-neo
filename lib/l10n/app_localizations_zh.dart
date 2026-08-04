@@ -437,6 +437,59 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesClose => '关闭';
 
   @override
+  String get sourceLoginTitle => '书源登录';
+
+  @override
+  String get sourceLoginSecureStorageNotice => '登录信息仅保存在当前设备的系统安全存储中。';
+
+  @override
+  String get sourceLoginNoForm => '该书源没有可显示的登录表单，网页登录暂未接入。';
+
+  @override
+  String get sourceLoginSave => '登录并保存会话';
+
+  @override
+  String get sourceLoginClear => '清除登录会话';
+
+  @override
+  String get sourceLoginSaved => '书源登录会话已更新';
+
+  @override
+  String get sourceLoginCleared => '书源登录会话已清除';
+
+  @override
+  String sourceLoginFailed(String details) {
+    return '无法更新书源登录会话：$details';
+  }
+
+  @override
+  String get sourceVerificationTitle => '书源验证';
+
+  @override
+  String get sourceVerificationBrowserHint =>
+      '请在安全浏览器中完成站点验证，然后点击“完成验证”。页面地址和 Cookie 只会返回当前书源任务。';
+
+  @override
+  String get sourceVerificationCodeHint => '识别图片并输入验证码，以继续当前书源任务。';
+
+  @override
+  String get sourceVerificationCodeLabel => '图片验证码';
+
+  @override
+  String get sourceVerificationSubmit => '继续';
+
+  @override
+  String get sourceVerificationRetry => '重新打开浏览器';
+
+  @override
+  String get sourceVerificationCancel => '取消验证';
+
+  @override
+  String sourceVerificationFailed(String details) {
+    return '无法打开书源验证：$details';
+  }
+
+  @override
   String get settings => '设置';
 
   @override
@@ -2286,7 +2339,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAccountGuestTitle => '登录开元阅读';
 
   @override
-  String get settingsAccountGuestSubtitle => '管理账号资料与支持者身份';
+  String get settingsAccountGuestSubtitle => '同步账号资料与安全设置';
 
   @override
   String get settingsAccountOpen => '用户中心';
@@ -2298,10 +2351,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountPageTitle => '用户中心';
 
   @override
-  String get accountPageSubtitle => '管理资料、登录方式和支持者身份。';
+  String get accountIntroTitle => '账号';
 
   @override
-  String get accountLoginTab => '登录';
+  String get accountPageSubtitle => '登录后同步资料与账号设置。';
+
+  @override
+  String get accountLoginTab => '邮箱登录';
 
   @override
   String get accountRegisterTab => '注册';
@@ -2385,13 +2441,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountResetPassword => '重置密码';
 
   @override
-  String get accountUseGithub => '使用 GitHub';
+  String get accountUseGithub => 'GitHub 登录';
 
   @override
   String get accountUseGoogle => '使用 Google';
 
   @override
   String get accountUsePasskey => '使用 Passkey';
+
+  @override
+  String get accountMoreSignInMethods => '更多登录方式';
 
   @override
   String get accountExternalHint => '将打开安全浏览器，授权后返回 App 即可。';
@@ -4101,6 +4160,62 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get agreementFlowStepIntroduction => '软件介绍';
+
+  @override
+  String get agreementFlowStepTerms => '使用协议';
+
+  @override
+  String get agreementFlowStepPrivacy => '隐私说明';
+
+  @override
+  String get agreementFlowNext => '下一步';
+
+  @override
+  String get agreementFlowBack => '返回';
+
+  @override
+  String get agreementFlowTermsTitle => '先确认清晰的使用边界';
+
+  @override
+  String get agreementFlowTermsSubtitle => '请阅读使用条款，以及用户内容和第三方书源的责任边界。';
+
+  @override
+  String get agreementFlowTermsConsent => '我已完整阅读并同意《使用条款》。';
+
+  @override
+  String get agreementFlowPrivacyTitle => '你的数据，由你掌控';
+
+  @override
+  String get agreementFlowPrivacySubtitle => '请确认哪些数据留在本机、何时会发生联网，以及下载记录如何保留。';
+
+  @override
+  String get agreementFlowPrivacyConsent => '我已完整阅读并同意《隐私说明》。';
+
+  @override
+  String get agreementFlowEnterApp => '进入开元阅读';
+
+  @override
+  String get agreementFlowPrivacyLocalTitle => '默认保存在本机';
+
+  @override
+  String get agreementFlowPrivacyLocalBody => '书籍、阅读进度、笔记和设置通常只保存在当前设备。';
+
+  @override
+  String get agreementFlowPrivacyNetworkTitle => '联网行为清晰可见';
+
+  @override
+  String get agreementFlowPrivacyNetworkBody =>
+      '本地阅读不会上传书籍正文；检查更新会访问 GitHub 和官网，书源、AI 与同步仅在使用相应功能时连接。';
+
+  @override
+  String get agreementFlowPrivacyRetentionTitle => '下载记录限期保留';
+
+  @override
+  String get agreementFlowPrivacyRetentionBody =>
+      '官网中包含原始 IP 的下载明细最多保留 30 天，之后删除。';
+
+  @override
   String get agreementV2Title => '使用条款与隐私说明';
 
   @override
@@ -4750,7 +4865,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountSecurityTitle => '账号安全';
 
   @override
+  String get accountSecurityLoading => '正在读取安全状态…';
+
+  @override
   String get accountChangeEmailTitle => '更换邮箱';
+
+  @override
+  String get accountChangeEmailEnterTitle => '填写新邮箱';
+
+  @override
+  String get accountChangeEmailEnterHint => '我们会分别向当前邮箱和新邮箱发送一个验证码。';
+
+  @override
+  String get accountChangeEmailVerifyTitle => '验证两个邮箱';
+
+  @override
+  String get accountChangeEmailVerifyHint => '输入两封邮件中的验证码，完成登录邮箱更换。';
 
   @override
   String get accountCurrentEmail => '当前邮箱';
@@ -4777,6 +4907,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountChangePasswordTitle => '设置或更换密码';
 
   @override
+  String get accountPasswordEmailTitle => '先验证当前邮箱';
+
+  @override
+  String get accountPasswordEmailHint => '发送验证码到当前邮箱，验证后再设置新密码。';
+
+  @override
+  String get accountPasswordNewTitle => '设置新密码';
+
+  @override
+  String get accountPasswordNewHint => '输入邮件验证码，并设置下次登录使用的密码。';
+
+  @override
   String get accountNewPassword => '新密码';
 
   @override
@@ -4796,6 +4938,41 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountMfaDisabledByDefault => '默认关闭。开启后可保护密码和邮箱验证码登录。';
+
+  @override
+  String get accountMfaOnTitle => '双重验证已开启';
+
+  @override
+  String get accountMfaEmailTitle => '先验证当前邮箱';
+
+  @override
+  String accountMfaEmailHint(String email) {
+    return '我们会向 $email 发送一个开启验证码。';
+  }
+
+  @override
+  String get accountMfaEmailCodeTitle => '输入邮件验证码';
+
+  @override
+  String get accountMfaEmailCodeHint => '验证完成后，下一个页面才会展示验证器二维码和密钥。';
+
+  @override
+  String get accountMfaAuthenticatorTitle => '将开元阅读添加到验证器';
+
+  @override
+  String get accountMfaAuthenticatorHint => '扫描二维码或手动输入密钥，再填写验证器生成的六位动态码。';
+
+  @override
+  String get accountMfaQrCodeLabel => '验证器设置二维码';
+
+  @override
+  String get accountMfaSecretLabel => '设置密钥';
+
+  @override
+  String get accountMfaSecretCopied => '设置密钥已复制';
+
+  @override
+  String get accountMfaRecoveryTitle => '保存恢复码';
 
   @override
   String get accountMfaChallengeTitle => '双重验证';
@@ -4844,6 +5021,127 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountRecoveryCodesSaved => '我已保存恢复码';
+
+  @override
+  String get accountPremiumLifetime => '永久高级版已解锁';
+
+  @override
+  String get accountPremiumLifetimeSubtitle => '高级版权益已绑定到当前账号，并在支持的平台间同步。';
+
+  @override
+  String get accountRedemptionCode => '永久高级版卡密';
+
+  @override
+  String get accountRedeemPremium => '兑换并永久解锁';
+
+  @override
+  String get accountApplePurchase => '通过 App Store 永久解锁';
+
+  @override
+  String get accountApplePurchaseHint => '一次购买，永久绑定当前开元阅读账号，并同步到支持的平台。';
+
+  @override
+  String get accountAppleRestore => '恢复购买';
+
+  @override
+  String get accountApplePurchasePending => '购买正在等待 App Store 确认';
+
+  @override
+  String get accountApplePurchaseSubmitted => '购买已提交，正在验证高级版权益';
+
+  @override
+  String get accountAppleRestoreSubmitted => '已请求恢复购买';
+
+  @override
+  String get accountPremiumUnlocked => '永久高级版已解锁';
+
+  @override
+  String get accountPremiumUnlockedReferral => '兑换成功：你和邀请人都已解锁永久高级版';
+
+  @override
+  String get accountInviteTitle => '邀请好友';
+
+  @override
+  String get accountInviteSubtitle => '好友绑定你的邀请码并兑换永久高级版卡密后，你们两人都永久解锁。';
+
+  @override
+  String get accountInviteMyCode => '我的邀请码';
+
+  @override
+  String get accountInviteCopyCode => '复制邀请码';
+
+  @override
+  String get accountInviteCopyLink => '复制邀请链接';
+
+  @override
+  String get accountInviteShareAction => '复制邀请链接并分享';
+
+  @override
+  String get accountInviteCopied => '邀请信息已复制';
+
+  @override
+  String accountInviteStats(int invited, int rewarded) {
+    return '已邀请 $invited 人 · 已成功 $rewarded 人';
+  }
+
+  @override
+  String get accountInviteStatsInvited => '已绑定人数';
+
+  @override
+  String get accountInviteStatsRewarded => '已成功解锁';
+
+  @override
+  String accountInviterBound(String name) {
+    return '已绑定邀请人：$name';
+  }
+
+  @override
+  String get accountInviteRewarded => '邀请已成功';
+
+  @override
+  String get accountInviteWaiting => '等待兑换卡密';
+
+  @override
+  String get accountInviteBindLabel => '好友邀请码';
+
+  @override
+  String get accountInviteBindHint => '每个账号只能绑定一次，绑定后不能更换';
+
+  @override
+  String get accountInviteBindAction => '确认绑定';
+
+  @override
+  String get accountInviteBound => '邀请码已绑定';
+
+  @override
+  String get accountInviteHowItWorks => '邀请流程';
+
+  @override
+  String get accountInviteStepShareTitle => '分享链接';
+
+  @override
+  String get accountInviteStepShareBody => '把链接或邀请码发给朋友，朋友打开后注册账号。';
+
+  @override
+  String get accountInviteStepBindTitle => '绑定邀请码';
+
+  @override
+  String get accountInviteStepBindBody => '朋友在个人中心输入你的邀请码；每个账号只能绑定一次。';
+
+  @override
+  String get accountInviteStepRedeemTitle => '兑换卡密';
+
+  @override
+  String get accountInviteStepRedeemBody => '朋友兑换永久高级版卡密后，你们两人都会立即解锁。';
+
+  @override
+  String get accountInviteMyBinding => '我的邀请关系';
+
+  @override
+  String get accountInviteBindIntro => '如果你也是被邀请来的，可以在这里绑定好友的邀请码。';
+
+  @override
+  String get accountInviteBindingNotNeeded => '当前账号已解锁高级版，无需再绑定邀请码。';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -5277,6 +5575,59 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get bookSourcesClose => '關閉';
+
+  @override
+  String get sourceLoginTitle => '書源登入';
+
+  @override
+  String get sourceLoginSecureStorageNotice => '登入資訊只會保存在目前裝置的系統安全儲存空間。';
+
+  @override
+  String get sourceLoginNoForm => '此書源沒有可顯示的登入表單，網頁登入尚未接入。';
+
+  @override
+  String get sourceLoginSave => '登入並儲存工作階段';
+
+  @override
+  String get sourceLoginClear => '清除登入工作階段';
+
+  @override
+  String get sourceLoginSaved => '書源登入工作階段已更新';
+
+  @override
+  String get sourceLoginCleared => '書源登入工作階段已清除';
+
+  @override
+  String sourceLoginFailed(String details) {
+    return '無法更新書源登入工作階段：$details';
+  }
+
+  @override
+  String get sourceVerificationTitle => '書源驗證';
+
+  @override
+  String get sourceVerificationBrowserHint =>
+      '請在安全瀏覽器中完成網站驗證，然後點選「完成驗證」。頁面位址與 Cookie 只會回傳目前書源工作。';
+
+  @override
+  String get sourceVerificationCodeHint => '辨識圖片並輸入驗證碼，以繼續目前書源工作。';
+
+  @override
+  String get sourceVerificationCodeLabel => '圖片驗證碼';
+
+  @override
+  String get sourceVerificationSubmit => '繼續';
+
+  @override
+  String get sourceVerificationRetry => '重新開啟瀏覽器';
+
+  @override
+  String get sourceVerificationCancel => '取消驗證';
+
+  @override
+  String sourceVerificationFailed(String details) {
+    return '無法開啟書源驗證：$details';
+  }
 
   @override
   String get settings => '設定';
@@ -7088,7 +7439,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsAccountGuestTitle => '登入開元閱讀';
 
   @override
-  String get settingsAccountGuestSubtitle => '管理帳號資料與支持者身分';
+  String get settingsAccountGuestSubtitle => '同步帳號資料與安全設定';
 
   @override
   String get settingsAccountOpen => '使用者中心';
@@ -7100,10 +7451,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get accountPageTitle => '使用者中心';
 
   @override
-  String get accountPageSubtitle => '管理資料、登入方式和支持者身分。';
+  String get accountIntroTitle => '帳號';
 
   @override
-  String get accountLoginTab => '登入';
+  String get accountPageSubtitle => '登入後同步資料與帳號設定。';
+
+  @override
+  String get accountLoginTab => '電子郵件登入';
 
   @override
   String get accountRegisterTab => '註冊';
@@ -7187,13 +7541,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get accountResetPassword => '重設密碼';
 
   @override
-  String get accountUseGithub => '使用 GitHub';
+  String get accountUseGithub => 'GitHub 登入';
 
   @override
   String get accountUseGoogle => '使用 Google';
 
   @override
   String get accountUsePasskey => '使用 Passkey';
+
+  @override
+  String get accountMoreSignInMethods => '更多登入方式';
 
   @override
   String get accountExternalHint => '將開啟安全瀏覽器，授權後返回 App 即可。';
@@ -8903,6 +9260,62 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get agreementFlowStepIntroduction => '軟體介紹';
+
+  @override
+  String get agreementFlowStepTerms => '使用協議';
+
+  @override
+  String get agreementFlowStepPrivacy => '隱私說明';
+
+  @override
+  String get agreementFlowNext => '下一步';
+
+  @override
+  String get agreementFlowBack => '返回';
+
+  @override
+  String get agreementFlowTermsTitle => '先確認清楚的使用邊界';
+
+  @override
+  String get agreementFlowTermsSubtitle => '請閱讀使用條款，以及使用者內容和第三方書源的責任邊界。';
+
+  @override
+  String get agreementFlowTermsConsent => '我已完整閱讀並同意《使用條款》。';
+
+  @override
+  String get agreementFlowPrivacyTitle => '你的資料，由你掌控';
+
+  @override
+  String get agreementFlowPrivacySubtitle => '請確認哪些資料留在本機、何時會連線，以及下載記錄如何保留。';
+
+  @override
+  String get agreementFlowPrivacyConsent => '我已完整閱讀並同意《隱私說明》。';
+
+  @override
+  String get agreementFlowEnterApp => '進入開元閱讀';
+
+  @override
+  String get agreementFlowPrivacyLocalTitle => '預設儲存在本機';
+
+  @override
+  String get agreementFlowPrivacyLocalBody => '書籍、閱讀進度、筆記和設定通常只儲存在目前裝置。';
+
+  @override
+  String get agreementFlowPrivacyNetworkTitle => '連線行為清楚可見';
+
+  @override
+  String get agreementFlowPrivacyNetworkBody =>
+      '本機閱讀不會上傳書籍正文；檢查更新會存取 GitHub 和官網，書源、AI 與同步僅在使用相關功能時連線。';
+
+  @override
+  String get agreementFlowPrivacyRetentionTitle => '下載記錄限期保留';
+
+  @override
+  String get agreementFlowPrivacyRetentionBody =>
+      '官網中包含原始 IP 的下載明細最多保留 30 天，之後刪除。';
+
+  @override
   String get agreementV2Title => '使用條款與隱私說明';
 
   @override
@@ -9646,4 +10059,107 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountRecoveryCodesSaved => '我已儲存恢復碼';
+
+  @override
+  String get accountPremiumLifetime => '永久高級版已解鎖';
+
+  @override
+  String get accountPremiumLifetimeSubtitle => '高級版權益已綁定至目前帳號，並在支援的平台間同步。';
+
+  @override
+  String get accountRedemptionCode => '永久高級版卡密';
+
+  @override
+  String get accountRedeemPremium => '兌換並永久解鎖';
+
+  @override
+  String get accountPremiumUnlocked => '永久高級版已解鎖';
+
+  @override
+  String get accountPremiumUnlockedReferral => '兌換成功：你和邀請人都已解鎖永久高級版';
+
+  @override
+  String get accountInviteTitle => '邀請好友';
+
+  @override
+  String get accountInviteSubtitle => '好友綁定你的邀請碼並兌換永久高級版卡密後，你們兩人都永久解鎖。';
+
+  @override
+  String get accountInviteMyCode => '我的邀請碼';
+
+  @override
+  String get accountInviteCopyCode => '複製邀請碼';
+
+  @override
+  String get accountInviteCopyLink => '複製邀請連結';
+
+  @override
+  String get accountInviteShareAction => '複製邀請連結並分享';
+
+  @override
+  String get accountInviteCopied => '邀請資訊已複製';
+
+  @override
+  String accountInviteStats(int invited, int rewarded) {
+    return '已邀請 $invited 人 · 已成功 $rewarded 人';
+  }
+
+  @override
+  String get accountInviteStatsInvited => '已綁定人數';
+
+  @override
+  String get accountInviteStatsRewarded => '已成功解鎖';
+
+  @override
+  String accountInviterBound(String name) {
+    return '已綁定邀請人：$name';
+  }
+
+  @override
+  String get accountInviteRewarded => '邀請已成功';
+
+  @override
+  String get accountInviteWaiting => '等待兌換卡密';
+
+  @override
+  String get accountInviteBindLabel => '好友邀請碼';
+
+  @override
+  String get accountInviteBindHint => '每個帳號只能綁定一次，綁定後不能更換';
+
+  @override
+  String get accountInviteBindAction => '確認綁定';
+
+  @override
+  String get accountInviteBound => '邀請碼已綁定';
+
+  @override
+  String get accountInviteHowItWorks => '邀請流程';
+
+  @override
+  String get accountInviteStepShareTitle => '分享連結';
+
+  @override
+  String get accountInviteStepShareBody => '把連結或邀請碼傳給好友，好友開啟後註冊帳號。';
+
+  @override
+  String get accountInviteStepBindTitle => '綁定邀請碼';
+
+  @override
+  String get accountInviteStepBindBody => '好友在個人中心輸入你的邀請碼；每個帳號只能綁定一次。';
+
+  @override
+  String get accountInviteStepRedeemTitle => '兌換卡密';
+
+  @override
+  String get accountInviteStepRedeemBody => '好友兌換永久高級版卡密後，你們兩人都會立即解鎖。';
+
+  @override
+  String get accountInviteMyBinding => '我的邀請關係';
+
+  @override
+  String get accountInviteBindIntro => '如果你也是受邀而來，可以在這裡綁定好友的邀請碼。';
+
+  @override
+  String get accountInviteBindingNotNeeded => '目前帳號已解鎖高級版，無需再綁定邀請碼。';
 }

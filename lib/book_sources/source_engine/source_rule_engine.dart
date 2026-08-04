@@ -47,6 +47,23 @@ class SourceRuleDocument {
   final Uri baseUri;
   final SourceScriptContext? scriptContext;
   final Map<String, Object?> ruleState;
+
+  SourceRuleDocument withScriptEntities({
+    Map<String, Object?>? book,
+    Map<String, Object?>? chapter,
+    void Function(Map<String, Object?> value)? bookWriter,
+    void Function(Map<String, Object?> value)? chapterWriter,
+  }) => SourceRuleDocument._(
+    value: value,
+    baseUri: baseUri,
+    scriptContext: scriptContext?.copyWith(
+      book: book,
+      chapter: chapter,
+      bookWriter: bookWriter,
+      chapterWriter: chapterWriter,
+    ),
+    ruleState: ruleState,
+  );
 }
 
 class SourceRuleEngine {
@@ -54,17 +71,11 @@ class SourceRuleEngine {
 
   final SourceScriptEvaluator Function()? scriptEvaluatorProvider;
 
-  static void ensureSupported(String rule, {required String field}) {
-    final text = rule.trim();
-    if (text.isEmpty) return;
-  }
-
   List<Object?> evaluateList(
     SourceRuleDocument document,
     Object? context,
     String rule,
   ) {
-    ensureSupported(rule, field: 'list rule');
     final putRule = _splitPutRule(rule);
     if (putRule != null) {
       return _evaluatePutList(document, context, putRule);
@@ -91,7 +102,6 @@ class SourceRuleEngine {
     Object? context,
     String rule,
   ) async {
-    ensureSupported(rule, field: 'list rule');
     final putRule = _splitPutRule(rule);
     if (putRule != null) {
       return _evaluatePutListAsync(document, context, putRule);
@@ -146,7 +156,6 @@ class SourceRuleEngine {
     String rule, {
     bool resolveUrl = false,
   }) {
-    ensureSupported(rule, field: 'value rule');
     final putRule = _splitPutRule(rule);
     if (putRule != null) {
       return _evaluatePutString(
@@ -199,14 +208,11 @@ class SourceRuleEngine {
     }
     result = result.trim();
     if (resolveUrl && result.isNotEmpty) {
-      final resolved = resolveSourceRequestUrl(document.baseUri, result);
-      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
-      if (uri.scheme != 'http' && uri.scheme != 'https') {
-        throw const BookSourceProtocolException(
-          'reading source rule produced a non-HTTP URL.',
-        );
-      }
-      return resolved;
+      return _resolveRuleRequestUrl(
+        document.baseUri,
+        result,
+        'reading source rule produced a non-HTTP URL.',
+      );
     }
     return result;
   }
@@ -219,7 +225,6 @@ class SourceRuleEngine {
     String joinSeparator = '',
     bool regexDotAll = true,
   }) async {
-    ensureSupported(rule, field: 'value rule');
     final putRule = _splitPutRule(rule);
     if (putRule != null) {
       return _evaluatePutStringAsync(
@@ -276,14 +281,11 @@ class SourceRuleEngine {
     }
     result = result.trim();
     if (resolveUrl && result.isNotEmpty) {
-      final resolved = resolveSourceRequestUrl(document.baseUri, result);
-      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
-      if (uri.scheme != 'http' && uri.scheme != 'https') {
-        throw const BookSourceProtocolException(
-          'Source rule produced a non-HTTP URL.',
-        );
-      }
-      return resolved;
+      return _resolveRuleRequestUrl(
+        document.baseUri,
+        result,
+        'Source rule produced a non-HTTP URL.',
+      );
     }
     return result;
   }
@@ -439,14 +441,11 @@ class SourceRuleEngine {
     }
     value = value.trim();
     if (resolveUrl && value.isNotEmpty) {
-      final resolved = resolveSourceRequestUrl(document.baseUri, value);
-      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
-      if (uri.scheme != 'http' && uri.scheme != 'https') {
-        throw const BookSourceProtocolException(
-          'reading source script produced a non-HTTP URL.',
-        );
-      }
-      return resolved;
+      return _resolveRuleRequestUrl(
+        document.baseUri,
+        value,
+        'reading source script produced a non-HTTP URL.',
+      );
     }
     return value;
   }
@@ -486,14 +485,11 @@ class SourceRuleEngine {
     }
     value = value.trim();
     if (resolveUrl && value.isNotEmpty) {
-      final resolved = resolveSourceRequestUrl(document.baseUri, value);
-      final uri = Uri.parse(resolved.split(RegExp(r',\s*\{')).first);
-      if (uri.scheme != 'http' && uri.scheme != 'https') {
-        throw const BookSourceProtocolException(
-          'Source script produced a non-HTTP URL.',
-        );
-      }
-      return resolved;
+      return _resolveRuleRequestUrl(
+        document.baseUri,
+        value,
+        'Source script produced a non-HTTP URL.',
+      );
     }
     return value;
   }
@@ -517,6 +513,18 @@ class SourceRuleEngine {
         result: _scriptInput(result),
         baseUrl: document.baseUri,
         variables: context.variables,
+        book: context.book,
+        chapter: context.chapter,
+        bookWriter: context.bookWriter,
+        chapterWriter: context.chapterWriter,
+        loginInfo: context.loginInfo,
+        loginHeaders: context.loginHeaders,
+        loginInfoWriter: context.loginInfoWriter,
+        loginHeaderWriter: context.loginHeaderWriter,
+        interactionHandler: context.interactionHandler,
+        cookieReader: context.cookieReader,
+        cookieWriter: context.cookieWriter,
+        cookieRemover: context.cookieRemover,
       ),
     );
   }
@@ -540,7 +548,19 @@ class SourceRuleEngine {
         result: _scriptInput(result),
         baseUrl: document.baseUri,
         variables: context.variables,
+        book: context.book,
+        chapter: context.chapter,
+        bookWriter: context.bookWriter,
+        chapterWriter: context.chapterWriter,
         networkHandler: context.networkHandler,
+        cookieReader: context.cookieReader,
+        cookieWriter: context.cookieWriter,
+        cookieRemover: context.cookieRemover,
+        loginInfo: context.loginInfo,
+        loginHeaders: context.loginHeaders,
+        loginInfoWriter: context.loginInfoWriter,
+        loginHeaderWriter: context.loginHeaderWriter,
+        interactionHandler: context.interactionHandler,
       ),
     );
   }
@@ -567,7 +587,6 @@ class SourceRuleEngine {
 
   String applyReplaceRule(String input, String rule) {
     if (rule.trim().isEmpty) return input;
-    ensureSupported(rule, field: 'replacement rule');
     final transformed = _splitTransform(
       rule.trim().startsWith('##') ? rule : '##$rule',
     );
@@ -591,19 +610,48 @@ class SourceRuleEngine {
     String selector, {
     required bool listMode,
   }) {
-    for (final fallback in selector.split('||')) {
-      final concatenated = <Object?>[];
-      for (final part in fallback.split('&&')) {
-        concatenated.addAll(
-          _evaluateSingle(document, context, part.trim(), listMode: listMode),
-        );
+    for (final fallback in _splitTopLevel(selector, '||')) {
+      final interleaved = _splitTopLevel(fallback, '%%');
+      if (interleaved.length > 1) {
+        final groups = <List<Object?>>[];
+        for (final part in interleaved) {
+          final values = _evaluateConcatenated(
+            document,
+            context,
+            part,
+            listMode: listMode,
+          );
+          if (values.isNotEmpty) groups.add(values);
+        }
+        if (groups.isNotEmpty) return _interleave(groups);
+        continue;
       }
+      final concatenated = _evaluateConcatenated(
+        document,
+        context,
+        fallback,
+        listMode: listMode,
+      );
       if (concatenated.any((value) => _stringValue(value).isNotEmpty)) {
-        if (listMode && concatenated.isNotEmpty) return concatenated;
         return concatenated;
       }
     }
     return const [];
+  }
+
+  List<Object?> _evaluateConcatenated(
+    SourceRuleDocument document,
+    Object? context,
+    String selector, {
+    required bool listMode,
+  }) {
+    final concatenated = <Object?>[];
+    for (final part in _splitTopLevel(selector, '&&')) {
+      concatenated.addAll(
+        _evaluateSingle(document, context, part.trim(), listMode: listMode),
+      );
+    }
+    return concatenated;
   }
 
   Future<List<Object?>> _evaluateAlternativesAsync(
@@ -612,23 +660,53 @@ class SourceRuleEngine {
     String selector, {
     required bool listMode,
   }) async {
-    for (final fallback in selector.split('||')) {
-      final concatenated = <Object?>[];
-      for (final part in fallback.split('&&')) {
-        concatenated.addAll(
-          await _evaluateSingleAsync(
+    for (final fallback in _splitTopLevel(selector, '||')) {
+      final interleaved = _splitTopLevel(fallback, '%%');
+      if (interleaved.length > 1) {
+        final groups = <List<Object?>>[];
+        for (final part in interleaved) {
+          final values = await _evaluateConcatenatedAsync(
             document,
             context,
-            part.trim(),
+            part,
             listMode: listMode,
-          ),
-        );
+          );
+          if (values.isNotEmpty) groups.add(values);
+        }
+        if (groups.isNotEmpty) return _interleave(groups);
+        continue;
       }
+      final concatenated = await _evaluateConcatenatedAsync(
+        document,
+        context,
+        fallback,
+        listMode: listMode,
+      );
       if (concatenated.any((value) => _stringValue(value).isNotEmpty)) {
         return concatenated;
       }
     }
     return const [];
+  }
+
+  Future<List<Object?>> _evaluateConcatenatedAsync(
+    SourceRuleDocument document,
+    Object? context,
+    String selector, {
+    required bool listMode,
+  }) async {
+    final concatenated = <Object?>[];
+    for (final part in _splitTopLevel(selector, '&&')) {
+      concatenated.addAll(
+        await _evaluateSingleAsync(
+          document,
+          context,
+          part.trim(),
+          listMode: listMode,
+        ),
+      );
+    }
+    return concatenated;
   }
 
   List<Object?> _evaluateSingle(
@@ -811,8 +889,10 @@ class SourceRuleEngine {
   List<Object?>? _terminalValue(List<Element> nodes, String segment) {
     return switch (segment) {
       'text' => nodes.map((node) => node.text).toList(),
-      'ownText' || 'textNodes' => nodes.map(_ownText).toList(),
+      'ownText' => nodes.map(_ownText).toList(),
+      'textNodes' => nodes.map(_directTextNodes).toList(),
       'html' => nodes.map((node) => node.innerHtml).toList(),
+      'all' => [nodes.map((node) => node.outerHtml).join()],
       _
           when _htmlAttributeNames.contains(segment.toLowerCase()) ||
               nodes.any((node) => node.attributes.containsKey(segment)) =>
@@ -868,9 +948,19 @@ class SourceRuleEngine {
         deduped.removeAt(excluded);
       }
     }
-    if (parsed.indexes == null) return deduped;
-    return parsed.indexes!
-        .map((value) => _normalizedIndex(value, deduped.length))
+    if (deduped.isEmpty) return const [];
+    if (parsed.excludedSelection != null) {
+      final excluded = _selectionIndexes(
+        parsed.excludedSelection!,
+        deduped.length,
+      ).toSet();
+      return [
+        for (var index = 0; index < deduped.length; index++)
+          if (!excluded.contains(index)) deduped[index],
+      ];
+    }
+    if (parsed.selection == null) return deduped;
+    return _selectionIndexes(parsed.selection!, deduped.length)
         .where((value) => value >= 0 && value < deduped.length)
         .map((value) => deduped[value])
         .toList();
@@ -941,33 +1031,42 @@ class SourceRuleEngine {
       exclude = int.parse(exclusion.group(1)!);
       selector = selector.substring(0, exclusion.start);
     }
-    List<int>? indexes;
-    final indexMatch = RegExp(r'\.(-?\d+(?::-?\d+)*)$').firstMatch(selector);
-    if (indexMatch != null) {
-      indexes = indexMatch.group(1)!.split(':').map(int.parse).toList();
-      selector = selector.substring(0, indexMatch.start);
+    List<_IndexSpec>? selection;
+    final bracketMatch = RegExp(
+      r'\[\s*(!?)([-\d:,\s]+)\s*\]$',
+    ).firstMatch(selector);
+    if (bracketMatch != null) {
+      final excludes = bracketMatch.group(1) == '!';
+      selection = _parseIndexSelection(bracketMatch.group(2)!);
+      selector = selector.substring(0, bracketMatch.start);
+      if (excludes) {
+        return _LegacySelector(
+          css: _legacyCss(selector),
+          excludedSelection: selection,
+        );
+      }
+    } else {
+      final indexMatch = RegExp(r'\.(-?\d+(?::-?\d+)*)$').firstMatch(selector);
+      if (indexMatch != null) {
+        selection = indexMatch
+            .group(1)!
+            .split(':')
+            .map((value) => _IndexSpec.single(int.parse(value)))
+            .toList(growable: false);
+        selector = selector.substring(0, indexMatch.start);
+      }
     }
     String? text;
-    if (selector.startsWith('class.')) {
-      final classNames = selector
-          .substring(6)
-          .trim()
-          .split(RegExp(r'\s+'))
-          .where((name) => name.isNotEmpty)
-          .toList(growable: false);
-      selector = classNames.map((name) => '.$name').join();
-    } else if (selector.startsWith('id.')) {
-      selector = '#${selector.substring(3)}';
-    } else if (selector.startsWith('tag.')) {
-      selector = selector.substring(4);
-    } else if (selector.startsWith('text.')) {
+    if (selector.startsWith('text.')) {
       text = selector.substring(5);
       selector = '*';
+    } else {
+      selector = _legacyCss(selector);
     }
     if (selector.isEmpty) selector = '*';
     return _LegacySelector(
       css: selector,
-      indexes: indexes,
+      selection: selection,
       exclude: exclude,
       text: text,
     );
@@ -1269,15 +1368,102 @@ _RuleTransform _splitTransform(String rule) {
 class _LegacySelector {
   const _LegacySelector({
     required this.css,
-    this.indexes,
+    this.selection,
+    this.excludedSelection,
     this.exclude,
     this.text,
   });
 
   final String css;
-  final List<int>? indexes;
+  final List<_IndexSpec>? selection;
+  final List<_IndexSpec>? excludedSelection;
   final int? exclude;
   final String? text;
+}
+
+class _IndexSpec {
+  const _IndexSpec.single(int value) : start = value, end = value, step = 1;
+
+  const _IndexSpec.range(this.start, this.end, this.step);
+
+  final int? start;
+  final int? end;
+  final int step;
+}
+
+List<_IndexSpec> _parseIndexSelection(String input) {
+  final specs = <_IndexSpec>[];
+  for (final raw in input.split(',')) {
+    final value = raw.trim();
+    if (value.isEmpty) continue;
+    final parts = value.split(':').map((part) => part.trim()).toList();
+    if (parts.length == 1) {
+      final index = int.tryParse(parts.single);
+      if (index != null) specs.add(_IndexSpec.single(index));
+      continue;
+    }
+    final start = parts.first.isEmpty ? null : int.tryParse(parts.first);
+    final end = parts[1].isEmpty ? null : int.tryParse(parts[1]);
+    final step = parts.length > 2 ? int.tryParse(parts[2]) ?? 1 : 1;
+    specs.add(_IndexSpec.range(start, end, step));
+  }
+  return specs;
+}
+
+Iterable<int> _selectionIndexes(List<_IndexSpec> specs, int length) sync* {
+  final seen = <int>{};
+  for (final spec in specs) {
+    var start = spec.start ?? 0;
+    var end = spec.end ?? length - 1;
+    start = _normalizedIndex(start, length).clamp(0, length - 1);
+    end = _normalizedIndex(end, length).clamp(0, length - 1);
+    final distance = (end - start).abs();
+    var step = spec.step.abs();
+    if (step == 0 || (spec.step < 0 && step < length)) {
+      step = spec.step < 0 ? length - step : 1;
+    }
+    if (distance == 0 || step > distance) {
+      if (seen.add(start)) yield start;
+      continue;
+    }
+    if (start <= end) {
+      for (var index = start; index <= end; index += step) {
+        if (seen.add(index)) yield index;
+      }
+    } else {
+      for (var index = start; index >= end; index -= step) {
+        if (seen.add(index)) yield index;
+      }
+    }
+  }
+}
+
+String _legacyCss(String selector) {
+  if (selector.startsWith('class.')) {
+    final classNames = selector
+        .substring(6)
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((name) => name.isNotEmpty);
+    return classNames.map((name) => '.$name').join();
+  }
+  if (selector.startsWith('id.')) return '#${selector.substring(3)}';
+  if (selector.startsWith('tag.')) return selector.substring(4);
+  return selector.isEmpty ? '*' : selector;
+}
+
+List<Object?> _interleave(List<List<Object?>> groups) {
+  final values = <Object?>[];
+  final length = groups.fold<int>(
+    0,
+    (maximum, group) => group.length > maximum ? group.length : maximum,
+  );
+  for (var index = 0; index < length; index++) {
+    for (final group in groups) {
+      if (index < group.length) values.add(group[index]);
+    }
+  }
+  return values;
 }
 
 enum _XPathAxis { child, descendant, followingSibling }
@@ -1435,12 +1621,32 @@ int _normalizedIndex(int index, int length) =>
 String _ownText(Element element) =>
     element.nodes.whereType<Text>().map((node) => node.data).join().trim();
 
+String _directTextNodes(Element element) => element.nodes
+    .whereType<Text>()
+    .map((node) => node.data.trim())
+    .where((value) => value.isNotEmpty)
+    .join('\n');
+
 bool _matches(Element element, String selector) {
   final parent = element.parent;
   if (parent != null) {
     return parent.querySelectorAll(selector).contains(element);
   }
   return selector == '*' || selector == element.localName;
+}
+
+String _resolveRuleRequestUrl(Uri baseUri, String value, String errorMessage) {
+  final urlText = value.split(RegExp(r',\s*\{')).first.trim();
+  final directUri = Uri.tryParse(urlText);
+  if (directUri?.scheme == 'data') {
+    return value;
+  }
+  final resolved = resolveSourceRequestUrl(baseUri, value);
+  final uri = Uri.tryParse(resolved.split(RegExp(r',\s*\{')).first);
+  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    throw BookSourceProtocolException(errorMessage);
+  }
+  return resolved;
 }
 
 String _stringValue(Object? value) => switch (value) {

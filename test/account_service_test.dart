@@ -1,11 +1,40 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/services/account/account.dart';
 
 void main() {
+  test('account summary cache restores the settings card identity', () async {
+    SharedPreferences.setMockInitialValues({});
+    const cache = MemberAccountSummaryCache();
+    const summary = MemberAccountSummary(
+      userId: 'user-1',
+      username: 'reader',
+      effectiveName: 'Reader',
+      avatarUrl: 'https://open.xxread.top/avatar.jpg',
+      premium: true,
+    );
+
+    await cache.save(summary);
+    final restored = await cache.load();
+
+    expect(restored?.userId, 'user-1');
+    expect(restored?.effectiveName, 'Reader');
+    expect(restored?.premium, isTrue);
+  });
+
+  test('invalid account summary cache is ignored safely', () async {
+    SharedPreferences.setMockInitialValues({
+      MemberAccountSummaryCache.storageKey: '{broken-json',
+    });
+
+    expect(await const MemberAccountSummaryCache().load(), isNull);
+  });
+
   test(
     'password login stores the rotated session without exposing secrets',
     () async {
@@ -104,6 +133,49 @@ void main() {
     },
   );
 
+  test('referral API loads and binds a single invite code', () async {
+    final storage = _MemoryTokenStore(
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+    );
+    var bound = false;
+    final adapter = _RouteAdapter((options) {
+      expect(options.headers['Authorization'], 'Bearer access-1');
+      if (options.uri.path == '/api/v1/membership/referral/bind') {
+        expect(options.method, 'POST');
+        expect(options.data, {'code': 'ORFRIEND1'});
+        bound = true;
+      }
+      return _json({
+        'invite_code': 'ORMYCODE1',
+        'invite_url': 'https://open.xxread.top/account?invite=ORMYCODE1',
+        'inviter': bound
+            ? {'code': 'ORFRIEND1', 'name': 'Friend', 'status': 'bound'}
+            : null,
+        'stats': {'invited': 2, 'rewarded': 1},
+        'recent_invites': [
+          {
+            'name': 'New Reader',
+            'status': 'rewarded',
+            'bound_at': '2026-08-03T00:00:00Z',
+            'rewarded_at': '2026-08-04T00:00:00Z',
+          },
+        ],
+      });
+    });
+    final client = _client(adapter, storage);
+
+    final before = await client.referral();
+    final after = await client.bindReferral('ORFRIEND1');
+
+    expect(before.inviteCode, 'ORMYCODE1');
+    expect(before.inviteUrl.host, 'open.xxread.top');
+    expect(before.rewardedCount, 1);
+    expect(before.recentInvites.single.name, 'New Reader');
+    expect(after.inviter?.code, 'ORFRIEND1');
+    expect(after.inviter?.status, 'bound');
+  });
+
   test('device authorization reports pending then completes login', () async {
     final storage = _MemoryTokenStore();
     var polls = 0;
@@ -113,6 +185,8 @@ void main() {
           'device_code': 'device-secret',
           'user_code': 'ABCD-EFGH',
           'verification_uri': '/activate',
+          'verification_uri_complete':
+              'https://github.com/login/oauth/authorize?client_id=client-id&state=member_state.ABCD-EFGH',
           'expires_in': 600,
           'interval': 5,
         }),
@@ -138,6 +212,10 @@ void main() {
     expect(
       authorization.verificationUri.toString(),
       'https://open.xxread.top/activate',
+    );
+    expect(
+      authorization.verificationUriComplete.toString(),
+      'https://github.com/login/oauth/authorize?client_id=client-id&state=member_state.ABCD-EFGH',
     );
     expect(await controller.pollDeviceAuthorization(authorization), isFalse);
     expect(await controller.pollDeviceAuthorization(authorization), isTrue);
@@ -444,6 +522,61 @@ void main() {
       expect(storage.mfaPending, isFalse);
     },
   );
+
+  test('avatar upload evicts the old URL even when URL is unchanged', () async {
+    final storage = _MemoryTokenStore(
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+    );
+    final directory = await Directory.systemTemp.createTemp('avatar-evict-');
+    addTearDown(() => directory.delete(recursive: true));
+    var avatarDownloads = 0;
+    final avatarCache = AccountAvatarCache(
+      cacheDirectory: directory,
+      loader: (_) async => Uint8List.fromList([++avatarDownloads]),
+    );
+    final avatarUri = Uri.parse(
+      'https://open.xxread.top/api/v1/auth/users/6e29be31-ffeb-4699-bf69-8b37afe15504/avatar?v=1',
+    );
+    final adapter = _RouteAdapter((options) {
+      return switch (options.uri.path) {
+        '/api/v1/auth/config' => _json({
+          'providers': <String, bool>{},
+          'username': {'min_length': 3, 'max_length': 30},
+          'password': {'min_length': 12, 'max_length': 128},
+        }),
+        '/api/v1/membership/config' => _json({
+          'product': 'premium_lifetime',
+          'features': <String>[],
+        }),
+        '/api/v1/auth/me' => _json({'user': _user()}),
+        '/api/v1/membership' => _json({
+          'premium': false,
+          'features': <String, bool>{},
+          'entitlements': <Object>[],
+        }),
+        '/api/v1/auth/avatar' => _json({'user': _user()}),
+        _ => throw StateError('Unexpected route ${options.uri.path}'),
+      };
+    });
+    final controller = MemberAccountController(
+      api: _client(adapter, storage),
+      avatarCache: avatarCache,
+    );
+    await controller.initialize();
+    expect(await avatarCache.load(avatarUri), [1]);
+
+    await controller.uploadAvatar(
+      AvatarUploadData(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        filename: 'avatar.jpg',
+        contentType: 'image/jpeg',
+      ),
+    );
+
+    expect(await avatarCache.load(avatarUri), [2]);
+    expect(avatarDownloads, 2);
+  });
 }
 
 MemberAccountApiClient _client(

@@ -441,6 +441,62 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesClose => '閉じる';
 
   @override
+  String get sourceLoginTitle => 'ソースにログイン';
+
+  @override
+  String get sourceLoginSecureStorageNotice =>
+      'ログイン情報はこの端末の安全なシステムストレージにのみ保存されます。';
+
+  @override
+  String get sourceLoginNoForm =>
+      'このソースには表示可能なログインフォームがありません。ブラウザーによるログインはまだ利用できません。';
+
+  @override
+  String get sourceLoginSave => 'ログインしてセッションを保存';
+
+  @override
+  String get sourceLoginClear => 'ログインセッションを消去';
+
+  @override
+  String get sourceLoginSaved => 'ソースのログインセッションを更新しました';
+
+  @override
+  String get sourceLoginCleared => 'ソースのログインセッションを消去しました';
+
+  @override
+  String sourceLoginFailed(String details) {
+    return 'ソースのログインセッションを更新できませんでした: $details';
+  }
+
+  @override
+  String get sourceVerificationTitle => 'ソースの確認';
+
+  @override
+  String get sourceVerificationBrowserHint =>
+      '安全なブラウザーでサイトの確認を完了し、「確認完了」を選択してください。ページのアドレスと Cookie はこのソース処理だけに返されます。';
+
+  @override
+  String get sourceVerificationCodeHint =>
+      '画像を読み取り、確認コードを入力してこのソース処理を続行してください。';
+
+  @override
+  String get sourceVerificationCodeLabel => '画像の確認コード';
+
+  @override
+  String get sourceVerificationSubmit => '続行';
+
+  @override
+  String get sourceVerificationRetry => 'ブラウザーを再度開く';
+
+  @override
+  String get sourceVerificationCancel => '確認をキャンセル';
+
+  @override
+  String sourceVerificationFailed(String details) {
+    return 'ソースの確認を開けませんでした: $details';
+  }
+
+  @override
   String get settings => '設定';
 
   @override
@@ -2303,7 +2359,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAccountGuestTitle => '開元閲読にログイン';
 
   @override
-  String get settingsAccountGuestSubtitle => 'プロフィールとサポーター情報を管理';
+  String get settingsAccountGuestSubtitle => 'プロフィールとセキュリティ設定を同期';
 
   @override
   String get settingsAccountOpen => 'アカウントセンター';
@@ -2315,10 +2371,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountPageTitle => 'アカウント';
 
   @override
-  String get accountPageSubtitle => 'プロフィール、ログイン方法、サポーター情報を管理します。';
+  String get accountIntroTitle => 'アカウント';
 
   @override
-  String get accountLoginTab => 'ログイン';
+  String get accountPageSubtitle => 'ログインしてプロフィールとアカウント設定を同期します。';
+
+  @override
+  String get accountLoginTab => 'メールでログイン';
 
   @override
   String get accountRegisterTab => '登録';
@@ -2402,13 +2461,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountResetPassword => 'パスワードを再設定';
 
   @override
-  String get accountUseGithub => 'GitHub を使用';
+  String get accountUseGithub => 'GitHub でログイン';
 
   @override
   String get accountUseGoogle => 'Google を使用';
 
   @override
   String get accountUsePasskey => 'Passkey を使用';
+
+  @override
+  String get accountMoreSignInMethods => 'その他のログイン方法';
 
   @override
   String get accountExternalHint => '安全なブラウザーが開きます。承認後に App へ戻ってください。';
@@ -4143,6 +4205,64 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get agreementFlowStepIntroduction => 'アプリ紹介';
+
+  @override
+  String get agreementFlowStepTerms => '利用規約';
+
+  @override
+  String get agreementFlowStepPrivacy => 'プライバシー';
+
+  @override
+  String get agreementFlowNext => '次へ';
+
+  @override
+  String get agreementFlowBack => '戻る';
+
+  @override
+  String get agreementFlowTermsTitle => '利用範囲を明確に確認';
+
+  @override
+  String get agreementFlowTermsSubtitle =>
+      '利用規約と、ユーザーコンテンツおよび第三者ソースの責任範囲を確認してください。';
+
+  @override
+  String get agreementFlowTermsConsent => '利用規約をすべて読み、同意します。';
+
+  @override
+  String get agreementFlowPrivacyTitle => 'データはあなたの管理下に';
+
+  @override
+  String get agreementFlowPrivacySubtitle =>
+      '端末内に残るデータ、通信が発生する場面、ダウンロード記録の保持期間を確認してください。';
+
+  @override
+  String get agreementFlowPrivacyConsent => 'プライバシー通知をすべて読み、同意します。';
+
+  @override
+  String get agreementFlowEnterApp => 'OpenReading を始める';
+
+  @override
+  String get agreementFlowPrivacyLocalTitle => '標準で端末内に保存';
+
+  @override
+  String get agreementFlowPrivacyLocalBody => '書籍、読書進捗、メモ、設定は通常この端末内に保存されます。';
+
+  @override
+  String get agreementFlowPrivacyNetworkTitle => '通信の用途を明示';
+
+  @override
+  String get agreementFlowPrivacyNetworkBody =>
+      'ローカル読書で本文は送信されません。更新確認は GitHub と公式サイトへ接続し、ソース・AI・同期は各機能を利用した場合のみ接続します。';
+
+  @override
+  String get agreementFlowPrivacyRetentionTitle => 'ダウンロード記録は期間限定';
+
+  @override
+  String get agreementFlowPrivacyRetentionBody =>
+      '公式サイトで生の IP を含むダウンロード明細は最長 30 日で削除されます。';
+
+  @override
   String get agreementV2Title => '利用規約とプライバシーについて';
 
   @override
@@ -4797,7 +4917,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountSecurityTitle => 'アカウントのセキュリティ';
 
   @override
+  String get accountSecurityLoading => 'Loading security status…';
+
+  @override
   String get accountChangeEmailTitle => 'メールアドレスを変更';
+
+  @override
+  String get accountChangeEmailEnterTitle => 'Choose a new email';
+
+  @override
+  String get accountChangeEmailEnterHint =>
+      'We will send one code to your current email and one to the new address.';
+
+  @override
+  String get accountChangeEmailVerifyTitle => 'Verify both email addresses';
+
+  @override
+  String get accountChangeEmailVerifyHint =>
+      'Enter the two codes to finish changing your sign-in email.';
 
   @override
   String get accountCurrentEmail => '現在のメール';
@@ -4824,6 +4961,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountChangePasswordTitle => 'パスワードを設定・変更';
 
   @override
+  String get accountPasswordEmailTitle => 'Verify by email';
+
+  @override
+  String get accountPasswordEmailHint =>
+      'Send a code to your current email before choosing a new password.';
+
+  @override
+  String get accountPasswordNewTitle => 'Choose a new password';
+
+  @override
+  String get accountPasswordNewHint =>
+      'Enter the email code and set the password you will use next time.';
+
+  @override
   String get accountNewPassword => '新しいパスワード';
 
   @override
@@ -4844,6 +4995,44 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get accountMfaDisabledByDefault =>
       '初期状態では無効です。有効にするとパスワードとメールコードのログインを保護できます。';
+
+  @override
+  String get accountMfaOnTitle => 'Two-factor authentication is on';
+
+  @override
+  String get accountMfaEmailTitle => 'Verify your email first';
+
+  @override
+  String accountMfaEmailHint(String email) {
+    return 'We will send a setup code to $email.';
+  }
+
+  @override
+  String get accountMfaEmailCodeTitle => 'Enter the email code';
+
+  @override
+  String get accountMfaEmailCodeHint =>
+      'After verification, the authenticator QR code and secret will open on the next page.';
+
+  @override
+  String get accountMfaAuthenticatorTitle =>
+      'Add Open Reading to your authenticator';
+
+  @override
+  String get accountMfaAuthenticatorHint =>
+      'Scan the QR code or enter the secret manually, then enter the six-digit code from the authenticator.';
+
+  @override
+  String get accountMfaQrCodeLabel => 'Authenticator setup QR code';
+
+  @override
+  String get accountMfaSecretLabel => 'Setup secret';
+
+  @override
+  String get accountMfaSecretCopied => 'Setup secret copied';
+
+  @override
+  String get accountMfaRecoveryTitle => 'Save your recovery codes';
 
   @override
   String get accountMfaChallengeTitle => '2 段階認証';
@@ -4894,4 +5083,135 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get accountRecoveryCodesSaved => '復旧コードを保存しました';
+
+  @override
+  String get accountPremiumLifetime => '永久プレミアムを解除済み';
+
+  @override
+  String get accountPremiumLifetimeSubtitle =>
+      'プレミアム特典はこのアカウントに紐づき、対応プラットフォーム間で同期されます。';
+
+  @override
+  String get accountRedemptionCode => '永久プレミアムコード';
+
+  @override
+  String get accountRedeemPremium => '引き換えて永久解除';
+
+  @override
+  String get accountApplePurchase => 'Unlock forever with App Store';
+
+  @override
+  String get accountApplePurchaseHint =>
+      'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.';
+
+  @override
+  String get accountAppleRestore => 'Restore purchases';
+
+  @override
+  String get accountApplePurchasePending =>
+      'The purchase is waiting for App Store approval';
+
+  @override
+  String get accountApplePurchaseSubmitted =>
+      'Purchase submitted; verifying Premium access';
+
+  @override
+  String get accountAppleRestoreSubmitted => 'Purchase restoration requested';
+
+  @override
+  String get accountPremiumUnlocked => '永久プレミアムを解除しました';
+
+  @override
+  String get accountPremiumUnlockedReferral =>
+      '引き換え完了：あなたと招待者の両方が永久プレミアムを解除しました';
+
+  @override
+  String get accountInviteTitle => '友達を招待';
+
+  @override
+  String get accountInviteSubtitle =>
+      '友達があなたの招待コードを紐づけ、永久プレミアムコードを引き換えると、2 人とも永久に解除されます。';
+
+  @override
+  String get accountInviteMyCode => '自分の招待コード';
+
+  @override
+  String get accountInviteCopyCode => '招待コードをコピー';
+
+  @override
+  String get accountInviteCopyLink => '招待リンクをコピー';
+
+  @override
+  String get accountInviteShareAction => '招待リンクをコピーして共有';
+
+  @override
+  String get accountInviteCopied => '招待情報をコピーしました';
+
+  @override
+  String accountInviteStats(int invited, int rewarded) {
+    return '招待 $invited 人 · 成功 $rewarded 人';
+  }
+
+  @override
+  String get accountInviteStatsInvited => '紐づけ人数';
+
+  @override
+  String get accountInviteStatsRewarded => '解除成功';
+
+  @override
+  String accountInviterBound(String name) {
+    return '招待者：$name';
+  }
+
+  @override
+  String get accountInviteRewarded => '招待成立';
+
+  @override
+  String get accountInviteWaiting => 'コードの引き換え待ち';
+
+  @override
+  String get accountInviteBindLabel => '友達の招待コード';
+
+  @override
+  String get accountInviteBindHint => 'アカウントごとに 1 回のみ紐づけでき、後から変更できません';
+
+  @override
+  String get accountInviteBindAction => '招待コードを紐づける';
+
+  @override
+  String get accountInviteBound => '招待コードを紐づけました';
+
+  @override
+  String get accountInviteHowItWorks => '招待の流れ';
+
+  @override
+  String get accountInviteStepShareTitle => 'リンクを共有';
+
+  @override
+  String get accountInviteStepShareBody =>
+      'リンクまたはコードを友達へ送り、開いてアカウントを作成してもらいます。';
+
+  @override
+  String get accountInviteStepBindTitle => 'コードを紐づける';
+
+  @override
+  String get accountInviteStepBindBody =>
+      '友達がアカウント画面でコードを入力します。各アカウント 1 回のみです。';
+
+  @override
+  String get accountInviteStepRedeemTitle => 'コードを引き換える';
+
+  @override
+  String get accountInviteStepRedeemBody =>
+      '友達が永久プレミアムコードを引き換えると、両方のアカウントがすぐ解除されます。';
+
+  @override
+  String get accountInviteMyBinding => '自分の招待関係';
+
+  @override
+  String get accountInviteBindIntro => 'あなたも招待された場合は、ここで友達のコードを紐づけられます。';
+
+  @override
+  String get accountInviteBindingNotNeeded =>
+      'このアカウントはプレミアム解除済みのため、招待コードは不要です。';
 }

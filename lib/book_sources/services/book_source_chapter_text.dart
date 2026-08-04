@@ -45,6 +45,10 @@ String readableBookSourceChapterText(
   return _removeRepeatedLeadingChapterTitle(cleaned, chapterTitles).join('\n');
 }
 
+bool isImageOnlyBookSourceChapter(BookSourceChapterContent content) =>
+    content.images.isNotEmpty &&
+    readableBookSourceChapterText(content).trim().isEmpty;
+
 /// Normalizes chapters whose parsing cost is large enough to disturb reader
 /// frames on a background isolate. Short plain-text chapters stay local to
 /// avoid paying isolate startup and message-copy overhead.

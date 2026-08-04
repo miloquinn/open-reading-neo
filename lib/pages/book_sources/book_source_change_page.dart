@@ -6,7 +6,7 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_change_service.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 import 'widgets/sourced_book_widgets.dart';
 
@@ -242,32 +242,29 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.bookSourceChangeSourceTitle)),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
+    return FloatingSubpageScaffold(
+      title: context.l10n.bookSourceChangeSourceTitle,
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: FloatingSubpageScaffold.headerExtentOf(context),
         ),
-        child: SafeArea(
-          top: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: _buildMigrationHeader(context),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    child: _buildSearchControls(context),
-                  ),
-                  Expanded(child: _buildBody(context)),
-                  _buildBottomAction(context),
-                ],
-              ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: _buildMigrationHeader(context),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: _buildSearchControls(context),
+                ),
+                Expanded(child: _buildBody(context)),
+                _buildBottomAction(context),
+              ],
             ),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/account/account.dart';
 import '../../utils/localization_extension.dart';
+import '../../widgets/account_avatar_image.dart';
+import '../../widgets/floating_subpage_scaffold.dart';
+import '../../widgets/qr_code_view.dart';
 import '../../widgets/side_toast.dart';
 
 enum _AccountMode { email, password, register, code, reset }
@@ -28,23 +32,11 @@ class _AccountPageState extends State<AccountPage> {
   final _displayName = TextEditingController();
   final _code = TextEditingController();
   final _mfaLoginCode = TextEditingController();
-  final _newEmail = TextEditingController();
-  final _currentEmailCode = TextEditingController();
-  final _newEmailCode = TextEditingController();
-  final _securityPassword = TextEditingController();
-  final _securityConfirmPassword = TextEditingController();
-  final _securityPasswordCode = TextEditingController();
-  final _mfaCode = TextEditingController();
   _AccountMode _mode = _AccountMode.email;
   MemberEmailChallenge? _challenge;
   DeviceAuthorization? _deviceAuthorization;
   bool _polling = false;
   bool _obscurePassword = true;
-  MemberEmailChangeChallenge? _emailChangeChallenge;
-  MemberEmailChallenge? _passwordChangeChallenge;
-  MemberEmailChallenge? _mfaSetupChallenge;
-  MemberMfaSetup? _mfaSetup;
-  List<String>? _recoveryCodes;
 
   @override
   void initState() {
@@ -78,13 +70,6 @@ class _AccountPageState extends State<AccountPage> {
     _displayName.dispose();
     _code.dispose();
     _mfaLoginCode.dispose();
-    _newEmail.dispose();
-    _currentEmailCode.dispose();
-    _newEmailCode.dispose();
-    _securityPassword.dispose();
-    _securityConfirmPassword.dispose();
-    _securityPasswordCode.dispose();
-    _mfaCode.dispose();
     super.dispose();
   }
 
@@ -282,120 +267,6 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
-  Future<void> _changeEmail() async {
-    final account = context.read<MemberAccountController>();
-    try {
-      final challenge = _emailChangeChallenge;
-      if (challenge == null) {
-        final value = await account.requestEmailChangeCode(_newEmail.text);
-        if (mounted) setState(() => _emailChangeChallenge = value);
-        return;
-      }
-      await account.changeEmail(
-        newEmail: _newEmail.text,
-        currentChallengeId: challenge.currentChallengeId,
-        currentCode: _currentEmailCode.text,
-        newChallengeId: challenge.newChallengeId,
-        newCode: _newEmailCode.text,
-      );
-      if (!mounted) return;
-      setState(() {
-        _emailChangeChallenge = null;
-        _newEmail.clear();
-        _currentEmailCode.clear();
-        _newEmailCode.clear();
-      });
-      showSideToast(context, context.l10n.accountEmailChanged);
-    } catch (error) {
-      _showError(error);
-    }
-  }
-
-  Future<void> _changePassword() async {
-    final account = context.read<MemberAccountController>();
-    try {
-      final challenge = _passwordChangeChallenge;
-      if (challenge == null) {
-        final value = await account.requestPasswordChangeCode();
-        if (mounted) setState(() => _passwordChangeChallenge = value);
-        return;
-      }
-      if (_securityPassword.text != _securityConfirmPassword.text) {
-        throw MemberAccountException(context.l10n.accountPasswordsMismatch);
-      }
-      await account.changePassword(
-        challengeId: challenge.id,
-        code: _securityPasswordCode.text,
-        password: _securityPassword.text,
-      );
-      if (!mounted) return;
-      setState(() {
-        _passwordChangeChallenge = null;
-        _securityPassword.clear();
-        _securityConfirmPassword.clear();
-        _securityPasswordCode.clear();
-      });
-      showSideToast(context, context.l10n.accountPasswordChanged);
-    } catch (error) {
-      _showError(error);
-    }
-  }
-
-  Future<void> _setupMfa() async {
-    final account = context.read<MemberAccountController>();
-    try {
-      final challenge = _mfaSetupChallenge;
-      if (challenge == null) {
-        final value = await account.requestMfaSetupCode();
-        if (mounted) setState(() => _mfaSetupChallenge = value);
-        return;
-      }
-      final setup = await account.setupMfa(
-        challengeId: challenge.id,
-        code: _mfaCode.text,
-      );
-      if (mounted) {
-        setState(() {
-          _mfaSetup = setup;
-          _mfaCode.clear();
-        });
-      }
-    } catch (error) {
-      _showError(error);
-    }
-  }
-
-  Future<void> _confirmMfa() async {
-    try {
-      final confirmation = await context
-          .read<MemberAccountController>()
-          .confirmMfa(_mfaCode.text);
-      if (!mounted) return;
-      setState(() {
-        _mfaSetup = null;
-        _mfaSetupChallenge = null;
-        _mfaCode.clear();
-        _recoveryCodes = confirmation.recoveryCodes;
-      });
-    } catch (error) {
-      _showError(error);
-    }
-  }
-
-  Future<void> _disableMfa() async {
-    try {
-      await context.read<MemberAccountController>().disableMfa(_mfaCode.text);
-      if (!mounted) return;
-      setState(() {
-        _mfaCode.clear();
-        _recoveryCodes = null;
-      });
-      showSideToast(context, context.l10n.accountMfaDisabled);
-    } catch (error) {
-      _showError(error);
-    }
-  }
-
   Future<void> _changeAvatar() async {
     final account = context.read<MemberAccountController>();
     final result = await FilePicker.pickFiles(
@@ -417,33 +288,18 @@ class _AccountPageState extends State<AccountPage> {
   Widget build(BuildContext context) {
     final account = context.watch<MemberAccountController>();
     final user = account.user;
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.accountPageTitle)),
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.055),
-              Theme.of(context).colorScheme.surface,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: account.initialized
-              ? ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-                  children: account.mfaRequired
-                      ? _buildMfaChallenge(account)
-                      : user == null
-                      ? _buildSignedOut(account)
-                      : _buildSignedIn(account, user),
-                )
-              : const Center(child: CircularProgressIndicator()),
-        ),
-      ),
+    return FloatingSubpageScaffold(
+      title: context.l10n.accountPageTitle,
+      body: account.initialized
+          ? ListView(
+              padding: floatingSubpagePadding(context, bottom: 40),
+              children: account.mfaRequired
+                  ? _buildMfaChallenge(account)
+                  : user == null
+                  ? _buildSignedOut(account)
+                  : _buildSignedIn(account, user),
+            )
+          : const Center(child: CircularProgressIndicator()),
     );
   }
 
@@ -451,16 +307,6 @@ class _AccountPageState extends State<AccountPage> {
     _AccountIntroCard(),
     const SizedBox(height: 16),
     _formCard(account),
-    const SizedBox(height: 16),
-    _ExternalLoginCard(
-      account: account,
-      polling: _polling,
-      authorization: _deviceAuthorization,
-      onLogin: _externalLogin,
-      onCancel: () => setState(() => _polling = false),
-    ),
-    const SizedBox(height: 16),
-    _SupportCard(account: account),
   ];
 
   List<Widget> _buildMfaChallenge(MemberAccountController account) => [
@@ -500,12 +346,12 @@ class _AccountPageState extends State<AccountPage> {
   ) => [
     _SignedInHeader(user: user, supporter: account.membership?.premium == true),
     const SizedBox(height: 16),
-    _SupportCard(account: account),
-    const SizedBox(height: 16),
     _AccountActionsCard(
       user: user,
       onEditProfile: () => _openProfileEditor(),
       onOpenSecurity: () => _openAccountSecurity(),
+      onOpenReferral: () => _openReferral(),
+      onOpenSupport: () => _openSupport(),
     ),
     const SizedBox(height: 20),
     TextButton.icon(
@@ -527,16 +373,13 @@ class _AccountPageState extends State<AccountPage> {
         builder: (_) => Consumer<MemberAccountController>(
           builder: (context, account, child) {
             final user = account.user;
-            return Scaffold(
-              appBar: AppBar(title: Text(context.l10n.accountEditProfile)),
+            return FloatingSubpageScaffold(
+              title: context.l10n.accountEditProfile,
               body: user == null
                   ? const SizedBox.shrink()
-                  : SafeArea(
-                      top: false,
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-                        children: [_profileCard(account, user)],
-                      ),
+                  : ListView(
+                      padding: floatingSubpagePadding(context, bottom: 40),
+                      children: [_profileCard(account, user)],
                     ),
             );
           },
@@ -547,35 +390,26 @@ class _AccountPageState extends State<AccountPage> {
 
   Future<void> _openAccountSecurity() async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => Consumer<MemberAccountController>(
-          builder: (context, account, child) {
-            final user = account.user;
-            return Scaffold(
-              appBar: AppBar(title: Text(context.l10n.accountSecurityTitle)),
-              body: user == null
-                  ? const SizedBox.shrink()
-                  : SafeArea(
-                      top: false,
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-                        children: [
-                          _LoginMethodsCard(user: user),
-                          const SizedBox(height: 16),
-                          _securityCard(account, user),
-                        ],
-                      ),
-                    ),
-            );
-          },
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => const _AccountSecurityPage()),
+    );
+  }
+
+  Future<void> _openReferral() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const _AccountReferralPage()),
+    );
+  }
+
+  Future<void> _openSupport() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const _AccountSupportPage()),
     );
   }
 
   Widget _formCard(MemberAccountController account) {
     final l10n = context.l10n;
     return _SectionCard(
+      key: const ValueKey('account-sign-in-card'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -794,6 +628,19 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ),
           ],
+          const SizedBox(height: 20),
+          Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const SizedBox(height: 20),
+          _ExternalLoginMethods(
+            account: account,
+            polling: _polling,
+            authorization: _deviceAuthorization,
+            onLogin: _externalLogin,
+            onCancel: () => setState(() => _polling = false),
+          ),
         ],
       ),
     );
@@ -886,197 +733,6 @@ class _AccountPageState extends State<AccountPage> {
         ),
       );
 
-  Widget _securityCard(MemberAccountController account, MemberUser user) =>
-      _SectionCard(
-        title: context.l10n.accountSecurityTitle,
-        icon: Icons.security_rounded,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.l10n.accountChangeEmailTitle,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 10),
-            Text('${context.l10n.accountCurrentEmail}: ${user.email}'),
-            const SizedBox(height: 10),
-            _field(
-              _newEmail,
-              context.l10n.accountNewEmail,
-              Icons.mark_email_unread_outlined,
-              keyboardType: TextInputType.emailAddress,
-            ),
-            if (_emailChangeChallenge != null) ...[
-              const SizedBox(height: 10),
-              _field(
-                _currentEmailCode,
-                context.l10n.accountCurrentEmailCode,
-                Icons.password_rounded,
-              ),
-              const SizedBox(height: 10),
-              _field(
-                _newEmailCode,
-                context.l10n.accountNewEmailCode,
-                Icons.password_rounded,
-              ),
-            ],
-            const SizedBox(height: 10),
-            OutlinedButton(
-              key: const ValueKey('account-change-email'),
-              onPressed: account.loading ? null : _changeEmail,
-              child: Text(
-                _emailChangeChallenge == null
-                    ? context.l10n.accountSendBothCodes
-                    : context.l10n.accountChangeEmailAction,
-              ),
-            ),
-            const Divider(height: 32),
-            Text(
-              context.l10n.accountChangePasswordTitle,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            if (_passwordChangeChallenge != null) ...[
-              const SizedBox(height: 10),
-              _field(
-                _securityPasswordCode,
-                context.l10n.accountVerificationCode,
-                Icons.password_rounded,
-              ),
-              const SizedBox(height: 10),
-              _field(
-                _securityPassword,
-                context.l10n.accountNewPassword,
-                Icons.lock_outline_rounded,
-                obscure: true,
-                helper: context.l10n.accountPasswordLengthHint,
-              ),
-              const SizedBox(height: 10),
-              _field(
-                _securityConfirmPassword,
-                context.l10n.accountConfirmPassword,
-                Icons.lock_reset_rounded,
-                obscure: true,
-              ),
-            ],
-            const SizedBox(height: 10),
-            OutlinedButton(
-              key: const ValueKey('account-change-password'),
-              onPressed: account.loading ? null : _changePassword,
-              child: Text(
-                _passwordChangeChallenge == null
-                    ? context.l10n.accountSendCode
-                    : context.l10n.accountChangePasswordAction,
-              ),
-            ),
-            const Divider(height: 32),
-            _mfaControls(account),
-          ],
-        ),
-      );
-
-  Widget _mfaControls(MemberAccountController account) {
-    final status = account.mfaStatus;
-    if (status == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final recoveryCodes = _recoveryCodes;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          context.l10n.accountMfaTitle,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          status.enabled
-              ? context.l10n.accountMfaEnabled
-              : context.l10n.accountMfaDisabledByDefault,
-        ),
-        if (recoveryCodes != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            context.l10n.accountRecoveryCodesWarning,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          const SizedBox(height: 8),
-          SelectableText(recoveryCodes.join('\n')),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(
-                ClipboardData(text: recoveryCodes.join('\n')),
-              );
-              if (mounted) {
-                showSideToast(context, context.l10n.accountRecoveryCodesCopied);
-              }
-            },
-            icon: const Icon(Icons.copy_rounded),
-            label: Text(context.l10n.accountCopyRecoveryCodes),
-          ),
-          TextButton(
-            onPressed: () => setState(() => _recoveryCodes = null),
-            child: Text(context.l10n.accountRecoveryCodesSaved),
-          ),
-        ] else if (status.enabled) ...[
-          const SizedBox(height: 10),
-          _field(
-            _mfaCode,
-            context.l10n.accountMfaOrRecoveryCode,
-            Icons.password_rounded,
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            key: const ValueKey('account-mfa-disable'),
-            onPressed: account.loading ? null : _disableMfa,
-            child: Text(context.l10n.accountMfaDisable),
-          ),
-        ] else if (_mfaSetup != null) ...[
-          const SizedBox(height: 10),
-          Text(context.l10n.accountMfaSecretWarning),
-          const SizedBox(height: 6),
-          SelectableText(_mfaSetup!.secret),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () => launchUrl(
-              _mfaSetup!.otpauthUri,
-              mode: LaunchMode.externalApplication,
-            ),
-            icon: const Icon(Icons.open_in_new_rounded),
-            label: Text(context.l10n.accountMfaOpenAuthenticator),
-          ),
-          const SizedBox(height: 10),
-          _field(_mfaCode, context.l10n.accountMfaCode, Icons.password_rounded),
-          const SizedBox(height: 10),
-          FilledButton(
-            key: const ValueKey('account-mfa-confirm'),
-            onPressed: account.loading ? null : _confirmMfa,
-            child: Text(context.l10n.accountMfaConfirm),
-          ),
-        ] else ...[
-          if (_mfaSetupChallenge != null) ...[
-            const SizedBox(height: 10),
-            _field(
-              _mfaCode,
-              context.l10n.accountVerificationCode,
-              Icons.password_rounded,
-            ),
-          ],
-          const SizedBox(height: 10),
-          OutlinedButton(
-            key: const ValueKey('account-mfa-setup'),
-            onPressed: account.loading ? null : _setupMfa,
-            child: Text(
-              _mfaSetupChallenge == null
-                  ? context.l10n.accountMfaSendSetupCode
-                  : context.l10n.accountMfaContinueSetup,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _field(
     TextEditingController controller,
     String label,
@@ -1124,7 +780,7 @@ class _AccountIntroCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                context.l10n.accountPageTitle,
+                context.l10n.accountIntroTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -1144,8 +800,8 @@ class _AccountIntroCard extends StatelessWidget {
   );
 }
 
-class _ExternalLoginCard extends StatelessWidget {
-  const _ExternalLoginCard({
+class _ExternalLoginMethods extends StatefulWidget {
+  const _ExternalLoginMethods({
     required this.account,
     required this.polling,
     required this.authorization,
@@ -1160,11 +816,120 @@ class _ExternalLoginCard extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) => _SectionCard(
-    child: Column(
+  State<_ExternalLoginMethods> createState() => _ExternalLoginMethodsState();
+}
+
+class _ExternalLoginMethodsState extends State<_ExternalLoginMethods> {
+  bool _showMore = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (polling) ...[
+        Row(
+          children: [
+            Icon(Icons.login_rounded, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                context.l10n.accountSignInMethodsTitle,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 15),
+        if (polling)
+          _AuthorizationProgress(
+            authorization: widget.authorization,
+            onCancel: widget.onCancel,
+          )
+        else ...[
+          _ProviderLoginButton(
+            key: const ValueKey('account-provider-github'),
+            label: context.l10n.accountUseGithub,
+            method: MemberExternalAuthMethod.github,
+            enabled: widget.account.providers.github && !widget.account.loading,
+            onPressed: widget.onLogin,
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            key: const ValueKey('account-more-providers'),
+            onPressed: widget.account.loading
+                ? null
+                : () => setState(() => _showMore = !_showMore),
+            icon: Icon(
+              _showMore
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              size: 20,
+            ),
+            label: Text(context.l10n.accountMoreSignInMethods),
+          ),
+          if (_showMore) ...[
+            const SizedBox(height: 4),
+            _ProviderLoginButton(
+              key: const ValueKey('account-provider-passkey'),
+              label: context.l10n.accountUsePasskey,
+              method: MemberExternalAuthMethod.passkey,
+              enabled:
+                  widget.account.providers.passkey && !widget.account.loading,
+              onPressed: widget.onLogin,
+            ),
+            const SizedBox(height: 8),
+            _ProviderLoginButton(
+              key: const ValueKey('account-provider-google'),
+              label: context.l10n.accountUseGoogle,
+              method: MemberExternalAuthMethod.google,
+              enabled:
+                  widget.account.providers.google && !widget.account.loading,
+              onPressed: widget.onLogin,
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.accountExternalHint,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ],
+    );
+    return content;
+  }
+
+  bool get polling => widget.polling;
+}
+
+class _AuthorizationProgress extends StatelessWidget {
+  const _AuthorizationProgress({
+    required this.authorization,
+    required this.onCancel,
+  });
+
+  final DeviceAuthorization? authorization;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final userCode = authorization?.userCode ?? '';
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Row(
             children: [
               const SizedBox.square(
@@ -1172,7 +937,14 @@ class _ExternalLoginCard extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2.4),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text(context.l10n.accountExternalHint)),
+              Expanded(
+                child: Text(
+                  context.l10n.accountExternalHint,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
               TextButton(
                 onPressed: onCancel,
                 child: Text(
@@ -1181,73 +953,210 @@ class _ExternalLoginCard extends StatelessWidget {
               ),
             ],
           ),
-          if ((authorization?.userCode ?? '').isNotEmpty) ...[
-            const SizedBox(height: 10),
-            SelectableText(
-              authorization!.userCode,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: 2,
+          if (userCode.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.75),
+                ),
+              ),
+              child: SelectableText(
+                userCode,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.4,
+                ),
               ),
             ),
           ],
-        ] else ...[
-          _providerButton(
-            context,
-            icon: Icons.code_rounded,
-            label: context.l10n.accountUseGithub,
-            enabled: account.providers.github,
-            method: MemberExternalAuthMethod.github,
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _providerButton(
-                  context,
-                  icon: Icons.key_rounded,
-                  label: context.l10n.accountUsePasskey,
-                  enabled: account.providers.passkey,
-                  method: MemberExternalAuthMethod.passkey,
-                ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProviderLoginButton extends StatelessWidget {
+  const _ProviderLoginButton({
+    super.key,
+    required this.label,
+    required this.method,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final String label;
+  final MemberExternalAuthMethod method;
+  final bool enabled;
+  final ValueChanged<MemberExternalAuthMethod> onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isGithub = method == MemberExternalAuthMethod.github;
+    final isPasskey = method == MemberExternalAuthMethod.passkey;
+    final foreground = isGithub ? Colors.white : colorScheme.onSurface;
+    final background = isGithub
+        ? const Color(0xFF24292F)
+        : isPasskey
+        ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.52)
+        : colorScheme.surface;
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.48,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: enabled ? () => onPressed(method) : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            height: isPasskey ? 46 : 54,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isGithub
+                    ? const Color(0xFF24292F)
+                    : colorScheme.outlineVariant.withValues(alpha: 0.86),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _providerButton(
-                  context,
-                  icon: Icons.g_mobiledata_rounded,
-                  label: context.l10n.accountUseGoogle,
-                  enabled: account.providers.google,
-                  method: MemberExternalAuthMethod.google,
+            ),
+            child: Row(
+              children: [
+                SizedBox.square(
+                  dimension: isPasskey ? 21 : 24,
+                  child: isPasskey
+                      ? Icon(
+                          Icons.key_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        )
+                      : _ProviderBrandMark(method: method),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            context.l10n.accountExternalHint,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: isPasskey
+                          ? colorScheme.onSurfaceVariant
+                          : foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: (isPasskey ? colorScheme.onSurfaceVariant : foreground)
+                      .withValues(alpha: 0.68),
+                ),
+              ],
             ),
           ),
-        ],
-      ],
-    ),
-  );
+        ),
+      ),
+    );
+  }
+}
 
-  Widget _providerButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required bool enabled,
-    required MemberExternalAuthMethod method,
-  }) => OutlinedButton.icon(
-    onPressed: enabled && !account.loading ? () => onLogin(method) : null,
-    icon: Icon(icon, size: 19),
-    label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+class _ProviderBrandMark extends StatelessWidget {
+  const _ProviderBrandMark({required this.method});
+
+  final MemberExternalAuthMethod method;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    painter: switch (method) {
+      MemberExternalAuthMethod.github => const _GithubMarkPainter(),
+      MemberExternalAuthMethod.google => const _GoogleMarkPainter(),
+      MemberExternalAuthMethod.passkey => null,
+    },
   );
+}
+
+class _GithubMarkPainter extends CustomPainter {
+  const _GithubMarkPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white;
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final mark = Path()
+      ..moveTo(6.1, 7.2)
+      ..lineTo(5.1, 3.1)
+      ..quadraticBezierTo(8.2, 3.2, 10.1, 4.8)
+      ..quadraticBezierTo(12, 4.35, 13.9, 4.8)
+      ..quadraticBezierTo(15.8, 3.2, 18.9, 3.1)
+      ..lineTo(17.9, 7.2)
+      ..quadraticBezierTo(19.6, 9, 19.6, 11.8)
+      ..quadraticBezierTo(19.6, 16.7, 15.8, 18.2)
+      ..quadraticBezierTo(14.9, 18.55, 14.9, 20)
+      ..lineTo(14.9, 22)
+      ..lineTo(9.1, 22)
+      ..lineTo(9.1, 20.3)
+      ..quadraticBezierTo(7.5, 20.65, 6.7, 19.5)
+      ..quadraticBezierTo(6, 18.45, 5, 17.75)
+      ..quadraticBezierTo(4.4, 17.3, 4.7, 16.9)
+      ..quadraticBezierTo(5, 16.55, 5.7, 17)
+      ..quadraticBezierTo(6.9, 17.75, 7.4, 18.35)
+      ..quadraticBezierTo(8, 19, 9.1, 18.7)
+      ..quadraticBezierTo(9.15, 18, 9.55, 17.55)
+      ..quadraticBezierTo(4.4, 16.95, 4.4, 11.8)
+      ..quadraticBezierTo(4.4, 9, 6.1, 7.2)
+      ..close();
+    canvas.drawPath(mark, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GoogleMarkPainter extends CustomPainter {
+  const _GoogleMarkPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final strokeWidth = size.shortestSide * 0.18;
+    final rect = Rect.fromLTWH(
+      strokeWidth / 2,
+      strokeWidth / 2,
+      size.width - strokeWidth,
+      size.height - strokeWidth,
+    );
+    Paint segment(Color color) => Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt;
+
+    canvas.drawArc(rect, -0.18, 1.3, false, segment(const Color(0xFF4285F4)));
+    canvas.drawArc(rect, 1.12, 1.16, false, segment(const Color(0xFF34A853)));
+    canvas.drawArc(rect, 2.28, 0.92, false, segment(const Color(0xFFFBBC05)));
+    canvas.drawArc(rect, 3.2, 1.55, false, segment(const Color(0xFFEA4335)));
+    canvas.drawArc(rect, 4.75, 0.78, false, segment(const Color(0xFF4285F4)));
+
+    final blue = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.square;
+    canvas.drawLine(
+      Offset(size.width * 0.52, size.height * 0.5),
+      Offset(size.width * 0.93, size.height * 0.5),
+      blue,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SignedInHeader extends StatelessWidget {
@@ -1310,6 +1219,797 @@ class _SignedInHeader extends StatelessWidget {
   );
 }
 
+class _AccountSecurityPage extends StatelessWidget {
+  const _AccountSecurityPage();
+
+  @override
+  Widget build(BuildContext context) => Consumer<MemberAccountController>(
+    builder: (context, account, child) {
+      final user = account.user;
+      final status = account.mfaStatus;
+      return FloatingSubpageScaffold(
+        title: context.l10n.accountSecurityTitle,
+        body: user == null
+            ? const SizedBox.shrink()
+            : ListView(
+                padding: floatingSubpagePadding(context, bottom: 40),
+                children: [
+                  _LoginMethodsCard(user: user),
+                  const SizedBox(height: 16),
+                  _SectionCard(
+                    child: Column(
+                      children: [
+                        _AccountActionTile(
+                          key: const ValueKey('account-change-email'),
+                          icon: Icons.mark_email_unread_outlined,
+                          title: context.l10n.accountChangeEmailTitle,
+                          subtitle: user.email,
+                          onTap: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) => const _ChangeEmailPage(),
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        _AccountActionTile(
+                          key: const ValueKey('account-change-password'),
+                          icon: Icons.password_rounded,
+                          title: context.l10n.accountChangePasswordTitle,
+                          subtitle: context.l10n.accountPasswordLengthHint,
+                          onTap: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) => const _ChangePasswordPage(),
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        _AccountActionTile(
+                          key: const ValueKey('account-mfa-setup'),
+                          icon: Icons.phonelink_lock_rounded,
+                          title: context.l10n.accountMfaTitle,
+                          subtitle: status == null
+                              ? context.l10n.accountSecurityLoading
+                              : status.enabled
+                              ? context.l10n.accountMfaEnabled
+                              : context.l10n.accountMfaDisabledByDefault,
+                          onTap: status == null
+                              ? null
+                              : () => Navigator.of(context).push<void>(
+                                  MaterialPageRoute(
+                                    builder: (_) => const _MfaOverviewPage(),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      );
+    },
+  );
+}
+
+class _ChangeEmailPage extends StatefulWidget {
+  const _ChangeEmailPage();
+
+  @override
+  State<_ChangeEmailPage> createState() => _ChangeEmailPageState();
+}
+
+class _ChangeEmailPageState extends State<_ChangeEmailPage> {
+  final _newEmail = TextEditingController();
+  final _currentEmailCode = TextEditingController();
+  final _newEmailCode = TextEditingController();
+  MemberEmailChangeChallenge? _challenge;
+
+  @override
+  void dispose() {
+    _newEmail.dispose();
+    _currentEmailCode.dispose();
+    _newEmailCode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final account = context.read<MemberAccountController>();
+    try {
+      final challenge = _challenge;
+      if (challenge == null) {
+        final value = await account.requestEmailChangeCode(_newEmail.text);
+        if (mounted) setState(() => _challenge = value);
+        return;
+      }
+      await account.changeEmail(
+        newEmail: _newEmail.text,
+        currentChallengeId: challenge.currentChallengeId,
+        currentCode: _currentEmailCode.text,
+        newChallengeId: challenge.newChallengeId,
+        newCode: _newEmailCode.text,
+      );
+      if (!mounted) return;
+      showSideToast(context, context.l10n.accountEmailChanged);
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<MemberAccountController>();
+    final user = account.user;
+    return FloatingSubpageScaffold(
+      title: '',
+      showHeader: false,
+      body: user == null
+          ? const SizedBox.shrink()
+          : ListView(
+              padding: floatingSubpagePadding(
+                context,
+                left: 20,
+                top: 0,
+                right: 20,
+                bottom: 40,
+              ),
+              children: [
+                _FlowIntro(
+                  icon: _challenge == null
+                      ? Icons.alternate_email_rounded
+                      : Icons.mark_email_read_outlined,
+                  title: _challenge == null
+                      ? context.l10n.accountChangeEmailEnterTitle
+                      : context.l10n.accountChangeEmailVerifyTitle,
+                  body: _challenge == null
+                      ? context.l10n.accountChangeEmailEnterHint
+                      : context.l10n.accountChangeEmailVerifyHint,
+                ),
+                const SizedBox(height: 16),
+                _SectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '${context.l10n.accountCurrentEmail}: ${user.email}',
+                      ),
+                      const SizedBox(height: 14),
+                      if (_challenge == null)
+                        _accountTextField(
+                          _newEmail,
+                          context.l10n.accountNewEmail,
+                          Icons.mark_email_unread_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                        )
+                      else ...[
+                        _accountTextField(
+                          _currentEmailCode,
+                          context.l10n.accountCurrentEmailCode,
+                          Icons.password_rounded,
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        _accountTextField(
+                          _newEmailCode,
+                          context.l10n.accountNewEmailCode,
+                          Icons.password_rounded,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        key: const ValueKey('account-change-email-submit'),
+                        onPressed: account.loading ? null : _submit,
+                        child: Text(
+                          _challenge == null
+                              ? context.l10n.accountSendBothCodes
+                              : context.l10n.accountChangeEmailAction,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _ChangePasswordPage extends StatefulWidget {
+  const _ChangePasswordPage();
+
+  @override
+  State<_ChangePasswordPage> createState() => _ChangePasswordPageState();
+}
+
+class _ChangePasswordPageState extends State<_ChangePasswordPage> {
+  final _code = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  MemberEmailChallenge? _challenge;
+
+  @override
+  void dispose() {
+    _code.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final account = context.read<MemberAccountController>();
+    try {
+      final challenge = _challenge;
+      if (challenge == null) {
+        final value = await account.requestPasswordChangeCode();
+        if (mounted) setState(() => _challenge = value);
+        return;
+      }
+      if (_password.text != _confirmPassword.text) {
+        throw MemberAccountException(context.l10n.accountPasswordsMismatch);
+      }
+      await account.changePassword(
+        challengeId: challenge.id,
+        code: _code.text,
+        password: _password.text,
+      );
+      if (!mounted) return;
+      showSideToast(context, context.l10n.accountPasswordChanged);
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<MemberAccountController>();
+    return FloatingSubpageScaffold(
+      title: '',
+      showHeader: false,
+      body: ListView(
+        padding: floatingSubpagePadding(
+          context,
+          left: 20,
+          top: 0,
+          right: 20,
+          bottom: 40,
+        ),
+        children: [
+          _FlowIntro(
+            icon: _challenge == null
+                ? Icons.outgoing_mail
+                : Icons.password_rounded,
+            title: _challenge == null
+                ? context.l10n.accountPasswordEmailTitle
+                : context.l10n.accountPasswordNewTitle,
+            body: _challenge == null
+                ? context.l10n.accountPasswordEmailHint
+                : context.l10n.accountPasswordNewHint,
+          ),
+          const SizedBox(height: 16),
+          _SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_challenge != null) ...[
+                  _accountTextField(
+                    _code,
+                    context.l10n.accountVerificationCode,
+                    Icons.password_rounded,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  _accountTextField(
+                    _password,
+                    context.l10n.accountNewPassword,
+                    Icons.lock_outline_rounded,
+                    obscure: true,
+                    helper: context.l10n.accountPasswordLengthHint,
+                  ),
+                  const SizedBox(height: 12),
+                  _accountTextField(
+                    _confirmPassword,
+                    context.l10n.accountConfirmPassword,
+                    Icons.lock_reset_rounded,
+                    obscure: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                FilledButton(
+                  key: const ValueKey('account-change-password-submit'),
+                  onPressed: account.loading ? null : _submit,
+                  child: Text(
+                    _challenge == null
+                        ? context.l10n.accountSendCode
+                        : context.l10n.accountChangePasswordAction,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MfaOverviewPage extends StatefulWidget {
+  const _MfaOverviewPage();
+
+  @override
+  State<_MfaOverviewPage> createState() => _MfaOverviewPageState();
+}
+
+class _MfaOverviewPageState extends State<_MfaOverviewPage> {
+  final _disableCode = TextEditingController();
+
+  @override
+  void dispose() {
+    _disableCode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _disable() async {
+    try {
+      await context.read<MemberAccountController>().disableMfa(
+        _disableCode.text,
+      );
+      if (!mounted) return;
+      _disableCode.clear();
+      showSideToast(context, context.l10n.accountMfaDisabled);
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  Future<void> _sendCode() async {
+    try {
+      final challenge = await context
+          .read<MemberAccountController>()
+          .requestMfaSetupCode();
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute(
+          builder: (_) => _MfaEmailCodePage(challenge: challenge),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<MemberAccountController>();
+    final status = account.mfaStatus;
+    final email = account.user?.email ?? '';
+    return FloatingSubpageScaffold(
+      title: '',
+      showHeader: false,
+      body: status == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: floatingSubpagePadding(
+                context,
+                left: 20,
+                top: 0,
+                right: 20,
+                bottom: 40,
+              ),
+              children: [
+                _FlowIntro(
+                  icon: status.enabled
+                      ? Icons.verified_user_rounded
+                      : Icons.outgoing_mail,
+                  title: status.enabled
+                      ? context.l10n.accountMfaOnTitle
+                      : context.l10n.accountMfaEmailTitle,
+                  body: status.enabled
+                      ? context.l10n.accountMfaEnabled
+                      : context.l10n.accountMfaEmailHint(email),
+                ),
+                const SizedBox(height: 24),
+                if (status.enabled)
+                  _SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _accountTextField(
+                          _disableCode,
+                          context.l10n.accountMfaOrRecoveryCode,
+                          Icons.password_rounded,
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton(
+                          key: const ValueKey('account-mfa-disable'),
+                          onPressed: account.loading ? null : _disable,
+                          child: Text(context.l10n.accountMfaDisable),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 52,
+                    child: FilledButton.icon(
+                      key: const ValueKey('account-mfa-send-email-submit'),
+                      onPressed: account.loading ? null : _sendCode,
+                      icon: const Icon(Icons.mail_outline_rounded),
+                      label: Text(context.l10n.accountMfaSendSetupCode),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _MfaEmailCodePage extends StatefulWidget {
+  const _MfaEmailCodePage({required this.challenge});
+
+  final MemberEmailChallenge challenge;
+
+  @override
+  State<_MfaEmailCodePage> createState() => _MfaEmailCodePageState();
+}
+
+class _MfaEmailCodePageState extends State<_MfaEmailCodePage> {
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _continue() async {
+    try {
+      final setup = await context.read<MemberAccountController>().setupMfa(
+        challengeId: widget.challenge.id,
+        code: _code.text,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute(builder: (_) => _MfaAuthenticatorPage(setup: setup)),
+      );
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<MemberAccountController>();
+    return FloatingSubpageScaffold(
+      title: '',
+      showHeader: false,
+      body: ListView(
+        padding: floatingSubpagePadding(
+          context,
+          left: 20,
+          top: 0,
+          right: 20,
+          bottom: 40,
+        ),
+        children: [
+          _FlowIntro(
+            icon: Icons.mark_email_read_outlined,
+            title: context.l10n.accountMfaEmailCodeTitle,
+            body: context.l10n.accountMfaEmailCodeHint,
+          ),
+          const SizedBox(height: 16),
+          _SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _accountTextField(
+                  _code,
+                  context.l10n.accountVerificationCode,
+                  Icons.password_rounded,
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  key: const ValueKey('account-mfa-email-code-submit'),
+                  onPressed: account.loading ? null : _continue,
+                  child: Text(context.l10n.accountMfaContinueSetup),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MfaAuthenticatorPage extends StatefulWidget {
+  const _MfaAuthenticatorPage({required this.setup});
+
+  final MemberMfaSetup setup;
+
+  @override
+  State<_MfaAuthenticatorPage> createState() => _MfaAuthenticatorPageState();
+}
+
+class _MfaAuthenticatorPageState extends State<_MfaAuthenticatorPage> {
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    try {
+      final confirmation = await context
+          .read<MemberAccountController>()
+          .confirmMfa(_code.text);
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              _MfaRecoveryCodesPage(recoveryCodes: confirmation.recoveryCodes),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<MemberAccountController>();
+    return FloatingSubpageScaffold(
+      title: '',
+      showHeader: false,
+      body: ListView(
+        padding: floatingSubpagePadding(
+          context,
+          left: 20,
+          top: 0,
+          right: 20,
+          bottom: 40,
+        ),
+        children: [
+          _FlowIntro(
+            icon: Icons.qr_code_2_rounded,
+            title: context.l10n.accountMfaAuthenticatorTitle,
+            body: context.l10n.accountMfaAuthenticatorHint,
+          ),
+          const SizedBox(height: 16),
+          _SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  child: QrCodeView(
+                    key: const ValueKey('account-mfa-qr-code'),
+                    data: widget.setup.otpauthUri.toString(),
+                    size: 224,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  context.l10n.accountMfaSecretLabel,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 6),
+                _SecretValue(value: widget.setup.secret),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => launchUrl(
+                    widget.setup.otpauthUri,
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: Text(context.l10n.accountMfaOpenAuthenticator),
+                ),
+                const SizedBox(height: 16),
+                _accountTextField(
+                  _code,
+                  context.l10n.accountMfaCode,
+                  Icons.password_rounded,
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  key: const ValueKey('account-mfa-confirm'),
+                  onPressed: account.loading ? null : _confirm,
+                  child: Text(context.l10n.accountMfaConfirm),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MfaRecoveryCodesPage extends StatelessWidget {
+  const _MfaRecoveryCodesPage({required this.recoveryCodes});
+
+  final List<String> recoveryCodes;
+
+  @override
+  Widget build(BuildContext context) => FloatingSubpageScaffold(
+    title: '',
+    showHeader: false,
+    canPop: false,
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
+      children: [
+        _FlowIntro(
+          icon: Icons.key_rounded,
+          title: context.l10n.accountMfaRecoveryTitle,
+          body: context.l10n.accountRecoveryCodesWarning,
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SelectableText(
+                recoveryCodes.join('\n'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  height: 1.65,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(
+                    ClipboardData(text: recoveryCodes.join('\n')),
+                  );
+                  if (context.mounted) {
+                    showSideToast(
+                      context,
+                      context.l10n.accountRecoveryCodesCopied,
+                    );
+                  }
+                },
+                icon: const Icon(Icons.copy_rounded),
+                label: Text(context.l10n.accountCopyRecoveryCodes),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                key: const ValueKey('account-mfa-recovery-saved'),
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(context.l10n.accountRecoveryCodesSaved),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _FlowIntro extends StatelessWidget {
+  const _FlowIntro({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: colorScheme.primary),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.7,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          body,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SecretValue extends StatelessWidget {
+  const _SecretValue({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: SelectableText(
+            value,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: MaterialLocalizations.of(context).copyButtonLabel,
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: value));
+            if (context.mounted) {
+              showSideToast(context, context.l10n.accountMfaSecretCopied);
+            }
+          },
+          icon: const Icon(Icons.copy_rounded),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _accountTextField(
+  TextEditingController controller,
+  String label,
+  IconData icon, {
+  bool obscure = false,
+  String? helper,
+  TextInputType? keyboardType,
+}) => TextField(
+  controller: controller,
+  obscureText: obscure,
+  keyboardType: keyboardType,
+  autocorrect: false,
+  enableSuggestions: !obscure,
+  decoration: InputDecoration(
+    labelText: label,
+    helperText: helper,
+    prefixIcon: Icon(icon),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+  ),
+);
+
 class _LoginMethodsCard extends StatelessWidget {
   const _LoginMethodsCard({required this.user});
 
@@ -1348,11 +2048,15 @@ class _AccountActionsCard extends StatelessWidget {
     required this.user,
     required this.onEditProfile,
     required this.onOpenSecurity,
+    required this.onOpenReferral,
+    required this.onOpenSupport,
   });
 
   final MemberUser user;
   final VoidCallback onEditProfile;
   final VoidCallback onOpenSecurity;
+  final VoidCallback onOpenReferral;
+  final VoidCallback onOpenSupport;
 
   @override
   Widget build(BuildContext context) => _SectionCard(
@@ -1373,7 +2077,58 @@ class _AccountActionsCard extends StatelessWidget {
           subtitle: user.email,
           onTap: onOpenSecurity,
         ),
+        const Divider(height: 1),
+        _AccountActionTile(
+          key: const ValueKey('account-referral'),
+          icon: Icons.group_add_rounded,
+          title: context.l10n.accountInviteTitle,
+          subtitle: context.l10n.accountInviteSubtitle,
+          onTap: onOpenReferral,
+        ),
+        const Divider(height: 1),
+        _AccountActionTile(
+          key: const ValueKey('account-support'),
+          icon: Icons.volunteer_activism_rounded,
+          title: context.l10n.accountSupportTitle,
+          subtitle: context.l10n.accountSupportFreeSubtitle,
+          onTap: onOpenSupport,
+        ),
       ],
+    ),
+  );
+}
+
+class _AccountReferralPage extends StatelessWidget {
+  const _AccountReferralPage();
+
+  @override
+  Widget build(BuildContext context) => Consumer<MemberAccountController>(
+    builder: (context, account, child) => FloatingSubpageScaffold(
+      title: context.l10n.accountInviteTitle,
+      body: ListView(
+        padding: floatingSubpagePadding(context, bottom: 40),
+        children: [
+          if (account.referral != null)
+            _ReferralCard(account: account)
+          else
+            _SectionCard(child: Text(context.l10n.accountInviteSubtitle)),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AccountSupportPage extends StatelessWidget {
+  const _AccountSupportPage();
+
+  @override
+  Widget build(BuildContext context) => Consumer<MemberAccountController>(
+    builder: (context, account, child) => FloatingSubpageScaffold(
+      title: context.l10n.accountSupportTitle,
+      body: ListView(
+        padding: floatingSubpagePadding(context, bottom: 40),
+        children: [_SupportCard(account: account)],
+      ),
     ),
   );
 }
@@ -1390,7 +2145,7 @@ class _AccountActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -1419,14 +2174,81 @@ class _AccountActionTile extends StatelessWidget {
   );
 }
 
-class _SupportCard extends StatelessWidget {
+class _SupportCard extends StatefulWidget {
   const _SupportCard({required this.account});
 
   final MemberAccountController account;
 
   @override
+  State<_SupportCard> createState() => _SupportCardState();
+}
+
+class _SupportCardState extends State<_SupportCard> {
+  final _redemptionCode = TextEditingController();
+
+  @override
+  void dispose() {
+    _redemptionCode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _redeem() async {
+    try {
+      final wasWaitingForInviteReward =
+          widget.account.referral?.inviter?.status == 'pending';
+      await widget.account.redeemMembership(_redemptionCode.text);
+      _redemptionCode.clear();
+      if (mounted) {
+        showSideToast(
+          context,
+          wasWaitingForInviteReward
+              ? context.l10n.accountPremiumUnlockedReferral
+              : context.l10n.accountPremiumUnlocked,
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  Future<void> _purchaseWithApple() async {
+    try {
+      await widget.account.purchaseApplePremium();
+      if (mounted) {
+        showSideToast(context, context.l10n.accountApplePurchaseSubmitted);
+      }
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  Future<void> _restoreApplePurchase() async {
+    try {
+      await widget.account.restoreApplePremium();
+      if (mounted) {
+        showSideToast(context, context.l10n.accountAppleRestoreSubmitted);
+      }
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final account = widget.account;
     final purchaseUrl = account.membershipConfig?.purchaseUrl;
+    final applePlatform =
+        !kIsWeb &&
+        {
+          TargetPlatform.iOS,
+          TargetPlatform.macOS,
+        }.contains(defaultTargetPlatform);
     final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1468,20 +2290,88 @@ class _SupportCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            context.l10n.accountSupportFreeTitle,
+            account.membership?.premium == true
+                ? context.l10n.accountPremiumLifetime
+                : context.l10n.accountSupportFreeTitle,
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 5),
           Text(
-            context.l10n.accountSupportFreeSubtitle,
+            account.membership?.premium == true
+                ? context.l10n.accountPremiumLifetimeSubtitle
+                : context.l10n.accountSupportFreeSubtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.onSurfaceVariant,
               height: 1.45,
             ),
           ),
-          if (purchaseUrl != null) ...[
+          if (account.isAuthenticated &&
+              account.membership?.premium != true &&
+              !applePlatform) ...[
+            const SizedBox(height: 14),
+            TextField(
+              key: const ValueKey('account-redemption-code'),
+              controller: _redemptionCode,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: context.l10n.accountRedemptionCode,
+                prefixIcon: const Icon(Icons.key_rounded),
+              ),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              key: const ValueKey('account-redeem-premium'),
+              onPressed: account.loading ? null : _redeem,
+              icon: const Icon(Icons.lock_open_rounded),
+              label: Text(context.l10n.accountRedeemPremium),
+            ),
+          ],
+          if (account.isAuthenticated &&
+              account.membership?.premium != true &&
+              applePlatform) ...[
+            const SizedBox(height: 14),
+            Text(
+              context.l10n.accountApplePurchaseHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              key: const ValueKey('account-apple-purchase'),
+              onPressed: account.applePurchase.loading
+                  ? null
+                  : _purchaseWithApple,
+              icon: const Icon(Icons.apple_rounded),
+              label: Text(
+                account.applePurchase.product == null
+                    ? context.l10n.accountApplePurchase
+                    : '${context.l10n.accountApplePurchase} · ${account.applePurchase.product!.price}',
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const ValueKey('account-apple-restore'),
+              onPressed: account.applePurchase.loading
+                  ? null
+                  : _restoreApplePurchase,
+              icon: const Icon(Icons.restore_rounded),
+              label: Text(context.l10n.accountAppleRestore),
+            ),
+            if (account.applePurchase.error case final error?) ...[
+              const SizedBox(height: 8),
+              Text(
+                error,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.error),
+              ),
+            ],
+          ],
+          if (purchaseUrl != null && !applePlatform) ...[
             const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: () => launchUrl(
@@ -1492,6 +2382,402 @@ class _SupportCard extends StatelessWidget {
               label: Text(context.l10n.accountSupportAction),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReferralCard extends StatefulWidget {
+  const _ReferralCard({required this.account});
+
+  final MemberAccountController account;
+
+  @override
+  State<_ReferralCard> createState() => _ReferralCardState();
+}
+
+class _ReferralCardState extends State<_ReferralCard> {
+  final _inviteCode = TextEditingController();
+
+  @override
+  void dispose() {
+    _inviteCode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _copy(String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (mounted) showSideToast(context, context.l10n.accountInviteCopied);
+  }
+
+  Future<void> _bind() async {
+    try {
+      await widget.account.bindReferral(_inviteCode.text);
+      _inviteCode.clear();
+      if (mounted) showSideToast(context, context.l10n.accountInviteBound);
+    } catch (error) {
+      if (mounted) {
+        showSideToast(context, error.toString(), kind: SideToastKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final referral = widget.account.referral;
+    if (referral == null) return const SizedBox.shrink();
+    final inviter = referral.inviter;
+    final colors = Theme.of(context).colorScheme;
+    return _SectionCard(
+      title: context.l10n.accountInviteTitle,
+      icon: Icons.group_add_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            context.l10n.accountInviteSubtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            key: const ValueKey('account-invite-ticket'),
+            padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+            decoration: BoxDecoration(
+              color: colors.tertiaryContainer.withValues(alpha: 0.52),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.tertiary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.l10n.accountInviteMyCode,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: colors.onTertiaryContainer.withValues(
+                                alpha: 0.7,
+                              ),
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        referral.inviteCode,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: colors.onTertiaryContainer,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.filledTonal(
+                  key: const ValueKey('account-copy-invite-code'),
+                  tooltip: context.l10n.accountInviteCopyCode,
+                  onPressed: () => _copy(referral.inviteCode),
+                  icon: const Icon(Icons.copy_rounded),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const ValueKey('account-share-invite'),
+            onPressed: () => _copy(referral.inviteUrl.toString()),
+            icon: const Icon(Icons.ios_share_rounded),
+            label: Text(context.l10n.accountInviteShareAction),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _InviteStat(
+                  value: referral.invitedCount,
+                  label: context.l10n.accountInviteStatsInvited,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _InviteStat(
+                  value: referral.rewardedCount,
+                  label: context.l10n.accountInviteStatsRewarded,
+                  highlighted: referral.rewardedCount > 0,
+                ),
+              ),
+            ],
+          ),
+          if (referral.recentInvites.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Text(
+              '最近邀请',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            ...referral.recentInvites
+                .take(5)
+                .map(
+                  (item) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 16,
+                      child: Text(item.name.characters.first.toUpperCase()),
+                    ),
+                    title: Text(item.name),
+                    subtitle: Text(
+                      '绑定于 ${MaterialLocalizations.of(context).formatCompactDate(item.boundAt)}',
+                    ),
+                    trailing: Text(
+                      item.status == 'rewarded' ? '已解锁奖励' : '等待兑换',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: item.status == 'rewarded'
+                            ? Colors.green.shade700
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            context.l10n.accountInviteHowItWorks,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          _InviteStep(
+            number: 1,
+            title: context.l10n.accountInviteStepShareTitle,
+            body: context.l10n.accountInviteStepShareBody,
+          ),
+          _InviteStep(
+            number: 2,
+            title: context.l10n.accountInviteStepBindTitle,
+            body: context.l10n.accountInviteStepBindBody,
+          ),
+          _InviteStep(
+            number: 3,
+            title: context.l10n.accountInviteStepRedeemTitle,
+            body: context.l10n.accountInviteStepRedeemBody,
+            last: true,
+          ),
+          const Divider(height: 30),
+          Text(
+            context.l10n.accountInviteMyBinding,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          if (inviter != null)
+            Container(
+              key: const ValueKey('account-inviter-bound'),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest.withValues(alpha: 0.58),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    inviter.status == 'rewarded'
+                        ? Icons.verified_rounded
+                        : Icons.hourglass_top_rounded,
+                    color: inviter.status == 'rewarded'
+                        ? colors.primary
+                        : colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.accountInviterBound(inviter.name),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${inviter.code} · ${inviter.status == 'rewarded' ? context.l10n.accountInviteRewarded : context.l10n.accountInviteWaiting}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (widget.account.membership?.premium != true) ...[
+            Text(
+              context.l10n.accountInviteBindIntro,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey('account-invite-code'),
+              controller: _inviteCode,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: context.l10n.accountInviteBindLabel,
+                helperText: context.l10n.accountInviteBindHint,
+                prefixIcon: const Icon(Icons.person_add_alt_1_rounded),
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              key: const ValueKey('account-bind-invite'),
+              onPressed: widget.account.loading ? null : _bind,
+              child: Text(context.l10n.accountInviteBindAction),
+            ),
+          ] else
+            Text(
+              context.l10n.accountInviteBindingNotNeeded,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InviteStat extends StatelessWidget {
+  const _InviteStat({
+    required this.value,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  final int value;
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? colors.primaryContainer.withValues(alpha: 0.62)
+            : colors.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$value',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: highlighted ? colors.primary : colors.onSurface,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: colors.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InviteStep extends StatelessWidget {
+  const _InviteStep({
+    required this.number,
+    required this.title,
+    required this.body,
+    this.last = false,
+  });
+
+  final int number;
+  final String title;
+  final String body;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 34,
+            child: Column(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$number',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                if (!last)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: colors.outlineVariant.withValues(alpha: 0.72),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: last ? 0 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    body,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1522,19 +2808,19 @@ class _MemberAvatar extends StatelessWidget {
     return ClipOval(
       child: user.avatarUrl == null
           ? fallback
-          : Image.network(
-              user.avatarUrl!,
+          : AccountAvatarImage(
+              url: Uri.parse(user.avatarUrl!),
+              fallback: fallback,
               width: size,
               height: size,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => fallback,
             ),
     );
   }
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({this.title, this.icon, required this.child});
+  const _SectionCard({super.key, this.title, this.icon, required this.child});
 
   final String? title;
   final IconData? icon;

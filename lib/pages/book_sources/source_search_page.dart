@@ -9,7 +9,7 @@ import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 import 'widgets/sourced_book_widgets.dart';
 
@@ -298,22 +298,15 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
     final enabledSources = widget.sources
         .where((source) => source.enabled)
         .toList(growable: false);
-    return Scaffold(
-      appBar: AppBar(titleSpacing: 0, title: _buildQueryField(enabledSources)),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (enabledSources.isNotEmpty) _buildScopeChips(enabledSources),
-              Expanded(child: _buildBody(enabledSources)),
-            ],
-          ),
-        ),
+    return FloatingSubpageScaffold(
+      title: context.l10n.bookSourcesSearch,
+      tools: _buildQueryField(enabledSources),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (enabledSources.isNotEmpty) _buildScopeChips(enabledSources),
+          Expanded(child: _buildBody(enabledSources)),
+        ],
       ),
     );
   }

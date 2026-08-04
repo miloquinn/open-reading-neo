@@ -2,6 +2,43 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.5.2",
+            "notes": {
+                "en": [
+                    "Added a native account entry in Settings with email sign-in, registration, recovery, profile and avatar editing, and secure sign-out",
+                    "Grouped sign-in methods, email, password, and optional two-step verification into Account security, with tokens kept in platform secure storage and browser-based device authorization for external providers",
+                    "Split email changes, password setup, and two-step verification into focused pages with a clearer guided flow",
+                    "Unified secondary pages with glass-style headers, centered titles, matching round controls on both sides, and search and tabs kept in the page content",
+                    "Added local avatar caching and automatic refresh after avatar uploads or removal",
+                    "EPUB NCX and EPUB 3 catalog fragments are now preserved so nested headings inside the same content file jump to and highlight their exact reading position"
+                ],
+                "zh": [
+                    "设置页新增原生账号入口，支持邮箱登录、注册、找回密码、资料与头像修改，以及安全退出",
+                    "登录方式、邮箱、密码和可选的双重验证统一收纳到账号安全页；令牌保存在系统安全存储中，第三方登录通过浏览器设备授权完成",
+                    "账号安全操作拆分为独立页面，更换邮箱、设置密码和双重验证按清晰流程逐步完成",
+                    "设置、同步、书源管理、任务、AI 历史和阅读主题等二级页面统一使用玻璃质感顶栏；标题居中显示，左右圆形按钮保持对称，搜索与标签页保留在页面内容中",
+                    "用户头像支持本地缓存，上传或删除头像后会自动刷新，避免显示旧头像",
+                    "完整保留 EPUB NCX 与 EPUB3 目录链接中的锚点，同一正文文件内的多级标题可精确跳转并按真实阅读位置高亮"
+                ],
+                "zh-TW": [
+                    "設定頁新增原生帳號入口，支援電子郵件登入、註冊、找回密碼、資料與頭像修改，以及安全登出",
+                    "登入方式、電子郵件、密碼與可選的雙重驗證統一收納到帳號安全頁；權杖保存在系統安全儲存區，第三方登入透過瀏覽器裝置授權完成",
+                    "帳號安全操作拆分為獨立頁面，更換電子郵件、設定密碼與雙重驗證可依清楚流程逐步完成",
+                    "設定、同步、書源管理、任務、AI 歷史與閱讀主題等次級頁面統一使用玻璃質感頂欄；標題置中顯示，左右圓形按鈕保持對稱，搜尋與分頁保留在頁面內容中",
+                    "使用者頭像支援本機快取，上傳或刪除頭像後會自動重新整理，避免顯示舊頭像",
+                    "完整保留 EPUB NCX 與 EPUB3 目錄連結中的錨點，同一正文檔案內的多層標題可精確跳轉並依實際閱讀位置醒目顯示"
+                ],
+                "ja": [
+                    "設定にネイティブのアカウント入口を追加し、メールでのログイン、登録、パスワード再設定、プロフィールとアバターの編集、安全なログアウトに対応しました",
+                    "ログイン方法、メール、パスワード、任意の2段階認証をアカウントセキュリティにまとめ、トークンはOSの安全なストレージに保存し、外部プロバイダーはブラウザーのデバイス認証を使用します",
+                    "メールアドレス変更、パスワード設定、2段階認証を個別のページに分け、わかりやすい手順で進められるようにしました",
+                    "設定、同期、書籍ソース管理、タスク、AI 履歴、読書テーマなどのサブページをガラス調ヘッダーに統一し、タイトルを中央、左右に同じ大きさの丸いボタンを配置しました。検索とタブはページ内に残しています",
+                    "アバターのローカルキャッシュに対応し、アップロードや削除の後は自動更新して古い画像が残らないようにしました",
+                    "EPUB NCX と EPUB 3 の目次リンクに含まれるアンカーを保持し、同じ本文ファイル内の階層見出しへ正確に移動して実際の読書位置を強調表示するようにしました"
+                ]
+            }
+        },
+        {
             "version": "2.5.1",
             "notes": {
                 "en": [
@@ -101,7 +138,7 @@
                     "Raised the per-book import limit from 100 MB to 500 MB",
                     "Reworked EPUB parsing and layout to load large books and images on demand with lower memory use and better compatibility",
                     "Added four selectable book-opening animations with smoother transitions from cover and loading state to content",
-                    "Added import support for Legado 3 JSON sources with compatibility analysis; newly imported third-party sources stay disabled until explicitly enabled"
+                    "Added import support for common reading-source JSON with compatibility analysis; newly imported third-party sources stay disabled until explicitly enabled"
                 ],
                 "zh": [
                     "悬浮导航栏支持自定义高度和左右边距，设置页面可实时预览",
@@ -109,7 +146,7 @@
                     "单本书籍导入上限从 100 MB 提高至 500 MB",
                     "重做 EPUB 按需解析与排版，大型书籍和图片不再一次性全部载入内存，等待时间、内存占用和兼容性均有改善",
                     "新增四种可选书籍打开动画，优化封面、加载状态与正文之间的过渡",
-                    "支持导入 Legado 3 JSON 书源并分析兼容性；新导入的第三方书源默认关闭，需由用户确认后启用"
+                    "支持导入通用阅读书源 JSON 并分析兼容性；新导入的第三方书源默认关闭，需由用户确认后启用"
                 ],
                 "zh-TW": [
                     "懸浮導覽列支援自訂高度與左右邊距，設定頁面可即時預覽",
@@ -117,7 +154,7 @@
                     "單本書籍匯入上限由 100 MB 提高至 500 MB",
                     "重做 EPUB 依需要解析與排版，大型書籍和圖片不再一次全部載入記憶體，等待時間、記憶體使用與相容性均有改善",
                     "新增四種可選書籍開啟動畫，改善封面、載入狀態與正文之間的過渡",
-                    "支援匯入 Legado 3 JSON 書源並分析相容性；新匯入的第三方書源預設關閉，需由使用者確認後啟用"
+                    "支援匯入通用閱讀書源 JSON 並分析相容性；新匯入的第三方書源預設關閉，需由使用者確認後啟用"
                 ],
                 "ja": [
                     "フローティングナビゲーションバーの高さと左右余白を設定し、設定画面でプレビューできるようにしました",
@@ -125,7 +162,7 @@
                     "1冊あたりの取り込み上限を 100 MB から 500 MB に引き上げました",
                     "EPUB の解析とレイアウトをオンデマンド方式に作り直し、大規模な書籍や画像のメモリ使用量、待ち時間、互換性を改善しました",
                     "4種類の書籍オープンアニメーションを追加し、表紙、読み込み状態、本文の切り替えを滑らかにしました",
-                    "Legado 3 JSON ソースの取り込みと互換性分析に対応し、新しく取り込んだ第三者ソースはユーザーが確認して有効にするまで無効のままにしました"
+                    "汎用読書ソース JSON の取り込みと互換性分析に対応し、新しく取り込んだ第三者ソースはユーザーが確認して有効にするまで無効のままにしました"
                 ]
             }
         },

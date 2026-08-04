@@ -1,10 +1,17 @@
 part of '../../reader_shader_page_curl.dart';
 
+/// Amount of mirrored front-page ink visible through the phone curl's back.
+///
+/// The remaining 64% comes from the active reader theme's paper color. Tablet
+/// spreads provide a real reverse-page snapshot and do not use this value.
+const double readerPhonePageCurlBackInkOpacity = 0.36;
+
 class _ReaderClassicFoldPainter extends CustomPainter {
   const _ReaderClassicFoldPainter({
     required this.shader,
     required this.sourcePage,
     required this.backPage,
+    required this.paperColor,
     required this.geometry,
     required this.bindingEdge,
     required this.bindingOverflow,
@@ -13,6 +20,7 @@ class _ReaderClassicFoldPainter extends CustomPainter {
   final ui.FragmentShader shader;
   final ui.Image sourcePage;
   final ui.Image? backPage;
+  final Color paperColor;
   final ReaderPageTurnGeometry geometry;
   final ReaderPageBindingEdge bindingEdge;
   final double bindingOverflow;
@@ -29,6 +37,10 @@ class _ReaderClassicFoldPainter extends CustomPainter {
       ..setFloat(index++, geometry.canonicalLineB.dy)
       ..setFloat(index++, bindingEdge == ReaderPageBindingEdge.right ? 1 : 0)
       ..setFloat(index++, backPage == null ? 0 : 1)
+      ..setFloat(index++, paperColor.r)
+      ..setFloat(index++, paperColor.g)
+      ..setFloat(index++, paperColor.b)
+      ..setFloat(index++, readerPhonePageCurlBackInkOpacity)
       ..setImageSampler(0, sourcePage)
       ..setImageSampler(1, backPage ?? sourcePage);
     final paintBounds = bindingEdge == ReaderPageBindingEdge.left
@@ -42,6 +54,7 @@ class _ReaderClassicFoldPainter extends CustomPainter {
       oldDelegate.geometry != geometry ||
       oldDelegate.bindingEdge != bindingEdge ||
       oldDelegate.bindingOverflow != bindingOverflow ||
+      oldDelegate.paperColor != paperColor ||
       !identical(oldDelegate.sourcePage, sourcePage) ||
       !identical(oldDelegate.backPage, backPage);
 }

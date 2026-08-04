@@ -1352,6 +1352,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         shader: _classicFoldShader!,
         sourcePage: sourceImage,
         backPage: backImage,
+        paperColor: widget.paperColor,
         geometry: geometry,
         bindingEdge: widget.bindingEdge,
         bindingOverflow: bindingOverflow,

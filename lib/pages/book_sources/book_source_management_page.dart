@@ -14,8 +14,11 @@ import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/source_cover_image.dart';
+
+import 'source_login_page.dart';
 
 /// Low-frequency configuration for online content providers.
 ///
@@ -116,31 +119,55 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     } on ProviderNotFoundException {
       // Standalone embeds without app settings retain the default-off state.
     }
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.l10n.bookSourceManagementTitle),
-        actions: [
-          IconButton(
-            tooltip: context.l10n.bookSourcesAdd,
-            onPressed: _showAddSourceDialog,
-            icon: const Icon(Icons.add_link_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
-              child: _buildSourceList(additionalProtocolsEnabled, scheme),
+    return FloatingSubpageScaffold(
+      title: context.l10n.bookSourceManagementTitle,
+      actions: [
+        FloatingSubpageMenuAction<_BookSourceHeaderAction>(
+          key: const Key('bookSourcesToolButton'),
+          tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+          icon: Icons.more_horiz_rounded,
+          onSelected: (action) {
+            switch (action) {
+              case _BookSourceHeaderAction.add:
+                _showAddSourceDialog();
+              case _BookSourceHeaderAction.select:
+                setState(() {
+                  _selectionMode = !_selectionMode;
+                  _selectedSourceIds.clear();
+                });
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              key: const Key('bookSourcesAddButton'),
+              value: _BookSourceHeaderAction.add,
+              child: ListTile(
+                leading: const Icon(Icons.add_link_rounded),
+                title: Text(context.l10n.bookSourcesAdd),
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-          ),
+            PopupMenuItem(
+              key: const Key('bookSourcesSelectionModeButton'),
+              value: _BookSourceHeaderAction.select,
+              child: ListTile(
+                leading: Icon(
+                  _selectionMode
+                      ? Icons.close_rounded
+                      : Icons.checklist_rounded,
+                ),
+                title: Text(context.l10n.bookSourcesSelect),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ),
+      ],
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 920),
+          child: _buildSourceList(additionalProtocolsEnabled, scheme),
         ),
       ),
     );
@@ -171,6 +198,11 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         key: const Key('bookSourceManagementList'),
         controller: _scrollController,
         slivers: [
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: FloatingSubpageScaffold.headerExtentOf(context),
+            ),
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             sliver: SliverToBoxAdapter(
@@ -268,23 +300,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 ),
               ),
             ],
-          ),
-        ),
-        FilledButton.icon(
-          onPressed: _showAddSourceDialog,
-          icon: const Icon(Icons.add_rounded),
-          label: Text(context.l10n.bookSourcesAdd),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          key: const Key('bookSourcesSelectionModeButton'),
-          tooltip: context.l10n.bookSourcesSelect,
-          onPressed: () => setState(() {
-            _selectionMode = !_selectionMode;
-            _selectedSourceIds.clear();
-          }),
-          icon: Icon(
-            _selectionMode ? Icons.close_rounded : Icons.checklist_rounded,
           ),
         ),
       ],
@@ -896,6 +911,13 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       tooltip: context.l10n.bookSourcesRemove,
       onSelected: (value) {
         if (value == 'rights') _showSourceRightsDialog(source);
+        if (value == 'login') {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SourceLoginPage(source: source),
+            ),
+          );
+        }
         if (value == 'remove') _confirmRemoveSource(source);
       },
       itemBuilder: (context) => [
@@ -903,6 +925,18 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           PopupMenuItem(
             value: 'rights',
             child: Text(context.l10n.bookSourcesRightsDetails),
+          ),
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource &&
+            '${source.sourceConfig?['loginUrl'] ?? ''}'.trim().isNotEmpty)
+          PopupMenuItem(
+            value: 'login',
+            child: Row(
+              children: [
+                const Icon(Icons.key_rounded),
+                const SizedBox(width: 10),
+                Text(context.l10n.sourceLoginTitle),
+              ],
+            ),
           ),
         PopupMenuItem(
           value: 'remove',
@@ -1428,6 +1462,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
 }
 
 enum _BookSourceFilter { all, enabled, disabled, runnable, pending }
+
+enum _BookSourceHeaderAction { add, select }
 
 class _BookSourceGroupPicker extends StatefulWidget {
   const _BookSourceGroupPicker({required this.groups, required this.selected});

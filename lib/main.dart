@@ -17,12 +17,14 @@ import 'l10n/app_localizations.dart';
 import 'book_sources/services/book_source_client.dart';
 import 'book_sources/services/book_source_registry.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
+import 'book_sources/source_engine/source_interaction_coordinator.dart';
 import 'core/reader/native_reader_service.dart';
 import 'models/book.dart';
 import 'pages/home/home_shell_page.dart';
 import 'pages/library/import_book/import_book_page.dart';
 import 'pages/legal/user_agreement_page.dart';
 import 'pages/reader/book_source_reader_page.dart';
+import 'pages/book_sources/source_verification_page.dart';
 import 'services/books/book_services.dart';
 import 'services/books/book_format_support.dart';
 import 'services/reading/reading_resume_service.dart';
@@ -193,7 +195,7 @@ class ThemeNotifier extends ChangeNotifier {
   AppTheme _currentAppTheme = AppThemes.fromAccentColor(
     AppThemes.defaultAccentColor,
   );
-  AppUiStyle _uiStyle = AppUiStyle.material3;
+  AppUiStyle _uiStyle = AppUiStyle.glass;
 
   ThemeMode get themeMode => _themeMode;
   bool get isInitialized => _isInitialized;
@@ -351,6 +353,9 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
   bool _showFirstHomeSupportAfterAgreement = false;
   _BootstrapError? _bootstrapError;
   StreamSubscription<BackgroundDownloadTap>? _notificationTapSubscription;
+  StreamSubscription<SourceInteractionTicket>? _sourceInteractionSubscription;
+  final List<SourceInteractionTicket> _pendingSourceInteractions = [];
+  bool _showingSourceInteraction = false;
   BackgroundDownloadTap? _pendingNotificationTap;
   bool _webDavSyncInitialized = false;
   bool _resumeReadingHandled = false;
@@ -380,6 +385,10 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     _notificationTapSubscription = BackgroundDownloadNotifier.taps.listen(
       _handleNotificationTap,
     );
+    _sourceInteractionSubscription = SourceInteractionCoordinator
+        .instance
+        .requests
+        .listen(_queueSourceInteraction);
     unawaited(BackgroundDownloadNotifier.initialize());
     _bootstrapServices();
     _checkAgreementStatus();
@@ -389,8 +398,38 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _notificationTapSubscription?.cancel();
+    _sourceInteractionSubscription?.cancel();
+    SourceInteractionCoordinator.instance.cancelAll();
     unawaited(_incomingBookService.dispose());
     super.dispose();
+  }
+
+  void _queueSourceInteraction(SourceInteractionTicket ticket) {
+    _pendingSourceInteractions.add(ticket);
+    _showNextSourceInteraction();
+  }
+
+  Future<void> _showNextSourceInteraction() async {
+    if (_showingSourceInteraction || _pendingSourceInteractions.isEmpty) return;
+    final context = _navigatorKey.currentContext;
+    if (context == null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _showNextSourceInteraction(),
+      );
+      return;
+    }
+    _showingSourceInteraction = true;
+    final ticket = _pendingSourceInteractions.removeAt(0);
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => SourceVerificationPage(ticket: ticket),
+        ),
+      );
+    } finally {
+      _showingSourceInteraction = false;
+      _showNextSourceInteraction();
+    }
   }
 
   void _enqueueInitialDesktopBooks() {

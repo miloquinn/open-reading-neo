@@ -4,6 +4,7 @@ import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 import 'webdav_sync_translator.dart';
 
@@ -95,209 +96,196 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
     final palette = PageStyleHelper.palette(context);
     final sync = context.watch<WebDavSyncController>();
     final hasStoredConfiguration = sync.isConfigured;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.webDavSetUp)),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: PageStyleHelper.backgroundGradient(context),
-        ),
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _SectionCard(
-                          title: l10n.webDavConnectionTitle,
-                          icon: Icons.cloud_outlined,
-                          child: Column(
-                            children: [
-                              TextFormField(
-                                controller: _serverController,
-                                keyboardType: TextInputType.url,
-                                autofillHints: const [AutofillHints.url],
-                                decoration: InputDecoration(
-                                  labelText: l10n.webDavServerUrl,
-                                  prefixIcon: const Icon(Icons.link_rounded),
-                                ),
-                                onChanged: _invalidateTest,
-                                validator: (value) {
-                                  final uri = Uri.tryParse(value?.trim() ?? '');
-                                  return uri != null && uri.host.isNotEmpty
-                                      ? null
-                                      : l10n.webDavErrorUnknown;
-                                },
+    return FloatingSubpageScaffold(
+      title: l10n.webDavSetUp,
+      body: ListView(
+        padding: floatingSubpagePadding(context, top: 20, bottom: 40),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionCard(
+                      title: l10n.webDavConnectionTitle,
+                      icon: Icons.cloud_outlined,
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _serverController,
+                            keyboardType: TextInputType.url,
+                            autofillHints: const [AutofillHints.url],
+                            decoration: InputDecoration(
+                              labelText: l10n.webDavServerUrl,
+                              prefixIcon: const Icon(Icons.link_rounded),
+                            ),
+                            onChanged: _invalidateTest,
+                            validator: (value) {
+                              final uri = Uri.tryParse(value?.trim() ?? '');
+                              return uri != null && uri.host.isNotEmpty
+                                  ? null
+                                  : l10n.webDavErrorUnknown;
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _usernameController,
+                            autofillHints: const [AutofillHints.username],
+                            decoration: InputDecoration(
+                              labelText: l10n.webDavUsername,
+                              prefixIcon: const Icon(
+                                Icons.person_outline_rounded,
                               ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _usernameController,
-                                autofillHints: const [AutofillHints.username],
-                                decoration: InputDecoration(
-                                  labelText: l10n.webDavUsername,
-                                  prefixIcon: const Icon(
-                                    Icons.person_outline_rounded,
-                                  ),
+                            ),
+                            onChanged: _invalidateTest,
+                            validator: (value) =>
+                                (value?.trim().isNotEmpty ?? false)
+                                ? null
+                                : l10n.webDavErrorAuthentication,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            autofillHints: const [AutofillHints.password],
+                            decoration: InputDecoration(
+                              labelText: l10n.webDavPassword,
+                              helperText: hasStoredConfiguration
+                                  ? l10n.webDavPasswordHint
+                                  : null,
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                tooltip: _obscurePassword
+                                    ? l10n.settingsShow
+                                    : l10n.settingsHide,
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
                                 ),
-                                onChanged: _invalidateTest,
-                                validator: (value) =>
-                                    (value?.trim().isNotEmpty ?? false)
-                                    ? null
-                                    : l10n.webDavErrorAuthentication,
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
                               ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                autofillHints: const [AutofillHints.password],
-                                decoration: InputDecoration(
-                                  labelText: l10n.webDavPassword,
-                                  helperText: hasStoredConfiguration
-                                      ? l10n.webDavPasswordHint
-                                      : null,
-                                  prefixIcon: const Icon(Icons.lock_outline),
-                                  suffixIcon: IconButton(
-                                    tooltip: _obscurePassword
-                                        ? l10n.settingsShow
-                                        : l10n.settingsHide,
-                                    onPressed: () => setState(
-                                      () =>
-                                          _obscurePassword = !_obscurePassword,
+                            ),
+                            onChanged: _invalidateTest,
+                            validator: (value) =>
+                                (value?.isNotEmpty ?? false) ||
+                                    hasStoredConfiguration
+                                ? null
+                                : l10n.webDavErrorAuthentication,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _rootController,
+                            decoration: InputDecoration(
+                              labelText: l10n.webDavRootPath,
+                              prefixIcon: const Icon(Icons.folder_outlined),
+                            ),
+                            onChanged: _invalidateTest,
+                            validator: (value) =>
+                                (value?.trim().isNotEmpty ?? false)
+                                ? null
+                                : l10n.webDavErrorUnknown,
+                          ),
+                          const SizedBox(height: 18),
+                          FilledButton.icon(
+                            onPressed: _testing ? null : _testConnection,
+                            icon: _testing
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                    ),
-                                  ),
-                                ),
-                                onChanged: _invalidateTest,
-                                validator: (value) =>
-                                    (value?.isNotEmpty ?? false) ||
-                                        hasStoredConfiguration
-                                    ? null
-                                    : l10n.webDavErrorAuthentication,
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _rootController,
-                                decoration: InputDecoration(
-                                  labelText: l10n.webDavRootPath,
-                                  prefixIcon: const Icon(Icons.folder_outlined),
-                                ),
-                                onChanged: _invalidateTest,
-                                validator: (value) =>
-                                    (value?.trim().isNotEmpty ?? false)
-                                    ? null
-                                    : l10n.webDavErrorUnknown,
-                              ),
-                              const SizedBox(height: 18),
-                              FilledButton.icon(
-                                onPressed: _testing ? null : _testConnection,
-                                icon: _testing
-                                    ? const SizedBox.square(
-                                        dimension: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.wifi_tethering_rounded),
-                                label: Text(
-                                  _testing
-                                      ? l10n.webDavTestingConnection
-                                      : l10n.webDavTestConnection,
-                                ),
-                              ),
-                              if (_connectionVerified ||
-                                  _connectionError != null) ...[
-                                const SizedBox(height: 14),
-                                Semantics(
-                                  liveRegion: true,
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          (_connectionVerified
-                                                  ? Colors.green
-                                                  : Theme.of(
-                                                      context,
-                                                    ).colorScheme.error)
-                                              .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          _connectionVerified
-                                              ? Icons.check_circle_outline
-                                              : Icons.error_outline,
-                                          color: _connectionVerified
+                                  )
+                                : const Icon(Icons.wifi_tethering_rounded),
+                            label: Text(
+                              _testing
+                                  ? l10n.webDavTestingConnection
+                                  : l10n.webDavTestConnection,
+                            ),
+                          ),
+                          if (_connectionVerified ||
+                              _connectionError != null) ...[
+                            const SizedBox(height: 14),
+                            Semantics(
+                              liveRegion: true,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      (_connectionVerified
                                               ? Colors.green
                                               : Theme.of(
                                                   context,
-                                                ).colorScheme.error,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            _connectionVerified
-                                                ? l10n.webDavConnectionSuccess
-                                                : webDavSyncErrorText(
-                                                    context,
-                                                    _connectionError,
-                                                  ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                                ).colorScheme.error)
+                                          .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: palette.card,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: palette.border),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.security_outlined,
-                                color: Theme.of(context).colorScheme.primary,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _connectionVerified
+                                          ? Icons.check_circle_outline
+                                          : Icons.error_outline,
+                                      color: _connectionVerified
+                                          ? Colors.green
+                                          : Theme.of(context).colorScheme.error,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _connectionVerified
+                                            ? l10n.webDavConnectionSuccess
+                                            : webDavSyncErrorText(
+                                                context,
+                                                _connectionError,
+                                              ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(child: Text(l10n.webDavSecurityNotice)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        FilledButton(
-                          onPressed: _connectionVerified && !_saving
-                              ? _save
-                              : null,
-                          child: Text(l10n.webDavSaveConfiguration),
-                        ),
-                      ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: palette.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: palette.border),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.security_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(l10n.webDavSecurityNotice)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _connectionVerified && !_saving ? _save : null,
+                      child: Text(l10n.webDavSaveConfiguration),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

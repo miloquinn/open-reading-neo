@@ -1,6 +1,6 @@
 # Open Reading 项目结构
 
-> 最后更新：2026-08-03
+> 最后更新：2026-08-04
 > 当前版本：2.3.8
 > 本文记录稳定的项目结构、模块边界和核心数据结构，不罗列每个实现细节。
 
@@ -41,7 +41,7 @@ open-reading/
 ├─ .github/workflows/       日常验证、跨平台构建和发布自动化
 ├─ lib/                     Flutter 主源码
 ├─ test/                    单元、组件、回归和 Golden 测试
-├─ tool/                    项目辅助脚本与官网下载校验工具
+├─ tool/                    项目辅助脚本、阅读书源实验室与官网下载校验工具
 ├─ shaders/                 阅读翻页等着色器资源
 ├─ DESIGN.md                产品、交互与前端设计决策基线
 ├─ CHANGELOG.md             面向版本的正式变更记录
@@ -121,17 +121,20 @@ lib/
 - `book_sources/services/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
 - `pages/book_sources/source_search_page.dart`：在线书源搜索与发现；大型书源库的范围条按需构建，“全部书源”通过最多 8 个 worker 有界并发搜索，按单源超时渐进追加结果，清空、切换范围或离页时取消当前请求。手机入口先打开加载页，再在后台解析注册表并替换为搜索页。
 - `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型阅读书源聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和能力标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/可执行状态、分组筛选和针对当前结果的批量操作。
-- `pages/settings/settings_page.dart`：应用设置、版本与维护入口；顶部账号卡片进入 `pages/account/account_page.dart`，其余设置按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”组织。重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
-- `pages/account/account_page.dart` 与 `services/account/`：邮箱密码注册/登录、邮箱验证码、密码找回、GitHub/Google/Passkey 浏览器设备授权、资料与头像管理、令牌安全存储和刷新轮换。登录后的用户中心首页只展示圆形头像身份摘要、靠前的高级功能支持卡，以及“编辑资料 / 账号安全”入口；资料表单收纳到编辑页，登录方式、邮箱换绑、密码和 MFA 收纳到账号安全页。账号安全流程支持当前邮箱与新邮箱双验证码换绑、通过当前邮箱验证码设置或修改密码，以及默认关闭的 TOTP 两步验证；恢复码只展示一次，MFA 未完成的 bearer 会话会安全持久化并在启动时恢复到验证界面，不会被刷新或误清除。浏览器授权只在网页端明确确认后一次性交换 App bearer 会话；支持者身份不控制 WebDAV 或其他功能，当前全部功能免费。
+- `book_sources/source_engine/`：阅读书源 JSON 的原生执行层，负责 URL 模板、HTTP/WebView、QuickJS、CSS/旧式 DOM、XPath、JSONPath、正则与跨阶段状态。脚本上下文、网络请求/响应和 evaluator 接口集中在共享契约文件，原生与 Web 平台只保留各自执行实现；每来源的变量、键值、Java 状态和两级缓存由单一隔离状态对象管理。登录信息与登录 Header 通过系统安全存储按来源隔离，运行时自动注入请求并执行响应登录检查；声明式登录表单由 `SourceLoginField` 和 `SourceLoginPage` 承载。旧式 DOM 兼容 `&&`、`||`、`%%`、方括号索引/排除/区间/倒序以及 `@all`、`@ownText`、`@textNodes`。
+- `tool/reading_source_lab/`：独立 Python 书源研究项目；无第三方运行时依赖，离线解析和去重阅读书源 JSON，生成只含统计的兼容矩阵，不执行脚本、不访问站点、不输出认证配置值。其研究笔记与三批样本聚合基线位于项目内 `docs/`。
+- `pages/settings/settings_page.dart`：应用设置、版本与维护入口；顶部账号卡片进入 `pages/account/account_page.dart`，普通状态使用蓝色身份卡，已解锁高级版时切换为深色香槟金专属卡并显示支持者徽章与永久权益摘要；其余设置按“外观与字体 / 阅读 / 数据与服务 / 通用 / 关于与支持”组织。重型配置统一收纳到子页（书库布局 `library_layout_settings_page.dart`、悬浮导航 `floating_navigation_settings_page.dart`、AI 助手 `ai_settings_page.dart` 等），主页面每行只保留摘要入口；`SettingsPageController` 可从首页导航后定位到“关于与支持”区域。
+- `pages/account/account_page.dart` 与 `services/account/`：邮箱密码注册/登录、邮箱验证码、密码找回、GitHub/Google/Passkey 浏览器设备授权、资料与头像管理、令牌安全存储和刷新轮换。登录后的用户中心首页只展示圆形头像身份摘要、靠前的高级功能支持卡，以及“编辑资料 / 账号安全”入口；资料表单收纳到编辑页，账号安全页本身只保留登录方式及邮箱、密码、MFA 三个导航入口。邮箱换绑和密码设置在各自独立的双步骤页面完成；默认关闭的 TOTP 双重验证依次使用独立的发送邮件、邮件验证码、二维码/密钥绑定、一次性恢复码页面，二维码由 `widgets/qr_code_view.dart` 在设备本地生成，不向外部服务泄露 TOTP 密钥。`services/account/account_avatar_cache.dart` 与 `widgets/account_avatar_image.dart` 为用户中心和设置页提供共享头像内存/磁盘缓存，上传或删除头像后主动失效旧 URL（包括服务端沿用同一 URL 的情况），并随图片缓存清理操作统一删除；`account_summary_cache.dart` 只持久化昵称、用户名、头像地址和高级版标记，设置页账号卡片启动时先显示这份非敏感摘要，再由远端会话和会员接口校准，登出、401 或 MFA 待验证时立即清除。恢复码只展示一次，MFA 未完成的 bearer 会话会安全持久化并在启动时恢复到验证界面，不会被刷新或误清除。GitHub/Google 设备登录直接打开提供商官方授权页，后端回调完成后批准对应设备请求，App 继续轮询并领取自己的 bearer 会话；Passkey 仍使用官网确认页，MFA 完成前不会批准设备。支持者身份不控制 WebDAV 或其他功能，当前全部功能免费。
 - `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片支持添加/编辑/删除/激活，服务商除内置项外可选“自定义”。自定义服务商把厂商身份与接口协议拆开，可选择 OpenAI Compatible 或 Anthropic，并按协议提示 Base URL 是否需要包含 `/v1`；快捷模型 JSON 同时保存协议，旧记录缺省按服务商原协议兼容读取。AI 预处理开关也位于此页。
 - `pages/settings/sync/`：WebDAV 概览、独立连接配置、即时保存的同步内容开关和书籍文件管理页；书源、书架信息、阅读进度等元数据自动同步，原文件需先开启上传权限，再按书选择上传或下载。新导入书籍提供“每次询问（默认）/ 自动上传 / 始终手动”三种策略；自动上传只处理符合安全限制的真正新增本地文件。
 - `pages/settings/replace_rules_page.dart` 与 `services/reader/replace_rule_service.dart`：全局“替换净化”规则管理与执行边界。规则使用 SharedPreferences JSON 持久化，支持新建、编辑、启停、删除、搜索、排序、JSON 导入导出，以及常见新旧字段（`pattern`/`regex`、`name`/`replaceSummary`、`isEnabled`/`enable`、`scope`/`useTo`、`order`/`serialNumber`）；规则可按书名/书源范围、排除范围和标题/正文类型生效。设置页提供稳定入口，本地文字阅读器和在线书源阅读器控制栏提供快速入口；标题与正文都在分页前净化，EPUB/Kindle 富文本会重算样式块偏移并保留图片，规则变更后当前阅读器清理文字/分页缓存并按现有进度重排。
 - `services/sync/`：本地优先的 WebDAV v1 同步实现。每台设备写入独立的不可变变更批次，使用 HLC、tombstone 和记录级 LWW 合并；`book_sources` 按书源 ID 同步公开注册信息，在线书籍通过 `source_id + source_book_id`、书源快照和书籍快照恢复为可直接打开的书架项，在线章节进度复用 `progress` 数据集同步，但章节正文、目录、封面路径和缓存始终留在设备本地。新上传书籍以未加密的原始字节和原始文件名保存在 `books/<书名 - 作者>/`，同名异内容使用 `(2)`、`(3)` 可读编号避免覆盖。SHA-256 仅保存在同步元数据和本地索引中用于校验，历史无扩展名 blob 仍可下载；持久封面继续独立按 SHA-256 内容寻址。`sync_dataset_catalog.dart` 分离稳定协议数据集与当前版本能力，暂未开放的笔记/高亮记录可保留在同步镜像中，但不会扫描或写入业务表。
 - `pages/settings/custom_fonts_page.dart`：用户字体库的导入、应用、重命名和删除入口。
 - `widgets/side_toast.dart`：应用内短反馈的统一浮层。手机在顶部居中、宽屏在右上展示，连续提示直接替换；普通/成功提示短暂停留，警告/错误略延长，并通过 `IgnorePointer` 保证通知出现时底层操作仍可点击。页面内不再直接使用底部 `SnackBar`。
+- `widgets/glass_top_bar.dart` 是首页与非首页二级页面共用的唯一顶栏玻璃表面，统一负责状态栏融合、`GlassEffectConfig.chromeSurfaceColor`、模糊强度和关闭玻璃效果时的降级；不再绘制底部分割线。`widgets/floating_subpage_scaffold.dart` 在其上提供居中 22px 标题、左右相同的 48px 圆形点击区以及统一内容基线：正文默认从玻璃顶栏底部再下移 8px，页面不再自行硬编码顶栏避让。按钮本身不执行第二次模糊，搜索、Tab 和大型页面工具仍属于内容层。设置、账号、同步、书源管理、任务、历史和阅读主题等子页面不再使用标准 AppBar；首页/设置主页面/书库主页面保留各自主框架，阅读器错误态使用阅读主题配色的同类返回控件。
 - `pages/settings/about/changelog_page.dart` 与 `services/core/changelog_service.dart`：应用内版本历史异步加载与展示；版本、顺序和四语文案统一来自 `assets/changelog/changelog.json`，首项自动标记为当前版本，语言按完整 locale、语言代码、英文和任意可用语言逐级回退。新增版本只更新数据资产，不再修改页面代码或增加版本专属 ARB getter。
 - `pages/settings/about/open_source_licenses_page.dart`：应用、历史版本、内置字体及 Flutter/Dart 依赖的许可查看入口。
-- `pages/legal/user_agreement_page.dart`：首次使用协议、隐私与第三方书源责任确认；条款披露 GitHub/官网更新检查和官网下载统计，含原始 IP 的下载明细最多保留 30 天。
+- `pages/legal/user_agreement_page.dart`：首次使用三段式引导（软件介绍 → 使用协议 → 隐私说明），步骤切换使用书页方向的淡入/位移动效，并尊重系统“减少动态效果”设置；使用协议页保留完整条款、第三方书源责任边界和独立确认，隐私页单独展示本机存储、联网触发条件与官网下载统计（含原始 IP 的下载明细最多保留 30 天），最后一步确认后才写入协议完成状态。
 
 ## 官网更新集成
 
@@ -298,7 +301,7 @@ EPUB 图片块与其后的正文共用同一个显示投影：携带图片的第
 - `BookSourceResponseCache`：公开书源元数据的有界两级缓存。原生平台使用 48 项/4 MiB 内存 LRU 与 160 项/16 MiB 临时目录 JSON 缓存，Web 端条件导出为同配额的内存实现；冷缓存并发请求共享一次加载，响应进入内存后立即返回，JSON 编码、磁盘写入、原子替换和配额清理在有序后台队列完成。单 key/前缀失效只推进相关活动代次并建立磁盘读取屏障，全部清空才推进全局 epoch；活动代次在对应加载和写入结束后释放，既阻止旧结果复活，也不无限积累或牵连其他书源。损坏、过期、失败或取消结果不会持久化。
 - `BookSourceChangeService`：手动整书换源编排。以最多 12 个 worker 有界并发搜索当前来源之外的已启用书源，每源搜索预算 6 秒；优先搜索 ORSP、已完整验证的阅读书源和配置中 `respondTime` 较低的来源，再按 `customOrder` 与名称稳定排序。取消订阅或单源超时会把取消令牌下传到 ORSP Dio 与阅读书源 HTTP 传输层，终止在途请求并释放 worker，而非只停止 UI 更新；书名必须规范化精确匹配，作者校验可由用户关闭。候选在提交前必须实际通过详情、目录和映射后当前章节正文验证。章节位置优先按完整标题、章节号匹配，再按新旧目录比例回退。
 - `SourceImportService` / `BookSourceImportAnalyzer`：64 MiB、最多 10,000 条的聚合导入边界；单次 UTF-8/JSON 解码，按 `bookSourceUrl` 保留最后一条，分别统计无效项和重复项。文件解析使用后台 isolate；URL 输入只在直接内容不是有效书源且声明嵌套 URL 时递归加载。能力扫描只生成本地摘要，不执行站点可用性探测，也不作为保存书源的前置条件。
-- `SourceRuntime` / `SourceHttpTransport`：阅读书源的应用内执行链路。搜索和详情规则产生的书籍级变量会随书籍快照传入目录、正文、下载与换源验证；旧快照缺变量时可从详情 URL 模板和状态写入规则反推。章节地址绝对化保留末尾请求选项，正文多节点按换行合并后再执行默认不跨行的清理表达式。请求按书源维持独立 Cookie 会话，接收并校验 `Set-Cookie` 的域、路径、Secure 与过期属性，支持配置中的静态 Cookie；重定向按浏览器语义处理 301/302/303/307/308，跨站时移除 Host、Authorization 和静态 Cookie。源级请求头支持 `source.getKey()`、`source.bookSourceUrl` 等常见取值表达式。普通公网 DNS 使用已校验地址连接；虚拟 DNS 的保留地址在同样检查后使用系统网络通道，避免本地隧道被自定义连接破坏。脚本网络调用通过暂停、APP 请求和上下文重放实现同步语义；Android 后台网页等待导航稳定后再回传最终 DOM、URL 与 Cookie。脚本 evaluator 通过 `source_script_engine_platform.dart` 条件导出：原生平台使用 QuickJS，Web 使用 API 兼容的明确不支持实现，避免 `flutter_js` 的 `dart:ffi` 依赖进入 Dart2JS，同时在实际遇到脚本规则时返回可识别错误。
+- `SourceRuntime` / `SourceHttpTransport`：阅读书源的应用内执行链路。搜索和详情规则产生的书籍级变量会随书籍快照传入目录、正文、下载与换源验证；旧快照缺变量时可从详情 URL 模板和状态写入规则反推。章节地址绝对化保留末尾请求选项，正文多节点按换行合并后再执行默认不跨行的清理表达式。请求按书源维持独立 Cookie 会话，接收并校验 `Set-Cookie` 的域、路径、Secure 与过期属性，支持配置中的静态 Cookie；请求 Cookie 头由共享纯函数解析，响应 `Set-Cookie` 仍按独立语义处理。重定向按浏览器语义处理 301/302/303/307/308，跨站时移除 Host、Authorization 和静态 Cookie。源级请求头支持 `source.getKey()`、`source.bookSourceUrl` 等常见取值表达式。普通公网 DNS 使用已校验地址连接；虚拟 DNS 的保留地址在同样检查后使用系统网络通道，避免本地隧道被自定义连接破坏。脚本网络调用通过暂停、APP 请求和上下文重放实现同步语义；Android 后台网页等待导航稳定后再回传最终 DOM、URL 与 Cookie。脚本 evaluator 通过 `source_script_engine_platform.dart` 条件导出：原生平台使用 QuickJS，Web 使用 API 兼容的明确不支持实现，避免 `flutter_js` 的 `dart:ffi` 依赖进入 Dart2JS，同时在实际遇到脚本规则时返回可识别错误。
 - `BookSourceChapterText`：仅把 HTML/纯文本响应转换为 canonical chapter text，并清理重复远端页码；HTML 和 64 KiB 以上正文通过后台 isolate 规范化，短纯文本保留直接路径以避免 isolate 开销。若正文最前面的首行/首段与接口标题或目录标题规范化后完全相同，则像本地 TXT 章节解析一样剥离该重复标题。不注入首行缩进、段间距或章节标题，这些展示语义全部交给共享文字阅读内核。
 - `BookSourceChapterCache`：章节正文的内存/磁盘缓存和并发去重；网络结果进入内存后立即返回，目录与正文 JSON 持久化在后台完成，磁盘失败不阻断阅读。同一缓存键的后台写入严格串行并通过临时文件替换；缓存清理递增写入代次，使清理前尚未完成的任务不能重新创建旧缓存。在线阅读器的 canonical 正文只保留最近 8 章，优先预取下一章并在正文首帧后生成分页布局，再机会式准备上一章与更远的后一章。水平滑动到相邻章节时，真实预览页先在当前 `PageView` 内完成整段动画，只有 `ScrollEnd` 确认停在边界页后才提交章节状态；提交后复用已预热布局，并让新控制器直接挂接目标页，避免停稳后的可见重置。中途回滑会取消待提交切章，进度持久化不阻塞跨章提交。
 - `SourceCoverCache`：书源封面 URL 级请求去重、最多 4 路并发、瞬态失败单次退避重试、压缩字节内存 LRU 和应用缓存目录磁盘缓存；单 URL 驱逐使用独立 epoch，旧请求完成时不能覆盖或移除新请求。
@@ -401,6 +404,28 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 - 设置页缓存管理只允许清理 `source_covers/`、`book_source_chapters/`、`book_source_responses/`、`native_reader_cache/` 和 `updates/` 等明确归属的缓存，同时清理 SourceCoverCache 压缩内存、书源响应内存和 Flutter 解码图片缓存；不枚举或删除数据库、书籍、documents 封面、进度、偏好或安全凭据。
 - 用户授权目录：通过平台存储桥接原地管理或导入书籍。
 - 网络：仅在用户使用在线书源、封面、AI、同步或更新检查等功能时访问。WebDAV 默认要求 HTTPS，只有用户显式允许时才可对私网/localhost 使用 HTTP；书籍恢复当前以 100 MiB 为安全上限。
+
+### 阅读书源交互验证边界
+
+- `source_interaction_coordinator.dart` 以请求 ID 排队等待中的浏览器/验证码任务，通过
+  `Future` 暂停规则执行，不阻塞 Dart isolate；取消、超时和应用销毁都会释放等待者。
+- `source_script_contract.dart` 定义交互请求与结果，QuickJS 以签名缓存结果后重放原脚本，
+  同一调用不会重复打开界面。
+- `source_verification_page.dart` 负责验证码输入和 Android 可见浏览器启动；Flutter 页面
+  不直接持有书源运行时。
+- Android 的 `SourceInteractiveBrowserActivity` 显示实际 WebView，用户明确完成后回传
+  最终 URL、DOM 与 Cookie。后台网页加载继续由独立通道处理，二者职责不混用。
+- 登录信息和浏览器 Cookie 只写入每来源会话与系统安全存储，不进入书源注册 JSON、
+  SharedPreferences、同步数据或日志。
+
+## 账号、高级版与邀请边界
+
+- Flutter 客户端的账号模型、Bearer 登录、一次性卡密兑换、永久高级版权益和邀请状态位于 `lib/services/account/`，账号中心入口位于 `lib/pages/account/account_page.dart`。
+- 永久高级版是服务端账号级权益，客户端不在本地持久化或自行判定解锁；登录后从官网会员 API 查询，支持平台间同步。
+- Android、Windows、Linux 和 Web 使用一次性卡密兑换；iOS/macOS 客户端不展示外部购买与卡密入口，改用 Apple 官方永久内购。
+- iOS/macOS 使用 App Store 非消耗型商品 `com.niki.xxread.premium.lifetime`。客户端通过 `services/account/apple_purchase_service.dart` 查询商品、购买和恢复，把 StoreKit 2 已签名交易提交给官网后端；只有服务端验签并返回最新会员状态后才完成交易。Apple 购买与卡密最终都映射为同一账号级 `premium` 永久权益，交易失败或服务端不可达时保持未完成以便重试。
+- 管理员后台的“会员运营”页通过统一审计查询展示邀请关系、绑定/奖励时间、卡密批次与兑换账号/时间；卡密只保存 HMAC，不展示明文。链动小铺订单通过 Merchant-Token 只读查询，订单卡密仅在内存中计算 HMAC 后与本地兑换记录匹配，无法可靠匹配时明确显示未关联。
+- 邀请码和唯一邀请关系由官网 PostgreSQL 保存。被邀请人首次兑换有效永久高级版卡密时，服务端在同一事务中解锁本人和邀请人；客户端只负责查询、展示和提交绑定请求。账号页将“资料 / 永久高级版 / 邀请奖励”作为一级内容，登录方式、密码、邮箱换绑、Passkey 与两步验证收纳到独立的账号安全二级页。邀请区展示固定邀请码、邀请链接、三步规则和最近邀请的“等待兑换 / 已解锁奖励”状态。
 
 ## 测试结构
 

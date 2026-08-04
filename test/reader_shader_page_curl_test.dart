@@ -1280,6 +1280,94 @@ void main() {
     );
   });
 
+  testWidgets('phone folded back is muted by opaque paper', (tester) async {
+    const pageWidth = 400.0;
+    const pageHeight = 400.0;
+    final rootKey = GlobalKey();
+    final controller = ReaderPageCurlController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: RepaintBoundary(
+            key: rootKey,
+            child: SizedBox(
+              width: pageWidth,
+              height: pageHeight,
+              child: ReaderShaderPageCurl(
+                key: const ValueKey('phone-visual-curl'),
+                controller: controller,
+                currentPage: _visualSnapshot(
+                  'phone-current',
+                  const ColoredBox(color: Colors.red),
+                ),
+                forwardPage: _visualSnapshot(
+                  'phone-target',
+                  const ColoredBox(color: Colors.blue),
+                ),
+                onTurnForward: () {},
+                onTurnBackward: () {},
+                paperColor: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (
+      var frame = 0;
+      frame < 20 && !controller.debugUsesClassicFoldShader;
+      frame++
+    ) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(controller.debugUsesClassicFoldShader, isTrue);
+
+    final curlRect = tester.getRect(
+      find.byKey(const ValueKey('phone-visual-curl')),
+    );
+    final gesture = await tester.startGesture(
+      Offset(curlRect.right - 2, curlRect.center.dy),
+    );
+    await gesture.moveBy(const Offset(-24, 0));
+    for (
+      var frame = 0;
+      frame < 20 && !controller.debugAnimationReady;
+      frame++
+    ) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(controller.debugAnimationReady, isTrue);
+    await gesture.moveTo(Offset(curlRect.left + 120, curlRect.center.dy));
+    await tester.pump();
+
+    final boundary =
+        rootKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    late ui.Image image;
+    ByteData? bytes;
+    await tester.runAsync(() async {
+      image = await boundary.toImage(pixelRatio: 1);
+      bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    });
+    expect(bytes, isNotNull);
+    final rawBytes = bytes!;
+    var foundMutedRedBack = false;
+    for (var y = 0; y < image.height && !foundMutedRedBack; y += 4) {
+      for (var x = 0; x < image.width; x += 4) {
+        final color = _pixelColor(rawBytes, image.width, x, y);
+        if (color.r > 0.9 && color.g > 0.5 && color.b > 0.5) {
+          foundMutedRedBack = true;
+          break;
+        }
+      }
+    }
+    image.dispose();
+
+    expect(foundMutedRedBack, isTrue);
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('tablet spread coordinator serializes opposite leaf turns', (
     tester,
   ) async {

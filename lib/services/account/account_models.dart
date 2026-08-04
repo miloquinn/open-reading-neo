@@ -289,6 +289,7 @@ class MemberMembershipConfig {
     required this.product,
     required this.features,
     this.purchaseUrl,
+    this.appleProductId,
   });
 
   factory MemberMembershipConfig.fromJson(
@@ -297,6 +298,7 @@ class MemberMembershipConfig {
   }) => MemberMembershipConfig(
     product: json['product'] as String,
     purchaseUrl: _absoluteUrl(json['purchase_url'] as String?, baseUri),
+    appleProductId: json['apple_product_id'] as String?,
     features: List<String>.unmodifiable(
       (json['features'] as List? ?? const []).whereType<String>(),
     ),
@@ -304,6 +306,7 @@ class MemberMembershipConfig {
 
   final String product;
   final String? purchaseUrl;
+  final String? appleProductId;
   final List<String> features;
 }
 
@@ -363,6 +366,84 @@ class MemberMembership {
   final Map<String, bool> features;
   final List<MemberEntitlement> entitlements;
   final bool? redeemed;
+}
+
+class MemberReferralInviter {
+  const MemberReferralInviter({
+    required this.code,
+    required this.name,
+    required this.status,
+  });
+
+  factory MemberReferralInviter.fromJson(Map<String, dynamic> json) =>
+      MemberReferralInviter(
+        code: json['code'] as String,
+        name: json['name'] as String,
+        status: json['status'] as String,
+      );
+
+  final String code;
+  final String name;
+  final String status;
+}
+
+class MemberReferral {
+  const MemberReferral({
+    required this.inviteCode,
+    required this.inviteUrl,
+    required this.invitedCount,
+    required this.rewardedCount,
+    required this.recentInvites,
+    this.inviter,
+  });
+
+  factory MemberReferral.fromJson(Map<String, dynamic> json) {
+    final inviter = _map(json['inviter']);
+    final stats = _map(json['stats']);
+    return MemberReferral(
+      inviteCode: json['invite_code'] as String,
+      inviteUrl: Uri.parse(json['invite_url'] as String),
+      inviter: inviter.isEmpty ? null : MemberReferralInviter.fromJson(inviter),
+      invitedCount: stats['invited'] as int? ?? 0,
+      rewardedCount: stats['rewarded'] as int? ?? 0,
+      recentInvites: List<MemberReferralInvite>.unmodifiable(
+        (json['recent_invites'] as List? ?? const []).whereType<Map>().map(
+          (item) => MemberReferralInvite.fromJson(item.cast<String, dynamic>()),
+        ),
+      ),
+    );
+  }
+
+  final String inviteCode;
+  final Uri inviteUrl;
+  final MemberReferralInviter? inviter;
+  final int invitedCount;
+  final int rewardedCount;
+  final List<MemberReferralInvite> recentInvites;
+}
+
+class MemberReferralInvite {
+  const MemberReferralInvite({
+    required this.name,
+    required this.status,
+    required this.boundAt,
+    this.rewardedAt,
+  });
+
+  factory MemberReferralInvite.fromJson(Map<String, dynamic> json) =>
+      MemberReferralInvite(
+        name: json['name'] as String,
+        status: json['status'] as String,
+        boundAt: DateTime.parse(json['bound_at'] as String),
+        rewardedAt: json['rewarded_at'] == null
+            ? null
+            : DateTime.parse(json['rewarded_at'] as String),
+      );
+
+  final String name;
+  final String status;
+  final DateTime boundAt;
+  final DateTime? rewardedAt;
 }
 
 Map<String, dynamic> _map(Object? value) =>

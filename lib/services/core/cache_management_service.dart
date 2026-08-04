@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../book_sources/services/book_source_chapter_cache.dart';
 import '../../book_sources/services/book_source_response_cache.dart';
 import '../../book_sources/services/source_cover_cache.dart';
+import '../account/account_avatar_cache.dart';
 
 enum AppCacheCategory { sourceCovers, sourceData, temporaryFiles }
 
@@ -28,11 +29,13 @@ class AppCacheUsage {
 class AppCacheManager {
   AppCacheManager({
     SourceCoverCache? sourceCoverCache,
+    AccountAvatarCache? accountAvatarCache,
     BookSourceResponseCache? sourceResponseCache,
     Directory? temporaryDirectory,
     Future<void> Function()? clearFlutterImageCache,
     int Function()? imageCacheBytesReader,
   }) : _sourceCoverCache = sourceCoverCache ?? SourceCoverCache.instance,
+       _accountAvatarCache = accountAvatarCache ?? AccountAvatarCache.instance,
        _sourceResponseCache =
            sourceResponseCache ?? BookSourceResponseCache.instance,
        _temporaryDirectory = temporaryDirectory,
@@ -45,6 +48,7 @@ class AppCacheManager {
   static const String nativeReaderDirectoryName = 'native_reader_cache';
 
   final SourceCoverCache _sourceCoverCache;
+  final AccountAvatarCache _accountAvatarCache;
   final BookSourceResponseCache _sourceResponseCache;
   final Directory? _temporaryDirectory;
   final Future<void> Function() _clearFlutterImageCache;
@@ -59,6 +63,8 @@ class AppCacheManager {
     bytesByCategory[AppCacheCategory.sourceCovers] =
         bytesByCategory[AppCacheCategory.sourceCovers]! +
         _sourceCoverCache.memorySizeBytes +
+        _accountAvatarCache.memorySizeBytes +
+        await _accountAvatarCache.diskSizeBytes() +
         _imageCacheBytesReader();
     bytesByCategory[AppCacheCategory.sourceData] =
         bytesByCategory[AppCacheCategory.sourceData]! +
@@ -71,6 +77,7 @@ class AppCacheManager {
     switch (category) {
       case AppCacheCategory.sourceCovers:
         await _sourceCoverCache.clear();
+        await _accountAvatarCache.clear();
         await _clearFlutterImageCache();
         return;
       case AppCacheCategory.sourceData:

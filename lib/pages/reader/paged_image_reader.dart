@@ -751,17 +751,52 @@ class PagedReaderMessageScaffold extends StatelessWidget {
       data: palette.toThemeData(typography: Theme.of(context).textTheme),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: Text(title)),
         body: ReaderThemeBackground(
           palette: palette,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: palette.text, height: 1.4),
-              ),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: palette.text,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: palette.text, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 20,
+                  top: 10,
+                  child: Material(
+                    color: palette.surface.withValues(alpha: 0.88),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: Icon(Icons.arrow_back_rounded, color: palette.text),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

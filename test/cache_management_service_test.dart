@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 import 'package:xxread/book_sources/services/book_source_chapter_cache.dart';
 import 'package:xxread/book_sources/services/book_source_response_cache.dart';
 import 'package:xxread/book_sources/services/source_cover_cache.dart';
+import 'package:xxread/services/account/account_avatar_cache.dart';
 import 'package:xxread/services/core/cache_management_service.dart';
 
 void main() {
@@ -14,6 +15,7 @@ void main() {
     final root = await Directory.systemTemp.createTemp('cache-manager-');
     addTearDown(() => root.delete(recursive: true));
     final covers = Directory(path.join(root.path, 'cover-cache'));
+    final avatars = Directory(path.join(root.path, 'avatar-cache'));
     final chapters = Directory(
       path.join(root.path, BookSourceChapterCache.directoryName),
     );
@@ -29,6 +31,7 @@ void main() {
     final userDocuments = Directory(path.join(root.path, 'books'));
     for (final directory in [
       covers,
+      avatars,
       chapters,
       nativeReader,
       responses,
@@ -60,8 +63,14 @@ void main() {
       loader: (_) async => Uint8List.fromList([2, 3, 4]),
     );
     await coverCache.load(Uri.parse('https://example.org/cover.jpg'));
+    final avatarCache = AccountAvatarCache(
+      cacheDirectory: avatars,
+      loader: (_) async => Uint8List.fromList([5, 6]),
+    );
+    await avatarCache.load(Uri.parse('https://example.org/avatar.jpg'));
     final manager = AppCacheManager(
       sourceCoverCache: coverCache,
+      accountAvatarCache: avatarCache,
       sourceResponseCache: BookSourceResponseCache(cacheDirectory: responses),
       temporaryDirectory: root,
       clearFlutterImageCache: () async => imageCacheClears++,
@@ -69,13 +78,14 @@ void main() {
     );
 
     final usage = await manager.usage();
-    expect(usage.bytesFor(AppCacheCategory.sourceCovers), 30);
+    expect(usage.bytesFor(AppCacheCategory.sourceCovers), 34);
     expect(usage.bytesFor(AppCacheCategory.sourceData), 21);
     expect(usage.bytesFor(AppCacheCategory.temporaryFiles), 13);
-    expect(usage.totalBytes, 64);
+    expect(usage.totalBytes, 68);
 
     await manager.clear(AppCacheCategory.sourceCovers);
     expect(await covers.exists(), isFalse);
+    expect(await avatars.exists(), isFalse);
     expect(imageCacheClears, 1);
     expect(await chapters.exists(), isTrue);
     expect(await book.exists(), isTrue);

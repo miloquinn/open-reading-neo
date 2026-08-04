@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
 import 'package:gbk_codec/gbk_codec.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/source_login_session.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
 import 'package:xxread/book_sources/source_engine/source_rule_engine.dart';
 import 'package:xxread/book_sources/source_engine/source_runtime.dart';
@@ -91,6 +93,122 @@ void main() {
       },
     );
 
+    test('injects stored login headers into source requests', () async {
+      final transport = _FakeTransport({
+        'https://books.test/search?q=test&page=1': '''
+          <div class="book"><a href="/book/1"><span class="name">书名</span></a></div>
+        ''',
+      });
+      final source = _htmlSource().toRegisteredSource(enabled: true);
+      final store = _MemoryLoginSessionStore();
+      await store.write(
+        source.id,
+        const SourceLoginSession(
+          loginHeaders: {'Authorization': 'Bearer token'},
+        ),
+      );
+      final runtime = SourceRuntime(
+        transport: transport,
+        loginSessionStore: store,
+      );
+
+      await runtime.search(source, 'test');
+
+      expect(
+        transport.requests.single.headers['Authorization'],
+        'Bearer token',
+      );
+    });
+
+    test(
+      'login check can update response and persist source login info',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/search?q=test&page=1': '<p>login required</p>',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['loginCheckJs'] = '''
+          var info = source.getLoginInfoMap();
+          info.put('checked', 'yes');
+          source.putLoginInfo(info);
+          ({
+            body: '<div class="book"><a href="/book/1"><span class="name">已登录</span></a></div>',
+            finalUrl: result.url(),
+            statusCode: 200,
+            headers: result.headers(),
+            cookies: result.cookies()
+          });
+        ''';
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final store = _MemoryLoginSessionStore();
+        final runtime = SourceRuntime(
+          transport: transport,
+          loginSessionStore: store,
+        );
+
+        final page = await runtime.search(source, 'test');
+
+        expect(page.items.single.title, '已登录');
+        expect((await store.read(source.id)).loginInfo['checked'], 'yes');
+      },
+    );
+
+    test(
+      'parses login fields and executes the source login function',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/session': 'token-ready',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['enabledCookieJar'] = true
+          ..['loginUi'] = jsonEncode([
+            {
+              'name': 'account',
+              'type': 'text',
+              'viewName': '账号',
+              'default': 'guest',
+            },
+            {'name': 'password', 'type': 'password', 'viewName': '密码'},
+          ])
+          ..['loginUrl'] = '''
+          function login() {
+            var info = source.getLoginInfoMap();
+            var token = java.ajax('/session') + ':' + info.get('account');
+            source.putLoginHeader(JSON.stringify({
+              'Authorization': 'Bearer ' + token,
+              'Cookie': 'sid=' + token
+            }));
+          }
+        ''';
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final store = _MemoryLoginSessionStore();
+        final runtime = SourceRuntime(
+          transport: transport,
+          loginSessionStore: store,
+        );
+
+        final fields = await runtime.loadLoginFields(source);
+        expect(fields.map((field) => field.name), ['account', 'password']);
+        expect(fields.first.defaultValue, 'guest');
+
+        await runtime.login(source, const {
+          'account': 'reader',
+          'password': 'secret',
+        });
+
+        final session = await store.read(source.id);
+        expect(session.loginInfo, {'account': 'reader', 'password': 'secret'});
+        expect(
+          session.loginHeaders['Authorization'],
+          'Bearer token-ready:reader',
+        );
+      },
+    );
+
     test('accepts non-executable single-quoted legacy options', () {
       final request = SourceRequestTemplate.parse(
         "/search,{'method':'POST','body':'q={{key}}','charset':'gbk'}",
@@ -168,6 +286,16 @@ void main() {
         throwsA(isA<BookSourceProtocolException>()),
       );
     });
+
+    test('accepts HEAD without a body', () {
+      final request = SourceRequestTemplate.parse(
+        '/probe,{"method":"HEAD"}',
+        baseUri: Uri.parse('https://books.test'),
+      );
+
+      expect(request.method, SourceRequestMethod.head);
+      expect(request.body, isNull);
+    });
   });
 
   group('SourceRuleEngine', () {
@@ -231,6 +359,59 @@ void main() {
           'class. alpha beta@text',
         ),
         'Matched',
+      );
+    });
+
+    test('supports reading-source interleaving and bracket indexes', () {
+      final document = SourceRuleDocument.parse(
+        '<ul class="left"><li>L1</li><li>L2</li><li>L3</li></ul>'
+        '<ul class="right"><li>R1</li><li>R2</li><li>R3</li></ul>',
+        Uri.parse('https://books.test/'),
+      );
+
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          'class.left@li[0:1]@text%%class.right@li[1:2]@text',
+        ),
+        'L1R2L2R3',
+      );
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          'class.left@li[!1]@text',
+        ),
+        'L1L3',
+      );
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          'class.left@li[-1:0]@text',
+        ),
+        'L3L2L1',
+      );
+    });
+
+    test('supports reading-source all and direct text node terminals', () {
+      final document = SourceRuleDocument.parse(
+        '<section><p>first <b>bold</b> tail</p><p>second</p></section>',
+        Uri.parse('https://books.test/'),
+      );
+
+      expect(
+        engine.evaluateString(
+          document,
+          document.value,
+          'section@p.0@textNodes',
+        ),
+        'first\ntail',
+      );
+      expect(
+        engine.evaluateString(document, document.value, 'section@p@all'),
+        '<p>first <b>bold</b> tail</p><p>second</p>',
       );
     });
 
@@ -456,20 +637,6 @@ void main() {
       );
     });
 
-    test('accepts scripts, complex JSONPath, XPath, and state rules', () {
-      for (final rule in const ['@js:result', r'$..books[*]', '//div']) {
-        expect(
-          () => SourceRuleEngine.ensureSupported(rule, field: 'test'),
-          returnsNormally,
-        );
-      }
-      expect(
-        () =>
-            SourceRuleEngine.ensureSupported(r'@put:{id:$.id}', field: 'test'),
-        returnsNormally,
-      );
-    });
-
     test('stores and reads source rule state with put/get syntax', () {
       final document = SourceRuleDocument.parse(
         '{"id":7,"author":"Alice"}',
@@ -545,6 +712,56 @@ void main() {
         );
         expect(content.content, '<p>正文</p>');
         expect(content.contentType, 'text/html');
+      },
+    );
+
+    test(
+      'preserves remote image request headers and chapter image pages',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/search?q=art&page=1': '''
+          <div class="book">
+            <a href="/book/1"><span class="name">Art Book</span></a>
+            <img src="//cdn.test/cover.jpg,{headers:{referer:'https://books.test/'}}">
+          </div>
+        ''',
+          'https://books.test/chapter/1': '''
+          <article>
+            <img src="//cdn.test/1.jpg,{headers:{Referer:'https://books.test/'}}">
+            <img data-src="/images/2.jpg">
+          </article>
+        ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['ruleContent'] = {'content': 'article@html'};
+        final source = ReadingSourceConfig.fromJson(raw).toRegisteredSource();
+        final runtime = SourceRuntime(
+          transport: transport,
+          loginSessionStore: _MemoryLoginSessionStore(),
+        );
+        addTearDown(runtime.close);
+
+        final search = await runtime.search(source, 'art');
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: search.items.single.id,
+          chapterId: 'https://books.test/chapter/1',
+        );
+
+        expect(
+          search.items.single.coverUrl,
+          Uri.parse('https://cdn.test/cover.jpg'),
+        );
+        expect(search.items.single.coverHeaders, {
+          'referer': 'https://books.test/',
+        });
+        expect(content.images.map((image) => image.url), [
+          Uri.parse('https://cdn.test/1.jpg'),
+          Uri.parse('https://books.test/images/2.jpg'),
+        ]);
+        expect(content.images.first.headers, {
+          'Referer': 'https://books.test/',
+        });
       },
     );
 
@@ -669,6 +886,55 @@ void main() {
         expect(reopenedContent.content, 'Readable after reopen');
       },
     );
+
+    test('decodes data-wrapped book and chapter targets', () async {
+      final transport = _FakeTransport({
+        'https://books.test/book/7': '<h1>Wrapped Book</h1>',
+        'https://books.test/toc/7':
+            '<ul><li><a href="data:;base64,aHR0cHM6Ly9ib29rcy50ZXN0L2NoYXB0ZXIvMQ==">One</a></li></ul>',
+        'https://books.test/chapter/1': '<article>Readable body</article>',
+      });
+      final runtime = SourceRuntime(
+        transport: transport,
+        loginSessionStore: _MemoryLoginSessionStore(),
+      );
+      addTearDown(runtime.close);
+      final source = ReadingSourceConfig.fromJson({
+        'bookSourceName': 'Wrapped source',
+        'bookSourceUrl': 'https://books.test',
+        'ruleBookInfo': {
+          'name': 'h1@text',
+          'tocUrl': "@js:'data:;base64,aHR0cHM6Ly9ib29rcy50ZXN0L3RvYy83'",
+        },
+        'ruleToc': {
+          'chapterList': 'li',
+          'chapterName': 'a@text',
+          'chapterUrl': 'a@href',
+        },
+        'ruleContent': {'content': 'article@text'},
+      }).toRegisteredSource();
+      const bookId = 'data:;base64,aHR0cHM6Ly9ib29rcy50ZXN0L2Jvb2svNw==';
+
+      final book = await runtime.getBook(source, bookId);
+      final chapters = await runtime.getChapters(source, book.id);
+      final content = await runtime.getChapterContent(
+        source,
+        bookId: book.id,
+        chapterId: chapters.single.id,
+      );
+
+      expect(book.id, bookId);
+      expect(chapters.single.title, 'One');
+      expect(content.content, 'Readable body');
+      expect(
+        transport.requests.map((request) => request.url.toString()),
+        containsAll([
+          'https://books.test/book/7',
+          'https://books.test/toc/7',
+          'https://books.test/chapter/1',
+        ]),
+      );
+    });
 
     test('loads declarative discovery channels and paged books', () async {
       final transport = _FakeTransport({
@@ -879,16 +1145,157 @@ void main() {
   });
 
   group('SourceHttpTransport', () {
-    late HttpServer server;
+    HttpServer? server;
 
     tearDown(() async {
-      await server.close(force: true);
+      await server?.close(force: true);
+    });
+
+    test('exposes the isolated cookie jar to source scripts', () {
+      final transport = SourceHttpTransport(
+        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
+      );
+      addTearDown(transport.close);
+      final uri = Uri.parse('https://cookies.test/path');
+
+      transport.setScriptCookies('source-1', uri, 'sid=abc; theme=dark');
+      expect(
+        transport.scriptCookieHeader('source-1', uri),
+        'sid=abc; theme=dark',
+      );
+      expect(transport.scriptCookieHeader('source-2', uri), isEmpty);
+
+      transport.removeScriptCookies('source-1', uri);
+      expect(transport.scriptCookieHeader('source-1', uri), isEmpty);
+    });
+
+    test(
+      'retries safe HTTP 400 responses through the system network',
+      () async {
+        final pinned = Dio()..httpClientAdapter = _SequenceAdapter([400]);
+        final system = Dio()
+          ..httpClientAdapter = _SequenceAdapter([200], body: 'books');
+        final transport = SourceHttpTransport(
+          dio: pinned,
+          systemDio: system,
+          networkPolicy: BookSourceNetworkPolicy(
+            lookup: (_) async => [InternetAddress('93.184.216.34')],
+          ),
+        );
+        addTearDown(transport.close);
+
+        final response = await transport.send(
+          SourceRequestTemplate.parse(
+            'https://books.test/channel',
+            baseUri: Uri.parse('https://books.test'),
+          ),
+        );
+
+        expect(response.body, 'books');
+        expect((pinned.httpClientAdapter as _SequenceAdapter).requests, 1);
+        expect((system.httpClientAdapter as _SequenceAdapter).requests, 1);
+      },
+    );
+
+    test('does not replay POST after HTTP 400', () async {
+      final pinned = Dio()..httpClientAdapter = _SequenceAdapter([400]);
+      final system = Dio()
+        ..httpClientAdapter = _SequenceAdapter([200], body: 'unexpected');
+      final transport = SourceHttpTransport(
+        dio: pinned,
+        systemDio: system,
+        networkPolicy: BookSourceNetworkPolicy(
+          lookup: (_) async => [InternetAddress('93.184.216.34')],
+        ),
+      );
+      addTearDown(transport.close);
+
+      await expectLater(
+        transport.send(
+          SourceRequestTemplate.parse(
+            'https://books.test/submit,{"method":"POST","body":"q=1"}',
+            baseUri: Uri.parse('https://books.test'),
+          ),
+        ),
+        throwsA(isA<BookSourceProtocolException>()),
+      );
+      expect((pinned.httpClientAdapter as _SequenceAdapter).requests, 1);
+      expect((system.httpClientAdapter as _SequenceAdapter).requests, 0);
+    });
+
+    test(
+      'returns response status headers and cookies to source scripts',
+      () async {
+        final boundServer = server = await HttpServer.bind(
+          InternetAddress.loopbackIPv4,
+          0,
+        );
+        boundServer.listen((request) async {
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.set('X-Source-Test', 'ready');
+          request.response.cookies.add(Cookie('sid', 'abc')..path = '/');
+          request.response.write('body');
+          await request.response.close();
+        });
+        final transport = SourceHttpTransport(
+          networkPolicy: const BookSourceNetworkPolicy(
+            allowPrivateNetwork: true,
+          ),
+        );
+        addTearDown(transport.close);
+
+        final response = await transport.send(
+          SourceRequestTemplate.parse(
+            'http://${boundServer.address.address}:${boundServer.port}/metadata',
+            baseUri: Uri.parse('https://unused.test'),
+            cookieJarKey: 'source-1',
+          ),
+        );
+
+        expect(response.statusCode, HttpStatus.ok);
+        expect(response.headers['x-source-test'], 'ready');
+        expect(response.cookies['sid'], 'abc');
+      },
+    );
+
+    test('sends HEAD and returns metadata without a response body', () async {
+      final boundServer = server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      final method = Completer<String>();
+      boundServer.listen((request) async {
+        method.complete(request.method);
+        request.response.statusCode = HttpStatus.noContent;
+        request.response.headers.set('X-Head', 'ready');
+        await request.response.close();
+      });
+      final transport = SourceHttpTransport(
+        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
+      );
+      addTearDown(transport.close);
+
+      final response = await transport.send(
+        SourceRequestTemplate.parse(
+          'http://${boundServer.address.address}:${boundServer.port}/probe,'
+          '{"method":"HEAD"}',
+          baseUri: Uri.parse('https://unused.test'),
+        ),
+      );
+
+      expect(await method.future, 'HEAD');
+      expect(response.body, isEmpty);
+      expect(response.statusCode, HttpStatus.noContent);
+      expect(response.headers['x-head'], 'ready');
     });
 
     test('sends and decodes bounded GBK POST responses', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final boundServer = server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
       final received = Completer<List<int>>();
-      server.listen((request) async {
+      boundServer.listen((request) async {
         received.complete(
           await request.fold<List<int>>([], (a, b) => a..addAll(b)),
         );
@@ -906,7 +1313,7 @@ void main() {
       addTearDown(transport.close);
       final response = await transport.send(
         SourceRequestTemplate.parse(
-          'http://${server.address.address}:${server.port}/search,'
+          'http://${boundServer.address.address}:${boundServer.port}/search,'
           '{"method":"POST","body":"关键词=剑来","charset":"gbk"}',
           baseUri: Uri.parse('https://unused.test'),
         ),
@@ -919,7 +1326,7 @@ void main() {
     test('keeps source cookies across same-URL redirects', () async {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       var requests = 0;
-      server.listen((request) async {
+      server!.listen((request) async {
         requests++;
         final hasSession = request.cookies.any(
           (cookie) => cookie.name == 'session' && cookie.value == 'ready',
@@ -940,7 +1347,7 @@ void main() {
 
       final response = await transport.send(
         SourceRequestTemplate.parse(
-          'http://${server.address.address}:${server.port}/channel',
+          'http://${server!.address.address}:${server!.port}/channel',
           baseUri: Uri.parse('https://unused.test'),
           cookieJarKey: 'source-1',
         ),
@@ -955,7 +1362,7 @@ void main() {
       () async {
         server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         final receivedCookies = <String, String?>{};
-        server.listen((request) async {
+        server!.listen((request) async {
           final session = request.cookies
               .where((cookie) => cookie.name == 'session')
               .firstOrNull;
@@ -986,13 +1393,13 @@ void main() {
         final baseUri = Uri.parse('https://unused.test');
         final response = await transport.send(
           SourceRequestTemplate.parse(
-            'http://${server.address.address}:${server.port}/start',
+            'http://${server!.address.address}:${server!.port}/start',
             baseUri: baseUri,
           ),
         );
         final nextResponse = await transport.send(
           SourceRequestTemplate.parse(
-            'http://${server.address.address}:${server.port}/probe',
+            'http://${server!.address.address}:${server!.port}/probe',
             baseUri: baseUri,
           ),
         );
@@ -1008,7 +1415,7 @@ void main() {
     test('matches browser method semantics for POST redirects', () async {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final methods = <String>[];
-      server.listen((request) async {
+      server!.listen((request) async {
         methods.add(request.method);
         if (request.uri.path == '/submit') {
           request.response.statusCode = HttpStatus.found;
@@ -1025,7 +1432,7 @@ void main() {
 
       final response = await transport.send(
         SourceRequestTemplate.parse(
-          'http://${server.address.address}:${server.port}/submit,'
+          'http://${server!.address.address}:${server!.port}/submit,'
           '{"method":"POST","body":"q=test"}',
           baseUri: Uri.parse('https://unused.test'),
         ),
@@ -1039,7 +1446,7 @@ void main() {
       'decodes malformed GBK responses without initializing codec decoder',
       () async {
         server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        server.listen((request) async {
+        server!.listen((request) async {
           request.response.headers.contentType = ContentType(
             'text',
             'plain',
@@ -1057,7 +1464,7 @@ void main() {
 
         final response = await transport.send(
           SourceRequestTemplate.parse(
-            'http://${server.address.address}:${server.port}/',
+            'http://${server!.address.address}:${server!.port}/',
             baseUri: Uri.parse('https://unused.test'),
           ),
         );
@@ -1069,7 +1476,7 @@ void main() {
 
     test('rejects responses over the configured bound', () async {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((request) async {
+      server!.listen((request) async {
         request.response.add(utf8.encode('12345'));
         await request.response.close();
       });
@@ -1082,7 +1489,7 @@ void main() {
       expect(
         () => transport.send(
           SourceRequestTemplate.parse(
-            'http://${server.address.address}:${server.port}/',
+            'http://${server!.address.address}:${server!.port}/',
             baseUri: Uri.parse('https://unused.test'),
           ),
         ),
@@ -1094,7 +1501,7 @@ void main() {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final started = Completer<void>();
       final release = Completer<void>();
-      server.listen((request) async {
+      server!.listen((request) async {
         if (!started.isCompleted) started.complete();
         await release.future;
         try {
@@ -1111,7 +1518,7 @@ void main() {
       final cancellation = BookDownloadCancellation();
       final request = transport.send(
         SourceRequestTemplate.parse(
-          'http://${server.address.address}:${server.port}/slow',
+          'http://${server!.address.address}:${server!.port}/slow',
           baseUri: Uri.parse('https://unused.test'),
         ),
         cancellation: cancellation,
@@ -1197,5 +1604,51 @@ class _FakeTransport implements SourceTransport {
       throw StateError('Missing fake response for ${request.url}');
     }
     return SourceResponse(body: body, finalUri: request.url);
+  }
+}
+
+class _SequenceAdapter implements HttpClientAdapter {
+  _SequenceAdapter(this.statuses, {this.body = ''});
+
+  final List<int> statuses;
+  final String body;
+  int requests = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final index = requests++;
+    final status = statuses[index.clamp(0, statuses.length - 1)];
+    return ResponseBody.fromString(
+      body,
+      status,
+      headers: {
+        HttpHeaders.contentTypeHeader: ['text/plain; charset=utf-8'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _MemoryLoginSessionStore implements SourceLoginSessionStore {
+  final Map<String, SourceLoginSession> values = {};
+
+  @override
+  Future<void> clear(String sourceId) async {
+    values.remove(sourceId);
+  }
+
+  @override
+  Future<SourceLoginSession> read(String sourceId) async =>
+      values[sourceId] ?? const SourceLoginSession();
+
+  @override
+  Future<void> write(String sourceId, SourceLoginSession session) async {
+    values[sourceId] = session;
   }
 }

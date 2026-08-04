@@ -10,65 +10,11 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:pointycastle/export.dart' hide Digest;
 
 import '../protocol/book_source_protocol.dart';
-import 'source_config.dart';
+import 'source_cookie_utils.dart';
 import 'source_rule_engine.dart';
+import 'source_script_contract.dart';
 
-class SourceScriptContext {
-  const SourceScriptContext({
-    required this.source,
-    this.result,
-    this.baseUrl,
-    this.variables = const {},
-    this.networkHandler,
-  });
-
-  final ReadingSourceConfig source;
-  final Object? result;
-  final Uri? baseUrl;
-  final Map<String, String> variables;
-  final Future<SourceScriptNetworkResult> Function(
-    SourceScriptNetworkRequest request,
-  )?
-  networkHandler;
-}
-
-class SourceScriptNetworkResult {
-  const SourceScriptNetworkResult({required this.body, required this.finalUrl});
-
-  final String body;
-  final String finalUrl;
-
-  Map<String, Object?> toJson() => {'body': body, 'finalUrl': finalUrl};
-}
-
-class SourceScriptNetworkRequest {
-  const SourceScriptNetworkRequest({
-    required this.signature,
-    required this.method,
-    required this.url,
-    this.body,
-    this.headers = const {},
-    this.webJs,
-  });
-
-  final String signature;
-  final String method;
-  final String url;
-  final String? body;
-  final Map<String, String> headers;
-  final String? webJs;
-}
-
-abstract class SourceScriptEvaluator {
-  Object? evaluate(String script, SourceScriptContext context);
-
-  Future<Object?> evaluateAsync(
-    String script,
-    SourceScriptContext context,
-  ) async => evaluate(script, context);
-
-  void dispose();
-}
+export 'source_script_contract.dart';
 
 class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
   QuickJsSourceScriptEvaluator({JavascriptRuntime? runtime})
@@ -80,10 +26,11 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
 
   final JavascriptRuntime _runtime;
   final SourceRuleEngine _declarativeRules = const SourceRuleEngine();
-  final Map<String, String> _sourceVariables = {};
-  final Map<String, Map<String, Object?>> _sourceState = {};
+  final Map<String, _SourceScriptState> _sourceStates = {};
   SourceScriptContext? _activeContext;
   Map<String, SourceScriptNetworkResult> _activeNetworkResponses = const {};
+  Map<String, SourceScriptInteractionResult> _activeInteractionResponses =
+      const {};
   Future<void> _evaluationTail = Future<void>.value();
 
   @override
@@ -110,61 +57,148 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     String script,
     SourceScriptContext context,
   ) async {
-    final responses = <String, SourceScriptNetworkResult>{};
-    for (var requestCount = 0; requestCount < 12; requestCount++) {
+    final networkResponses = <String, SourceScriptNetworkResult>{};
+    final interactionResponses = <String, SourceScriptInteractionResult>{};
+    var networkCount = 0;
+    var interactionCount = 0;
+    for (var replayCount = 0; replayCount < 24; replayCount++) {
       try {
-        return _evaluateAttempt(script, context, responses);
+        return _evaluateAttempt(
+          script,
+          context,
+          networkResponses,
+          interactionResponses,
+        );
       } on _SourceNetworkNeeded catch (pending) {
+        if (++networkCount > 12) {
+          throw const BookSourceProtocolException(
+            'Source script exceeded the network request limit.',
+          );
+        }
         final handler = context.networkHandler;
         if (handler == null) {
           throw const BookSourceProtocolException(
             'This source script requested network access outside a source operation.',
           );
         }
-        responses[pending.request.signature] = await handler(pending.request);
+        networkResponses[pending.request.signature] = await handler(
+          pending.request,
+        );
+      } on _SourceInteractionNeeded catch (pending) {
+        if (++interactionCount > 4) {
+          throw const BookSourceProtocolException(
+            'Source script exceeded the user interaction limit.',
+          );
+        }
+        final handler = context.interactionHandler;
+        if (handler == null) {
+          throw const BookSourceProtocolException(
+            'This source requires an interactive verification screen.',
+          );
+        }
+        final result = await handler(pending.request);
+        if (result.cancelled) {
+          throw const BookSourceProtocolException(
+            'Reading source verification was cancelled.',
+          );
+        }
+        if (result.error?.isNotEmpty == true) {
+          throw BookSourceProtocolException(result.error!);
+        }
+        interactionResponses[pending.request.signature] = result;
       }
     }
     throw const BookSourceProtocolException(
-      'Source script exceeded the network request limit.',
+      'Source script exceeded the replay limit.',
     );
   }
 
   Object? _evaluateAttempt(
     String script,
     SourceScriptContext context,
-    Map<String, SourceScriptNetworkResult> networkResponses,
-  ) {
+    Map<String, SourceScriptNetworkResult> networkResponses, [
+    Map<String, SourceScriptInteractionResult> interactionResponses = const {},
+  ]) {
     _activeContext = context;
     _activeNetworkResponses = networkResponses;
+    _activeInteractionResponses = interactionResponses;
     final sourceId = context.source.stableId;
+    final sourceState = _sourceStates.putIfAbsent(
+      sourceId,
+      _SourceScriptState.new,
+    );
+    final loginInfo = context.loginInfo.isEmpty
+        ? sourceState.loginInfo
+        : context.loginInfo;
+    final loginHeaders = context.loginHeaders.isEmpty
+        ? sourceState.loginHeaders
+        : context.loginHeaders;
     final payload = <String, Object?>{
       'script': script,
       'sourceId': sourceId,
       'sourceKey': context.source.url,
       'sourceUrl': context.source.url,
       'sourceComment': context.source.comment,
+      'sourceName': context.source.name,
+      'sourceType': context.source.type,
       'sourceHeader': _sourceHeader(context.source.raw['header']),
-      'sourceVariable': _sourceVariables[sourceId] ?? '',
-      'state': _sourceState[sourceId] ?? const <String, Object?>{},
-      'result': _jsonSafe(context.result),
+      'sourceGroup': context.source.group,
+      'sourceExploreUrl': context.source.exploreUrl,
+      'sourceLoginUrl': '${context.source.raw['loginUrl'] ?? ''}',
+      'sourceRules': {
+        'ruleSearch': context.source.rule('ruleSearch'),
+        'ruleExplore': context.source.rule('ruleExplore'),
+        'ruleBookInfo': context.source.rule('ruleBookInfo'),
+        'ruleToc': context.source.rule('ruleToc'),
+        'ruleContent': context.source.rule('ruleContent'),
+      },
+      'sourceLastUpdateTime': context.source.lastUpdateTime,
+      'sourceVariable': sourceState.variable,
+      'sourceValues': sourceState.values,
+      'loginInfo': loginInfo,
+      'loginHeaders': loginHeaders,
+      'sharedScript': context.source.jsLib,
+      'state': sourceState.javaState,
+      'result': context.result is SourceScriptNetworkResult
+          ? {
+              '__networkResponse': true,
+              ...(context.result as SourceScriptNetworkResult).toJson(),
+            }
+          : _jsonSafe(context.result),
       'baseUrl':
           context.baseUrl?.toString() ?? context.source.baseUri.toString(),
       'variables': context.variables,
+      'book': context.book,
+      'chapter': context.chapter,
     };
     final encoded = jsonEncode(payload);
     final evaluated = _runtime.evaluate('''
 (() => {
   const __payload = $encoded;
   const __state = Object.assign({}, __payload.state || {});
+  const __sourceValues = Object.assign({}, __payload.sourceValues || {});
+  let __loginInfo = Object.assign({}, __payload.loginInfo || {});
+  let __loginHeaders = Object.assign({}, __payload.loginHeaders || {});
   let __sourceVariable = __payload.sourceVariable || '';
   globalThis.result = __payload.result;
   globalThis.baseUrl = __payload.baseUrl;
   globalThis.key = (__payload.variables || {}).key || '';
   globalThis.page = Number((__payload.variables || {}).page || 1);
   globalThis.source = {
+    bookSourceName: __payload.sourceName || '',
+    bookSourceType: Number(__payload.sourceType || 0),
     bookSourceUrl: __payload.sourceUrl,
     bookSourceComment: __payload.sourceComment || '',
-    header: __payload.sourceHeader || {},
+    bookSourceGroup: __payload.sourceGroup || '',
+    lastUpdateTime: Number(__payload.sourceLastUpdateTime || 0),
+    exploreUrl: __payload.sourceExploreUrl || '',
+    loginUrl: __payload.sourceLoginUrl || '',
+    ruleSearch: __payload.sourceRules.ruleSearch || {},
+    ruleExplore: __payload.sourceRules.ruleExplore || {},
+    ruleBookInfo: __payload.sourceRules.ruleBookInfo || {},
+    ruleToc: __payload.sourceRules.ruleToc || {},
+    ruleContent: __payload.sourceRules.ruleContent || {},
+    header: __javaMap(__payload.sourceHeader || {}),
     key: __payload.sourceKey,
     getKey: () => __payload.sourceKey,
     getVariable: () => __sourceVariable,
@@ -172,22 +206,78 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       __sourceVariable = value == null ? '' : String(value);
       return value;
     },
-    getHeaderMap: () => __payload.sourceHeader || {},
-    getLoginHeader: () => '',
-    getLoginHeaderMap: () => ({}),
-    putLoginHeader: () => null,
-    removeLoginHeader: () => null,
-    getLoginInfoMap: () => ({})
+    put: (name, value) => {
+      __sourceValues[String(name)] = value == null ? '' : String(value);
+      return value;
+    },
+    get: (name) => __sourceValues[String(name)] || '',
+    getHeaderMap: () => __javaMap(__payload.sourceHeader || {}),
+    getLoginHeader: () => Object.keys(__loginHeaders).length
+      ? JSON.stringify(__loginHeaders)
+      : '',
+    getLoginHeaderMap: () => __javaMap(__loginHeaders),
+    putLoginHeader: (value) => {
+      if (typeof value === 'string') {
+        try { __loginHeaders = Object.assign({}, JSON.parse(value) || {}); }
+        catch (_) { __loginHeaders = {}; }
+      } else {
+        __loginHeaders = Object.assign({}, value || {});
+      }
+      return value;
+    },
+    removeLoginHeader: () => { __loginHeaders = {}; return null; },
+    getLoginInfo: () => JSON.stringify(__loginInfo),
+    getLoginInfoMap: () => __javaMap(__loginInfo),
+    putLoginInfo: (value) => {
+      if (typeof value === 'string') {
+        try { __loginInfo = Object.assign({}, JSON.parse(value) || {}); }
+        catch (_) { __loginInfo = {}; }
+      } else {
+        __loginInfo = Object.assign({}, value || {});
+      }
+      return value;
+    }
   };
   Object.defineProperty(globalThis.source, 'variable', {
     get: () => __sourceVariable,
     set: (value) => { __sourceVariable = value == null ? '' : String(value); }
   });
+  globalThis.cache = {
+    put: (name, value, seconds) => __host('cachePut', [String(name), value, Number(seconds || 0)]),
+    get: (name) => __host('cacheGet', [String(name)]),
+    delete: (name) => __host('cacheDelete', [String(name)]),
+    putMemory: (name, value) => __host('cachePutMemory', [String(name), value]),
+    getFromMemory: (name) => __host('cacheGetMemory', [String(name)]),
+    deleteMemory: (name) => __host('cacheDeleteMemory', [String(name)]),
+    putFile: (name, value, seconds) => __host('cachePut', [String(name), value, Number(seconds || 0)]),
+    getFile: (name) => __host('cacheGet', [String(name)])
+  };
   const __host = (op, args) => sendMessage(
     '$_hostChannel',
     JSON.stringify({ sourceId: __payload.sourceId, op, args: args || [] })
   );
   const __pad2 = (value) => String(value).padStart(2, '0');
+  function __javaMap(value) {
+    const map = Object.assign({}, value || {});
+    Object.defineProperties(map, {
+      get: { value: (key) => map[String(key)], enumerable: false },
+      put: { value: (key, item) => {
+        const previous = map[String(key)];
+        map[String(key)] = item;
+        return previous;
+      }, enumerable: false },
+      remove: { value: (key) => {
+        const previous = map[String(key)];
+        delete map[String(key)];
+        return previous;
+      }, enumerable: false },
+      containsKey: { value: (key) => Object.prototype.hasOwnProperty.call(map, String(key)), enumerable: false },
+      isEmpty: { value: () => Object.keys(map).length === 0, enumerable: false },
+      size: { value: () => Object.keys(map).length, enumerable: false },
+      toString: { value: () => JSON.stringify(map), enumerable: false }
+    });
+    return map;
+  }
   const __formatDate = (time, format, offset) => {
     const date = new Date(Number(time) + Number(offset || 0));
     const utc = offset !== undefined;
@@ -212,14 +302,33 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       outerHtml: () => data.outerHtml || '',
       attr: (name) => (data.attributes || {})[String(name)] || '',
       select: (rule) => __elements(rule, data.outerHtml || ''),
+      remove: () => element,
       toArray: () => [element],
       toString: () => data.outerHtml || data.text || ''
     };
     return element;
   };
+  const __javaList = (values) => {
+    const list = Array.from(values || []);
+    Object.defineProperties(list, {
+      size: { value: () => list.length, enumerable: false },
+      get: { value: (index) => list[Number(index)], enumerable: false },
+      isEmpty: { value: () => list.length === 0, enumerable: false },
+      toArray: { value: () => Array.from(list), enumerable: false },
+      first: { value: () => list.length ? list[0] : null, enumerable: false },
+      last: { value: () => list.length ? list[list.length - 1] : null, enumerable: false },
+      text: { value: () => list.map((item) => item && typeof item.text === 'function' ? item.text() : String(item || '')).join(''), enumerable: false },
+      html: { value: () => list.map((item) => item && typeof item.html === 'function' ? item.html() : String(item || '')).join(''), enumerable: false },
+      outerHtml: { value: () => list.map((item) => item && typeof item.outerHtml === 'function' ? item.outerHtml() : String(item || '')).join(''), enumerable: false },
+      attr: { value: (name) => list.length && list[0] && typeof list[0].attr === 'function' ? list[0].attr(name) : '', enumerable: false },
+      select: { value: (rule) => __javaList(list.flatMap((item) => item && typeof item.select === 'function' ? item.select(rule).toArray() : [])), enumerable: false },
+      remove: { value: () => { list.splice(0, list.length); return list; }, enumerable: false }
+    });
+    return list;
+  };
   const __elements = (rule, content) => {
     const values = __host('getElements', [String(rule), content === undefined ? result : content]) || [];
-    return Array.from(values).map(__wrapElement);
+    return __javaList(Array.from(values).map(__wrapElement));
   };
   const __entity = (prefix, seed) => {
     const entity = Object.assign({}, seed || {});
@@ -232,19 +341,29 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       __state[prefix + 'reverseToc'] = value;
       return value;
     };
+    entity.putCustomVariable = (value) => {
+      __state[prefix + 'customVariable'] = value;
+      return value;
+    };
+    entity.getCustomVariable = () => __state[prefix + 'customVariable'];
+    entity.setUseReplaceRule = (value) => {
+      __state[prefix + 'useReplaceRule'] = value;
+      return value;
+    };
     Object.defineProperty(entity, 'variable', {
       get: () => __state[prefix + 'variable'],
       set: (value) => { __state[prefix + 'variable'] = value; }
     });
     return entity;
   };
-  globalThis.book = __entity('book:', __payload.variables || {});
-  globalThis.chapter = __entity('chapter:', __payload.variables || {});
+  globalThis.book = __entity('book:', __payload.book || {});
+  globalThis.chapter = __entity('chapter:', __payload.chapter || {});
+  globalThis.src = typeof result === 'string' ? result : '';
   globalThis.cookie = {
-    getKey: () => __payload.sourceKey,
-    removeCookie: () => null,
-    getCookie: () => '',
-    setCookie: () => null
+    getKey: (url, key) => __host('cookieGetKey', [String(url), String(key)]),
+    removeCookie: (url) => __host('cookieRemove', [String(url)]),
+    getCookie: (url) => __host('cookieGet', [String(url)]),
+    setCookie: (url, value) => __host('cookieSet', [String(url), String(value)])
   };
   const __symmetricCrypto = (transformation, keyValue, ivValue) => ({
     decrypt: (data) => Array.from(__host('symmetricCrypto', [
@@ -357,13 +476,25 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     const data = response || {};
     const bodyText = data.body == null ? '' : String(data.body);
     const finalUrl = data.finalUrl || String(requestedUrl || '');
+    const responseHeaders = Object.assign({}, data.headers || {});
+    const responseCookies = Object.assign({}, data.cookies || {});
     return {
       body: () => bodyText,
-      code: () => 200,
+      code: () => Number(data.statusCode || 200),
+      statusCode: () => Number(data.statusCode || 200),
       url: () => finalUrl,
-      headers: () => ({}),
-      cookies: () => ({}),
+      headers: (name) => name === undefined
+        ? responseHeaders
+        : (responseHeaders[String(name)] || responseHeaders[String(name).toLowerCase()] || ''),
+      cookies: () => responseCookies,
       raw: () => ({ request: () => ({ url: () => finalUrl }) }),
+      toJSON: () => ({
+        body: bodyText,
+        finalUrl: finalUrl,
+        statusCode: Number(data.statusCode || 200),
+        headers: responseHeaders,
+        cookies: responseCookies
+      }),
       valueOf: () => bodyText,
       toString: () => bodyText
     };
@@ -381,14 +512,15 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       }
       return __state[String(name)];
     },
-    getString: (rule, content) => __host('getString', [String(rule), content === undefined ? result : content]),
-    getStringList: (rule, content) => __host('getStringList', [String(rule), content === undefined ? result : content]),
-    getElements: (rule, content) => __elements(rule, content),
+    getString: (rule, content) => __host('getString', [String(rule), content === undefined ? globalThis.result : content]),
+    getStringList: (rule, content) => __javaList(__host('getStringList', [String(rule), content === undefined ? globalThis.result : content])),
+    getElements: (rule, content) => __elements(rule, content === undefined ? globalThis.result : content),
     getElement: (rule, content) => {
-      const values = __elements(rule, content);
+      const values = __elements(rule, content === undefined ? globalThis.result : content);
       return values.length ? values[0] : null;
     },
     md5Encode: (value) => __host('md5', [String(value)]),
+    md5Encode16: (value) => __host('md5', [String(value)]).substring(8, 24),
     base64Encode: (value) => __host('base64Encode', [String(value)]),
     base64Decode: (value) => __host('base64Decode', [String(value)]),
     base64DecodeToByteArray: (value) => Array.from(__host('base64DecodeBytes', [String(value)]) || []),
@@ -408,21 +540,33 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     timeFormat: (time) => __formatDate(time, 'yyyy/MM/dd HH:mm'),
     timeFormatUTC: (time, format, offset) => __formatDate(time, format, offset),
     randomUUID: () => __host('randomUUID', []),
+    androidId: () => __host('androidId', []),
     digestHex: (value, algorithm) => __host(
       'digestHex', [String(value), String(algorithm)]
     ),
     toNumChapter: (value) => __host('toNumChapter', [String(value)]),
     strToBytes: (value) => Array.from(__host('utf8Bytes', [String(value)]) || []),
     htmlFormat: (value) => __host('htmlFormat', [String(value)]),
+    t2s: (value) => __host('traditionalToSimplified', [String(value)]),
+    s2t: (value) => __host('simplifiedToTraditional', [String(value)]),
+    bytesToStr: (value) => __host('bytesToUtf8', [value]),
+    getWebViewUA: () => (__payload.sourceHeader || {})['User-Agent'] ||
+      (__payload.sourceHeader || {})['user-agent'] ||
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
     desEncodeToBase64String: (data, keyValue, transformation, ivValue) =>
       __symmetricCrypto(String(transformation), keyValue, ivValue)
         .encryptBase64(String(data)),
-    getCookie: () => '',
+    getCookie: (url, key) => key === undefined
+      ? __host('cookieGet', [String(url)])
+      : __host('cookieGetKey', [String(url), String(key)]),
     setContent: (value) => { globalThis.result = value; return value; },
+    refreshExplore: () => null,
+    refreshBookInfo: () => null,
+    refreshContent: () => null,
     refreshTocUrl: () => null,
     refreshBookUrl: () => null,
     initUrl: () => null,
-    getStrResponse: () => String(result == null ? '' : result),
+    getStrResponse: () => result,
     webView: (html, url, js) => (__sourceNetwork(
       'WEBVIEW', url, html, null, js
     ).body || ''),
@@ -437,8 +581,88 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     ),
     post: (url, body, headers) => __responseObject(
       __sourceNetwork('POST', url, body, headers), url
-    )
+    ),
+    head: (url, headers) => __responseObject(
+      __sourceNetwork('HEAD', url, null, headers), url
+    ),
+    startBrowser: (url, title, html) => {
+      const value = __sourceInteraction(
+        'browser', url, title, false, html
+      );
+      return value.finalUrl || '';
+    },
+    startBrowserAwait: (url, title, refetchAfterSuccess, html) => {
+      let shouldRefetch = refetchAfterSuccess;
+      let pageHtml = html;
+      if (typeof refetchAfterSuccess === 'string' && html === undefined) {
+        pageHtml = refetchAfterSuccess;
+        shouldRefetch = false;
+      }
+      const value = __sourceInteraction(
+        'browserAwait', url, title, Boolean(shouldRefetch), pageHtml
+      );
+      return __responseObject({
+        body: value.body || '',
+        finalUrl: value.finalUrl || String(url || ''),
+        statusCode: 200,
+        headers: {},
+        cookies: value.cookies || {}
+      }, url);
+    },
+    getVerificationCode: (imageUrl) => __sourceInteraction(
+      'verificationCode', imageUrl, '', false, null
+    ).value || ''
   };
+  globalThis.sleep = () => null;
+  const __jsoupParse = (value) => {
+    const outer = String(value == null ? '' : value);
+    return {
+      select: (rule) => __elements(rule, outer),
+      html: () => outer,
+      outerHtml: () => outer,
+      text: () => java.htmlFormat(outer),
+      toString: () => outer
+    };
+  };
+  globalThis.org = {
+    jsoup: { Jsoup: { parse: __jsoupParse, parseBodyFragment: __jsoupParse } }
+  };
+  globalThis.traditionalToSimplified = (value) => java.t2s(value);
+  globalThis.simplifiedToTraditional = (value) => java.s2t(value);
+  function __sourceInteraction(kind, url, title, refetchAfterSuccess, html) {
+    let targetUrl = String(url == null ? '' : url);
+    let pageHtml = html == null ? null : String(html);
+    if (!pageHtml && /^\\s*</.test(targetUrl)) {
+      pageHtml = targetUrl;
+      targetUrl = String(globalThis.baseUrl || __payload.sourceUrl || '');
+    }
+    const reply = __host('interaction', [
+      kind,
+      targetUrl,
+      title == null ? '' : String(title),
+      Boolean(refetchAfterSuccess),
+      pageHtml
+    ]);
+    if (!reply || reply.cached !== true) {
+      const request = reply && reply.request ? reply.request : {
+        signature: JSON.stringify([
+          kind,
+          targetUrl,
+          title == null ? '' : String(title),
+          Boolean(refetchAfterSuccess),
+          pageHtml
+        ]),
+        kind: kind,
+        url: targetUrl,
+        title: title == null ? '' : String(title),
+        refetchAfterSuccess: Boolean(refetchAfterSuccess),
+        html: pageHtml
+      };
+      throw new Error('__OPEN_READING_INTERACTION__' +
+        encodeURIComponent(JSON.stringify(request)));
+    }
+    return reply.value || {};
+  }
   function __sourceNetwork(method, url, body, headers, webJs) {
     const reply = __host('network', [method, String(url), body, headers, webJs]);
     if (!reply || reply.cached !== true) {
@@ -454,11 +678,22 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     }
     return reply.value || { body: '', finalUrl: String(url) };
   }
-  let __value = (0, eval)(__payload.script);
+  if (__payload.result && __payload.result.__networkResponse === true) {
+    globalThis.result = __responseObject(__payload.result, __payload.result.finalUrl);
+  }
+  const __program = '(function(){\\n' +
+    (__payload.sharedScript || '') +
+    '\\nreturn eval(' + JSON.stringify(__payload.script) + ');\\n})()';
+  let __value = (0, eval)(__program);
   if (__value === undefined || typeof __value === 'function') __value = '';
   return JSON.stringify({
     value: __value,
+    book: globalThis.book,
+    chapter: globalThis.chapter,
     sourceVariable: __sourceVariable,
+    sourceValues: __sourceValues,
+    loginInfo: __loginInfo,
+    loginHeaders: __loginHeaders,
     state: __state
   });
 })()
@@ -466,6 +701,8 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     if (evaluated.isError) {
       final pending = _networkRequestFromError(evaluated.stringResult);
       if (pending != null) throw _SourceNetworkNeeded(pending);
+      final interaction = _interactionRequestFromError(evaluated.stringResult);
+      if (interaction != null) throw _SourceInteractionNeeded(interaction);
       throw BookSourceProtocolException(
         'Reading source JavaScript failed: ${evaluated.stringResult}',
       );
@@ -475,11 +712,49 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       if (envelope is! Map) {
         throw const FormatException('Script result envelope is not an object.');
       }
-      _sourceVariables[sourceId] = '${envelope['sourceVariable'] ?? ''}';
+      sourceState.variable = '${envelope['sourceVariable'] ?? ''}';
+      final sourceValues = envelope['sourceValues'];
+      if (sourceValues is Map) {
+        sourceState.values = sourceValues.map(
+          (key, value) => MapEntry('$key', '${value ?? ''}'),
+        );
+      }
+      final loginInfo = envelope['loginInfo'];
+      if (loginInfo is Map) {
+        final normalized = loginInfo.map(
+          (key, value) => MapEntry('$key', '${value ?? ''}'),
+        );
+        if (context.loginInfoWriter != null) {
+          context.loginInfoWriter!(normalized);
+        } else {
+          sourceState.loginInfo = normalized;
+        }
+      }
+      final loginHeaders = envelope['loginHeaders'];
+      if (loginHeaders is Map) {
+        final normalized = loginHeaders.map(
+          (key, value) => MapEntry('$key', '${value ?? ''}'),
+        );
+        if (context.loginHeaderWriter != null) {
+          context.loginHeaderWriter!(normalized);
+        } else {
+          sourceState.loginHeaders = normalized;
+        }
+      }
       final state = envelope['state'];
       if (state is Map) {
-        _sourceState[sourceId] = state.map(
+        sourceState.javaState = state.map(
           (key, value) => MapEntry('$key', value),
+        );
+      }
+      final book = envelope['book'];
+      if (book is Map && context.bookWriter != null) {
+        context.bookWriter!(book.map((key, value) => MapEntry('$key', value)));
+      }
+      final chapter = envelope['chapter'];
+      if (chapter is Map && context.chapterWriter != null) {
+        context.chapterWriter!(
+          chapter.map((key, value) => MapEntry('$key', value)),
         );
       }
       return envelope['value'];
@@ -513,18 +788,134 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       'hmacHex' => _hmac(arguments, base64Output: false),
       'symmetricCrypto' => _symmetricCrypto(arguments),
       'randomUUID' => _randomUuid(),
+      'androidId' => _androidId(),
       'digestHex' => _digestHex(arguments),
       'digestBytes' => _digestBytes(arguments),
       'hmacBytes' => _hmacBytes(arguments),
       'toNumChapter' => _toNumChapter(value),
       'utf8Bytes' => List<int>.from(utf8.encode(value)),
       'htmlFormat' => html_parser.parseFragment(value).text ?? '',
+      'traditionalToSimplified' => _traditionalToSimplified(value),
+      'simplifiedToTraditional' => _simplifiedToTraditional(value),
       'getString' => _selectWithRule(arguments, listMode: false),
       'getStringList' => _selectWithRule(arguments, listMode: true),
       'getElements' => _selectElements(arguments),
+      'cookieGet' => _cookieGet(arguments),
+      'cookieGetKey' => _cookieGetKey(arguments),
+      'cookieSet' => _cookieSet(arguments),
+      'cookieRemove' => _cookieRemove(arguments),
+      'cachePut' => _cachePut(arguments),
+      'cacheGet' => _cacheGet(arguments),
+      'cacheDelete' => _cacheDelete(arguments),
+      'cachePutMemory' => _cachePutMemory(arguments),
+      'cacheGetMemory' => _cacheGetMemory(arguments),
+      'cacheDeleteMemory' => _cacheDeleteMemory(arguments),
       'network' => _networkResult(arguments),
+      'interaction' => _interactionResult(arguments),
       _ => null,
     };
+  }
+
+  String _cookieGet(List arguments) {
+    final context = _activeContext;
+    if (context?.cookieReader == null || arguments.isEmpty) return '';
+    final uri = _cookieUri('${arguments.first ?? ''}', context!);
+    return uri == null ? '' : context.cookieReader!(uri);
+  }
+
+  String _cookieGetKey(List arguments) {
+    if (arguments.length < 2) return '';
+    final key = '${arguments[1] ?? ''}'.trim();
+    if (key.isEmpty) return '';
+    return parseSourceCookieHeader(_cookieGet(arguments))[key] ?? '';
+  }
+
+  Object? _cookieSet(List arguments) {
+    final context = _activeContext;
+    if (context?.cookieWriter == null || arguments.length < 2) return null;
+    final uri = _cookieUri('${arguments.first ?? ''}', context!);
+    if (uri != null) context.cookieWriter!(uri, '${arguments[1] ?? ''}');
+    return null;
+  }
+
+  Object? _cookieRemove(List arguments) {
+    final context = _activeContext;
+    if (context?.cookieRemover == null || arguments.isEmpty) return null;
+    final uri = _cookieUri('${arguments.first ?? ''}', context!);
+    if (uri != null) context.cookieRemover!(uri);
+    return null;
+  }
+
+  Object? _cachePut(List arguments) {
+    final sourceState = _activeSourceState;
+    if (sourceState == null || arguments.length < 2) return null;
+    final key = '${arguments[0] ?? ''}';
+    if (key.isEmpty) return null;
+    final seconds = arguments.length > 2 ? _number(arguments[2]) : 0;
+    sourceState.cache[key] = _ScriptCacheEntry(
+      value: arguments[1],
+      expiresAt: seconds <= 0
+          ? null
+          : DateTime.now().add(Duration(seconds: seconds.round())),
+    );
+    return null;
+  }
+
+  Object? _cacheGet(List arguments) {
+    final sourceState = _activeSourceState;
+    if (sourceState == null || arguments.isEmpty) return null;
+    final key = '${arguments.first ?? ''}';
+    final entry = sourceState.cache[key];
+    if (entry == null) return null;
+    if (entry.expiresAt?.isBefore(DateTime.now()) ?? false) {
+      sourceState.cache.remove(key);
+      return null;
+    }
+    return _jsonSafe(entry.value);
+  }
+
+  Object? _cacheDelete(List arguments) {
+    final sourceState = _activeSourceState;
+    if (sourceState == null || arguments.isEmpty) return null;
+    final key = '${arguments.first ?? ''}';
+    sourceState.cache.remove(key);
+    sourceState.memoryCache.remove(key);
+    return null;
+  }
+
+  Object? _cachePutMemory(List arguments) {
+    final sourceState = _activeSourceState;
+    if (sourceState == null || arguments.length < 2) return null;
+    sourceState.memoryCache['${arguments[0]}'] = arguments[1];
+    return null;
+  }
+
+  Object? _cacheGetMemory(List arguments) {
+    final sourceState = _activeSourceState;
+    if (sourceState == null || arguments.isEmpty) return null;
+    return _jsonSafe(sourceState.memoryCache['${arguments.first}']);
+  }
+
+  Object? _cacheDeleteMemory(List arguments) {
+    final sourceState = _activeSourceState;
+    if (sourceState == null || arguments.isEmpty) return null;
+    sourceState.memoryCache.remove('${arguments.first}');
+    return null;
+  }
+
+  _SourceScriptState? get _activeSourceState {
+    final sourceId = _activeContext?.source.stableId;
+    if (sourceId == null) return null;
+    return _sourceStates.putIfAbsent(sourceId, _SourceScriptState.new);
+  }
+
+  Uri? _cookieUri(String value, SourceScriptContext context) {
+    final base = context.baseUrl ?? context.source.baseUri;
+    final uri = base.resolve(value.trim().isEmpty ? base.toString() : value);
+    if (!uri.hasAuthority || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    return uri;
   }
 
   Object _networkResult(List arguments) {
@@ -557,6 +948,34 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
         'body': body,
         'headers': headers,
         'webJs': webJs,
+      },
+    };
+  }
+
+  Object _interactionResult(List arguments) {
+    final kind = arguments.isEmpty ? '' : '${arguments[0] ?? ''}';
+    final url = arguments.length > 1 ? '${arguments[1] ?? ''}' : '';
+    final title = arguments.length > 2 ? '${arguments[2] ?? ''}' : '';
+    final refetch = arguments.length > 3 && arguments[3] == true;
+    final html = arguments.length > 4 && arguments[4] != null
+        ? '${arguments[4]}'
+        : null;
+    final signature = jsonEncode([kind, url, title, refetch, html]);
+    final cached = _activeInteractionResponses[signature];
+    if (cached != null) {
+      final value = cached.toJson();
+      value['cookies'] = parseSourceCookieHeader(cached.cookieHeader);
+      return {'cached': true, 'value': value};
+    }
+    return {
+      'cached': false,
+      'request': {
+        'signature': signature,
+        'kind': kind,
+        'url': url,
+        'title': title,
+        'refetchAfterSuccess': refetch,
+        'html': html,
       },
     };
   }
@@ -653,10 +1072,61 @@ SourceScriptNetworkRequest? _networkRequestFromError(String message) {
   }
 }
 
+SourceScriptInteractionRequest? _interactionRequestFromError(String message) {
+  final match = RegExp(
+    r'__OPEN_READING_INTERACTION__([^\s]+)',
+  ).firstMatch(message);
+  if (match == null) return null;
+  try {
+    final decoded = jsonDecode(Uri.decodeComponent(match.group(1)!));
+    if (decoded is! Map) return null;
+    final kind = switch ('${decoded['kind'] ?? ''}') {
+      'browser' => SourceScriptInteractionKind.browser,
+      'browserAwait' => SourceScriptInteractionKind.browserAwait,
+      'verificationCode' => SourceScriptInteractionKind.verificationCode,
+      _ => null,
+    };
+    if (kind == null) return null;
+    return SourceScriptInteractionRequest(
+      signature: '${decoded['signature'] ?? ''}',
+      kind: kind,
+      url: '${decoded['url'] ?? ''}',
+      title: '${decoded['title'] ?? ''}',
+      html: decoded['html'] == null ? null : '${decoded['html']}',
+      refetchAfterSuccess: decoded['refetchAfterSuccess'] == true,
+    );
+  } on Object {
+    return null;
+  }
+}
+
 class _SourceNetworkNeeded implements Exception {
   const _SourceNetworkNeeded(this.request);
 
   final SourceScriptNetworkRequest request;
+}
+
+class _SourceInteractionNeeded implements Exception {
+  const _SourceInteractionNeeded(this.request);
+
+  final SourceScriptInteractionRequest request;
+}
+
+class _ScriptCacheEntry {
+  const _ScriptCacheEntry({required this.value, this.expiresAt});
+
+  final Object? value;
+  final DateTime? expiresAt;
+}
+
+class _SourceScriptState {
+  String variable = '';
+  Map<String, String> values = {};
+  Map<String, String> loginInfo = {};
+  Map<String, String> loginHeaders = {};
+  Map<String, Object?> javaState = {};
+  final Map<String, _ScriptCacheEntry> cache = {};
+  final Map<String, Object?> memoryCache = {};
 }
 
 Object? _jsonSafe(Object? value) {
@@ -669,6 +1139,221 @@ Object? _jsonSafe(Object? value) {
   if (value is Iterable) return value.map(_jsonSafe).toList(growable: false);
   return '$value';
 }
+
+String _traditionalToSimplified(String value) =>
+    _translateCharacters(value, _traditionalSimplifiedMap);
+
+String _simplifiedToTraditional(String value) =>
+    _translateCharacters(value, _simplifiedTraditionalMap);
+
+String _translateCharacters(String value, Map<int, int> mapping) {
+  if (value.isEmpty) return value;
+  final output = StringBuffer();
+  for (final rune in value.runes) {
+    output.writeCharCode(mapping[rune] ?? rune);
+  }
+  return output.toString();
+}
+
+// Keep the built-in conversion deliberately small and deterministic. Sources
+// mainly use it for labels and category names; content parsing must not depend
+// on a locale-specific system service.
+const _traditionalSimplifiedPairs = <String>[
+  '萬万',
+  '與与',
+  '專专',
+  '業业',
+  '東东',
+  '絲丝',
+  '兩两',
+  '為为',
+  '這这',
+  '個个',
+  '們们',
+  '來来',
+  '國国',
+  '學学',
+  '習习',
+  '書书',
+  '體体',
+  '發发',
+  '現现',
+  '會会',
+  '應应',
+  '該该',
+  '號号',
+  '處处',
+  '門门',
+  '開开',
+  '關关',
+  '問问',
+  '題题',
+  '說说',
+  '話话',
+  '讀读',
+  '寫写',
+  '進进',
+  '過过',
+  '還还',
+  '選选',
+  '擇择',
+  '頁页',
+  '類类',
+  '別别',
+  '圖图',
+  '標标',
+  '籤签',
+  '網网',
+  '頁页',
+  '線线',
+  '經经',
+  '驗验',
+  '證证',
+  '碼码',
+  '樂乐',
+  '歡欢',
+  '愛爱',
+  '戀恋',
+  '廣广',
+  '東东',
+  '臺台',
+  '灣湾',
+  '門门',
+  '漢汉',
+  '語语',
+  '簡简',
+  '繁繁',
+  '轉转',
+  '換换',
+  '優优',
+  '劣劣',
+  '機机',
+  '動动',
+  '靜静',
+  '訊讯',
+  '息息',
+  '時时',
+  '間间',
+  '長长',
+  '短短',
+  '頭头',
+  '聽听',
+  '見见',
+  '覺觉',
+  '點点',
+  '擊击',
+  '標标',
+  '題题',
+  '數数',
+  '據据',
+  '從从',
+  '無无',
+  '與与',
+  '將将',
+  '後后',
+  '裡里',
+  '別别',
+  '麼么',
+  '們们',
+  '創创',
+  '建建',
+  '導导',
+  '覽览',
+  '級级',
+  '線线',
+  '線线',
+  '畫画',
+  '報报',
+  '導导',
+  '權权',
+  '限限',
+  '錯错',
+  '誤误',
+  '載载',
+  '入入',
+  '輸输',
+  '出出',
+  '實实',
+  '際际',
+  '聯联',
+  '絡络',
+  '標标',
+  '準准',
+  '體体',
+  '驗验',
+  '認认',
+  '識识',
+  '獲获',
+  '取取',
+  '細细',
+  '節节',
+  '點点',
+  '擊击',
+  '後后',
+  '臺台',
+  '館馆',
+  '專专',
+  '區区',
+  '頁页',
+  '冊册',
+  '冊册',
+  '乾干',
+  '兒儿',
+  '畫画',
+  '麗丽',
+  '潔洁',
+  '壓压',
+  '縮缩',
+  '慾欲',
+  '與与',
+  '將将',
+  '製制',
+  '作作',
+  '廣广',
+  '場场',
+  '夢梦',
+  '韓韩',
+  '熱热',
+  '劇剧',
+  '誘诱',
+  '亂乱',
+  '倫伦',
+  '學学',
+  '姊姐',
+  '師师',
+  '護护',
+  '醫医',
+  '辦办',
+  '強强',
+  '獄狱',
+  '勵励',
+  '靈灵',
+  '懸悬',
+  '慾欲',
+  '戲戏',
+  '職职',
+  '恢恢',
+  '聲声',
+  '雙双',
+  '分分',
+  '類类',
+  '篩筛',
+  '條条',
+];
+
+final Map<int, int> _traditionalSimplifiedMap = {
+  for (final pair in _traditionalSimplifiedPairs)
+    pair.runes.first: pair.runes.last,
+};
+
+final Map<int, int> _simplifiedTraditionalMap = {
+  for (final entry in _traditionalSimplifiedMap.entries) entry.value: entry.key,
+};
+
+double _number(Object? value) => switch (value) {
+  num number => number.toDouble(),
+  _ => double.tryParse('${value ?? ''}') ?? 0,
+};
 
 Object _sourceHeader(Object? raw) {
   if (raw is Map) {
@@ -713,6 +1398,11 @@ String _randomUuid() {
       '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
       '${hex.substring(20)}';
 }
+
+String _androidId() => sha256
+    .convert(utf8.encode('open-reading-source-runtime'))
+    .toString()
+    .substring(0, 16);
 
 String _digestHex(List arguments) {
   if (arguments.isEmpty) return '';

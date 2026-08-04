@@ -1,0 +1,11 @@
+[project]
+name = "reading-source-lab"
+version = "0.1.0"
+description = "Offline parser and compatibility auditor for reading-source JSON."
+requires-python = ">=3.11"
+
+[project.scripts]
+reading-source-lab = "reading_source_lab.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

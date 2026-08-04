@@ -227,6 +227,7 @@ class BookSourceBook {
   final String author;
   final String description;
   final Uri? coverUrl;
+  final Map<String, String> coverHeaders;
   final List<String> categories;
   final String? status;
   final String? latestChapter;
@@ -240,6 +241,7 @@ class BookSourceBook {
     required this.description,
     required this.categories,
     this.coverUrl,
+    this.coverHeaders = const {},
     this.status,
     this.latestChapter,
     this.updatedAt,
@@ -254,6 +256,7 @@ class BookSourceBook {
       author: (json['author'] as String?)?.trim() ?? '',
       description: (json['description'] as String?)?.trim() ?? '',
       coverUrl: _optionalHttpUri(json['coverUrl']),
+      coverHeaders: _stringMap(json['coverHeaders']),
       categories: _stringList(json['categories']),
       status: (json['status'] as String?)?.trim(),
       latestChapter: (json['latestChapter'] as String?)?.trim(),
@@ -270,6 +273,7 @@ class BookSourceBook {
     'author': author,
     'description': description,
     if (coverUrl != null) 'coverUrl': coverUrl.toString(),
+    if (coverHeaders.isNotEmpty) 'coverHeaders': coverHeaders,
     'categories': categories,
     if (status != null) 'status': status,
     if (latestChapter != null) 'latestChapter': latestChapter,
@@ -349,6 +353,7 @@ class BookSourceChapterContent {
   final String title;
   final String content;
   final String contentType;
+  final List<BookSourceRemoteImage> images;
 
   const BookSourceChapterContent({
     required this.bookId,
@@ -356,6 +361,7 @@ class BookSourceChapterContent {
     required this.title,
     required this.content,
     required this.contentType,
+    this.images = const [],
   });
 
   factory BookSourceChapterContent.fromJson(Map<String, dynamic> json) {
@@ -376,8 +382,36 @@ class BookSourceChapterContent {
       title: (json['title'] as String?)?.trim() ?? '',
       content: _requiredString(json, 'content'),
       contentType: contentType,
+      images: (json['images'] as List? ?? const [])
+          .map((value) => BookSourceRemoteImage.fromJson(_jsonMap(value)))
+          .toList(growable: false),
     );
   }
+}
+
+class BookSourceRemoteImage {
+  const BookSourceRemoteImage({required this.url, this.headers = const {}});
+
+  final Uri url;
+  final Map<String, String> headers;
+
+  factory BookSourceRemoteImage.fromJson(Map<String, dynamic> json) {
+    final url = _optionalHttpUri(json['url']);
+    if (url == null) {
+      throw const BookSourceProtocolException(
+        'Chapter image URL must use HTTP or HTTPS.',
+      );
+    }
+    return BookSourceRemoteImage(
+      url: url,
+      headers: _stringMap(json['headers']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'url': url.toString(),
+    if (headers.isNotEmpty) 'headers': headers,
+  };
 }
 
 Map<String, dynamic> decodeBookSourceJson(Object? data) {

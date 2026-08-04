@@ -14,6 +14,7 @@ on:
       - "pubspec.lock"
       - "pubspec.yaml"
       - "shaders/**"
+      - "tool/patch_passkeys_darwin.py"
       - "windows/**"
   push:
     branches:
@@ -28,6 +29,7 @@ on:
       - "pubspec.lock"
       - "pubspec.yaml"
       - "shaders/**"
+      - "tool/patch_passkeys_darwin.py"
       - "windows/**"
   schedule:
     # Monday 02:17 in Asia/Shanghai (Sunday 18:17 UTC).

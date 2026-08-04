@@ -20,12 +20,19 @@ from a maintainer-created version tag or an explicitly approved manual run.
 | `MACOS_NOTARY_KEY_ID` | App Store Connect API key ID used by `notarytool` |
 | `MACOS_NOTARY_ISSUER_ID` | App Store Connect issuer ID |
 | `MACOS_NOTARY_PRIVATE_KEY_BASE64` | Base64-encoded App Store Connect `.p8` private key |
+| `MACOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded Developer ID profile for `com.niki.xxread` |
 | `PUBLIC_RELEASE_TOKEN` | Fine-grained token that can publish to `miloquinn/open-reading` |
 | `OFFICIAL_SITE_SSH_HOST` | Official-site deployment host |
 | `OFFICIAL_SITE_SSH_PORT` | Official-site SSH port |
 | `OFFICIAL_SITE_SSH_USER` | Restricted official-site release account |
 | `OFFICIAL_SITE_SSH_PRIVATE_KEY` | Private key for the restricted release account |
 | `OFFICIAL_SITE_SSH_KNOWN_HOSTS` | Pinned SSH host-key entry |
+
+The release workflow embeds the Developer ID profile and verifies that it
+matches both `com.niki.xxread` and the imported Developer ID certificate.
+Apple does not grant native Sign in with Apple to Developer ID distribution;
+the website-distributed macOS app therefore uses the web/device authorization
+flow, while iOS keeps the native system authorization sheet.
 
 ## GitHub Environment variables
 

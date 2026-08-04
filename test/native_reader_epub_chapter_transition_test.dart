@@ -13,6 +13,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/native_reader_page.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
+import 'package:xxread/widgets/reader_shader_page_curl.dart';
 
 void main() {
   test('reader font overrides EPUB font except for the system default', () {
@@ -47,22 +48,32 @@ void main() {
       final epub = File('${directory.path}/transition.epub');
       epub.writeAsBytesSync(_epubFixture());
       final paginationMisses = <int>[];
+      late StateSetter rebuildHost;
+      var hostRevision = 0;
 
       try {
         await tester.pumpWidget(
           MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
-            home: NativeReaderPage(
-              book: Book(
-                title: 'EPUB transition fixture',
-                filePath: epub.path,
-                format: 'epub',
-                fileModifiedTime: epub
-                    .lastModifiedSync()
-                    .millisecondsSinceEpoch,
-              ),
-              onPaginationCacheMiss: paginationMisses.add,
+            home: StatefulBuilder(
+              builder: (context, setHostState) {
+                rebuildHost = setHostState;
+                return Semantics(
+                  label: 'host-revision-$hostRevision',
+                  child: NativeReaderPage(
+                    book: Book(
+                      title: 'EPUB transition fixture',
+                      filePath: epub.path,
+                      format: 'epub',
+                      fileModifiedTime: epub
+                          .lastModifiedSync()
+                          .millisecondsSinceEpoch,
+                    ),
+                    onPaginationCacheMiss: paginationMisses.add,
+                  ),
+                );
+              },
             ),
           ),
         );
@@ -103,6 +114,44 @@ void main() {
         await tester.pump();
         await _pumpUntil(tester, () => paginationMisses.contains(3));
         paginationMisses.clear();
+
+        final boundaryLeaf = find.byWidgetPredicate(
+          (widget) =>
+              widget is ReaderPaperPageLeaf &&
+              widget.metadata.chapterTitle == 'Chapter 1' &&
+              widget.metadata.pageNumber == firstChapterPages.length,
+        );
+        expect(boundaryLeaf, findsOneWidget);
+        final boundaryElement = tester.element(boundaryLeaf);
+        final rect = tester.getRect(pageView);
+        final gesture = await tester.startGesture(
+          Offset(rect.right - 8, rect.center.dy),
+        );
+        await gesture.moveBy(const Offset(-150, 0));
+        await tester.pump();
+        final pageDuringTurn = controller.page!;
+        expect(pageDuringTurn, isNot(pageDuringTurn.roundToDouble()));
+        final incomingLeaf = find.byWidgetPredicate(
+          (widget) =>
+              widget is ReaderPaperPageLeaf &&
+              widget.metadata.chapterTitle == 'Chapter 2' &&
+              widget.metadata.pageNumber == 1,
+        );
+        expect(incomingLeaf, findsOneWidget);
+        final incomingElement = tester.element(incomingLeaf);
+
+        // A pagination/cache completion rebuild used to run the post-frame
+        // page reconciliation during this active drag. That jump briefly
+        // replaced the chapter-boundary leaf with another page, then snapped
+        // back when PageView resumed the gesture.
+        rebuildHost(() => hostRevision++);
+        await tester.pump();
+        expect(controller.page, closeTo(pageDuringTurn, 0.001));
+        expect(tester.element(boundaryLeaf), same(boundaryElement));
+        expect(tester.element(incomingLeaf), same(incomingElement));
+
+        await gesture.cancel();
+        await tester.pumpAndSettle();
 
         final turn = controller.nextPage(
           duration: const Duration(milliseconds: 280),
@@ -213,6 +262,103 @@ void main() {
       directory.deleteSync(recursive: true);
     }
   });
+
+  testWidgets(
+    'EPUB page curl returns from a chapter first page to the previous last page',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await tester.binding.setSurfaceSize(const Size(480, 800));
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: ReaderPageMode.pageCurl.name,
+        ReaderSettingsStore.txtChapterTitlePageKey: false,
+      });
+      final directory = Directory.systemTemp.createTempSync(
+        'open-reading-epub-curl-boundary-',
+      );
+      final epub = File('${directory.path}/curl-boundary.epub');
+      epub.writeAsBytesSync(_epubFixture(chapterCount: 3));
+
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NativeReaderPage(
+              book: Book(
+                title: 'EPUB curl boundary fixture',
+                filePath: epub.path,
+                format: 'epub',
+                fileModifiedTime: epub
+                    .lastModifiedSync()
+                    .millisecondsSinceEpoch,
+              ),
+            ),
+          ),
+        );
+        await tester.runAsync(() async {
+          for (var attempt = 0; attempt < 60; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+            if (find.byType(ReaderShaderPageCurl).evaluate().isNotEmpty) return;
+          }
+        });
+        await _pumpUntil(
+          tester,
+          () => find.byType(ReaderShaderPageCurl).evaluate().isNotEmpty,
+        );
+
+        ReaderShaderPageCurl curl() => tester.widget<ReaderShaderPageCurl>(
+          find.byType(ReaderShaderPageCurl),
+        );
+        for (var turn = 0; turn < 40; turn++) {
+          final current = curl();
+          if (current.currentPage.key.pageIdentity.contains(
+            ':chapter2.xhtml:0:',
+          )) {
+            break;
+          }
+          if (current.forwardPage == null) {
+            await tester.runAsync(() async {
+              await Future<void>.delayed(const Duration(milliseconds: 100));
+            });
+            await tester.pump();
+            continue;
+          }
+          final future = current.controller!.turnForward();
+          await tester.pumpAndSettle();
+          await future;
+        }
+
+        final chapterTwoFirst = curl();
+        expect(
+          chapterTwoFirst.currentPage.key.pageIdentity,
+          contains(':chapter2.xhtml:0:'),
+        );
+        expect(chapterTwoFirst.backwardPage, isNotNull);
+        final previousIdentity = chapterTwoFirst.backwardPage!.key.pageIdentity;
+
+        final curlRect = tester.getRect(find.byType(ReaderShaderPageCurl));
+        final backwardGesture = await tester.startGesture(
+          Offset(curlRect.left + 2, curlRect.center.dy),
+        );
+        await backwardGesture.moveBy(const Offset(40, 0));
+        await tester.pump();
+        await backwardGesture.moveBy(Offset(curlRect.width * 0.7, -24));
+        await tester.pump();
+        await backwardGesture.up();
+        await tester.pumpAndSettle();
+
+        expect(curl().currentPage.key.pageIdentity, previousIdentity);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.binding.setSurfaceSize(null);
+        debugDefaultTargetPlatformOverride = null;
+        directory.deleteSync(recursive: true);
+      }
+    },
+  );
 }
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {

@@ -929,7 +929,9 @@ class _ExternalLoginMethodsState extends State<_ExternalLoginMethods> {
               label: context.l10n.accountUseApple,
               brand: _ProviderBrand.apple,
               enabled: !widget.account.loading,
-              onTap: widget.onLoginApple,
+              onTap: defaultTargetPlatform == TargetPlatform.macOS
+                  ? () => widget.onLogin(MemberExternalAuthMethod.apple)
+                  : widget.onLoginApple,
             ),
             const SizedBox(height: 8),
           ],

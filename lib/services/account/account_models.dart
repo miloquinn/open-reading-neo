@@ -8,7 +8,7 @@ extension MemberEmailCodePurposeValue on MemberEmailCodePurpose {
   };
 }
 
-enum MemberExternalAuthMethod { google, github, passkey }
+enum MemberExternalAuthMethod { google, github, apple, passkey }
 
 extension MemberExternalAuthMethodValue on MemberExternalAuthMethod {
   String get apiValue => name;
@@ -82,6 +82,7 @@ class MemberAuthProviders {
   bool supports(MemberExternalAuthMethod method) => switch (method) {
     MemberExternalAuthMethod.google => google,
     MemberExternalAuthMethod.github => github,
+    MemberExternalAuthMethod.apple => apple,
     MemberExternalAuthMethod.passkey => passkey,
   };
 }

@@ -25,6 +25,7 @@ void main() {
     ]);
     final service = BookImportSourceService(
       filePicker: () async => pickerResult,
+      materializePickedFiles: false,
     );
 
     final sources = await service.pickFiles();
@@ -33,6 +34,57 @@ void main() {
     expect(sources.single.extension, 'epub');
     expect(sources.single.kind, BookImportSourceKind.filePicker);
     expect(sources.single.ownership, BookImportOwnership.externalCopy);
+  });
+
+  test('macOS 文件选择后立即复制，原授权路径失效仍可导入并安全清理', () async {
+    final external = await Directory.systemTemp.createTemp('picker-external-');
+    final temporary = await Directory.systemTemp.createTemp('picker-staged-');
+    addTearDown(() async {
+      if (await external.exists()) await external.delete(recursive: true);
+      if (await temporary.exists()) await temporary.delete(recursive: true);
+    });
+    final original = File('${external.path}/长篇小说.epub');
+    await original.writeAsBytes(<int>[1, 2, 3, 4]);
+    final service = BookImportSourceService(
+      filePicker: () async => FilePickerResult(<PlatformFile>[
+        PlatformFile(name: '长篇小说.epub', path: original.path, size: 4),
+      ]),
+      temporaryDirectory: () async => temporary,
+      materializePickedFiles: true,
+    );
+
+    final source = (await service.pickFiles()).single;
+    expect(source.locator, original.path);
+    expect(source.localPath, isNot(original.path));
+    expect(
+      p.isWithin('${temporary.path}/book_picker_sources', source.localPath!),
+      isTrue,
+    );
+
+    await original.delete();
+    expect(await File(source.localPath!).readAsBytes(), <int>[1, 2, 3, 4]);
+
+    await service.release(source);
+    expect(await File(source.localPath!).exists(), isFalse);
+  });
+
+  test('普通平台文件选择来源不会删除外部原文件', () async {
+    final directory = await Directory.systemTemp.createTemp('picker-direct-');
+    addTearDown(() => directory.delete(recursive: true));
+    final original = File('${directory.path}/book.epub');
+    await original.writeAsBytes(<int>[1, 2]);
+    final service = BookImportSourceService(
+      filePicker: () async => FilePickerResult(<PlatformFile>[
+        PlatformFile(name: 'book.epub', path: original.path, size: 2),
+      ]),
+      temporaryDirectory: () async => directory,
+      materializePickedFiles: false,
+    );
+
+    final source = (await service.pickFiles()).single;
+    await service.release(source);
+
+    expect(await original.exists(), isTrue);
   });
 
   test('iOS 共享 Documents 中的书籍按原地管理来源返回', () async {

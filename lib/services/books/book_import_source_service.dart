@@ -24,11 +24,14 @@ class BookImportSourceService implements BookImportSourcePreparer {
     PlatformStorageBridge? platformBridge,
     Future<Directory> Function()? documentsDirectory,
     Future<Directory> Function()? temporaryDirectory,
+    bool? materializePickedFiles,
   }) : _filePicker = filePicker ?? _pickSupportedFiles,
        _platformBridge = platformBridge ?? PlatformStorageBridge(),
        _documentsDirectory =
            documentsDirectory ?? getApplicationDocumentsDirectory,
-       _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
+       _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory,
+       _materializePickedFiles =
+           materializePickedFiles ?? (!kIsWeb && Platform.isMacOS);
 
   /// 与 [BookFormatRegistry.pickerExtensions] 同步；格式变更只改注册表。
   static Set<String> get supportedExtensions =>
@@ -61,6 +64,7 @@ class BookImportSourceService implements BookImportSourcePreparer {
   final PlatformStorageBridge _platformBridge;
   final Future<Directory> Function() _documentsDirectory;
   final Future<Directory> Function() _temporaryDirectory;
+  final bool _materializePickedFiles;
 
   static Future<FilePickerResult?> _pickSupportedFiles() {
     return FilePicker.pickFiles(
@@ -109,6 +113,14 @@ class BookImportSourceService implements BookImportSourcePreparer {
       if (path == null) continue;
       final file = File(path);
       final stat = await file.stat();
+      var localPath = path;
+      if (_materializePickedFiles) {
+        localPath = await _stagePickedFile(
+          file,
+          displayName: pickedFile.name,
+          expectedBytes: pickedFile.size,
+        );
+      }
       sources.add(
         BookImportSource(
           id: '${BookImportSourceKind.filePicker.storageValue}:$path',
@@ -117,7 +129,7 @@ class BookImportSourceService implements BookImportSourcePreparer {
           displayName: pickedFile.name,
           extension: fileExtension,
           locator: path,
-          localPath: path,
+          localPath: localPath,
           sizeBytes: pickedFile.size,
           modifiedTime: stat.modified.millisecondsSinceEpoch,
         ),
@@ -243,7 +255,8 @@ class BookImportSourceService implements BookImportSourcePreparer {
     final isIncomingBook =
         source.kind == BookImportSourceKind.systemOpen ||
         source.kind == BookImportSourceKind.systemShare;
-    if (!isMaterializedDocument && !isIncomingBook) {
+    final isStagedPickerFile = source.kind == BookImportSourceKind.filePicker;
+    if (!isMaterializedDocument && !isIncomingBook && !isStagedPickerFile) {
       return;
     }
     final localPath = source.localPath;
@@ -251,12 +264,49 @@ class BookImportSourceService implements BookImportSourcePreparer {
     final temporaryRoot = await _temporaryDirectory();
     final materializedRoot = join(
       temporaryRoot.path,
-      isIncomingBook ? 'incoming_books' : 'book_import_sources',
+      isIncomingBook
+          ? 'incoming_books'
+          : isStagedPickerFile
+          ? 'book_picker_sources'
+          : 'book_import_sources',
     );
     if (!isWithin(materializedRoot, localPath)) return;
     final file = File(localPath);
     if (await file.exists()) {
       await file.delete();
+    }
+  }
+
+  Future<String> _stagePickedFile(
+    File source, {
+    required String displayName,
+    required int expectedBytes,
+  }) async {
+    final temporaryRoot = await _temporaryDirectory();
+    final stagingRoot = Directory(
+      join(temporaryRoot.path, 'book_picker_sources'),
+    );
+    await stagingRoot.create(recursive: true);
+    final destination = await _allocateTemporaryDestination(
+      stagingRoot,
+      displayName,
+    );
+    try {
+      await source.copy(destination.path);
+      final actualBytes = await destination.length();
+      if (expectedBytes >= 0 && actualBytes != expectedBytes) {
+        throw BookImportFailure(
+          code: 'copy_verification_failed',
+          message:
+              'Picked file size mismatch: expected=$expectedBytes actual=$actualBytes',
+        );
+      }
+      return destination.path;
+    } catch (_) {
+      if (await destination.exists()) {
+        await destination.delete();
+      }
+      rethrow;
     }
   }
 

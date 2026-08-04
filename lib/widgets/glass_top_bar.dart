@@ -18,6 +18,7 @@ class GlassTopBar extends StatelessWidget {
     this.titleFontSize = 34,
     this.titleFontWeight = FontWeight.w700,
     this.horizontalPadding = 16,
+    this.centerTitleSideInset = 56,
   });
 
   final String title;
@@ -29,6 +30,7 @@ class GlassTopBar extends StatelessWidget {
   final double titleFontSize;
   final FontWeight titleFontWeight;
   final double horizontalPadding;
+  final double centerTitleSideInset;
 
   @override
   Widget build(BuildContext context) {
@@ -61,17 +63,22 @@ class GlassTopBar extends StatelessWidget {
                 children: [
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: Center(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: titleFontSize,
-                            fontWeight: titleFontWeight,
-                            color: scheme.onSurface,
-                            height: 1,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: centerTitleSideInset,
+                        ),
+                        child: Center(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: titleFontSize,
+                              fontWeight: titleFontWeight,
+                              color: scheme.onSurface,
+                              height: 1,
+                            ),
                           ),
                         ),
                       ),

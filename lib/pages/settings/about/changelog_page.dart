@@ -69,7 +69,7 @@ class _ChangelogPageState extends State<ChangelogPage> {
           return ListView.separated(
             padding: floatingSubpagePadding(context),
             itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) => _VersionCard(
               key: ValueKey('changelog-entry-${entries[index].version}'),
               entry: entries[index],

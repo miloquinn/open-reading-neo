@@ -120,4 +120,26 @@ void main() {
     );
     expect(find.byType(BackdropFilter), findsOneWidget);
   });
+
+  testWidgets('ellipsizes long titles between the header controls', (
+    tester,
+  ) async {
+    const title = 'Dart QR encoder adaptation with an intentionally long name';
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FloatingSubpageScaffold(title: title, body: SizedBox.shrink()),
+      ),
+    );
+
+    final titleFinder = find.text(title);
+    final titleWidget = tester.widget<Text>(titleFinder);
+    final titleRect = tester.getRect(titleFinder);
+    final backRect = tester.getRect(
+      find.byKey(const ValueKey('floating-subpage-back')),
+    );
+
+    expect(titleWidget.maxLines, 1);
+    expect(titleWidget.overflow, TextOverflow.ellipsis);
+    expect(titleRect.left, greaterThanOrEqualTo(backRect.right + 8));
+  });
 }

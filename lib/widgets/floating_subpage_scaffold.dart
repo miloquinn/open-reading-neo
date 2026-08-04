@@ -67,6 +67,8 @@ class FloatingSubpageScaffold extends StatelessWidget {
       systemTopInset: systemTopInset,
       contentHeight: chromeContentHeight,
       titleFontSize: 22,
+      centerTitleSideInset:
+          ((actions.isEmpty ? 1 : actions.length) * 48).toDouble() + 8,
       leading: canPop
           ? FloatingSubpageAction(
               key: const ValueKey('floating-subpage-back'),

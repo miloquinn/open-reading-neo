@@ -367,7 +367,7 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
                       _LocalFilesList(
                         items: _synced,
                         selected: const {},
-                        onToggle: (_, __) {},
+                        onToggle: (_, _) {},
                         emptyText: l10n.webDavFilesEmpty,
                         selectable: false,
                       ),
@@ -569,7 +569,7 @@ class _LocalFilesList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final item = items[index];
         final tooLarge =
@@ -607,7 +607,7 @@ class _RemoteFilesList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final item = items[index];
         final size = item.sizeBytes ?? 0;

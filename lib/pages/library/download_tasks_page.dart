@@ -47,7 +47,7 @@ class _DownloadTaskList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: tasks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final task = tasks[index];
         final progress = task.progress;
@@ -151,7 +151,7 @@ class _AiPreprocessTaskList extends StatelessWidget {
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: tasks.length + (hasFinished ? 1 : 0),
-          separatorBuilder: (_, __) => const Divider(height: 1),
+          separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) {
             if (hasFinished && index == tasks.length) {
               return Padding(

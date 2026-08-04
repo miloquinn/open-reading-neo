@@ -111,13 +111,13 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       const store = ReaderSettingsStore();
 
-      expect(await store.loadScrollByChapter(), isTrue);
-
-      await store.saveScrollByChapter(false);
-
       expect(await store.loadScrollByChapter(), isFalse);
+
+      await store.saveScrollByChapter(true);
+
+      expect(await store.loadScrollByChapter(), isTrue);
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool(ReaderSettingsStore.scrollByChapterKey), isFalse);
+      expect(prefs.getBool(ReaderSettingsStore.scrollByChapterKey), isTrue);
     },
   );
 

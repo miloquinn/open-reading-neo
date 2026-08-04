@@ -4537,6 +4537,18 @@ abstract class AppLocalizations {
   /// **'Confirm password'**
   String get accountConfirmPassword;
 
+  /// No description provided for @accountAvatarCropTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Crop avatar'**
+  String get accountAvatarCropTitle;
+
+  /// No description provided for @accountAvatarCropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reposition and pinch to zoom until the subject fits inside the circle.'**
+  String get accountAvatarCropHint;
+
   /// Public username field
   ///
   /// In en, this message translates to:
@@ -4668,6 +4680,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Support is optional and does not unlock WebDAV or any other feature.'**
   String get accountSupportFreeSubtitle;
+
+  /// Transparent notice explaining the current purpose of Premium purchases
+  ///
+  /// In en, this message translates to:
+  /// **'Premium currently exists only to help us learn and validate the purchase flow; it does not include any actual premium features yet. Buying Premium is effectively much like making a donation. If you would like to support the project, you can purchase Premium.'**
+  String get accountSupportPurchaseNotice;
 
   /// Open the supporter purchase page
   ///
@@ -7713,6 +7731,12 @@ abstract class AppLocalizations {
   /// **'Terms'**
   String get agreementFlowStepTerms;
 
+  /// Third-party book source agreement flow step label
+  ///
+  /// In en, this message translates to:
+  /// **'Book sources'**
+  String get agreementFlowStepSource;
+
   /// Privacy onboarding flow step label
   ///
   /// In en, this message translates to:
@@ -7740,7 +7764,7 @@ abstract class AppLocalizations {
   /// Terms step supporting text
   ///
   /// In en, this message translates to:
-  /// **'Review the terms and the boundary for content and third-party sources.'**
+  /// **'Review the terms governing use of the software and content you choose to open.'**
   String get agreementFlowTermsSubtitle;
 
   /// Terms-only consent checkbox label
@@ -7748,6 +7772,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I have read and agree to the Terms of Use.'**
   String get agreementFlowTermsConsent;
+
+  /// Third-party book source agreement step heading
+  ///
+  /// In en, this message translates to:
+  /// **'Third-party book source agreement'**
+  String get agreementFlowSourceTitle;
+
+  /// Third-party book source agreement step supporting text
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm how source addresses, content, authorization, and responsibility are separated from the official project.'**
+  String get agreementFlowSourceSubtitle;
+
+  /// Third-party book source agreement consent checkbox label
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and agree to the Third-party Book Source Agreement.'**
+  String get agreementFlowSourceConsent;
 
   /// Privacy step heading
   ///

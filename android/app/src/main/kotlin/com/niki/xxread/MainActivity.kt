@@ -20,7 +20,10 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.niki.xxread/fullscreen"
     private val READER_KEYS_CHANNEL = "com.niki.xxread/reader_keys"
     private val READER_STATUS_CHANNEL = "com.niki.xxread/reader_status"
+    private val ACCOUNT_AUTH_CHANNEL = "com.niki.xxread/account_auth"
     private var readerKeysChannel: MethodChannel? = null
+    private var accountAuthChannel: MethodChannel? = null
+    private var pendingAuthCallback: String? = null
     private var safDirectoryBridge: SafDirectoryBridge? = null
     private var incomingBookIntentBridge: IncomingBookIntentBridge? = null
     private var appUpdateBridge: AppUpdateBridge? = null
@@ -101,6 +104,23 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        accountAuthChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            ACCOUNT_AUTH_CHANNEL,
+        ).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getInitialAuthCallback" -> {
+                        val value = pendingAuthCallback ?: authCallbackUri(intent)
+                        pendingAuthCallback = null
+                        result.success(value)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
+        deliverAuthCallback(intent)
+
         safDirectoryBridge = SafDirectoryBridge(
             this,
             flutterEngine.dartExecutor.binaryMessenger,
@@ -170,7 +190,11 @@ class MainActivity : FlutterActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         backgroundDownloadBridge?.onNewIntent(intent)
-        if (!isAuthCallback(intent)) incomingBookIntentBridge?.handleIntent(intent)
+        if (isAuthCallback(intent)) {
+            deliverAuthCallback(intent)
+        } else {
+            incomingBookIntentBridge?.handleIntent(intent)
+        }
     }
 
     private fun isAuthCallback(intent: Intent?): Boolean {
@@ -181,8 +205,22 @@ class MainActivity : FlutterActivity() {
             uri.path == "/device"
     }
 
+    private fun authCallbackUri(intent: Intent?): String? =
+        if (isAuthCallback(intent)) intent?.data?.toString() else null
+
+    private fun deliverAuthCallback(intent: Intent?) {
+        val value = authCallbackUri(intent) ?: return
+        val channel = accountAuthChannel
+        if (channel == null) {
+            pendingAuthCallback = value
+            return
+        }
+        channel.invokeMethod("onAuthCallback", value)
+    }
+
     override fun onDestroy() {
         incomingBookIntentBridge?.dispose()
+        accountAuthChannel = null
         incomingBookIntentBridge = null
         safDirectoryBridge?.dispose()
         safDirectoryBridge = null

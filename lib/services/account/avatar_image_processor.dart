@@ -22,6 +22,13 @@ class AvatarUploadData {
   final String contentType;
 }
 
+class AvatarImageInfo {
+  const AvatarImageInfo({required this.width, required this.height});
+
+  final int width;
+  final int height;
+}
+
 class AvatarImageProcessor {
   const AvatarImageProcessor();
 
@@ -30,13 +37,35 @@ class AvatarImageProcessor {
   static const maxPixels = 20 * 1000 * 1000;
   static const maxOutputBytes = 2 * 1024 * 1024;
 
+  Future<AvatarImageInfo> inspect(Uint8List sourceBytes) async {
+    _validateInput(sourceBytes);
+    ui.Codec? codec;
+    ui.Image? source;
+    try {
+      codec = await ui.instantiateImageCodec(sourceBytes);
+      final frame = await codec.getNextFrame();
+      source = frame.image;
+      _validateDimensions(source);
+      return AvatarImageInfo(width: source.width, height: source.height);
+    } on AvatarProcessingException {
+      rethrow;
+    } catch (_) {
+      throw const AvatarProcessingException('头像文件无法读取');
+    } finally {
+      source?.dispose();
+      codec?.dispose();
+    }
+  }
+
   Future<AvatarUploadData> compress(Uint8List sourceBytes) async {
-    if (sourceBytes.isEmpty) {
-      throw const AvatarProcessingException('头像文件为空');
-    }
-    if (sourceBytes.length > maxInputBytes) {
-      throw const AvatarProcessingException('头像原图不能超过 25 MiB');
-    }
+    return cropAndCompress(sourceBytes);
+  }
+
+  Future<AvatarUploadData> cropAndCompress(
+    Uint8List sourceBytes, {
+    ui.Rect? sourceRect,
+  }) async {
+    _validateInput(sourceBytes);
 
     ui.Codec? codec;
     ui.Image? source;
@@ -46,21 +75,29 @@ class AvatarImageProcessor {
       codec = await ui.instantiateImageCodec(sourceBytes);
       final frame = await codec.getNextFrame();
       source = frame.image;
-      if (source.width <= 0 ||
-          source.height <= 0 ||
-          source.width * source.height > maxPixels) {
-        throw const AvatarProcessingException('头像尺寸过大');
-      }
+      _validateDimensions(source);
 
-      final scale = source.width >= source.height
-          ? maxDimension / source.width
-          : maxDimension / source.height;
-      final boundedScale = scale < 1 ? scale : 1.0;
-      final targetWidth = (source.width * boundedScale).round().clamp(
+      final imageBounds = ui.Rect.fromLTWH(
+        0,
+        0,
+        source.width.toDouble(),
+        source.height.toDouble(),
+      );
+      final crop = sourceRect == null
+          ? imageBounds
+          : sourceRect.intersect(imageBounds);
+      if (crop.isEmpty || crop.width < 1 || crop.height < 1) {
+        throw const AvatarProcessingException('头像裁剪区域无效');
+      }
+      final longestSide = crop.width > crop.height ? crop.width : crop.height;
+      final outputScale = longestSide > maxDimension
+          ? maxDimension / longestSide
+          : 1.0;
+      final targetWidth = (crop.width * outputScale).round().clamp(
         1,
         maxDimension,
       );
-      final targetHeight = (source.height * boundedScale).round().clamp(
+      final targetHeight = (crop.height * outputScale).round().clamp(
         1,
         maxDimension,
       );
@@ -69,12 +106,7 @@ class AvatarImageProcessor {
       final canvas = ui.Canvas(recorder);
       canvas.drawImageRect(
         source,
-        ui.Rect.fromLTWH(
-          0,
-          0,
-          source.width.toDouble(),
-          source.height.toDouble(),
-        ),
+        crop,
         ui.Rect.fromLTWH(0, 0, targetWidth.toDouble(), targetHeight.toDouble()),
         ui.Paint()..filterQuality = ui.FilterQuality.high,
       );
@@ -101,6 +133,23 @@ class AvatarImageProcessor {
       picture?.dispose();
       source?.dispose();
       codec?.dispose();
+    }
+  }
+
+  void _validateInput(Uint8List sourceBytes) {
+    if (sourceBytes.isEmpty) {
+      throw const AvatarProcessingException('头像文件为空');
+    }
+    if (sourceBytes.length > maxInputBytes) {
+      throw const AvatarProcessingException('头像原图不能超过 25 MiB');
+    }
+  }
+
+  void _validateDimensions(ui.Image source) {
+    if (source.width <= 0 ||
+        source.height <= 0 ||
+        source.width * source.height > maxPixels) {
+      throw const AvatarProcessingException('头像尺寸过大');
     }
   }
 }

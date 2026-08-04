@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,11 +12,13 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
+import 'package:xxread/book_sources/services/source_cover_cache.dart';
 import 'package:xxread/core/reader/reader_page_turn_geometry.dart';
 import 'package:xxread/core/reader/reader_margin_settings.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/paged_image_reader.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/reader_themes.dart';
@@ -75,6 +79,48 @@ void main() {
       expect(find.byType(ReaderOpeningLoader), findsNothing);
     },
   );
+
+  testWidgets('image-only source chapters open in the paged image reader', (
+    tester,
+  ) async {
+    final directory = await Directory.systemTemp.createTemp('source-images-');
+    addTearDown(() => directory.delete(recursive: true));
+    final requested = <Uri>[];
+    final cache = SourceCoverCache(
+      cacheDirectory: directory,
+      loader: (uri) async {
+        requested.add(uri);
+        return Uint8List.fromList(const [1, 2, 3]);
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceReaderPage(
+          source: _testSource(),
+          book: const BookSourceBook(
+            id: 'book-1',
+            title: 'Image book',
+            author: 'Author',
+            description: '',
+            categories: [],
+          ),
+          client: _ImageOnlyBookSourceClient(),
+          initialTheme: ReaderThemes.day,
+          remoteImageCache: cache,
+        ),
+      ),
+    );
+
+    await _pumpUntilFound(tester, find.byType(PagedImageReader));
+
+    expect(find.byType(PagedImageReader), findsOneWidget);
+    expect(requested, contains(Uri.parse('https://images.test/1.jpg')));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
 
   testWidgets('a genuinely slow opening never overlaps loader and content', (
     tester,
@@ -1471,6 +1517,34 @@ class _ConfigurableBookSourceClient extends BookSourceClient {
       contentType: 'text/plain',
     );
   }
+}
+
+class _ImageOnlyBookSourceClient extends BookSourceClient {
+  @override
+  Future<List<BookSourceChapter>> getChapters(
+    RegisteredBookSource source,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
+    BookSourceChapter(id: 'chapter-1', title: 'Image chapter', order: 1),
+  ];
+
+  @override
+  Future<BookSourceChapterContent> getChapterContent(
+    RegisteredBookSource source, {
+    required String bookId,
+    required String chapterId,
+    Map<String, String> sourceVariables = const {},
+  }) async => BookSourceChapterContent(
+    bookId: bookId,
+    chapterId: chapterId,
+    title: 'Image chapter',
+    content: '<img src="https://images.test/1.jpg">',
+    contentType: 'text/html',
+    images: [
+      BookSourceRemoteImage(url: Uri.parse('https://images.test/1.jpg')),
+    ],
+  );
 }
 
 class _DelayedOpeningBookSourceClient extends BookSourceClient {

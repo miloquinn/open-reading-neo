@@ -72,12 +72,12 @@ void main() {
     expect(scrollSwitch, findsOneWidget);
 
     final scrollByChapter = tester.widget<SwitchListTile>(scrollSwitch);
-    expect(scrollByChapter.value, isTrue);
-    scrollByChapter.onChanged!(false);
+    expect(scrollByChapter.value, isFalse);
+    scrollByChapter.onChanged!(true);
     await tester.pumpAndSettle();
 
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getBool(ReaderSettingsStore.scrollByChapterKey), isFalse);
+    expect(prefs.getBool(ReaderSettingsStore.scrollByChapterKey), isTrue);
   });
 
   testWidgets('source reader shares continuous whole-book scrolling setting', (

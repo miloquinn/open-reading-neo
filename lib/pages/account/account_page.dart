@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,7 @@ import '../../widgets/account_avatar_image.dart';
 import '../../widgets/floating_subpage_scaffold.dart';
 import '../../widgets/qr_code_view.dart';
 import '../../widgets/side_toast.dart';
+import 'avatar_crop_page.dart';
 
 enum _AccountMode { email, password, register, code, reset }
 
@@ -105,6 +107,10 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _submit() async {
     final account = context.read<MemberAccountController>();
     try {
+      if (_mode != _AccountMode.email && _email.text.trim().isEmpty) {
+        _showError(MemberAccountException(context.l10n.accountEmailRequired));
+        return;
+      }
       switch (_mode) {
         case _AccountMode.email:
           _continueWithEmail();
@@ -181,6 +187,16 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _externalLogin(MemberExternalAuthMethod method) async {
     final account = context.read<MemberAccountController>();
     try {
+      if (method == MemberExternalAuthMethod.passkey) {
+        await account.loginPasskey();
+        if (!mounted) return;
+        _syncProfile(account.user);
+        await account.loadMfaStatus();
+        if (mounted) {
+          showSideToast(context, context.l10n.settingsAccountVerified);
+        }
+        return;
+      }
       final authorization = await account.beginExternalLogin(method);
       final uri =
           authorization.verificationUriComplete ??
@@ -197,18 +213,25 @@ class _AccountPageState extends State<AccountPage> {
         Duration(seconds: authorization.expiresIn),
       );
       while (mounted && _polling && DateTime.now().isBefore(deadline)) {
-        await Future<void>.delayed(Duration(seconds: authorization.interval));
+        await Future.any<void>([
+          Future<void>.delayed(Duration(seconds: authorization.interval)),
+          account.waitForAuthCallback(
+            Duration(seconds: authorization.interval),
+          ),
+        ]);
         if (!mounted || !_polling) return;
-        bool complete;
-        try {
-          complete = await account.pollDeviceAuthorization(authorization);
-        } on MemberAccountException catch (error) {
-          if (error.code != 'slow_down') rethrow;
-          account.clearError();
-          await Future<void>.delayed(
-            Duration(seconds: error.retryAfter ?? authorization.interval),
-          );
-          continue;
+        var complete = account.isAuthenticated || account.mfaRequired;
+        if (!complete) {
+          try {
+            complete = await account.pollDeviceAuthorization(authorization);
+          } on MemberAccountException catch (error) {
+            if (error.code != 'slow_down') rethrow;
+            account.clearError();
+            await Future<void>.delayed(
+              Duration(seconds: error.retryAfter ?? authorization.interval),
+            );
+            continue;
+          }
         }
         if (!complete) continue;
         if (!mounted) return;
@@ -277,7 +300,18 @@ class _AccountPageState extends State<AccountPage> {
     final bytes = result?.files.single.bytes;
     if (bytes == null) return;
     try {
-      final upload = await _avatarProcessor.compress(bytes);
+      final imageInfo = await _avatarProcessor.inspect(bytes);
+      if (!mounted) return;
+      final cropRect = await Navigator.of(context).push<ui.Rect>(
+        MaterialPageRoute(
+          builder: (_) => AvatarCropPage(bytes: bytes, imageInfo: imageInfo),
+        ),
+      );
+      if (cropRect == null) return;
+      final upload = await _avatarProcessor.cropAndCompress(
+        bytes,
+        sourceRect: cropRect,
+      );
       await account.uploadAvatar(upload);
     } catch (error) {
       _showError(error);
@@ -459,6 +493,27 @@ class _AccountPageState extends State<AccountPage> {
                   child: Text(l10n.accountForgotPassword),
                 ),
               ],
+            ),
+          ] else if (_email.text.trim().isEmpty) ...[
+            Text(
+              _modeTitle(),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              _modeHint(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _field(
+              _email,
+              l10n.accountEmail,
+              Icons.mail_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
             ),
           ] else ...[
             InkWell(
@@ -2307,6 +2362,40 @@ class _SupportCardState extends State<_SupportCard> {
               height: 1.45,
             ),
           ),
+          if (account.membership?.premium != true) ...[
+            const SizedBox(height: 12),
+            Container(
+              key: const ValueKey('account-premium-purchase-notice'),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.68),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: 0.72),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 19,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      context.l10n.accountSupportPurchaseNotice,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (account.isAuthenticated &&
               account.membership?.premium != true &&
               !applePlatform) ...[

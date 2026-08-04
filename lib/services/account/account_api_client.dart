@@ -261,6 +261,20 @@ class MemberAccountApiClient {
     baseUri: baseUri,
   );
 
+  Future<Map<String, dynamic>> beginPasskeyLogin() => _jsonRequest(
+    'POST',
+    '$authRoot/passkeys/login/begin',
+    authenticated: false,
+  );
+
+  Future<MemberSession> finishPasskeyLogin({
+    required String challengeId,
+    required Map<String, dynamic> credential,
+  }) => _sessionRequest('$authRoot/passkeys/login/finish', {
+    'challenge_id': challengeId,
+    'credential': credential,
+  }, authenticated: false);
+
   Future<MemberSession?> pollDeviceAuthorization(
     DeviceAuthorization authorization,
   ) async {

@@ -14,6 +14,11 @@ import 'book_source_network_policy.dart';
 
 typedef SourceCoverLoader = Future<Uint8List> Function(Uri uri);
 
+const String _sourceCoverUserAgent =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/124.0.0.0 Safari/537.36';
+
 class SourceCoverLoadException implements Exception {
   const SourceCoverLoadException(this.message, {this.transient = false});
 
@@ -54,7 +59,11 @@ class SourceCoverCache {
               receiveTimeout: const Duration(seconds: 15),
               sendTimeout: const Duration(seconds: 8),
               responseType: ResponseType.bytes,
-              headers: const {'Accept': 'image/*'},
+              headers: const {
+                'Accept':
+                    'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'User-Agent': _sourceCoverUserAgent,
+              },
             ),
           )
           ..httpClientAdapter = IOHttpClientAdapter(
@@ -187,13 +196,14 @@ class SourceCoverCache {
   ]) async {
     try {
       var current = uri;
+      var headers = Map<String, String>.from(requestHeaders);
       for (var redirects = 0; redirects <= 5; redirects++) {
         await _networkPolicy.validate(current);
         final response = await _dio.get<ResponseBody>(
           current.toString(),
           options: Options(
             responseType: ResponseType.stream,
-            headers: requestHeaders,
+            headers: headers,
             followRedirects: false,
             validateStatus: (status) =>
                 status != null && status >= 200 && status < 400,
@@ -207,23 +217,26 @@ class SourceCoverCache {
               'Cover redirected too many times.',
             );
           }
-          current = BookSourceNetworkPolicy.redirectTarget(
+          final next = BookSourceNetworkPolicy.redirectTarget(
             current,
             response.headers.value(HttpHeaders.locationHeader),
           );
+          if (current.authority != next.authority) {
+            headers.removeWhere((name, _) {
+              final normalized = name.toLowerCase();
+              return normalized == HttpHeaders.cookieHeader ||
+                  normalized == HttpHeaders.authorizationHeader ||
+                  normalized == 'proxy-authorization' ||
+                  normalized == HttpHeaders.hostHeader;
+            });
+          }
+          current = next;
           continue;
         }
         if (status != HttpStatus.ok || response.data == null) {
           throw SourceCoverLoadException(
             'Cover request failed with HTTP $status.',
             transient: _isTransientStatus(status),
-          );
-        }
-        final contentType =
-            response.headers.value(Headers.contentTypeHeader) ?? '';
-        if (!contentType.toLowerCase().startsWith('image/')) {
-          throw const SourceCoverLoadException(
-            'Cover response is not an image.',
           );
         }
         final declaredLength = int.tryParse(
@@ -243,7 +256,13 @@ class SourceCoverCache {
           }
           builder.add(chunk);
         }
-        return builder.takeBytes();
+        final bytes = builder.takeBytes();
+        if (!_hasSupportedImageSignature(bytes)) {
+          throw const SourceCoverLoadException(
+            'Cover response is not an image.',
+          );
+        }
+        return bytes;
       }
       throw const SourceCoverLoadException('Cover request failed.');
     } on DioException catch (error) {
@@ -410,4 +429,34 @@ class SourceCoverCache {
     }
     return total;
   }
+}
+
+bool _hasSupportedImageSignature(Uint8List bytes) {
+  if (bytes.length >= 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4e &&
+      bytes[3] == 0x47 &&
+      bytes[4] == 0x0d &&
+      bytes[5] == 0x0a &&
+      bytes[6] == 0x1a &&
+      bytes[7] == 0x0a) {
+    return true;
+  }
+  if (bytes.length >= 3 &&
+      bytes[0] == 0xff &&
+      bytes[1] == 0xd8 &&
+      bytes[2] == 0xff) {
+    return true;
+  }
+  if (bytes.length >= 6) {
+    final signature = ascii.decode(bytes.sublist(0, 6), allowInvalid: true);
+    if (signature == 'GIF87a' || signature == 'GIF89a') return true;
+  }
+  if (bytes.length >= 12 &&
+      ascii.decode(bytes.sublist(0, 4), allowInvalid: true) == 'RIFF' &&
+      ascii.decode(bytes.sublist(8, 12), allowInvalid: true) == 'WEBP') {
+    return true;
+  }
+  return false;
 }

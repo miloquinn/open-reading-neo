@@ -246,7 +246,7 @@ class ReaderSettingsStore {
 
   Future<bool> loadScrollByChapter() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(scrollByChapterKey) ?? true;
+    return prefs.getBool(scrollByChapterKey) ?? false;
   }
 
   Future<void> saveScrollByChapter(bool value) async {

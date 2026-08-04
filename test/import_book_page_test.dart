@@ -5,6 +5,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/library/import_book/import_book_page.dart';
 import 'package:xxread/pages/library/import_book/import_book_widgets.dart';
 import 'package:xxread/services/books/book_import_models.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 void main() {
   testWidgets('手机布局先展示来源选择和空队列', (tester) async {
@@ -20,6 +21,11 @@ void main() {
     expect(find.text('选择文件'), findsOneWidget);
     expect(find.text('还没有选择书籍'), findsOneWidget);
     expect(find.byType(ImportSourcePanel), findsOneWidget);
+    final headerRect = tester.getRect(
+      find.byKey(const ValueKey('floating-subpage-header')),
+    );
+    final sourcePanelRect = tester.getRect(find.byType(ImportSourcePanel));
+    expect(sourcePanelRect.top, greaterThan(headerRect.bottom));
   });
 
   testWidgets('宽屏布局同时保留来源面板和导入队列', (tester) async {
@@ -49,10 +55,18 @@ void main() {
     await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
-    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    final scaffold = tester.widget<Scaffold>(
+      find.descendant(
+        of: find.byType(FloatingSubpageScaffold),
+        matching: find.byType(Scaffold),
+      ),
+    );
     expect(scaffold.resizeToAvoidBottomInset, isFalse);
+    expect(find.byType(FloatingSubpageScaffold), findsOneWidget);
     expect(
-      tester.getTopLeft(find.byKey(const ValueKey('import-page-header'))).dy,
+      tester
+          .getTopLeft(find.byKey(const ValueKey('floating-subpage-header')))
+          .dy,
       greaterThanOrEqualTo(0),
     );
     expect(find.byType(ImportSourcePanel), findsOneWidget);
@@ -90,12 +104,13 @@ void main() {
     expect(find.byType(ImportSourcePanel), findsNothing);
 
     final headerRect = tester.getRect(
-      find.byKey(const ValueKey('import-page-header')),
+      find.byKey(const ValueKey('floating-subpage-header')),
     );
     final actionRect = tester.getRect(
       find.byKey(const ValueKey('import-primary-action')),
     );
-    expect(headerRect.top, greaterThanOrEqualTo(44));
+    expect(headerRect.top, 0);
+    expect(headerRect.height, greaterThanOrEqualTo(104));
     expect(actionRect.top, greaterThan(headerRect.bottom));
     expect(actionRect.bottom, lessThanOrEqualTo(900));
     expect(actionRect.width, greaterThan(300));

@@ -2752,7 +2752,16 @@ Uri? _sourceCoverUrl(Book book) {
     final decoded = jsonDecode(raw);
     if (decoded is! Map) return null;
     final value = decoded['coverUrl'];
-    return value is String && value.isNotEmpty ? Uri.tryParse(value) : null;
+    if (value is! String || value.isEmpty) return null;
+    final parsed = Uri.tryParse(value);
+    if (parsed == null) return null;
+    if (parsed.hasAuthority) return parsed;
+    final sourceRaw = book.sourceJson;
+    if (sourceRaw == null || sourceRaw.isEmpty) return null;
+    final source = jsonDecode(sourceRaw);
+    if (source is! Map || source['apiBaseUrl'] is! String) return null;
+    final baseUri = Uri.tryParse(source['apiBaseUrl'] as String);
+    return baseUri?.resolveUri(parsed);
   } catch (_) {
     return null;
   }

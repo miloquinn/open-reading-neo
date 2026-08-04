@@ -715,6 +715,74 @@ void main() {
       },
     );
 
+    test('chapter URLs can depend on the parsed chapter title', () async {
+      final transport = _FakeTransport({
+        'https://books.test/book/1': '''
+          <h1>上下文书名</h1><a class="toc" href="/book/1/toc">目录</a>
+        ''',
+        'https://books.test/book/1/toc': '''
+          <ul id="chapters"><li><a data-id="7">第七章</a></li></ul>
+        ''',
+        'https://books.test/chapter/7?title=%E7%AC%AC%E4%B8%83%E7%AB%A0':
+            '<article id="content"><p>依赖章节上下文的正文</p></article>',
+      });
+      final raw = Map<String, dynamic>.from(_htmlSource().raw)
+        ..['ruleToc'] = {
+          'chapterList': '#chapters@li',
+          'chapterName': 'a@text',
+          'chapterUrl':
+              r'a@data-id<js>`/chapter/${result}?title=${encodeURIComponent(chapter.title)}`</js>',
+        };
+      final source = ReadingSourceConfig.fromJson(
+        raw,
+      ).toRegisteredSource(enabled: true);
+      final runtime = SourceRuntime(transport: transport);
+      addTearDown(runtime.close);
+
+      final book = await runtime.getBook(source, 'https://books.test/book/1');
+      final chapters = await runtime.getChapters(source, book.id);
+      final content = await runtime.getChapterContent(
+        source,
+        bookId: book.id,
+        chapterId: chapters.single.id,
+        sourceVariables: {
+          ...book.sourceVariables,
+          'chapterIndex': '0',
+          'chapterTitle': chapters.single.title,
+          'bookName': book.title,
+          'bookAuthor': book.author,
+          'bookType': '${book.type}',
+        },
+      );
+
+      expect(
+        chapters.single.id,
+        'https://books.test/chapter/7?title=%E7%AC%AC%E4%B8%83%E7%AB%A0',
+      );
+      expect(content.content, contains('依赖章节上下文的正文'));
+    });
+
+    test(
+      'rejects short login and verification shells as chapter content',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/chapter/login':
+              '<html><body><form>请先登录后阅读</form></body></html>',
+        });
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        await expectLater(
+          runtime.getChapterContent(
+            _htmlSource().toRegisteredSource(enabled: true),
+            bookId: 'https://books.test/book/1',
+            chapterId: 'https://books.test/chapter/login',
+          ),
+          throwsA(isA<BookSourceProtocolException>()),
+        );
+      },
+    );
+
     test(
       'preserves remote image request headers and chapter image pages',
       () async {

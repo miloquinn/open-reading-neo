@@ -22,7 +22,7 @@ class UserAgreementPage extends StatefulWidget {
   State<UserAgreementPage> createState() => _UserAgreementPageState();
 }
 
-enum _AgreementStep { introduction, terms, privacy }
+enum _AgreementStep { introduction, terms, source, privacy }
 
 class _UserAgreementPageState extends State<UserAgreementPage> {
   _AgreementStep _step = _AgreementStep.introduction;
@@ -109,6 +109,7 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
                               wide: wide,
                             ),
                             _AgreementStep.terms => _buildTermsPage(scheme),
+                            _AgreementStep.source => _buildSourcePage(scheme),
                             _AgreementStep.privacy => _buildPrivacyPage(scheme),
                           },
                         ),
@@ -226,112 +227,66 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
   }
 
   Widget _buildStepIndicator(ColorScheme scheme) {
-    final motionDuration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 360);
     final labels = [
       context.l10n.agreementFlowStepIntroduction,
       context.l10n.agreementFlowStepTerms,
+      context.l10n.agreementFlowStepSource,
       context.l10n.agreementFlowStepPrivacy,
     ];
     return Semantics(
       key: const Key('agreementStepIndicator'),
       label: labels[_step.index],
-      child: Row(
-        children: [
-          for (var index = 0; index < labels.length; index++) ...[
-            Expanded(
-              child: _buildStepItem(scheme, index: index, label: labels[index]),
-            ),
-            if (index != labels.length - 1)
-              Expanded(
-                child: AnimatedContainer(
-                  duration: motionDuration,
-                  curve: Curves.easeOutCubic,
-                  height: 2,
-                  color: index < _step.index
-                      ? scheme.primary
-                      : scheme.outline.withValues(alpha: 0.18),
-                ),
-              ),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < labels.length; index++)
+              _buildStepItem(scheme, index: index),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStepItem(
-    ColorScheme scheme, {
-    required int index,
-    required String label,
-  }) {
+  Widget _buildStepItem(ColorScheme scheme, {required int index}) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final active = index == _step.index;
-    final completed = index < _step.index;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedContainer(
+    final label = switch (index) {
+      0 => context.l10n.agreementFlowStepIntroduction,
+      1 => context.l10n.agreementFlowStepTerms,
+      2 => context.l10n.agreementFlowStepSource,
+      _ => context.l10n.agreementFlowStepPrivacy,
+    };
+    return Semantics(
+      label: label,
+      selected: active,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: AnimatedContainer(
+          key: Key('agreementStepDot$index'),
           duration: reduceMotion
               ? Duration.zero
               : const Duration(milliseconds: 360),
           curve: Curves.easeOutCubic,
-          width: active ? 30 : 24,
-          height: active ? 30 : 24,
+          width: active ? 12 : 8,
+          height: active ? 12 : 8,
           decoration: BoxDecoration(
-            color: completed || active
+            color: active
                 ? scheme.primary
-                : scheme.surfaceContainerHighest.withValues(alpha: 0.54),
+                : scheme.outline.withValues(alpha: 0.25),
             shape: BoxShape.circle,
             boxShadow: active
                 ? [
                     BoxShadow(
-                      color: scheme.primary.withValues(alpha: 0.22),
-                      blurRadius: 14,
+                      color: scheme.primary.withValues(alpha: 0.24),
+                      blurRadius: 12,
                       spreadRadius: 2,
                     ),
                   ]
                 : null,
           ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 220),
-              child: completed
-                  ? Icon(
-                      Icons.check_rounded,
-                      key: const ValueKey('done'),
-                      size: 15,
-                      color: scheme.onPrimary,
-                    )
-                  : Text(
-                      '${index + 1}',
-                      key: const ValueKey('number'),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: active
-                            ? scheme.onPrimary
-                            : scheme.onSurface.withValues(alpha: 0.56),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-            ),
-          ),
         ),
-        const SizedBox(height: 7),
-        AnimatedDefaultTextStyle(
-          duration: reduceMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 260),
-          style: Theme.of(context).textTheme.labelMedium!.copyWith(
-            color: active || completed
-                ? scheme.onSurface.withValues(alpha: active ? 0.88 : 0.62)
-                : scheme.onSurface.withValues(alpha: 0.38),
-            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-          ),
-          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        ),
-      ],
+      ),
     );
   }
 
@@ -621,11 +576,6 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
         context.l10n.agreementV2Section4Body,
       ),
       (
-        5,
-        context.l10n.agreementV2Section5Title,
-        context.l10n.agreementV2Section5Body,
-      ),
-      (
         7,
         context.l10n.agreementV2Section7Title,
         context.l10n.agreementV2Section7Body,
@@ -661,18 +611,6 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildImportantNotice(scheme),
-          const SizedBox(height: 16),
-          _buildSourceBoundary(scheme),
-          const SizedBox(height: 12),
-          _buildConsentCheckbox(
-            key: const Key('agreementSourceConsent'),
-            scheme: scheme,
-            value: _sourceBoundaryConfirmed,
-            label: context.l10n.agreementV2SourceConfirmLabel,
-            emphasized: true,
-            onChanged: (value) =>
-                setState(() => _sourceBoundaryConfirmed = value),
-          ),
           const SizedBox(height: 26),
           for (var i = 0; i < sections.length; i++) ...[
             _buildLegalSection(
@@ -691,6 +629,37 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
         value: _termsConfirmed,
         label: context.l10n.agreementFlowTermsConsent,
         onChanged: (value) => setState(() => _termsConfirmed = value),
+      ),
+    );
+  }
+
+  Widget _buildSourcePage(ColorScheme scheme) {
+    return _buildDocumentPanel(
+      key: const Key('agreementSourcePage'),
+      scheme: scheme,
+      icon: Icons.hub_outlined,
+      title: context.l10n.agreementFlowSourceTitle,
+      subtitle: context.l10n.agreementFlowSourceSubtitle,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSourceBoundary(scheme),
+          const SizedBox(height: 22),
+          _buildLegalSection(
+            scheme,
+            5,
+            context.l10n.agreementV2Section5Title,
+            context.l10n.agreementV2Section5Body,
+          ),
+        ],
+      ),
+      footer: _buildConsentCheckbox(
+        key: const Key('agreementSourceConsent'),
+        scheme: scheme,
+        value: _sourceBoundaryConfirmed,
+        label: context.l10n.agreementFlowSourceConsent,
+        emphasized: true,
+        onChanged: (value) => setState(() => _sourceBoundaryConfirmed = value),
       ),
     );
   }
@@ -1101,13 +1070,14 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final canAdvance = switch (_step) {
       _AgreementStep.introduction => true,
-      _AgreementStep.terms =>
-        _termsConfirmed && _sourceBoundaryConfirmed && !_saving,
+      _AgreementStep.terms => _termsConfirmed && !_saving,
+      _AgreementStep.source => _sourceBoundaryConfirmed && !_saving,
       _AgreementStep.privacy => _privacyConfirmed && !_saving,
     };
     final primaryLabel = switch (_step) {
       _AgreementStep.introduction => context.l10n.agreementFlowNext,
       _AgreementStep.terms => context.l10n.agreementFlowNext,
+      _AgreementStep.source => context.l10n.agreementFlowNext,
       _AgreementStep.privacy => context.l10n.agreementFlowEnterApp,
     };
     final primaryKey = switch (_step) {
@@ -1115,6 +1085,7 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
         'agreementIntroductionNextButton',
       ),
       _AgreementStep.terms => const Key('agreementTermsNextButton'),
+      _AgreementStep.source => const Key('agreementSourceNextButton'),
       _AgreementStep.privacy => const Key('agreementContinueButton'),
     };
 
@@ -1192,7 +1163,11 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
       case _AgreementStep.introduction:
         _setStep(_AgreementStep.terms);
       case _AgreementStep.terms:
-        if (_termsConfirmed && _sourceBoundaryConfirmed) {
+        if (_termsConfirmed) {
+          _setStep(_AgreementStep.source);
+        }
+      case _AgreementStep.source:
+        if (_sourceBoundaryConfirmed) {
           _setStep(_AgreementStep.privacy);
         }
       case _AgreementStep.privacy:
@@ -1206,8 +1181,10 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
         return;
       case _AgreementStep.terms:
         _setStep(_AgreementStep.introduction);
-      case _AgreementStep.privacy:
+      case _AgreementStep.source:
         _setStep(_AgreementStep.terms);
+      case _AgreementStep.privacy:
+        _setStep(_AgreementStep.source);
     }
   }
 

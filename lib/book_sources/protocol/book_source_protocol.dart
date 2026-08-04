@@ -137,7 +137,10 @@ class BookSourceSearchPage {
     this.total,
   });
 
-  factory BookSourceSearchPage.fromJson(Map<String, dynamic> json) {
+  factory BookSourceSearchPage.fromJson(
+    Map<String, dynamic> json, {
+    Uri? baseUri,
+  }) {
     final rawItems = json['items'];
     if (rawItems is! List) {
       throw const BookSourceProtocolException(
@@ -146,7 +149,9 @@ class BookSourceSearchPage {
     }
     return BookSourceSearchPage(
       items: rawItems
-          .map((item) => BookSourceBook.fromJson(_jsonMap(item)))
+          .map(
+            (item) => BookSourceBook.fromJson(_jsonMap(item), baseUri: baseUri),
+          )
           .toList(growable: false),
       page: (json['page'] as num?)?.toInt() ?? 1,
       pageSize: (json['pageSize'] as num?)?.toInt() ?? rawItems.length,
@@ -168,7 +173,10 @@ class BookSourceDiscoverySection {
     required this.items,
   });
 
-  factory BookSourceDiscoverySection.fromJson(Map<String, dynamic> json) {
+  factory BookSourceDiscoverySection.fromJson(
+    Map<String, dynamic> json, {
+    Uri? baseUri,
+  }) {
     final rawItems = json['items'];
     if (rawItems is! List) {
       throw const BookSourceProtocolException(
@@ -179,7 +187,9 @@ class BookSourceDiscoverySection {
       id: _requiredString(json, 'id'),
       title: _requiredString(json, 'title'),
       items: rawItems
-          .map((item) => BookSourceBook.fromJson(_jsonMap(item)))
+          .map(
+            (item) => BookSourceBook.fromJson(_jsonMap(item), baseUri: baseUri),
+          )
           .toList(growable: false),
     );
   }
@@ -190,7 +200,10 @@ class BookSourceDiscoveryPage {
 
   const BookSourceDiscoveryPage({required this.sections});
 
-  factory BookSourceDiscoveryPage.fromJson(Map<String, dynamic> json) {
+  factory BookSourceDiscoveryPage.fromJson(
+    Map<String, dynamic> json, {
+    Uri? baseUri,
+  }) {
     final rawSections = json['sections'];
     if (rawSections is! List) {
       throw const BookSourceProtocolException(
@@ -200,7 +213,10 @@ class BookSourceDiscoveryPage {
     return BookSourceDiscoveryPage(
       sections: rawSections
           .map(
-            (section) => BookSourceDiscoverySection.fromJson(_jsonMap(section)),
+            (section) => BookSourceDiscoverySection.fromJson(
+              _jsonMap(section),
+              baseUri: baseUri,
+            ),
           )
           .toList(growable: false),
     );
@@ -226,6 +242,7 @@ class BookSourceBook {
   final String title;
   final String author;
   final String description;
+  final int type;
   final Uri? coverUrl;
   final Map<String, String> coverHeaders;
   final List<String> categories;
@@ -240,6 +257,7 @@ class BookSourceBook {
     required this.author,
     required this.description,
     required this.categories,
+    this.type = 8,
     this.coverUrl,
     this.coverHeaders = const {},
     this.status,
@@ -248,14 +266,15 @@ class BookSourceBook {
     this.sourceVariables = const {},
   });
 
-  factory BookSourceBook.fromJson(Map<String, dynamic> json) {
+  factory BookSourceBook.fromJson(Map<String, dynamic> json, {Uri? baseUri}) {
     final updatedAtValue = json['updatedAt'] as String?;
     return BookSourceBook(
       id: _requiredString(json, 'id'),
       title: _requiredString(json, 'title'),
       author: (json['author'] as String?)?.trim() ?? '',
       description: (json['description'] as String?)?.trim() ?? '',
-      coverUrl: _optionalHttpUri(json['coverUrl']),
+      type: (json['type'] as num?)?.toInt() ?? 8,
+      coverUrl: _optionalHttpUri(json['coverUrl'], baseUri: baseUri),
       coverHeaders: _stringMap(json['coverHeaders']),
       categories: _stringList(json['categories']),
       status: (json['status'] as String?)?.trim(),
@@ -272,6 +291,7 @@ class BookSourceBook {
     'title': title,
     'author': author,
     'description': description,
+    'type': type,
     if (coverUrl != null) 'coverUrl': coverUrl.toString(),
     if (coverHeaders.isNotEmpty) 'coverHeaders': coverHeaders,
     'categories': categories,
@@ -477,10 +497,22 @@ int? _catalogPageSizeFromJson(Object? value) {
   return parsed >= 1 && parsed <= 1000 ? parsed : null;
 }
 
-Uri? _optionalHttpUri(Object? value) {
+Uri? _optionalHttpUri(Object? value, {Uri? baseUri}) {
   if (value == null) return null;
   if (value is! String || value.trim().isEmpty) return null;
-  return _httpUri(value.trim());
+  final raw = value.trim();
+  final parsed = Uri.tryParse(raw);
+  final resolved = parsed == null
+      ? null
+      : parsed.hasAuthority
+      ? parsed
+      : baseUri?.resolveUri(parsed);
+  if (resolved == null ||
+      !resolved.hasAuthority ||
+      (resolved.scheme != 'http' && resolved.scheme != 'https')) {
+    throw BookSourceProtocolException('Invalid HTTP URL: $raw');
+  }
+  return resolved;
 }
 
 Map<String, dynamic> _jsonMap(Object? value) {

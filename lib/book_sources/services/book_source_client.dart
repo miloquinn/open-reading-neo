@@ -247,10 +247,11 @@ class BookSourceClient {
         cancellation: cancellation,
         deduplicateInFlight: cancellation == null,
         persistToDisk: false,
-        validate: BookSourceSearchPage.fromJson,
+        validate: (json) =>
+            BookSourceSearchPage.fromJson(json, baseUri: source.apiBaseUrl),
       );
       cancellation?.throwIfCancelled();
-      return BookSourceSearchPage.fromJson(json);
+      return BookSourceSearchPage.fromJson(json, baseUri: source.apiBaseUrl);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -273,9 +274,10 @@ class BookSourceClient {
         key: _orspCacheKey(source, 'discovery'),
         ttl: discoveryCacheTtl,
         uri: uri,
-        validate: BookSourceDiscoveryPage.fromJson,
+        validate: (json) =>
+            BookSourceDiscoveryPage.fromJson(json, baseUri: source.apiBaseUrl),
       );
-      return BookSourceDiscoveryPage.fromJson(json);
+      return BookSourceDiscoveryPage.fromJson(json, baseUri: source.apiBaseUrl);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -363,9 +365,10 @@ class BookSourceClient {
         ]),
         ttl: browseCacheTtl,
         uri: uri,
-        validate: BookSourceSearchPage.fromJson,
+        validate: (json) =>
+            BookSourceSearchPage.fromJson(json, baseUri: source.apiBaseUrl),
       );
-      return BookSourceSearchPage.fromJson(json);
+      return BookSourceSearchPage.fromJson(json, baseUri: source.apiBaseUrl);
     } on DioException catch (error) {
       throw BookSourceProtocolException(
         _dioErrorMessage(error),
@@ -398,7 +401,10 @@ class BookSourceClient {
         ttl: bookDetailCacheTtl,
         uri: uri,
         validate: (json) {
-          final book = BookSourceBook.fromJson(json);
+          final book = BookSourceBook.fromJson(
+            json,
+            baseUri: source.apiBaseUrl,
+          );
           if (book.id != bookId) {
             throw const BookSourceProtocolException(
               'Book detail response does not match the requested book.',
@@ -407,7 +413,7 @@ class BookSourceClient {
           return book;
         },
       );
-      final book = BookSourceBook.fromJson(json);
+      final book = BookSourceBook.fromJson(json, baseUri: source.apiBaseUrl);
       if (book.id != bookId) {
         throw const BookSourceProtocolException(
           'Book detail response does not match the requested book.',

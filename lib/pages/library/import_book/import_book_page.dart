@@ -7,14 +7,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/storage/android_book_folder_registry.dart';
 import 'package:xxread/services/sync/sync.dart';
 import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/system_ui_helper.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 import 'import_book_controller.dart';
@@ -274,57 +273,42 @@ class _ImportBookPageState extends State<ImportBookPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final mediaQuery = _sanitizedMediaQuery(MediaQuery.of(context));
-    final overlayStyle = SystemUiHelper.overlayStyleForBrightness(
-      theme.brightness,
-    );
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: overlayStyle,
-      child: MediaQuery(
-        data: mediaQuery,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return PopScope(
-              canPop: !_isBusy,
-              onPopInvokedWithResult: (didPop, _) {
-                if (!didPop && !_isBusy) {
-                  unawaited(_requestExit());
-                }
-              },
-              child: Scaffold(
-                // This page has no text input. File pickers on a few Android
-                // variants can return stale keyboard/window insets, so the page
-                // owns a stable safe-area layout instead of using Scaffold's
-                // bottomNavigationBar slot.
-                resizeToAvoidBottomInset: false,
-                backgroundColor: scheme.surface,
-                body: SafeArea(
-                  bottom: false,
-                  child: Column(
-                    children: [
-                      _buildPageHeader(),
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            if (constraints.maxWidth >= 840) {
-                              return _buildWideLayout();
-                            }
-                            return _buildCompactLayout();
-                          },
-                        ),
-                      ),
-                      if (_buildBottomBar() case final bottomBar?) bottomBar,
-                    ],
+    return MediaQuery(
+      data: mediaQuery,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return PopScope(
+            canPop: !_isBusy,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && !_isBusy) {
+                unawaited(_requestExit());
+              }
+            },
+            child: FloatingSubpageScaffold(
+              title: context.l10n.importBooks,
+              onBack: _isBusy ? null : _requestExit,
+              resizeToAvoidBottomInset: false,
+              body: Column(
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth >= 840) {
+                          return _buildWideLayout();
+                        }
+                        return _buildCompactLayout();
+                      },
+                    ),
                   ),
-                ),
+                  if (_buildBottomBar() case final bottomBar?) bottomBar,
+                ],
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -347,47 +331,14 @@ class _ImportBookPageState extends State<ImportBookPage> {
     );
   }
 
-  Widget _buildPageHeader() {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      key: const ValueKey('import-page-header'),
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: 0.55),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            onPressed: _isBusy ? null : _requestExit,
-            icon: const Icon(Icons.arrow_back_rounded),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              context.l10n.importBooks,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildWideLayout() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        FloatingSubpageScaffold.headerExtentOf(context) + 20,
+        24,
+        20,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -405,7 +356,12 @@ class _ImportBookPageState extends State<ImportBookPage> {
   Widget _buildCompactLayout() {
     if (_controller.totalCount == 0) {
       return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          FloatingSubpageScaffold.headerExtentOf(context) + 18,
+          16,
+          28,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -421,7 +377,12 @@ class _ImportBookPageState extends State<ImportBookPage> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        FloatingSubpageScaffold.headerExtentOf(context) + 18,
+        16,
+        12,
+      ),
       child: _buildQueuePane(onAddMore: _showSourcePicker),
     );
   }

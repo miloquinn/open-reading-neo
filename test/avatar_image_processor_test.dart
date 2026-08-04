@@ -36,6 +36,30 @@ void main() {
       ),
     );
   });
+
+  test(
+    'avatar processor crops a square selection before compression',
+    () async {
+      final source = await _png(width: 1200, height: 800);
+
+      final upload = await const AvatarImageProcessor().cropAndCompress(
+        source,
+        sourceRect: const ui.Rect.fromLTWH(200, 0, 800, 800),
+      );
+      final codec = await ui.instantiateImageCodec(upload.bytes);
+      final frame = await codec.getNextFrame();
+
+      expect(frame.image.width, 512);
+      expect(frame.image.height, 512);
+      expect(
+        upload.bytes.length,
+        lessThan(AvatarImageProcessor.maxOutputBytes),
+      );
+
+      frame.image.dispose();
+      codec.dispose();
+    },
+  );
 }
 
 Future<Uint8List> _png({required int width, required int height}) async {

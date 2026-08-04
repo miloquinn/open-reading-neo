@@ -296,19 +296,29 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
   };
   const __wrapElement = (data) => {
     if (!data || data.__element !== true) return data;
+    let currentText = data.text || '';
+    let currentHtml = data.html || '';
+    let currentOuterHtml = data.outerHtml || '';
     const element = {
-      text: () => data.text || '',
-      html: () => data.html || '',
-      outerHtml: () => data.outerHtml || '',
+      text: () => currentText,
+      html: () => currentHtml,
+      outerHtml: () => currentOuterHtml,
       attr: (name) => (data.attributes || {})[String(name)] || '',
-      select: (rule) => __elements(rule, data.outerHtml || ''),
+      select: (rule) => __elements(rule, currentOuterHtml, () => {
+        const updated = __host('removeElements', [currentOuterHtml, String(rule)]);
+        if (updated) {
+          currentText = updated.text || '';
+          currentHtml = updated.html || '';
+          currentOuterHtml = updated.outerHtml || '';
+        }
+      }),
       remove: () => element,
       toArray: () => [element],
-      toString: () => data.outerHtml || data.text || ''
+      toString: () => currentOuterHtml || currentText
     };
     return element;
   };
-  const __javaList = (values) => {
+  const __javaList = (values, onRemove) => {
     const list = Array.from(values || []);
     Object.defineProperties(list, {
       size: { value: () => list.length, enumerable: false },
@@ -321,14 +331,26 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       html: { value: () => list.map((item) => item && typeof item.html === 'function' ? item.html() : String(item || '')).join(''), enumerable: false },
       outerHtml: { value: () => list.map((item) => item && typeof item.outerHtml === 'function' ? item.outerHtml() : String(item || '')).join(''), enumerable: false },
       attr: { value: (name) => list.length && list[0] && typeof list[0].attr === 'function' ? list[0].attr(name) : '', enumerable: false },
-      select: { value: (rule) => __javaList(list.flatMap((item) => item && typeof item.select === 'function' ? item.select(rule).toArray() : [])), enumerable: false },
-      remove: { value: () => { list.splice(0, list.length); return list; }, enumerable: false }
+      select: { value: (rule) => {
+        const selected = list
+          .filter((item) => item && typeof item.select === 'function')
+          .map((item) => item.select(rule));
+        return __javaList(
+          selected.flatMap((items) => items.toArray()),
+          () => selected.forEach((items) => items.remove())
+        );
+      }, enumerable: false },
+      remove: { value: () => {
+        if (typeof onRemove === 'function') onRemove();
+        list.splice(0, list.length);
+        return list;
+      }, enumerable: false }
     });
     return list;
   };
-  const __elements = (rule, content) => {
+  const __elements = (rule, content, onRemove) => {
     const values = __host('getElements', [String(rule), content === undefined ? result : content]) || [];
-    return __javaList(Array.from(values).map(__wrapElement));
+    return __javaList(Array.from(values).map(__wrapElement), onRemove);
   };
   const __entity = (prefix, seed) => {
     const entity = Object.assign({}, seed || {});
@@ -512,8 +534,8 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       }
       return __state[String(name)];
     },
-    getString: (rule, content) => __host('getString', [String(rule), content === undefined ? globalThis.result : content]),
-    getStringList: (rule, content) => __javaList(__host('getStringList', [String(rule), content === undefined ? globalThis.result : content])),
+    getString: (rule, content) => __host('getString', [String(rule), content === undefined ? globalThis.result : content, globalThis.baseUrl]),
+    getStringList: (rule, content) => __javaList(__host('getStringList', [String(rule), content === undefined ? globalThis.result : content, globalThis.baseUrl])),
     getElements: (rule, content) => __elements(rule, content === undefined ? globalThis.result : content),
     getElement: (rule, content) => {
       const values = __elements(rule, content === undefined ? globalThis.result : content);
@@ -559,7 +581,11 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     getCookie: (url, key) => key === undefined
       ? __host('cookieGet', [String(url)])
       : __host('cookieGetKey', [String(url), String(key)]),
-    setContent: (value) => { globalThis.result = value; return value; },
+    setContent: (value, url) => {
+      globalThis.result = value;
+      if (url != null && String(url).trim()) globalThis.baseUrl = String(url);
+      return value;
+    },
     refreshExplore: () => null,
     refreshBookInfo: () => null,
     refreshContent: () => null,
@@ -567,9 +593,15 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     refreshBookUrl: () => null,
     initUrl: () => null,
     getStrResponse: () => result,
-    webView: (html, url, js) => (__sourceNetwork(
-      'WEBVIEW', url, html, null, js
-    ).body || ''),
+    webView: (html, url, js) => {
+      let target = url == null ? '' : String(url);
+      if (html != null && /^\\s*</.test(String(html)) &&
+          target && !/^(?:https?:)?\\/\\//i.test(target) && !target.startsWith('/')) {
+        target = String(globalThis.baseUrl || __payload.sourceUrl || '');
+      }
+      if (!target) target = String(globalThis.baseUrl || __payload.sourceUrl || '');
+      return __sourceNetwork('WEBVIEW', target, html, null, js).body || '';
+    },
     encodeURI: (value) => encodeURIComponent(String(value)),
     decodeURI: (value) => decodeURIComponent(String(value)),
     ajax: (url) => (__sourceNetwork('GET', url, null, null).body || ''),
@@ -615,9 +647,12 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
   };
   globalThis.sleep = () => null;
   const __jsoupParse = (value) => {
-    const outer = String(value == null ? '' : value);
+    let outer = String(value == null ? '' : value);
     return {
-      select: (rule) => __elements(rule, outer),
+      select: (rule) => __elements(rule, outer, () => {
+        const updated = __host('removeElements', [outer, String(rule)]);
+        if (updated && updated.outerHtml) outer = updated.outerHtml;
+      }),
       html: () => outer,
       outerHtml: () => outer,
       text: () => java.htmlFormat(outer),
@@ -800,6 +835,7 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       'getString' => _selectWithRule(arguments, listMode: false),
       'getStringList' => _selectWithRule(arguments, listMode: true),
       'getElements' => _selectElements(arguments),
+      'removeElements' => _removeElements(arguments),
       'cookieGet' => _cookieGet(arguments),
       'cookieGetKey' => _cookieGetKey(arguments),
       'cookieSet' => _cookieSet(arguments),
@@ -1040,6 +1076,23 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
           return _jsonSafe(item);
         })
         .toList(growable: false);
+  }
+
+  Map<String, String> _removeElements(List arguments) {
+    if (arguments.length < 2) return const {};
+    final body = '${arguments.first ?? ''}';
+    final selector = '${arguments[1] ?? ''}'.trim();
+    if (body.isEmpty || selector.isEmpty) return const {};
+    final document = html_parser.parse(body);
+    for (final element in document.querySelectorAll(selector)) {
+      element.remove();
+    }
+    final root = document.documentElement;
+    return {
+      'text': document.body?.text ?? document.text ?? '',
+      'html': document.body?.innerHtml ?? root?.innerHtml ?? '',
+      'outerHtml': root?.outerHtml ?? '',
+    };
   }
 
   @override

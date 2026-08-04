@@ -18,6 +18,26 @@ import 'package:path_provider/path_provider.dart';
 
 import 'online_font_models.dart';
 
+Future<void> inflateFontEntryInIsolate(
+  Uint8List compressed,
+  int expectedSize,
+  String destinationPath,
+) async {
+  final inflated = ZLibCodec(raw: true).decode(compressed);
+  if (inflated.length != expectedSize) {
+    throw const OnlineFontException(OnlineFontErrorCode.sizeMismatch);
+  }
+  await File(destinationPath).writeAsBytes(inflated, flush: true);
+}
+
+Future<void> inflateFontEntryOffMain(
+  Uint8List compressed,
+  int expectedSize,
+  String destinationPath,
+) => Isolate.run(
+  () => inflateFontEntryInIsolate(compressed, expectedSize, destinationPath),
+);
+
 typedef OnlineFontDirectoryProvider = Future<Directory> Function();
 typedef OnlineFontRegistrar =
     Future<void> Function(String family, Uint8List bytes, FontStyle style);
@@ -46,6 +66,9 @@ class OnlineFontService {
 
   /// 下载单个文件最多允许的额外字节（防 Content-Length 误报）。
   static const int _downloadToleranceBytes = 2 * 1024 * 1024;
+
+  /// 部分代理会忽略 Range 并返回完整官方 ZIP；允许回退读取整包，但限制体积。
+  static const int _maxArchiveDownloadBytes = 128 * 1024 * 1024;
 
   /// 允许的下载主机白名单（防 SSRF）。
   static const Set<String> _allowedHosts = <String>{
@@ -480,40 +503,60 @@ class OnlineFontService {
     }
 
     final rangeEnd = zipEntry.compressedOffset + zipEntry.compressedSize - 1;
+    final effectiveCancelToken = cancelToken ?? CancelToken();
     final response = await _dio.download(
       fileSpec.url,
       archiveTempFile.path,
-      cancelToken: cancelToken,
+      cancelToken: effectiveCancelToken,
       deleteOnError: true,
-      onReceiveProgress: (received, _) {
-        final fraction = zipEntry.compressedSize == 0
+      onReceiveProgress: (received, total) {
+        if (received > _maxArchiveDownloadBytes ||
+            total > _maxArchiveDownloadBytes) {
+          effectiveCancelToken.cancel(
+            'Online font archive download exceeded size limit',
+          );
+          return;
+        }
+        final expectedTransferBytes = total > zipEntry.compressedSize
+            ? total
+            : zipEntry.compressedSize;
+        final fraction = expectedTransferBytes == 0
             ? 0.0
-            : (received / zipEntry.compressedSize).clamp(0.0, 1.0);
+            : (received / expectedTransferBytes).clamp(0.0, 1.0);
         onReceiveProgress((fileSpec.size * fraction).round());
       },
       options: Options(
-        validateStatus: (status) => status == HttpStatus.partialContent,
+        validateStatus: (status) =>
+            status == HttpStatus.ok || status == HttpStatus.partialContent,
         headers: <String, String>{
           'Accept': 'application/octet-stream',
           'Range': 'bytes=${zipEntry.compressedOffset}-$rangeEnd',
         },
       ),
     );
-    if (response.statusCode != HttpStatus.partialContent ||
-        !await archiveTempFile.exists() ||
-        await archiveTempFile.length() != zipEntry.compressedSize) {
+    if (!await archiveTempFile.exists()) {
+      throw const OnlineFontException(OnlineFontErrorCode.invalidResponse);
+    }
+    final archiveLength = await archiveTempFile.length();
+    final isPartialResponse = response.statusCode == HttpStatus.partialContent;
+    final isFullResponse = response.statusCode == HttpStatus.ok;
+    if ((isPartialResponse && archiveLength != zipEntry.compressedSize) ||
+        (isFullResponse && archiveLength <= rangeEnd) ||
+        (!isPartialResponse && !isFullResponse)) {
       throw const OnlineFontException(OnlineFontErrorCode.invalidResponse);
     }
 
     try {
-      await Isolate.run(() async {
-        final compressed = await archiveTempFile.readAsBytes();
-        final inflated = ZLibCodec(raw: true).decode(compressed);
-        if (inflated.length != fileSpec.size) {
-          throw const OnlineFontException(OnlineFontErrorCode.sizeMismatch);
-        }
-        await tempFile.writeAsBytes(inflated, flush: true);
-      });
+      final compressed = isPartialResponse
+          ? await archiveTempFile.readAsBytes()
+          : await _readFileRange(
+              archiveTempFile,
+              zipEntry.compressedOffset,
+              zipEntry.compressedSize,
+            );
+      final expectedSize = fileSpec.size;
+      final destinationPath = tempFile.path;
+      await inflateFontEntryOffMain(compressed, expectedSize, destinationPath);
     } on OnlineFontException {
       rethrow;
     } catch (error) {
@@ -522,6 +565,24 @@ class OnlineFontService {
       if (await archiveTempFile.exists()) {
         await archiveTempFile.delete();
       }
+    }
+  }
+
+  static Future<Uint8List> _readFileRange(
+    File file,
+    int offset,
+    int length,
+  ) async {
+    final handle = await file.open();
+    try {
+      await handle.setPosition(offset);
+      final bytes = await handle.read(length);
+      if (bytes.length != length) {
+        throw const OnlineFontException(OnlineFontErrorCode.invalidResponse);
+      }
+      return bytes;
+    } finally {
+      await handle.close();
     }
   }
 

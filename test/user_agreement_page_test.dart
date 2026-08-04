@@ -29,7 +29,7 @@ void main() {
     },
   );
 
-  testWidgets('welcome flow separates introduction, terms, and privacy', (
+  testWidgets('welcome flow separates terms, source, and privacy consent', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -48,7 +48,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('agreementIntroductionPage')), findsOneWidget);
+    expect(find.byKey(const Key('agreementStepDot0')), findsOneWidget);
+    expect(find.byKey(const Key('agreementStepDot1')), findsOneWidget);
+    expect(find.byKey(const Key('agreementStepDot2')), findsOneWidget);
+    expect(find.byKey(const Key('agreementStepDot3')), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+    expect(find.text('2'), findsNothing);
+    expect(find.text('3'), findsNothing);
+    expect(find.text('4'), findsNothing);
     expect(find.byKey(const Key('agreementTermsPage')), findsNothing);
+    expect(find.byKey(const Key('agreementSourcePage')), findsNothing);
     expect(find.byKey(const Key('agreementPrivacyPage')), findsNothing);
     expect(find.byKey(const Key('agreementSourceBoundaryCard')), findsNothing);
 
@@ -56,11 +65,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('agreementTermsPage')), findsOneWidget);
-    expect(
-      find.byKey(const Key('agreementSourceBoundaryCard')),
-      findsOneWidget,
-    );
-    expect(find.textContaining('provides no source addresses'), findsOneWidget);
+    expect(find.byKey(const Key('agreementSourcePage')), findsNothing);
+    expect(find.byKey(const Key('agreementSourceBoundaryCard')), findsNothing);
 
     FilledButton termsNextButton() => tester.widget<FilledButton>(
       find.byKey(const Key('agreementTermsNextButton')),
@@ -70,17 +76,28 @@ void main() {
 
     await tester.tap(find.byKey(const Key('agreementTermsConsent')));
     await tester.pump();
-    expect(termsNextButton().onPressed, isNull);
-
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('agreementSourceConsent')),
-      180,
-    );
-    await tester.tap(find.byKey(const Key('agreementSourceConsent')));
-    await tester.pump();
     expect(termsNextButton().onPressed, isNotNull);
 
     await tester.tap(find.byKey(const Key('agreementTermsNextButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('agreementSourcePage')), findsOneWidget);
+    expect(
+      find.byKey(const Key('agreementSourceBoundaryCard')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('provides no source addresses'), findsOneWidget);
+
+    FilledButton sourceNextButton() => tester.widget<FilledButton>(
+      find.byKey(const Key('agreementSourceNextButton')),
+    );
+    expect(sourceNextButton().onPressed, isNull);
+
+    await tester.tap(find.byKey(const Key('agreementSourceConsent')));
+    await tester.pump();
+    expect(sourceNextButton().onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const Key('agreementSourceNextButton')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('agreementPrivacyPage')), findsOneWidget);
@@ -159,12 +176,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'terms in $locale');
       await tester.tap(find.byKey(const Key('agreementTermsConsent')));
-      final sourceConsent = tester.widget<InkWell>(
-        find.byKey(const Key('agreementSourceConsent')),
-      );
-      sourceConsent.onTap!();
       await tester.pump();
       await tester.tap(find.byKey(const Key('agreementTermsNextButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('agreementSourcePage')), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'source in $locale');
+      await tester.tap(find.byKey(const Key('agreementSourceConsent')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('agreementSourceNextButton')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('agreementPrivacyPage')), findsOneWidget);

@@ -175,6 +175,28 @@ void main() {
       expect(content.images.single.url, Uri.parse('https://images.test/1.jpg'));
     });
 
+    test('resolves relative covers against the source API base URL', () {
+      final page = BookSourceSearchPage.fromJson({
+        'items': [
+          {
+            'id': 'book',
+            'title': 'Book',
+            'author': '',
+            'categories': [],
+            'coverUrl': '/covers/book.webp',
+          },
+        ],
+        'page': 1,
+        'pageSize': 1,
+        'hasMore': false,
+      }, baseUri: Uri.parse('https://api.example/v1/'));
+
+      expect(
+        page.items.single.coverUrl,
+        Uri.parse('https://api.example/covers/book.webp'),
+      );
+    });
+
     test('parses optional discovery and category responses', () {
       final discovery = BookSourceDiscoveryPage.fromJson({
         'sections': [

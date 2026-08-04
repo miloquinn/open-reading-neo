@@ -109,6 +109,45 @@ void main() {
     expect(cache.memorySizeBytes, 0);
   });
 
+  test('accepts valid image bytes when content type is missing', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-signature-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final dio = Dio()..httpClientAdapter = _SignatureCoverAdapter();
+    final cache = SourceCoverCache(
+      dio: dio,
+      cacheDirectory: directory,
+      networkPolicy: BookSourceNetworkPolicy(
+        lookup: (_) async => [InternetAddress('93.184.216.34')],
+      ),
+    );
+
+    final bytes = await cache.load(
+      Uri.parse('https://example.org/no-content-type'),
+    );
+
+    expect(bytes.take(8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  });
+
+  test('rejects HTML even when the server labels it as an image', () async {
+    final directory = await Directory.systemTemp.createTemp('source-html-');
+    addTearDown(() => directory.delete(recursive: true));
+    final dio = Dio()..httpClientAdapter = _HtmlCoverAdapter();
+    final cache = SourceCoverCache(
+      dio: dio,
+      cacheDirectory: directory,
+      networkPolicy: BookSourceNetworkPolicy(
+        lookup: (_) async => [InternetAddress('93.184.216.34')],
+      ),
+    );
+
+    await expectLater(
+      cache.load(Uri.parse('https://example.org/login.jpg')),
+      throwsA(isA<SourceCoverLoadException>()),
+    );
+  });
+
   test('evict removes memory and disk so the next load refetches', () async {
     final directory = await Directory.systemTemp.createTemp('source-evict-');
     addTearDown(() => directory.delete(recursive: true));
@@ -183,6 +222,53 @@ class _ChunkedCoverAdapter implements HttpClientAdapter {
         Uint8List.fromList([4, 5, 6]),
         Uint8List.fromList([7, 8, 9]),
       ]),
+      HttpStatus.ok,
+      headers: {
+        Headers.contentTypeHeader: ['image/jpeg'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _SignatureCoverAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromBytes([
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+      0,
+      0,
+      0,
+      0,
+    ], HttpStatus.ok);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _HtmlCoverAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      '<html><body>login</body></html>',
       HttpStatus.ok,
       headers: {
         Headers.contentTypeHeader: ['image/jpeg'],

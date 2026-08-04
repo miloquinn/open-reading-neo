@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:passkeys/authenticator.dart';
+import 'package:passkeys/types.dart';
 
+import 'account_auth_callback_bridge.dart';
 import 'account_api_client.dart';
 import 'account_avatar_cache.dart';
 import 'account_models.dart';
 import 'account_summary_cache.dart';
+import 'account_token_store.dart';
 import 'apple_purchase_service.dart';
 import 'avatar_image_processor.dart';
 
@@ -14,9 +19,14 @@ class MemberAccountController extends ChangeNotifier {
     MemberAccountApiClient? api,
     AccountAvatarCache? avatarCache,
     MemberAccountSummaryCache? summaryCache,
+    PendingDeviceAuthorizationStore? pendingAuthorizationStore,
+    AccountAuthCallbackBridge? authCallbackBridge,
   }) : _api = api ?? MemberAccountApiClient(),
        _avatarCache = avatarCache ?? AccountAvatarCache.instance,
-       _summaryCache = summaryCache ?? const MemberAccountSummaryCache() {
+       _summaryCache = summaryCache ?? const MemberAccountSummaryCache(),
+       _pendingAuthorizationStore =
+           pendingAuthorizationStore ?? SecurePendingDeviceAuthorizationStore(),
+       _authCallbackBridge = authCallbackBridge ?? AccountAuthCallbackBridge() {
     _applePurchase = ApplePremiumPurchaseService(
       productId: appleProductId,
       verify: (purchase) => _api.submitApplePurchase(
@@ -37,6 +47,8 @@ class MemberAccountController extends ChangeNotifier {
   final MemberAccountApiClient _api;
   final AccountAvatarCache _avatarCache;
   final MemberAccountSummaryCache _summaryCache;
+  final PendingDeviceAuthorizationStore _pendingAuthorizationStore;
+  final AccountAuthCallbackBridge _authCallbackBridge;
   late final ApplePremiumPurchaseService _applePurchase;
 
   bool _initialized = false;
@@ -50,6 +62,10 @@ class MemberAccountController extends ChangeNotifier {
   MemberReferral? _referral;
   MemberMfaStatus? _mfaStatus;
   String? _error;
+  DeviceAuthorization? _pendingDeviceAuthorization;
+  StreamSubscription<Uri>? _authCallbackSubscription;
+  Completer<void>? _authCallbackSignal;
+  Future<void>? _callbackCompletion;
 
   bool get initialized => _initialized;
   bool get loading => _loading;
@@ -77,6 +93,8 @@ class MemberAccountController extends ChangeNotifier {
   Future<void> initialize() async {
     if (_initialized || _loading) return;
     await _run(() async {
+      await _restorePendingDeviceAuthorization();
+      unawaited(_initializeAuthCallbackBridge());
       _summary = await _summaryCache.load();
       if (_summary != null) notifyListeners();
       final configs = await Future.wait<Object?>([
@@ -107,6 +125,22 @@ class MemberAccountController extends ChangeNotifier {
 
   Future<void> loginPassword(String email, String password) =>
       _authenticate(() => _api.loginPassword(email, password));
+
+  Future<void> loginPasskey() => _run(() async {
+    final begin = await _api.beginPasskeyLogin();
+    final options = AuthenticateRequestType.fromJson(
+      Map<String, dynamic>.from(begin['public_key'] as Map),
+      preferImmediatelyAvailableCredentials: false,
+    );
+    final credential = await PasskeyAuthenticator().authenticate(options);
+    final session = await _api.finishPasskeyLogin(
+      challengeId: begin['challenge_id'] as String,
+      credential: credential.toJson(),
+    );
+    _acceptAuthenticatedSession(session);
+    await _loadAccountValues();
+    await _persistSummary();
+  });
 
   Future<MemberEmailChallenge> requestCode(
     String email,
@@ -238,7 +272,42 @@ class MemberAccountController extends ChangeNotifier {
 
   Future<DeviceAuthorization> beginExternalLogin(
     MemberExternalAuthMethod method,
-  ) => _runValue(() => _api.beginExternalLogin(method));
+  ) => _runValue(() async {
+    await _initializeAuthCallbackBridge();
+    final authorization = await _api.beginExternalLogin(method);
+    _pendingDeviceAuthorization = authorization;
+    _authCallbackSignal = Completer<void>();
+    await _pendingAuthorizationStore.save(
+      jsonEncode(_deviceAuthorizationJson(authorization)),
+    );
+    return authorization;
+  });
+
+  Future<void> _initializeAuthCallbackBridge() async {
+    if (_authCallbackSubscription != null) return;
+    try {
+      _authCallbackSubscription = _authCallbackBridge.callbacks.listen(
+        _handleAuthCallback,
+      );
+      await _authCallbackBridge.initialize();
+    } catch (_) {
+      await _authCallbackSubscription?.cancel();
+      _authCallbackSubscription = null;
+      // Polling remains the compatibility fallback on unsupported hosts.
+    }
+  }
+
+  DeviceAuthorization? get pendingDeviceAuthorization =>
+      _pendingDeviceAuthorization;
+
+  Future<void> waitForAuthCallback(Duration timeout) async {
+    final signal = _authCallbackSignal ??= Completer<void>();
+    try {
+      await signal.future.timeout(timeout);
+    } on TimeoutException {
+      // Normal polling remains the fallback when the browser cannot deep-link.
+    }
+  }
 
   Future<bool> pollDeviceAuthorization(
     DeviceAuthorization authorization,
@@ -255,9 +324,67 @@ class MemberAccountController extends ChangeNotifier {
         await _persistSummary();
       }
       completed = true;
+      _pendingDeviceAuthorization = null;
+      _authCallbackSignal = null;
+      await _pendingAuthorizationStore.clear();
     });
     return completed;
   }
+
+  void _handleAuthCallback(Uri uri) {
+    if (uri.path != '/device' || uri.queryParameters['status'] != 'success') {
+      return;
+    }
+    final code = uri.queryParameters['device_code']?.toUpperCase();
+    final pending = _pendingDeviceAuthorization;
+    if (pending == null || (code != null && code != pending.userCode)) return;
+    final signal = _authCallbackSignal ??= Completer<void>();
+    if (!signal.isCompleted) signal.complete();
+    _callbackCompletion ??= _completePendingAuthorizationFromCallback();
+  }
+
+  Future<void> _completePendingAuthorizationFromCallback() async {
+    try {
+      while (_loading) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      final authorization = _pendingDeviceAuthorization;
+      if (authorization == null || isAuthenticated || mfaRequired) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await pollDeviceAuthorization(authorization);
+    } catch (_) {
+      // The account page polling loop remains the final fallback.
+    } finally {
+      _callbackCompletion = null;
+    }
+  }
+
+  Future<void> _restorePendingDeviceAuthorization() async {
+    final payload = await _pendingAuthorizationStore.read();
+    if (payload == null || payload.isEmpty) return;
+    try {
+      _pendingDeviceAuthorization = DeviceAuthorization.fromJson(
+        MemberExternalAuthMethod.values.byName(
+          (jsonDecode(payload) as Map<String, dynamic>)['method'] as String,
+        ),
+        jsonDecode(payload) as Map<String, dynamic>,
+        baseUri: _api.baseUri,
+      );
+      _authCallbackSignal = Completer<void>();
+    } catch (_) {
+      await _pendingAuthorizationStore.clear();
+    }
+  }
+
+  Map<String, Object?> _deviceAuthorizationJson(DeviceAuthorization value) => {
+    'method': value.method.name,
+    'device_code': value.deviceCode,
+    'user_code': value.userCode,
+    'verification_uri': value.verificationUri.toString(),
+    'verification_uri_complete': value.verificationUriComplete?.toString(),
+    'expires_in': value.expiresIn,
+    'interval': value.interval,
+  };
 
   Future<void> updateProfile({required String username, String? displayName}) =>
       _run(() async {

@@ -1,4 +1,5 @@
 export 'account_api_client.dart';
+export 'account_auth_callback_bridge.dart';
 export 'account_avatar_cache.dart';
 export 'account_models.dart';
 export 'account_summary_cache.dart';

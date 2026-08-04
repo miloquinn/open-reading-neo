@@ -2440,6 +2440,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountConfirmPassword => 'パスワード確認';
 
   @override
+  String get accountAvatarCropTitle => 'アバターを切り抜く';
+
+  @override
+  String get accountAvatarCropHint =>
+      '画像をドラッグして位置を調整し、ピンチ操作で円の中に収まるよう拡大・縮小します。';
+
+  @override
   String get accountUsername => 'ユーザー名';
 
   @override
@@ -2505,6 +2512,10 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get accountSupportFreeSubtitle =>
       '支援は任意で、WebDAV やその他の機能を解放するものではありません。';
+
+  @override
+  String get accountSupportPurchaseNotice =>
+      'プレミアム版は現在、購入フローの学習と検証を目的としたもので、実際のプレミアム機能はまだありません。プレミアム版の購入は、実質的には寄付とほぼ同じです。プロジェクトを支援していただける場合は、プレミアム版をご購入ください。';
 
   @override
   String get accountSupportAction => '今すぐ支援';
@@ -4211,6 +4222,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get agreementFlowStepTerms => '利用規約';
 
   @override
+  String get agreementFlowStepSource => '書籍ソース';
+
+  @override
   String get agreementFlowStepPrivacy => 'プライバシー';
 
   @override
@@ -4224,10 +4238,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get agreementFlowTermsSubtitle =>
-      '利用規約と、ユーザーコンテンツおよび第三者ソースの責任範囲を確認してください。';
+      'ソフトウェアの利用と、ご自身で開くコンテンツに適用される規約を確認してください。';
 
   @override
   String get agreementFlowTermsConsent => '利用規約をすべて読み、同意します。';
+
+  @override
+  String get agreementFlowSourceTitle => 'サードパーティ書籍ソース規約';
+
+  @override
+  String get agreementFlowSourceSubtitle =>
+      'ソースのアドレス、コンテンツの許諾、利用責任が公式プロジェクトから独立していることを確認してください。';
+
+  @override
+  String get agreementFlowSourceConsent => 'サードパーティ書籍ソース規約をすべて読み、同意します。';
 
   @override
   String get agreementFlowPrivacyTitle => 'データはあなたの管理下に';

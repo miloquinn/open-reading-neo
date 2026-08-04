@@ -132,6 +132,61 @@ void main() {
   );
 
   test(
+    'extracts the verified font when a proxy ignores Range and returns 200',
+    () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'online-font-full-zip-service-test-',
+      );
+      addTearDown(() => sandbox.delete(recursive: true));
+      final fontBytes = Uint8List(96 * 1024)
+        ..setAll(0, const <int>[0, 1, 0, 0]);
+      final compressed = Uint8List.fromList(
+        ZLibCodec(raw: true).encode(fontBytes),
+      );
+      const compressedOffset = 1234;
+      final archiveBytes = Uint8List(compressedOffset + compressed.length + 512)
+        ..setRange(
+          compressedOffset,
+          compressedOffset + compressed.length,
+          compressed,
+        );
+      final dio = Dio()
+        ..httpClientAdapter = _ChunkedHttpClientAdapter(archiveBytes);
+      Uint8List? registeredBytes;
+      final service = OnlineFontService(
+        supportDirectory: () async => sandbox,
+        dio: dio,
+        registrar: (family, bytes, style) async {
+          registeredBytes = bytes;
+        },
+      );
+      await service.initialize();
+
+      final record = await service.download(
+        fontId: 'official_full_zip_font',
+        family: 'OfficialFullZipFont',
+        files: <OnlineFontFile>[
+          OnlineFontFile(
+            url: 'https://developer.huawei.com/fonts.zip',
+            fileName: 'official_full_zip_font.ttf',
+            size: fontBytes.length,
+            expectedSha256: sha256.convert(fontBytes).toString(),
+            zipEntry: OnlineFontZipEntry(
+              path: 'fonts/official_full_zip_font.ttf',
+              compressedOffset: compressedOffset,
+              compressedSize: compressed.length,
+            ),
+          ),
+        ],
+      );
+
+      expect(registeredBytes, fontBytes);
+      expect(record.files.single.sha256, sha256.convert(fontBytes).toString());
+      expect(record.files.single.size, fontBytes.length);
+    },
+  );
+
+  test(
     'rejects an upstream font whose pinned SHA-256 no longer matches',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(

@@ -82,6 +82,7 @@ dependencies:
   audioplayers: ^6.8.1
   pointycastle: ^4.0.0
   in_app_purchase: ^3.3.0
+  passkeys: ^2.22.0
 
 dev_dependencies:
   flutter_test:

@@ -348,9 +348,16 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   Future<void> _loadSection(
     _DiscoverSection section, {
     bool force = false,
+    bool preserveContent = false,
   }) async {
     final revision = ++_sectionLoadRevision;
     if (!force && _cache[section] != null) return;
+    final currentCache = _cache[section];
+    final keepCurrentContent =
+        preserveContent &&
+        currentCache != null &&
+        !currentCache.loading &&
+        currentCache.error == null;
     if (force) {
       await _client.invalidateResponseCaches(_scopedSourcesFor(section));
       if (!mounted || revision != _sectionLoadRevision) return;
@@ -369,12 +376,14 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       );
       return;
     }
-    setState(() {
-      _cache[section] = const _SectionCache.loading();
-      if (force && section == _DiscoverSection.categories) {
-        _resetCategorySelection();
-      }
-    });
+    if (!keepCurrentContent) {
+      setState(() {
+        _cache[section] = const _SectionCache.loading();
+        if (force && section == _DiscoverSection.categories) {
+          _resetCategorySelection();
+        }
+      });
+    }
     _SectionCache next;
     try {
       next = switch (section) {
@@ -390,7 +399,14 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       next = _SectionCache.error(error.toString());
     }
     if (!mounted || revision != _sectionLoadRevision) return;
-    setState(() => _cache[section] = next);
+    setState(() {
+      _cache[section] = next;
+      if (keepCurrentContent &&
+          section == _DiscoverSection.categories &&
+          next.error == null) {
+        _resetCategorySelection();
+      }
+    });
     if (section == _DiscoverSection.categories &&
         !(_layoutController.layout.value == BookSourceDiscoverLayout.list &&
             _showListDirectory)) {
@@ -725,7 +741,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       await _loadSection(_DiscoverSection.categories, force: true);
       return;
     }
-    await _loadSection(_section, force: true);
+    await _loadSection(_section, force: true, preserveContent: true);
   }
 
   Future<void> _openSourceManagement() async {
@@ -932,7 +948,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         _paddedSectionSliver(
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 44),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(
+                key: Key('bookSourceDiscoverSectionLoadingIndicator'),
+              ),
+            ),
           ),
           bottomPadding: bottomPadding,
         ),
@@ -944,7 +964,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         _paddedSectionSliver(
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 44),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(
+                key: Key('bookSourceDiscoverSectionLoadingIndicator'),
+              ),
+            ),
           ),
           bottomPadding: bottomPadding,
         ),

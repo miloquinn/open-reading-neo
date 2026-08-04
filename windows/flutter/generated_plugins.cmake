@@ -7,6 +7,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_js
   flutter_secure_storage_windows
   flutter_tts
+  passkeys_windows
   pdfx
   url_launcher_windows
 )

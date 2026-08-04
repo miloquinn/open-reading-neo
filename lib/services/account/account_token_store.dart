@@ -12,6 +12,48 @@ abstract interface class MemberTokenStore {
   Future<void> clear();
 }
 
+abstract interface class PendingDeviceAuthorizationStore {
+  Future<String?> read();
+  Future<void> save(String payload);
+  Future<void> clear();
+}
+
+class SecurePendingDeviceAuthorizationStore
+    implements PendingDeviceAuthorizationStore {
+  SecurePendingDeviceAuthorizationStore([FlutterSecureStorage? storage])
+    : _storage = storage ?? const FlutterSecureStorage();
+
+  static const _key = 'open_reading.account.pending_device_authorization';
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read() async {
+    try {
+      return await _storage.read(key: _key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> save(String payload) async {
+    try {
+      await _storage.write(key: _key, value: payload);
+    } catch (_) {
+      // In-memory polling remains available when secure storage is absent.
+    }
+  }
+
+  @override
+  Future<void> clear() async {
+    try {
+      await _storage.delete(key: _key);
+    } catch (_) {
+      // Nothing to clear on hosts without secure storage.
+    }
+  }
+}
+
 class SecureMemberTokenStore implements MemberTokenStore {
   SecureMemberTokenStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();

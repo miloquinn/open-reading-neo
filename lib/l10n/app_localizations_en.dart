@@ -2532,6 +2532,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountConfirmPassword => 'Confirm password';
 
   @override
+  String get accountAvatarCropTitle => 'Crop avatar';
+
+  @override
+  String get accountAvatarCropHint =>
+      'Drag to reposition and pinch to zoom until the subject fits inside the circle.';
+
+  @override
   String get accountUsername => 'Username';
 
   @override
@@ -2598,6 +2605,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountSupportFreeSubtitle =>
       'Support is optional and does not unlock WebDAV or any other feature.';
+
+  @override
+  String get accountSupportPurchaseNotice =>
+      'Premium currently exists only to help us learn and validate the purchase flow; it does not include any actual premium features yet. Buying Premium is effectively much like making a donation. If you would like to support the project, you can purchase Premium.';
 
   @override
   String get accountSupportAction => 'Support now';
@@ -4374,6 +4385,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get agreementFlowStepTerms => 'Terms';
 
   @override
+  String get agreementFlowStepSource => 'Book sources';
+
+  @override
   String get agreementFlowStepPrivacy => 'Privacy';
 
   @override
@@ -4387,11 +4401,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get agreementFlowTermsSubtitle =>
-      'Review the terms and the boundary for content and third-party sources.';
+      'Review the terms governing use of the software and content you choose to open.';
 
   @override
   String get agreementFlowTermsConsent =>
       'I have read and agree to the Terms of Use.';
+
+  @override
+  String get agreementFlowSourceTitle => 'Third-party book source agreement';
+
+  @override
+  String get agreementFlowSourceSubtitle =>
+      'Confirm how source addresses, content, authorization, and responsibility are separated from the official project.';
+
+  @override
+  String get agreementFlowSourceConsent =>
+      'I have read and agree to the Third-party Book Source Agreement.';
 
   @override
   String get agreementFlowPrivacyTitle => 'Your data stays under your control';

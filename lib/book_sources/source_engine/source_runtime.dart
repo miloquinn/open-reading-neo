@@ -36,6 +36,8 @@ class SourceRuntime {
   SourceScriptEvaluator? _scriptEvaluator;
   late final SourceLoginSessionStore _loginSessionStore;
   final Map<String, Map<String, Object?>> _bookRuleStates = {};
+  final Map<String, Map<String, Object?>> _bookEntityContexts = {};
+  final Map<String, Map<String, Object?>> _chapterRuleContexts = {};
   final Map<String, SourceLoginSession> _loginSessions = {};
   final Set<String> _dirtyLoginSessions = {};
 
@@ -44,6 +46,8 @@ class SourceRuntime {
 
   void close({bool force = true}) {
     _bookRuleStates.clear();
+    _bookEntityContexts.clear();
+    _chapterRuleContexts.clear();
     _loginSessions.clear();
     _dirtyLoginSessions.clear();
     _scriptEvaluator?.dispose();
@@ -179,7 +183,7 @@ class SourceRuntime {
   }) async {
     final source = _source(registered);
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
-    final bookContext = <String, Object?>{'bookUrl': bookId, ...ruleState};
+    final bookContext = _bookContext(source, bookId, ruleState);
     final requestTarget = _decodeSourceDataTarget(bookId) ?? bookId;
     final response = await _request(
       source,
@@ -218,11 +222,15 @@ class SourceRuntime {
       rule,
       'coverUrl',
     );
+    _seedBookMetadata(bookContext, source: source, bookId: bookId, name: title);
+    final author = await _value(contextualDocument, context, rule, 'author');
+    bookContext['author'] = author;
     final book = BookSourceBook(
       id: bookId,
       title: title,
-      author: await _value(contextualDocument, context, rule, 'author'),
+      author: author,
       description: await _value(contextualDocument, context, rule, 'intro'),
+      type: _bookType(source),
       coverUrl: cover?.url,
       coverHeaders: cover?.headers ?? const {},
       categories: _splitCategories(
@@ -234,8 +242,15 @@ class SourceRuntime {
       latestChapter: _nullable(
         await _value(contextualDocument, context, rule, 'lastChapter'),
       ),
-      sourceVariables: _sourceVariables(contextualDocument.ruleState),
+      sourceVariables: _bookSourceVariables(
+        source,
+        ruleState,
+        name: title,
+        author: author,
+        type: _bookType(source),
+      ),
     );
+    _rememberBookContext(source, bookId, bookContext);
     _rememberRuleState(source, bookId, document.ruleState);
     _rememberRuleState(source, book.id, document.ruleState);
     await _flushLoginSession(source);
@@ -249,8 +264,8 @@ class SourceRuntime {
   }) async {
     final source = _source(registered);
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
-    final bookContext = <String, Object?>{'bookUrl': bookId, ...ruleState};
-    final tocUrl = await _tocUrl(source, bookId, ruleState);
+    final bookContext = _bookContext(source, bookId, ruleState);
+    final tocUrl = await _tocUrl(source, bookId, ruleState, bookContext);
     final rule = source.rule('ruleToc');
     final chapters = <BookSourceChapter>[];
     final seenPages = <String>{};
@@ -293,6 +308,7 @@ class SourceRuntime {
           rule,
           'chapterName',
         );
+        chapterContext['title'] = title;
         final url = await _url(contextualDocument, context, rule, 'chapterUrl');
         if (title.isEmpty || url.isEmpty || !seenChapters.add(url)) continue;
         if (chapters.length >= _maxChapters) {
@@ -303,6 +319,12 @@ class SourceRuntime {
         chapters.add(
           BookSourceChapter(id: url, title: title, order: chapters.length),
         );
+        _rememberChapterContext(source, bookId, url, {
+          'index': chapters.length - 1,
+          'title': title,
+          'url': url,
+          'chapterUrl': url,
+        });
       }
       nextUrl = await _url(contextualDocument, null, rule, 'nextTocUrl');
     }
@@ -311,6 +333,7 @@ class SourceRuntime {
         'Compatible source did not return any chapters.',
       );
     }
+    _rememberBookContext(source, bookId, bookContext);
     _rememberRuleState(source, bookId, ruleState);
     await _flushLoginSession(source);
     return chapters;
@@ -325,7 +348,7 @@ class SourceRuntime {
     final source = _source(registered);
     final rule = source.rule('ruleContent');
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
-    final bookContext = <String, Object?>{'bookUrl': bookId, ...ruleState};
+    final bookContext = _bookContext(source, bookId, ruleState);
     final parts = <String>[];
     final seenPages = <String>{};
     var nextUrl = chapterId;
@@ -340,6 +363,11 @@ class SourceRuntime {
           'chapterUrl': chapterId,
         }),
       );
+      if (response.statusCode >= 400) {
+        throw BookSourceProtocolException(
+          'Chapter request failed with HTTP ${response.statusCode}.',
+        );
+      }
       final document = _document(
         source,
         response,
@@ -347,10 +375,19 @@ class SourceRuntime {
         book: bookContext,
         ruleState: ruleState,
       );
+      final rememberedChapter =
+          _chapterRuleContexts[_chapterStateKey(source, bookId, chapterId)] ??
+          const <String, Object?>{};
       final chapterContext = <String, Object?>{
+        ...rememberedChapter,
         'url': nextUrl,
         'chapterUrl': chapterId,
-        'index': hop,
+        'index':
+            int.tryParse(sourceVariables['chapterIndex'] ?? '') ??
+            rememberedChapter['index'] ??
+            hop,
+        'title':
+            sourceVariables['chapterTitle'] ?? rememberedChapter['title'] ?? '',
       };
       final contextualDocument = document.withScriptEntities(
         book: bookContext,
@@ -374,7 +411,7 @@ class SourceRuntime {
       if (content.trim().isNotEmpty) parts.add(content.trim());
       nextUrl = await _url(contextualDocument, null, rule, 'nextContentUrl');
     }
-    if (parts.isEmpty) {
+    if (parts.isEmpty || parts.every(_looksLikePlaceholderContent)) {
       throw const BookSourceProtocolException(
         'Compatible source did not return chapter content.',
       );
@@ -383,10 +420,15 @@ class SourceRuntime {
     await _flushLoginSession(source);
     final joinedContent = parts.join('\n\n');
     final imageHeaders = await _sourceHeaders(source);
+    final rememberedChapter =
+        _chapterRuleContexts[_chapterStateKey(source, bookId, chapterId)] ??
+        const <String, Object?>{};
     return BookSourceChapterContent(
       bookId: bookId,
       chapterId: chapterId,
-      title: '',
+      title:
+          sourceVariables['chapterTitle'] ??
+          '${rememberedChapter['title'] ?? ''}',
       content: joinedContent,
       contentType: 'text/html',
       images: _chapterImages(source, joinedContent, imageHeaders),
@@ -397,6 +439,7 @@ class SourceRuntime {
     ReadingSourceConfig source,
     String bookId,
     Map<String, Object?> ruleState,
+    Map<String, Object?> bookContext,
   ) async {
     final rule = source.rule('ruleBookInfo');
     final tocRule = _optionalRule(rule, 'tocUrl');
@@ -410,14 +453,23 @@ class SourceRuntime {
       source,
       response,
       variables: {'bookUrl': bookId},
+      book: bookContext,
       ruleState: ruleState,
+    );
+    final contextualDocument = document.withScriptEntities(
+      book: bookContext,
+      bookWriter: (value) => bookContext.addAll(value),
     );
     final init = _optionalRule(rule, 'init');
     final context = init.isEmpty
         ? null
-        : (await _rules.evaluateListAsync(document, null, init)).firstOrNull;
+        : (await _rules.evaluateListAsync(
+            contextualDocument,
+            null,
+            init,
+          )).firstOrNull;
     return _rules.evaluateStringAsync(
-      document,
+      contextualDocument,
       context,
       tocRule,
       resolveUrl: true,
@@ -430,25 +482,46 @@ class SourceRuntime {
     Object? context,
     Map<String, dynamic> rule,
   ) async {
-    final title = await _value(document, context, rule, 'name');
-    final url = await _url(document, context, rule, 'bookUrl');
+    final bookContext = _bookContext(source, '', document.ruleState);
+    final contextualDocument = document.withScriptEntities(
+      book: bookContext,
+      bookWriter: (value) => bookContext.addAll(value),
+    );
+    final title = await _value(contextualDocument, context, rule, 'name');
+    final url = await _url(contextualDocument, context, rule, 'bookUrl');
     if (title.isEmpty || url.isEmpty) return null;
-    final cover = await _remoteAssetValue(document, context, rule, 'coverUrl');
+    _seedBookMetadata(bookContext, source: source, bookId: url, name: title);
+    final cover = await _remoteAssetValue(
+      contextualDocument,
+      context,
+      rule,
+      'coverUrl',
+    );
+    final author = await _value(contextualDocument, context, rule, 'author');
+    bookContext['author'] = author;
     final book = BookSourceBook(
       id: url,
       title: title,
-      author: await _value(document, context, rule, 'author'),
-      description: await _value(document, context, rule, 'intro'),
+      author: author,
+      description: await _value(contextualDocument, context, rule, 'intro'),
+      type: _bookType(source),
       coverUrl: cover?.url,
       coverHeaders: cover?.headers ?? const {},
       categories: _splitCategories(
-        await _value(document, context, rule, 'kind'),
+        await _value(contextualDocument, context, rule, 'kind'),
       ),
       latestChapter: _nullable(
-        await _value(document, context, rule, 'lastChapter'),
+        await _value(contextualDocument, context, rule, 'lastChapter'),
       ),
-      sourceVariables: _sourceVariables(document.ruleState),
+      sourceVariables: _bookSourceVariables(
+        source,
+        document.ruleState,
+        name: title,
+        author: author,
+        type: _bookType(source),
+      ),
     );
+    _rememberBookContext(source, book.id, bookContext);
     _rememberRuleState(source, book.id, document.ruleState);
     return book;
   }
@@ -922,8 +995,110 @@ class SourceRuntime {
     ...variables,
   };
 
-  Map<String, String> _sourceVariables(Map<String, Object?> state) =>
-      Map.unmodifiable(_requestVariables(state, const {}));
+  Map<String, String> _bookSourceVariables(
+    ReadingSourceConfig source,
+    Map<String, Object?> state, {
+    required String name,
+    required String author,
+    required int type,
+  }) {
+    final variables = <String, String>{..._requestVariables(state, const {})};
+    if (_sourceUsesEntityContext(source)) {
+      variables.addAll({
+        'bookName': name,
+        'bookAuthor': author,
+        'bookType': '$type',
+      });
+    }
+    return Map.unmodifiable(variables);
+  }
+
+  bool _sourceUsesEntityContext(ReadingSourceConfig source) {
+    final rules = <Object?>[
+      source.rule('ruleSearch'),
+      source.rule('ruleExplore'),
+      source.rule('ruleBookInfo'),
+      source.rule('ruleToc'),
+      source.rule('ruleContent'),
+    ];
+    return rules.any(
+      (rule) => '$rule'.contains(RegExp(r'\b(?:book|chapter)\s*\.')),
+    );
+  }
+
+  Map<String, Object?> _bookContext(
+    ReadingSourceConfig source,
+    String bookId,
+    Map<String, Object?> state,
+  ) {
+    final context = <String, Object?>{
+      ...?_bookEntityContexts[_bookStateKey(source, bookId)],
+      ...state,
+    };
+    context['bookUrl'] = bookId;
+    context['name'] ??= state['bookName'];
+    context['author'] ??= state['bookAuthor'];
+    context['type'] =
+        int.tryParse('${state['bookType'] ?? ''}') ??
+        context['type'] ??
+        _bookType(source);
+    context['durChapterIndex'] ??= 0;
+    context['durChapterTitle'] ??= '';
+    return context;
+  }
+
+  int _bookType(ReadingSourceConfig source) => switch (source.type) {
+    1 => 32,
+    2 => 64,
+    3 => 136,
+    4 => 4,
+    _ => 8,
+  };
+
+  void _seedBookMetadata(
+    Map<String, Object?> state, {
+    required ReadingSourceConfig source,
+    required String bookId,
+    required String name,
+  }) {
+    state['bookUrl'] = bookId;
+    state['name'] ??= name;
+    state['type'] ??= _bookType(source);
+    state['durChapterIndex'] ??= 0;
+    state['durChapterTitle'] ??= '';
+  }
+
+  void _rememberBookContext(
+    ReadingSourceConfig source,
+    String bookId,
+    Map<String, Object?> context,
+  ) {
+    final key = _bookStateKey(source, bookId);
+    _bookEntityContexts.remove(key);
+    _bookEntityContexts[key] = Map<String, Object?>.from(context);
+    while (_bookEntityContexts.length > _maxRememberedBookStates) {
+      _bookEntityContexts.remove(_bookEntityContexts.keys.first);
+    }
+  }
+
+  String _chapterStateKey(
+    ReadingSourceConfig source,
+    String bookId,
+    String chapterId,
+  ) => '${source.stableId}\u0000$bookId\u0000$chapterId';
+
+  void _rememberChapterContext(
+    ReadingSourceConfig source,
+    String bookId,
+    String chapterId,
+    Map<String, Object?> context,
+  ) {
+    _chapterRuleContexts[_chapterStateKey(source, bookId, chapterId)] =
+        Map<String, Object?>.from(context);
+    while (_chapterRuleContexts.length > _maxChapters) {
+      _chapterRuleContexts.remove(_chapterRuleContexts.keys.first);
+    }
+  }
 
   Future<Map<String, String>> _sourceHeaders(ReadingSourceConfig source) async {
     await _ensureLoginSession(source);
@@ -1426,6 +1601,30 @@ String _optionalRule(Map<String, dynamic> rules, String key) {
 }
 
 String? _nullable(String value) => value.trim().isEmpty ? null : value.trim();
+
+bool _looksLikePlaceholderContent(String value) {
+  if (RegExp(r'<img\b', caseSensitive: false).hasMatch(value)) return false;
+  final plain = value
+      .replaceAll(RegExp(r'<[^>]+>'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (plain.isEmpty) return true;
+  if (plain.length <= 180 &&
+      RegExp(
+        r'(?:请先登录|请登录|登录后阅读|验证码|人机验证|安全验证|访问频繁|请求频繁|加载中|正在加载|请稍候|内容获取失败|章节不存在)',
+        caseSensitive: false,
+      ).hasMatch(plain)) {
+    return true;
+  }
+  if (plain.startsWith('{') &&
+      RegExp(
+        r'"(?:error|message|code)"\s*:',
+        caseSensitive: false,
+      ).hasMatch(plain)) {
+    return true;
+  }
+  return false;
+}
 
 List<String> _splitCategories(String value) => value
     .split(RegExp(r'[,/|\s]+'))

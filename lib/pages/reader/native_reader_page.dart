@@ -29,6 +29,7 @@ import 'package:xxread/core/reader/reader_layout.dart';
 import 'package:xxread/core/reader/reader_keep_screen_on.dart';
 import 'package:xxread/core/reader/reader_margin_settings.dart';
 import 'package:xxread/core/reader/reader_aloud_controller.dart';
+import 'package:xxread/core/reader/reader_position_save_queue.dart';
 import 'package:xxread/core/reader/reader_safe_area.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/core/reader/reader_system_ui.dart';
@@ -234,11 +235,19 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _restoreAnchorAfterLayout = true;
   bool _initialPositionRestored = false;
   bool _initialPositionRestoreScheduled = false;
+  bool _exitInProgress = false;
   String? _lastSavedLocation;
+  late final ReaderPositionSaveQueue _positionSaveQueue =
+      ReaderPositionSaveQueue(
+        onError: (error, stackTrace) {
+          debugPrint('save reader position failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        },
+      );
   bool _openPreviousChapterAtLastPage = false;
   bool _controlsVisible = false;
   NativePageMode _pageMode = ReaderSettings.defaultPageMode;
-  bool _scrollByChapter = true;
+  bool _scrollByChapter = false;
   double _fontSize = 19;
   int _fontWeight = ReaderSettings.defaultFontWeight;
   double _lineHeight = 1.75;
@@ -349,6 +358,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(_flushReadingSession());
+      unawaited(_flushPendingPositionSave());
     }
   }
 
@@ -476,11 +486,16 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   }
 
   Future<void> _exitReader() async {
+    if (_exitInProgress) return;
+    _exitInProgress = true;
     BookOpenTransition.beginExit();
     unawaited(_flushReadingSession());
+    await _flushPendingPositionSave();
     if (!mounted) return;
     Navigator.of(context).pop();
   }
+
+  Future<void> _flushPendingPositionSave() => _positionSaveQueue.flush();
 
   @override
   void didChangeDependencies() {
@@ -810,6 +825,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     _openingCoverHoldReached?.removeListener(_onOpeningCoverHoldChanged);
     _readerAloudController?.dispose();
     unawaited(_flushReadingSession());
+    unawaited(_flushPendingPositionSave());
     _pageController?.dispose();
     _verticalPagePositionsListener.itemPositions.removeListener(
       _onVerticalPagePositionsChanged,
@@ -1166,14 +1182,14 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     await _applyReaderSystemUi();
   }
 
-  void _saveCanonicalProgress(
+  Future<void> _saveCanonicalProgress(
     _NativeChapter chapter,
     _ReaderPageData page,
     int chapterIndex,
   ) {
     _anchorOffset = page.startOffset;
     final bookId = widget.book.id;
-    if (bookId == null) return;
+    if (bookId == null) return Future<void>.value();
     final excerptEnd = (page.startOffset + 72).clamp(
       0,
       chapter.plainText.length,
@@ -1195,14 +1211,26 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     final readingProgress = chapterCount <= 0
         ? null
         : ((chapterIndex + chapterProgress) / chapterCount).clamp(0.0, 1.0);
-    BookDao().updateBookCanonicalLocator(
-      bookId,
-      LocatorCodec.encodeCanonicalLocator(locator),
-      null,
-      _layoutSignature,
-      chapterIndex,
-      readingProgress: readingProgress,
+    return _queuePositionWrite(
+      () => BookDao().updateBookCanonicalLocator(
+        bookId,
+        LocatorCodec.encodeCanonicalLocator(locator),
+        null,
+        _layoutSignature,
+        chapterIndex,
+        readingProgress: readingProgress,
+      ),
     );
+  }
+
+  Future<void> _queueBookProgress(int bookId, int chapterIndex) {
+    return _queuePositionWrite(
+      () => BookDao().updateBookProgress(bookId, chapterIndex),
+    );
+  }
+
+  Future<void> _queuePositionWrite(Future<void> Function() write) {
+    return _positionSaveQueue.enqueue(write);
   }
 
   Future<void> _setPageMode(NativePageMode mode) async {
@@ -1648,7 +1676,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     }
     final bookId = widget.book.id;
     if (bookId != null) {
-      await BookDao().updateBookProgress(bookId, next);
+      await _queueBookProgress(bookId, next);
     }
   }
 
@@ -2007,18 +2035,20 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           : offset / chapter.plainText.length,
     );
     _anchorOffset = offset;
-    await BookDao().updateBookCanonicalLocator(
-      bookId,
-      LocatorCodec.encodeCanonicalLocator(locator),
-      null,
-      _layoutSignature,
-      chapterIndex,
-      readingProgress:
-          (chapterIndex +
-              (chapter.plainText.isEmpty
-                  ? 1.0
-                  : offset / chapter.plainText.length)) /
-          _loadedChapters.length,
+    await _queuePositionWrite(
+      () => BookDao().updateBookCanonicalLocator(
+        bookId,
+        LocatorCodec.encodeCanonicalLocator(locator),
+        null,
+        _layoutSignature,
+        chapterIndex,
+        readingProgress:
+            (chapterIndex +
+                (chapter.plainText.isEmpty
+                    ? 1.0
+                    : offset / chapter.plainText.length)) /
+            _loadedChapters.length,
+      ),
     );
   }
 
@@ -3115,7 +3145,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       }
     });
     if (chapterChanged && widget.book.id != null) {
-      BookDao().updateBookProgress(widget.book.id!, page.chapterIndex);
+      unawaited(_queueBookProgress(widget.book.id!, page.chapterIndex));
     }
     if (page.chapterIndex >= _horizontalLastChapter - 1 &&
         _horizontalLastChapter < chapters.length - 1) {
@@ -3423,7 +3453,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       });
     }
     if (chapterChanged && widget.book.id != null) {
-      BookDao().updateBookProgress(widget.book.id!, nextChapter);
+      unawaited(_queueBookProgress(widget.book.id!, nextChapter));
     }
     final offset = _continuousOffsetAtViewportCenter(
       _visibleChapters[nextChapter],

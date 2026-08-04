@@ -68,6 +68,19 @@ void main() {
     expect(find.text('更多登录方式'), findsOneWidget);
     expect(find.text('使用 Google'), findsNothing);
     expect(find.text('支持高级功能'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('account-open-register')));
+    await tester.pump();
+    expect(find.text('注册'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-change-email')), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'reader@example.com');
+    expect(find.text('reader@example.com'), findsOneWidget);
+    await tester.tap(find.text('已有账号？返回登录'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('account-change-email')));
+    await tester.pump();
+
     expect(
       find.byKey(const ValueKey('account-provider-github')),
       findsOneWidget,
@@ -294,6 +307,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('account-support')));
       await tester.pumpAndSettle();
       expect(find.text('当前所有功能免费'), findsOneWidget);
+      expect(
+        find.text(
+          '高级版目前仅用于学习并跑通购买流程，暂时没有实际高级功能。购买高级版与捐赠几乎没有区别；如果你愿意，可以购买高级版支持一下项目。',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('account-premium-purchase-notice')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('account-redemption-code')),
         findsOneWidget,

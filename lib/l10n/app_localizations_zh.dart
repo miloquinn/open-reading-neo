@@ -2420,6 +2420,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountConfirmPassword => '确认密码';
 
   @override
+  String get accountAvatarCropTitle => '裁剪头像';
+
+  @override
+  String get accountAvatarCropHint => '拖动图片调整位置，双指缩放，让头像主体位于圆形区域内。';
+
+  @override
   String get accountUsername => '用户名';
 
   @override
@@ -2484,6 +2490,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountSupportFreeSubtitle => '支持完全自愿，不会解锁 WebDAV 或其他功能。';
+
+  @override
+  String get accountSupportPurchaseNotice =>
+      '高级版目前仅用于学习并跑通购买流程，暂时没有实际高级功能。购买高级版与捐赠几乎没有区别；如果你愿意，可以购买高级版支持一下项目。';
 
   @override
   String get accountSupportAction => '立即支持';
@@ -4166,6 +4176,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get agreementFlowStepTerms => '使用协议';
 
   @override
+  String get agreementFlowStepSource => '书源协议';
+
+  @override
   String get agreementFlowStepPrivacy => '隐私说明';
 
   @override
@@ -4178,10 +4191,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get agreementFlowTermsTitle => '先确认清晰的使用边界';
 
   @override
-  String get agreementFlowTermsSubtitle => '请阅读使用条款，以及用户内容和第三方书源的责任边界。';
+  String get agreementFlowTermsSubtitle => '请阅读软件使用和你主动打开内容所适用的条款。';
 
   @override
   String get agreementFlowTermsConsent => '我已完整阅读并同意《使用条款》。';
+
+  @override
+  String get agreementFlowSourceTitle => '第三方书源协议';
+
+  @override
+  String get agreementFlowSourceSubtitle => '请确认书源地址、内容授权与使用责任均独立于官方项目。';
+
+  @override
+  String get agreementFlowSourceConsent => '我已完整阅读并同意《第三方书源协议》。';
 
   @override
   String get agreementFlowPrivacyTitle => '你的数据，由你掌控';
@@ -7520,6 +7542,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get accountConfirmPassword => '確認密碼';
 
   @override
+  String get accountAvatarCropTitle => '裁剪頭像';
+
+  @override
+  String get accountAvatarCropHint => '拖動圖片調整位置，雙指縮放，讓頭像主體位於圓形區域內。';
+
+  @override
   String get accountUsername => '使用者名稱';
 
   @override
@@ -7584,6 +7612,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountSupportFreeSubtitle => '支持完全自願，不會解鎖 WebDAV 或其他功能。';
+
+  @override
+  String get accountSupportPurchaseNotice =>
+      '高級版目前僅用於學習並跑通購買流程，暫時沒有實際高級功能。購買高級版與捐贈幾乎沒有區別；如果你願意，可以購買高級版支持一下專案。';
 
   @override
   String get accountSupportAction => '立即支持';
@@ -9266,6 +9298,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get agreementFlowStepTerms => '使用協議';
 
   @override
+  String get agreementFlowStepSource => '書源協議';
+
+  @override
   String get agreementFlowStepPrivacy => '隱私說明';
 
   @override
@@ -9278,10 +9313,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get agreementFlowTermsTitle => '先確認清楚的使用邊界';
 
   @override
-  String get agreementFlowTermsSubtitle => '請閱讀使用條款，以及使用者內容和第三方書源的責任邊界。';
+  String get agreementFlowTermsSubtitle => '請閱讀軟體使用和你主動開啟內容所適用的條款。';
 
   @override
   String get agreementFlowTermsConsent => '我已完整閱讀並同意《使用條款》。';
+
+  @override
+  String get agreementFlowSourceTitle => '第三方書源協議';
+
+  @override
+  String get agreementFlowSourceSubtitle => '請確認書源位址、內容授權與使用責任均獨立於官方專案。';
+
+  @override
+  String get agreementFlowSourceConsent => '我已完整閱讀並同意《第三方書源協議》。';
 
   @override
   String get agreementFlowPrivacyTitle => '你的資料，由你掌控';

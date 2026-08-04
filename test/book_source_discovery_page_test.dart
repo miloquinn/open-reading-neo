@@ -132,6 +132,45 @@ void main() {
     expect(client.discoverySourceIds, ['source-a', 'source-a']);
   });
 
+  testWidgets(
+    'pull to refresh keeps content instead of showing another loader',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 1100);
+      addTearDown(tester.view.reset);
+      final source = _source('source-a', 'Source A');
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+      });
+      final client = _DelayedRefreshDiscoveryClient();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final refresh = tester.widget<RefreshIndicator>(
+        find.byType(RefreshIndicator),
+      );
+      final refreshFuture = refresh.onRefresh();
+      await tester.pump();
+
+      expect(find.text('Source A picks'), findsOneWidget);
+      expect(
+        find.byKey(const Key('bookSourceDiscoverSectionLoadingIndicator')),
+        findsNothing,
+      );
+
+      client.finishRefresh();
+      await refreshFuture;
+      await tester.pumpAndSettle();
+    },
+  );
+
   test('discover layout preference is restored by a new controller', () async {
     final first = BookSourcesPageController();
     await first.setLayout(BookSourceDiscoverLayout.list);
@@ -970,6 +1009,22 @@ class _DiscoveryClient extends BookSourceClient {
         updatedAt: DateTime.utc(2026, 7, 17),
       ),
     ]);
+  }
+}
+
+class _DelayedRefreshDiscoveryClient extends _DiscoveryClient {
+  final Completer<void> _refreshCompleter = Completer<void>();
+  int _requestCount = 0;
+
+  void finishRefresh() => _refreshCompleter.complete();
+
+  @override
+  Future<BookSourceDiscoveryPage> getDiscovery(
+    RegisteredBookSource source,
+  ) async {
+    _requestCount++;
+    if (_requestCount > 1) await _refreshCompleter.future;
+    return super.getDiscovery(source);
   }
 }
 

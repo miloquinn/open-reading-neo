@@ -1,6 +1,40 @@
 import Flutter
 import UIKit
 
+final class AuthCallbackBridge {
+  static let shared = AuthCallbackBridge()
+  private var channel: FlutterMethodChannel?
+  private var pending: String?
+
+  static func isCallback(_ url: URL) -> Bool {
+    url.scheme?.lowercased() == "xxread"
+      && url.host?.lowercased() == "auth"
+      && url.path == "/device"
+  }
+
+  func attach(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "com.niki.xxread/account_auth",
+      binaryMessenger: messenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "getInitialAuthCallback" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(self?.pending)
+      self?.pending = nil
+    }
+    self.channel = channel
+  }
+
+  func accept(urls: [URL]) {
+    guard let url = urls.first(where: Self.isCallback) else { return }
+    pending = url.absoluteString
+    channel?.invokeMethod("onAuthCallback", arguments: url.absoluteString)
+  }
+}
+
 @objc(ReaderFlutterViewController) class ReaderFlutterViewController: FlutterViewController {
   private var readerImmersiveEnabled = false {
     didSet {
@@ -75,6 +109,8 @@ import UIKit
       NSLog("Reader bridge init failed: binaryMessenger unavailable")
       return
     }
+
+    AuthCallbackBridge.shared.attach(messenger: messenger)
 
     let readerUIChannel = FlutterMethodChannel(
       name: "com.niki.xxread/reader_ui",

@@ -201,12 +201,21 @@ class BookSourceShelfService {
         final end = (offset + _downloadBatchSize).clamp(0, chapters.length);
         final batch = chapters.sublist(offset, end);
         final contents = await Future.wait(
-          batch.map((chapter) async {
+          batch.asMap().entries.map((entry) async {
+            final chapter = entry.value;
+            final chapterIndex = offset + entry.key;
             final content = await _client.getChapterContentForDownload(
               source,
               bookId: book.id,
               chapterId: chapter.id,
-              sourceVariables: book.sourceVariables,
+              sourceVariables: {
+                ...book.sourceVariables,
+                'chapterIndex': '$chapterIndex',
+                'chapterTitle': chapter.title,
+                'bookName': book.title,
+                'bookAuthor': book.author,
+                'bookType': '${book.type}',
+              },
               cancellation: cancellation,
             );
             cancellation?.throwIfCancelled();
@@ -306,8 +315,17 @@ class BookSourceShelfService {
 
   BookSourceBook sourceBookFrom(Book book) {
     final json = jsonDecode(book.sourceBookJson!);
+    Uri? baseUri;
+    final sourceRaw = book.sourceJson;
+    if (sourceRaw != null && sourceRaw.isNotEmpty) {
+      final sourceJson = jsonDecode(sourceRaw);
+      if (sourceJson is Map && sourceJson['apiBaseUrl'] is String) {
+        baseUri = Uri.tryParse(sourceJson['apiBaseUrl'] as String);
+      }
+    }
     return BookSourceBook.fromJson(
       (json as Map).map((key, value) => MapEntry('$key', value)),
+      baseUri: baseUri,
     );
   }
 

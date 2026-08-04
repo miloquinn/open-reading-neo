@@ -9,8 +9,10 @@ class SceneDelegate: FlutterSceneDelegate {
     options connectionOptions: UIScene.ConnectionOptions
   ) {
     super.scene(scene, willConnectTo: session, options: connectionOptions)
+    let urls = connectionOptions.urlContexts.map(\.url)
+    AuthCallbackBridge.shared.accept(urls: urls)
     IncomingBookInbox.shared.accept(
-      urls: connectionOptions.urlContexts.map(\.url),
+      urls: urls.filter { !AuthCallbackBridge.isCallback($0) },
       action: "open"
     )
   }
@@ -19,10 +21,9 @@ class SceneDelegate: FlutterSceneDelegate {
     _ scene: UIScene,
     openURLContexts URLContexts: Set<UIOpenURLContext>
   ) {
-    IncomingBookInbox.shared.accept(
-      urls: URLContexts.map(\.url),
-      action: "open"
-    )
+    let urls = URLContexts.map(\.url)
+    AuthCallbackBridge.shared.accept(urls: urls)
+    IncomingBookInbox.shared.accept(urls: urls.filter { !AuthCallbackBridge.isCallback($0) }, action: "open")
     super.scene(scene, openURLContexts: URLContexts)
   }
 

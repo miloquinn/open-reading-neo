@@ -87,6 +87,7 @@ class BookSourceReaderPage extends StatefulWidget {
   final BookSourceReadingProgressStore progressStore;
   final BookSourceShelfService? shelfService;
   final ReaderThemePalette? initialTheme;
+  final SourceCoverCache? remoteImageCache;
 
   const BookSourceReaderPage({
     super.key,
@@ -96,6 +97,7 @@ class BookSourceReaderPage extends StatefulWidget {
     this.progressStore = const BookSourceReadingProgressStore(),
     this.shelfService,
     this.initialTheme,
+    this.remoteImageCache,
   });
 
   @override
@@ -111,6 +113,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   late final BookSourceClient _client = widget.client ?? BookSourceClient();
   late final BookSourceShelfService _shelfService =
       widget.shelfService ?? BookSourceShelfService(client: _client);
+  late final SourceCoverCache _remoteImageCache =
+      widget.remoteImageCache ?? SourceCoverCache.instance;
   PageController _pageController = PageController();
   final ItemScrollController _verticalPageScrollController =
       ItemScrollController();
@@ -191,7 +195,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   final Map<int, _BookSourceVerticalLayout> _verticalLayouts = {};
   final Map<String, GlobalKey> _verticalPartKeys = {};
   Future<void> _progressSaveQueue = Future<void>.value();
-  bool _scrollByChapter = true;
+  bool _scrollByChapter = false;
   Size _pagedViewportSize = Size.zero;
   Size _verticalViewportSize = Size.zero;
   bool _exitPromptVisible = false;
@@ -972,7 +976,14 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
             widget.source,
             bookId: widget.book.id,
             chapterId: _chapters[index].id,
-            sourceVariables: widget.book.sourceVariables,
+            sourceVariables: {
+              ...widget.book.sourceVariables,
+              'chapterIndex': '$index',
+              'chapterTitle': _chapters[index].title,
+              'bookName': widget.book.title,
+              'bookAuthor': widget.book.author,
+              'bookType': '${widget.book.type}',
+            },
           );
     future = contentFuture
         .then((content) async {
@@ -2605,7 +2616,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       title: _chapters[_chapterIndex].title,
       pageCount: images.length,
       initialPage: _pageIndex.clamp(0, images.length - 1),
-      loadPage: (index) => SourceCoverCache.instance.load(
+      loadPage: (index) => _remoteImageCache.load(
         images[index].url,
         headers: images[index].headers,
       ),

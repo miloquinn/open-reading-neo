@@ -2,6 +2,27 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.5.3",
+            "notes": {
+                "en": [
+                    "Fixed the macOS app failing to open from Finder on some systems by using an ASCII-safe internal executable name while keeping the visible app name as Open Reading",
+                    "The macOS release workflow now launches the signed and notarized app through LaunchServices before publishing"
+                ],
+                "zh": [
+                    "修复部分 macOS 系统从 Finder 打开应用时提示“应用程序无法打开”的问题；内部可执行文件改用 ASCII 安全名称，界面仍显示“开元阅读”",
+                    "macOS 发布流程新增 LaunchServices 真实启动检查，签名和公证后的应用必须能够从系统正常启动才会发布"
+                ],
+                "zh-TW": [
+                    "修復部分 macOS 系統從 Finder 開啟應用程式時顯示「應用程式無法開啟」的問題；內部執行檔改用 ASCII 安全名稱，介面仍顯示「開元閱讀」",
+                    "macOS 發布流程新增 LaunchServices 實際啟動檢查，簽署與公證後的應用程式必須能由系統正常啟動才會發布"
+                ],
+                "ja": [
+                    "一部の macOS で Finder から開くと「アプリケーションを開けません」と表示される問題を修正しました。内部実行ファイルを ASCII セーフな名前に変更し、表示名は引き続き Open Reading です",
+                    "macOS リリース処理に LaunchServices による実起動確認を追加し、署名・公証済みアプリがシステムから起動できる場合のみ公開します"
+                ]
+            }
+        },
+        {
             "version": "2.5.2",
             "notes": {
                 "en": [

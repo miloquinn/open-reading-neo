@@ -560,6 +560,14 @@ jobs:
           actual_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")"
           actual_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")"
           executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$info_plist")"
+          if [[ ! "$executable" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::The macOS internal executable must use an ASCII-safe name."
+            exit 1
+          fi
+          if [[ ! -x "$app_path/Contents/MacOS/$executable" ]]; then
+            echo "::error::CFBundleExecutable does not resolve to an executable file."
+            exit 1
+          fi
           architectures="$(lipo -archs "$app_path/Contents/MacOS/$executable")"
           if [[ "$actual_version" != "$version" || "$actual_build" != "$build_number" ]]; then
             echo "::error::The macOS bundle version does not match pubspec.yaml."
@@ -593,6 +601,25 @@ jobs:
           xcrun stapler validate "$MACOS_APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$MACOS_APP_PATH"
           spctl --assess --type execute --verbose=4 "$MACOS_APP_PATH"
+
+      - name: Verify macOS LaunchServices startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          executable="$(
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' \
+              "$MACOS_APP_PATH/Contents/Info.plist"
+          )"
+          open "$MACOS_APP_PATH"
+          for attempt in {1..20}; do
+            if pgrep -x "$executable" >/dev/null; then
+              pkill -x "$executable" || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::The notarized macOS app did not launch through LaunchServices."
+          exit 1
 
       - name: Package notarized macOS application
         shell: bash

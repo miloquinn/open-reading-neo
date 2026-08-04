@@ -729,7 +729,11 @@ jobs:
       - name: Check out release metadata
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          # Artifacts are immutable outputs from RELEASE_TAG, while public
+          # notes and release automation may be repaired after a build. Read
+          # that metadata from the maintained default branch so a missing
+          # notes file never requires moving or recreating an immutable tag.
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Download all platform artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

@@ -66,17 +66,35 @@ class ApplePremiumPurchaseService extends ChangeNotifier {
   ApplePurchaseStore get _activeStore =>
       _store ??= InAppPurchaseStore(InAppPurchase.instance);
 
+  /// Sets up the purchase stream once, then (re)loads the product. Safe to
+  /// call again after a failed or still-pending product load so the UI has
+  /// a way to retry instead of getting permanently stuck once the stream
+  /// subscription exists.
   Future<void> initialize() async {
-    if (_subscription != null) return;
-    _subscription = _activeStore.purchaseStream.listen(_handlePurchases);
-    await _loadProduct();
+    _subscription ??= _activeStore.purchaseStream.listen(_handlePurchases);
+    if (_product != null || _loading) return;
+    _setLoading(true);
+    try {
+      await _loadProduct();
+      _setError(null);
+    } catch (error) {
+      _setError(error);
+    } finally {
+      _setLoading(false);
+    }
   }
 
   Future<void> _loadProduct() async {
-    if (!await _activeStore.isAvailable()) {
+    // StoreKit's product query can hang well past what a user will wait on
+    // an account screen; fail fast so the UI can offer a retry instead of
+    // showing an unexplained blank price indefinitely.
+    const timeout = Duration(seconds: 8);
+    if (!await _activeStore.isAvailable().timeout(timeout)) {
       throw const MemberAccountException('App Store 内购暂不可用');
     }
-    final response = await _activeStore.queryProductDetails({productId});
+    final response = await _activeStore
+        .queryProductDetails({productId})
+        .timeout(timeout);
     if (response.error != null) {
       throw MemberAccountException(response.error!.message);
     }
@@ -88,9 +106,12 @@ class ApplePremiumPurchaseService extends ChangeNotifier {
   }
 
   Future<void> purchase() async {
+    // Runs before this method's own loading scope so a still-pending or
+    // retried product load isn't short-circuited by initialize()'s own
+    // "already loading" guard.
+    await initialize();
     _setLoading(true);
     try {
-      await initialize();
       final product = _product;
       if (product == null) throw const MemberAccountException('商品信息未加载');
       final started = await _activeStore.buyNonConsumable(
@@ -106,9 +127,9 @@ class ApplePremiumPurchaseService extends ChangeNotifier {
   }
 
   Future<void> restore() async {
+    await initialize();
     _setLoading(true);
     try {
-      await initialize();
       await _activeStore.restorePurchases();
     } catch (error) {
       _setError(error);

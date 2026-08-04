@@ -5132,6 +5132,12 @@ class AppLocalizationsJa extends AppLocalizations {
       'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.';
 
   @override
+  String get accountAppleProductLoading => '商品情報を取得しています…';
+
+  @override
+  String get accountAppleProductRetry => '商品情報の取得に失敗しました。タップして再試行';
+
+  @override
   String get accountAppleRestore => 'Restore purchases';
 
   @override

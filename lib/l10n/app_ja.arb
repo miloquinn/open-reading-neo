@@ -1143,6 +1143,8 @@
   "accountCreate": "アカウントを作成",
   "accountResetPassword": "パスワードを再設定",
   "accountUseApple": "Apple でサインイン",
+  "accountAppleProductLoading": "商品情報を取得しています…",
+  "accountAppleProductRetry": "商品情報の取得に失敗しました。タップして再試行",
   "accountUseGithub": "GitHub でログイン",
   "accountUseGoogle": "Google を使用",
   "accountUsePasskey": "Passkey を使用",

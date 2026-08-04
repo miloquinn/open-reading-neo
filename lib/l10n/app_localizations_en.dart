@@ -5329,6 +5329,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.';
 
   @override
+  String get accountAppleProductLoading => 'Loading product info…';
+
+  @override
+  String get accountAppleProductRetry =>
+      'Couldn\'t load product info. Tap to retry.';
+
+  @override
   String get accountAppleRestore => 'Restore purchases';
 
   @override

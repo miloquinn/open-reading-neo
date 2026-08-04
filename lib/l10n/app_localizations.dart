@@ -9381,6 +9381,18 @@ abstract class AppLocalizations {
   /// **'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.'**
   String get accountApplePurchaseHint;
 
+  /// Apple product details are still loading
+  ///
+  /// In en, this message translates to:
+  /// **'Loading product info…'**
+  String get accountAppleProductLoading;
+
+  /// Apple product details failed to load; tappable retry
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load product info. Tap to retry.'**
+  String get accountAppleProductRetry;
+
   /// No description provided for @accountAppleRestore.
   ///
   /// In en, this message translates to:

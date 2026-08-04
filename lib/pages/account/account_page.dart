@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2411,29 +2412,35 @@ class _SupportCardState extends State<_SupportCard> {
             const SizedBox(height: 12),
             Container(
               key: const ValueKey('account-premium-purchase-notice'),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: colors.surface.withValues(alpha: 0.68),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: colors.outlineVariant.withValues(alpha: 0.72),
-                ),
+                color: colors.tertiaryContainer.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 19,
-                    color: colors.onSurfaceVariant,
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colors.tertiary.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.tips_and_updates_rounded,
+                      size: 15,
+                      color: colors.onTertiaryContainer,
+                    ),
                   ),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       context.l10n.accountSupportPurchaseNotice,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                        height: 1.5,
+                        color: colors.onTertiaryContainer,
+                        height: 1.55,
                       ),
                     ),
                   ),
@@ -2473,32 +2480,39 @@ class _SupportCardState extends State<_SupportCard> {
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 10),
-            FilledButton.icon(
+            const SizedBox(height: 12),
+            _AppleStorePurchaseButton(
               key: const ValueKey('account-apple-purchase'),
-              onPressed: account.applePurchase.loading
-                  ? null
-                  : _purchaseWithApple,
-              icon: const Icon(Icons.apple_rounded),
-              label: Text(
-                account.applePurchase.product == null
-                    ? context.l10n.accountApplePurchase
-                    : '${context.l10n.accountApplePurchase} · ${account.applePurchase.product!.price}',
+              purchase: account.applePurchase,
+              onPurchase: _purchaseWithApple,
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: CupertinoButton(
+                key: const ValueKey('account-apple-restore'),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                minimumSize: Size.zero,
+                onPressed: account.applePurchase.loading
+                    ? null
+                    : _restoreApplePurchase,
+                child: Text(
+                  context.l10n.accountAppleRestore,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: account.applePurchase.loading
+                        ? CupertinoColors.inactiveGray
+                        : CupertinoColors.activeBlue.resolveFrom(context),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              key: const ValueKey('account-apple-restore'),
-              onPressed: account.applePurchase.loading
-                  ? null
-                  : _restoreApplePurchase,
-              icon: const Icon(Icons.restore_rounded),
-              label: Text(context.l10n.accountAppleRestore),
-            ),
-            if (account.applePurchase.error case final error?) ...[
-              const SizedBox(height: 8),
+            if (account.applePurchase.error != null &&
+                account.applePurchase.product != null) ...[
+              const SizedBox(height: 4),
               Text(
-                error,
+                account.applePurchase.error!,
+                textAlign: TextAlign.center,
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: colors.error),
@@ -2518,6 +2532,70 @@ class _SupportCardState extends State<_SupportCard> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Mirrors the iOS "Get"/pill purchase button so App Store purchase reads as
+/// a native control rather than a generic Material button. Product loading,
+/// purchase-in-flight, and failed-to-load states share one pill so the
+/// button never sits blank while StoreKit is still answering.
+class _AppleStorePurchaseButton extends StatelessWidget {
+  const _AppleStorePurchaseButton({
+    super.key,
+    required this.purchase,
+    required this.onPurchase,
+  });
+
+  final ApplePremiumPurchaseService purchase;
+  final VoidCallback onPurchase;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = purchase.product;
+    final loading = purchase.loading;
+    if (product == null) {
+      return CupertinoButton(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        borderRadius: BorderRadius.circular(14),
+        color: CupertinoColors.systemFill.resolveFrom(context),
+        onPressed: loading ? null : purchase.initialize,
+        child: loading
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CupertinoActivityIndicator(),
+              )
+            : Text(
+                purchase.error != null
+                    ? context.l10n.accountAppleProductRetry
+                    : context.l10n.accountAppleProductLoading,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+      );
+    }
+    return CupertinoButton.filled(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      borderRadius: BorderRadius.circular(14),
+      onPressed: loading ? null : onPurchase,
+      child: loading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CupertinoActivityIndicator(color: CupertinoColors.white),
+            )
+          : Text(
+              '${context.l10n.accountApplePurchase} · ${product.price}',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.white,
+              ),
+            ),
     );
   }
 }

@@ -5066,6 +5066,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountApplePurchaseHint => '一次购买，永久绑定当前开元阅读账号，并同步到支持的平台。';
 
   @override
+  String get accountAppleProductLoading => '正在获取商品信息…';
+
+  @override
+  String get accountAppleProductRetry => '商品信息加载失败，点击重试';
+
+  @override
   String get accountAppleRestore => '恢复购买';
 
   @override
@@ -10121,6 +10127,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountRedeemPremium => '兌換並永久解鎖';
+
+  @override
+  String get accountAppleProductLoading => '正在取得商品資訊…';
+
+  @override
+  String get accountAppleProductRetry => '商品資訊載入失敗，點一下重試';
 
   @override
   String get accountPremiumUnlocked => '永久高級版已解鎖';

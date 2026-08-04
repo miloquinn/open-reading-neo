@@ -1142,6 +1142,7 @@
   "accountSignIn": "ログイン",
   "accountCreate": "アカウントを作成",
   "accountResetPassword": "パスワードを再設定",
+  "accountUseApple": "Apple でサインイン",
   "accountUseGithub": "GitHub でログイン",
   "accountUseGoogle": "Google を使用",
   "accountUsePasskey": "Passkey を使用",

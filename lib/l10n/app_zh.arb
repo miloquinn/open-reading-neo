@@ -1547,6 +1547,7 @@
   "accountSignIn": "登录",
   "accountCreate": "创建账号",
   "accountResetPassword": "重置密码",
+  "accountUseApple": "使用 Apple 登录",
   "accountUseGithub": "GitHub 登录",
   "accountUseGoogle": "使用 Google",
   "accountUsePasskey": "使用 Passkey",

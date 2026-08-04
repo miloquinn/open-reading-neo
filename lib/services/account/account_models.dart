@@ -62,6 +62,7 @@ class MemberAuthProviders {
   const MemberAuthProviders({
     this.google = false,
     this.github = false,
+    this.apple = false,
     this.passkey = false,
   });
 
@@ -69,11 +70,13 @@ class MemberAuthProviders {
       MemberAuthProviders(
         google: json['google'] as bool? ?? false,
         github: json['github'] as bool? ?? false,
+        apple: json['apple'] as bool? ?? false,
         passkey: json['passkey'] as bool? ?? false,
       );
 
   final bool google;
   final bool github;
+  final bool apple;
   final bool passkey;
 
   bool supports(MemberExternalAuthMethod method) => switch (method) {

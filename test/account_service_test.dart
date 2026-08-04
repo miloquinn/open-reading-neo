@@ -62,6 +62,44 @@ void main() {
   );
 
   test(
+    'apple login posts the identity token and stores the rotated session',
+    () async {
+      final storage = _MemoryTokenStore();
+      final adapter = _RouteAdapter((options) {
+        expect(options.uri.path, '/api/v1/auth/apple/login');
+        expect(options.data, {
+          'identity_token': 'apple-identity-token',
+          'full_name': 'Jamie Reader',
+        });
+        return _json(
+          _session(access: 'access-apple', refresh: 'refresh-apple'),
+        );
+      });
+      final client = _client(adapter, storage);
+
+      final session = await client.loginApple(
+        identityToken: 'apple-identity-token',
+        fullName: 'Jamie Reader',
+      );
+
+      expect(session.user.username, 'reader');
+      expect(storage.accessToken, 'access-apple');
+      expect(storage.refreshToken, 'refresh-apple');
+    },
+  );
+
+  test('apple login omits full_name when not provided', () async {
+    final storage = _MemoryTokenStore();
+    final adapter = _RouteAdapter((options) {
+      expect(options.data, {'identity_token': 'apple-identity-token'});
+      return _json(_session(access: 'access-apple', refresh: 'refresh-apple'));
+    });
+    final client = _client(adapter, storage);
+
+    await client.loginApple(identityToken: 'apple-identity-token');
+  });
+
+  test(
     '401 refreshes once, rotates tokens, and retries me with new access',
     () async {
       final storage = _MemoryTokenStore(

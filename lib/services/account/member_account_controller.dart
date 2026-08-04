@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:passkeys/authenticator.dart';
 import 'package:passkeys/types.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'account_auth_callback_bridge.dart';
 import 'account_api_client.dart';
@@ -140,6 +141,28 @@ class MemberAccountController extends ChangeNotifier {
     _acceptAuthenticatedSession(session);
     await _loadAccountValues();
     await _persistSummary();
+  });
+
+  Future<void> loginWithApple() => _authenticate(() async {
+    final credential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+    );
+    final identityToken = credential.identityToken;
+    if (identityToken == null || identityToken.isEmpty) {
+      throw const MemberAccountException('Apple 未返回身份令牌');
+    }
+    final fullName = [credential.givenName, credential.familyName]
+        .whereType<String>()
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .join(' ');
+    return _api.loginApple(
+      identityToken: identityToken,
+      fullName: fullName.isEmpty ? null : fullName,
+    );
   });
 
   Future<MemberEmailChallenge> requestCode(

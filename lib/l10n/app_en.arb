@@ -2442,6 +2442,8 @@
   "@accountCreate": {"description": "Submit account registration"},
   "accountResetPassword": "Reset password",
   "@accountResetPassword": {"description": "Submit password reset"},
+  "accountUseApple": "Sign in with Apple",
+  "@accountUseApple": {"description": "Apple account login"},
   "accountUseGithub": "GitHub sign in",
   "@accountUseGithub": {"description": "GitHub account login"},
   "accountUseGoogle": "Continue with Google",

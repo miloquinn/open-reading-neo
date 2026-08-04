@@ -2560,6 +2560,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountResetPassword => 'Reset password';
 
   @override
+  String get accountUseApple => 'Sign in with Apple';
+
+  @override
   String get accountUseGithub => 'GitHub sign in';
 
   @override

@@ -1142,6 +1142,7 @@
   "accountSignIn": "登入",
   "accountCreate": "建立帳號",
   "accountResetPassword": "重設密碼",
+  "accountUseApple": "使用 Apple 登入",
   "accountUseGithub": "GitHub 登入",
   "accountUseGoogle": "使用 Google",
   "accountUsePasskey": "使用 Passkey",

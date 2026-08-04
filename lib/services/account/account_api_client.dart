@@ -261,6 +261,15 @@ class MemberAccountApiClient {
     baseUri: baseUri,
   );
 
+  Future<MemberSession> loginApple({
+    required String identityToken,
+    String? fullName,
+  }) => _sessionRequest('$authRoot/apple/login', {
+    'identity_token': identityToken,
+    if (fullName != null && fullName.trim().isNotEmpty)
+      'full_name': fullName.trim(),
+  }, authenticated: false);
+
   Future<Map<String, dynamic>> beginPasskeyLogin() => _jsonRequest(
     'POST',
     '$authRoot/passkeys/login/begin',

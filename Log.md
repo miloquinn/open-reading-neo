@@ -1402,3 +1402,15 @@
 
 - 本地 TXT/EPUB 阅读位置写入统一进入串行队列，canonical locator、章节索引和朗读位置不再并发落库；主动退出、切后台和销毁阶段会刷新已排队写入，避免快速翻页后退出时旧请求晚完成并覆盖最新位置。
 - 新增写入顺序、退出刷新和单次失败后继续保存的回归测试；阅读位置队列、本地 EPUB 初始恢复和 EPUB 跨章共 7 项测试通过。目标静态分析无 error/warning，保留本地阅读器 7 条既有 info。未做真机快速翻页退出复核。
+
+## 2026-08-04
+
+### 原生 Apple 登录（Sign in with Apple）
+
+- iOS/macOS 内购（App Store 永久高级版）核对确认客户端与服务端此前已全部完成并通过测试，本轮未改动，仅剩 App Store Connect 后台的定价、隐私问卷、审核截图和随版本首次送审。
+- 新增原生 Sign in with Apple 登录，走 `sign_in_with_apple` 插件的 `AuthenticationServices` 原生授权面板，不复用 Google/GitHub 现有的浏览器跳转设备码流程（Apple 原生令牌无需该流程）。iOS/macOS 均新增 `com.apple.developer.applesignin` entitlement 和 Xcode `SignInWithApple` SystemCapabilities 声明；账号页登录方式列表在 Apple 平台新增始终可见的 Apple 登录入口，视觉权重不低于 GitHub，满足 App Review 4.8 对等要求。
+- 官网后端新增 `POST /api/v1/auth/apple/login`：验证身份令牌用 Apple 公开 JWKS（`https://appleid.apple.com/auth/keys`，运行时拉取，不落盘、无需私钥或证书），校验签发方、`aud`（复用已有的 `OPEN_READING_APPLE_BUNDLE_IDS`，即 IAP 已在用的同一个 bundle id 配置，未新增环境变量）、过期时间；`membership_oauth_identities.provider` 约束新增 `apple`，账号解析、会话签发和管理端筛选与 Google/GitHub 完全复用同一套逻辑。首次授权可选带上原生凭据里的 `full_name`（Apple 仅首次登录返回一次），后续登录不再重复写入。
+- 明确未使用 `/Users/xiaoyuan/certs/APPLE` 下的任何证书或密码：该目录中的 P8/P12 材料用于 App Store Connect API 自动化和 macOS Developer ID 签名等既有用途，与本次 Sign in with Apple（原生令牌 + 公开 JWKS 校验）和 IAP（Apple 公开根证书校验交易 JWS）均无关，两者都不需要我方持有任何私钥。
+- 仍需人工在 Apple 开发者后台完成、无法由自动化代劳：Identifiers → App ID `com.niki.xxread` 勾选 Sign In with Apple 能力并（如为手动签名）重新生成描述文件；App Store Connect 送审版本页确认已挂载 `com.niki.xxread.premium.lifetime` 且完成 App Privacy 问卷。
+- 官网后端新增 apple 登录服务层、路由、schema 约束放宽和 10 项定向测试（新用户创建、二次登录复用身份并保留仅首次登录写入的展示名、跨应用 `aud` 拒绝、未配置时禁用、`provider_status`、路由端到端与 503/400 分支），Ruff 与全量 148 项测试通过（较此前 138 项净增 10 项）。Flutter 侧新增 `MemberAccountController.loginWithApple`、`MemberAccountApiClient.loginApple`、账号页原生按钮与登录方式重构，目标文件静态分析与全项目 `flutter analyze` 均无新增问题。
+- 用户在 Apple 开发者后台配置 Sign In with Apple 能力时要求预留 Server-to-Server Notification Endpoint，随即补充官网后端 `POST /api/v1/auth/apple/notifications`：用同一套 JWKS 校验 Apple 推送的通知 JWT（`iss`/`aud` 与登录校验一致，`aud` 同样复用 `OPEN_READING_APPLE_BUNDLE_IDS`，无需新密钥），解出内层 `events` JSON 后对 `consent-revoked`、`account-delete`（同时兼容论坛反馈的 `account-deleted` 拼写）两类事件解绑 `membership_oauth_identities` 对应记录，其余事件类型忽略。新增 4 项定向测试，Ruff 与全量 152 项测试通过。已告知用户该端点地址为 `https://open.xxread.top/api/v1/auth/apple/notifications`，需部署后再让 Apple 端保存生效。

@@ -2468,6 +2468,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get accountResetPassword => 'パスワードを再設定';
 
   @override
+  String get accountUseApple => 'Apple でサインイン';
+
+  @override
   String get accountUseGithub => 'GitHub でログイン';
 
   @override

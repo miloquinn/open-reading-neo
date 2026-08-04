@@ -2447,6 +2447,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountResetPassword => '重置密码';
 
   @override
+  String get accountUseApple => '使用 Apple 登录';
+
+  @override
   String get accountUseGithub => 'GitHub 登录';
 
   @override
@@ -7567,6 +7570,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountResetPassword => '重設密碼';
+
+  @override
+  String get accountUseApple => '使用 Apple 登入';
 
   @override
   String get accountUseGithub => 'GitHub 登入';

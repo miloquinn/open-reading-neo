@@ -263,6 +263,21 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  Future<void> _loginWithApple() async {
+    final account = context.read<MemberAccountController>();
+    try {
+      await account.loginWithApple();
+      if (!mounted) return;
+      _syncProfile(account.user);
+      if (account.mfaRequired) return;
+      await account.loadMfaStatus();
+      if (!mounted) return;
+      showSideToast(context, context.l10n.settingsAccountVerified);
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
   Future<void> _saveProfile() async {
     try {
       await context.read<MemberAccountController>().updateProfile(
@@ -694,6 +709,7 @@ class _AccountPageState extends State<AccountPage> {
             polling: _polling,
             authorization: _deviceAuthorization,
             onLogin: _externalLogin,
+            onLoginApple: _loginWithApple,
             onCancel: () => setState(() => _polling = false),
           ),
         ],
@@ -861,6 +877,7 @@ class _ExternalLoginMethods extends StatefulWidget {
     required this.polling,
     required this.authorization,
     required this.onLogin,
+    required this.onLoginApple,
     required this.onCancel,
   });
 
@@ -868,6 +885,7 @@ class _ExternalLoginMethods extends StatefulWidget {
   final bool polling;
   final DeviceAuthorization? authorization;
   final ValueChanged<MemberExternalAuthMethod> onLogin;
+  final VoidCallback onLoginApple;
   final VoidCallback onCancel;
 
   @override
@@ -904,12 +922,22 @@ class _ExternalLoginMethodsState extends State<_ExternalLoginMethods> {
             onCancel: widget.onCancel,
           )
         else ...[
+          if (_isApplePlatform && widget.account.providers.apple) ...[
+            _ProviderLoginButton(
+              key: const ValueKey('account-provider-apple'),
+              label: context.l10n.accountUseApple,
+              brand: _ProviderBrand.apple,
+              enabled: !widget.account.loading,
+              onTap: widget.onLoginApple,
+            ),
+            const SizedBox(height: 8),
+          ],
           _ProviderLoginButton(
             key: const ValueKey('account-provider-github'),
             label: context.l10n.accountUseGithub,
-            method: MemberExternalAuthMethod.github,
+            brand: _ProviderBrand.github,
             enabled: widget.account.providers.github && !widget.account.loading,
-            onPressed: widget.onLogin,
+            onTap: () => widget.onLogin(MemberExternalAuthMethod.github),
           ),
           const SizedBox(height: 8),
           TextButton.icon(
@@ -930,19 +958,19 @@ class _ExternalLoginMethodsState extends State<_ExternalLoginMethods> {
             _ProviderLoginButton(
               key: const ValueKey('account-provider-passkey'),
               label: context.l10n.accountUsePasskey,
-              method: MemberExternalAuthMethod.passkey,
+              brand: _ProviderBrand.passkey,
               enabled:
                   widget.account.providers.passkey && !widget.account.loading,
-              onPressed: widget.onLogin,
+              onTap: () => widget.onLogin(MemberExternalAuthMethod.passkey),
             ),
             const SizedBox(height: 8),
             _ProviderLoginButton(
               key: const ValueKey('account-provider-google'),
               label: context.l10n.accountUseGoogle,
-              method: MemberExternalAuthMethod.google,
+              brand: _ProviderBrand.google,
               enabled:
                   widget.account.providers.google && !widget.account.loading,
-              onPressed: widget.onLogin,
+              onTap: () => widget.onLogin(MemberExternalAuthMethod.google),
             ),
           ],
           const SizedBox(height: 6),
@@ -961,6 +989,13 @@ class _ExternalLoginMethodsState extends State<_ExternalLoginMethods> {
   }
 
   bool get polling => widget.polling;
+
+  bool get _isApplePlatform =>
+      !kIsWeb &&
+      {
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+      }.contains(defaultTargetPlatform);
 }
 
 class _AuthorizationProgress extends StatelessWidget {
@@ -1035,27 +1070,30 @@ class _AuthorizationProgress extends StatelessWidget {
   }
 }
 
+enum _ProviderBrand { github, google, apple, passkey }
+
 class _ProviderLoginButton extends StatelessWidget {
   const _ProviderLoginButton({
     super.key,
     required this.label,
-    required this.method,
+    required this.brand,
     required this.enabled,
-    required this.onPressed,
+    required this.onTap,
   });
 
   final String label;
-  final MemberExternalAuthMethod method;
+  final _ProviderBrand brand;
   final bool enabled;
-  final ValueChanged<MemberExternalAuthMethod> onPressed;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isGithub = method == MemberExternalAuthMethod.github;
-    final isPasskey = method == MemberExternalAuthMethod.passkey;
-    final foreground = isGithub ? Colors.white : colorScheme.onSurface;
-    final background = isGithub
+    final isDark =
+        brand == _ProviderBrand.github || brand == _ProviderBrand.apple;
+    final isPasskey = brand == _ProviderBrand.passkey;
+    final foreground = isDark ? Colors.white : colorScheme.onSurface;
+    final background = isDark
         ? const Color(0xFF24292F)
         : isPasskey
         ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.52)
@@ -1067,7 +1105,7 @@ class _ProviderLoginButton extends StatelessWidget {
         color: background,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          onTap: enabled ? () => onPressed(method) : null,
+          onTap: enabled ? onTap : null,
           borderRadius: BorderRadius.circular(14),
           child: Container(
             height: isPasskey ? 46 : 54,
@@ -1075,7 +1113,7 @@ class _ProviderLoginButton extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isGithub
+                color: isDark
                     ? const Color(0xFF24292F)
                     : colorScheme.outlineVariant.withValues(alpha: 0.86),
               ),
@@ -1084,13 +1122,20 @@ class _ProviderLoginButton extends StatelessWidget {
               children: [
                 SizedBox.square(
                   dimension: isPasskey ? 21 : 24,
-                  child: isPasskey
-                      ? Icon(
-                          Icons.key_rounded,
-                          size: 20,
-                          color: colorScheme.primary,
-                        )
-                      : _ProviderBrandMark(method: method),
+                  child: switch (brand) {
+                    _ProviderBrand.passkey => Icon(
+                      Icons.key_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                    _ProviderBrand.apple => const Icon(
+                      Icons.apple_rounded,
+                      size: 24,
+                      color: Colors.white,
+                    ),
+                    _ProviderBrand.github ||
+                    _ProviderBrand.google => _ProviderBrandMark(brand: brand),
+                  },
                 ),
                 const SizedBox(width: 13),
                 Expanded(
@@ -1122,16 +1167,16 @@ class _ProviderLoginButton extends StatelessWidget {
 }
 
 class _ProviderBrandMark extends StatelessWidget {
-  const _ProviderBrandMark({required this.method});
+  const _ProviderBrandMark({required this.brand});
 
-  final MemberExternalAuthMethod method;
+  final _ProviderBrand brand;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
-    painter: switch (method) {
-      MemberExternalAuthMethod.github => const _GithubMarkPainter(),
-      MemberExternalAuthMethod.google => const _GoogleMarkPainter(),
-      MemberExternalAuthMethod.passkey => null,
+    painter: switch (brand) {
+      _ProviderBrand.github => const _GithubMarkPainter(),
+      _ProviderBrand.google => const _GoogleMarkPainter(),
+      _ProviderBrand.apple || _ProviderBrand.passkey => null,
     },
   );
 }

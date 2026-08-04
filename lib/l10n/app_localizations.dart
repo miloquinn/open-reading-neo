@@ -4591,6 +4591,12 @@ abstract class AppLocalizations {
   /// **'Reset password'**
   String get accountResetPassword;
 
+  /// Apple account login
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Apple'**
+  String get accountUseApple;
+
   /// GitHub account login
   ///
   /// In en, this message translates to:

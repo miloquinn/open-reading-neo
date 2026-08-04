@@ -83,6 +83,7 @@ dependencies:
   pointycastle: ^4.0.0
   in_app_purchase: ^3.3.0
   passkeys: ^2.22.0
+  sign_in_with_apple: ^8.1.0
 
 dev_dependencies:
   flutter_test:

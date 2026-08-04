@@ -16,6 +16,27 @@ int normalizeReaderFontWeight(num value) => ((value / 100).round() * 100).clamp(
 FontWeight readerFontWeightFromValue(int value) =>
     FontWeight.values[(normalizeReaderFontWeight(value) ~/ 100) - 1];
 
+/// Explicitly sets the `wght` axis for variable reader fonts instead of
+/// relying on [FontWeight] alone. Impeller (iOS's default renderer) doesn't
+/// reliably resolve a `TextStyle.fontWeight` to a registered variable font's
+/// axis on its own — without this, weight changes silently no-op and glyphs
+/// missing from whichever default instance gets picked fall back to a
+/// different font, producing visibly mismatched glyph sizes mid-paragraph.
+List<FontVariation> readerFontVariationsFromValue(
+  int value, {
+  required bool supportsVariableWeight,
+  int? variableWeightMin,
+  int? variableWeightMax,
+}) {
+  if (!supportsVariableWeight) return const <FontVariation>[];
+  final normalized = normalizeReaderFontWeight(value);
+  final clamped = normalized.clamp(
+    variableWeightMin ?? normalized,
+    variableWeightMax ?? normalized,
+  );
+  return <FontVariation>[FontVariation('wght', clamped.toDouble())];
+}
+
 @immutable
 class ReaderSettings {
   static const double defaultFontSize = 19;

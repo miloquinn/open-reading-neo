@@ -2104,6 +2104,9 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
               locale: Localizations.maybeLocaleOf(context),
             ) ??
             const <String>[],
+        fontWeightSupportsVariable: _readerFont.supportsVariableWeight,
+        fontWeightVariableMin: _readerFont.variableWeightMin,
+        fontWeightVariableMax: _readerFont.variableWeightMax,
         lineHeight: _lineHeight,
         letterSpacing: _letterSpacing,
         textAlignment: _textAlignment,
@@ -2641,6 +2644,12 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     color: _readerTheme.text,
     fontSize: _fontSize,
     fontWeight: readerFontWeightFromValue(_fontWeight),
+    fontVariations: readerFontVariationsFromValue(
+      _fontWeight,
+      supportsVariableWeight: _readerFont.supportsVariableWeight,
+      variableWeightMin: _readerFont.variableWeightMin,
+      variableWeightMax: _readerFont.variableWeightMax,
+    ),
     height: _lineHeight,
     letterSpacing: _letterSpacing,
   );

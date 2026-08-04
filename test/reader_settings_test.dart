@@ -4,6 +4,46 @@ import 'package:xxread/core/reader/reader_layout.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 
 void main() {
+  test('variable fonts get an explicit wght axis instead of relying on '
+      'engine-implicit weight matching', () {
+    final variations = readerFontVariationsFromValue(
+      620,
+      supportsVariableWeight: true,
+      variableWeightMin: 200,
+      variableWeightMax: 900,
+    );
+
+    expect(variations, hasLength(1));
+    expect(variations.single.axis, 'wght');
+    expect(variations.single.value, 600);
+  });
+
+  test(
+    'non-variable fonts get no explicit axis and fall back to synthetic bolding',
+    () {
+      final variations = readerFontVariationsFromValue(
+        700,
+        supportsVariableWeight: false,
+      );
+
+      expect(variations, isEmpty);
+    },
+  );
+
+  test(
+    'the requested weight is clamped to the font\'s declared axis range',
+    () {
+      final variations = readerFontVariationsFromValue(
+        700,
+        supportsVariableWeight: true,
+        variableWeightMin: 400,
+        variableWeightMax: 600,
+      );
+
+      expect(variations.single.value, 600);
+    },
+  );
+
   test('defaults page turning to horizontal slide', () async {
     SharedPreferences.setMockInitialValues({});
 

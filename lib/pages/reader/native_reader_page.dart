@@ -979,6 +979,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     ),
     fontSize: _fontSize,
     fontWeight: readerFontWeightFromValue(_fontWeight),
+    fontVariations: readerFontVariationsFromValue(
+      _fontWeight,
+      supportsVariableWeight: _readerFont.supportsVariableWeight,
+      variableWeightMin: _readerFont.variableWeightMin,
+      variableWeightMax: _readerFont.variableWeightMax,
+    ),
     height: _lineHeight,
     letterSpacing: _letterSpacing,
     color: _readerTheme.text,
@@ -2177,6 +2183,9 @@ class _NativeReaderPageState extends State<NativeReaderPage>
               locale: Localizations.maybeLocaleOf(context),
             ) ??
             const <String>[],
+        fontWeightSupportsVariable: _readerFont.supportsVariableWeight,
+        fontWeightVariableMin: _readerFont.variableWeightMin,
+        fontWeightVariableMax: _readerFont.variableWeightMax,
         lineHeight: _lineHeight,
         letterSpacing: _letterSpacing,
         textAlignment: _textAlignment,

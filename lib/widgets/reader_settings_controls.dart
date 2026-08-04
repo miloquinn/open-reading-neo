@@ -53,6 +53,9 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.fontWeight,
     this.fontFamily,
     this.fontFamilyFallback = const <String>[],
+    this.fontWeightSupportsVariable = false,
+    this.fontWeightVariableMin,
+    this.fontWeightVariableMax,
     required this.lineHeight,
     required this.letterSpacing,
     required this.textAlignment,
@@ -129,6 +132,9 @@ class ReaderSettingsSheet extends StatefulWidget {
   final int fontWeight;
   final String? fontFamily;
   final List<String> fontFamilyFallback;
+  final bool fontWeightSupportsVariable;
+  final int? fontWeightVariableMin;
+  final int? fontWeightVariableMax;
   final double lineHeight;
   final double letterSpacing;
   final ReaderTextAlignment textAlignment;
@@ -255,6 +261,9 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
       previewText: widget.fontWeightPreviewText,
       fontFamily: widget.fontFamily,
       fontFamilyFallback: widget.fontFamilyFallback,
+      fontWeightSupportsVariable: widget.fontWeightSupportsVariable,
+      fontWeightVariableMin: widget.fontWeightVariableMin,
+      fontWeightVariableMax: widget.fontWeightVariableMax,
       value: _fontWeight,
       onChanged: (value) => setState(() => _fontWeight = value),
       onChangeEnd: widget.onFontWeightChanged,
@@ -1063,6 +1072,9 @@ class ReaderFontWeightControl extends StatelessWidget {
     required this.onChangeEnd,
     this.fontFamily,
     this.fontFamilyFallback = const <String>[],
+    this.fontWeightSupportsVariable = false,
+    this.fontWeightVariableMin,
+    this.fontWeightVariableMax,
   }) : assert(valueLabels.length == 5);
 
   final String label;
@@ -1074,6 +1086,9 @@ class ReaderFontWeightControl extends StatelessWidget {
   final ValueChanged<int> onChangeEnd;
   final String? fontFamily;
   final List<String> fontFamilyFallback;
+  final bool fontWeightSupportsVariable;
+  final int? fontWeightVariableMin;
+  final int? fontWeightVariableMax;
 
   int get _normalizedValue => normalizeReaderFontWeight(value);
 
@@ -1095,6 +1110,12 @@ class ReaderFontWeightControl extends StatelessWidget {
       fontSize: 18,
       height: 1.3,
       fontWeight: readerFontWeightFromValue(_normalizedValue),
+      fontVariations: readerFontVariationsFromValue(
+        _normalizedValue,
+        supportsVariableWeight: fontWeightSupportsVariable,
+        variableWeightMin: fontWeightVariableMin,
+        variableWeightMax: fontWeightVariableMax,
+      ),
     );
     return Padding(
       key: const ValueKey('reader-font-weight-control'),

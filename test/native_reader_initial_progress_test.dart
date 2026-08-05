@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:xxread/core/reader/canonical_locator.dart';
 import 'package:xxread/core/reader/reader_layout.dart';
@@ -14,9 +17,27 @@ import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
+import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory databaseDirectory;
+
+  setUpAll(() async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    databaseDirectory = await Directory.systemTemp.createTemp(
+      'open-reading-reader-progress-db-',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (_) async => databaseDirectory.path,
+        );
+  });
+
   testWidgets(
     'EPUB horizontal reader paints the restored page on its first frame',
     (tester) async {
@@ -185,6 +206,136 @@ void main() {
       }
     },
   );
+
+  testWidgets(
+    'EPUB system back persists the pending horizontal page before reopening',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await tester.binding.setSurfaceSize(const Size(480, 800));
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
+      });
+      final directory = Directory.systemTemp.createTempSync(
+        'open-reading-epub-resume-progress-',
+      );
+      final epub = File('${directory.path}/resume-progress.epub')
+        ..writeAsBytesSync(_epubFixture());
+      final bookId = (await tester.runAsync<int>(
+        () => BookDao().insertBook(
+          Book(
+            title: 'EPUB resume progress fixture',
+            filePath: epub.path,
+            format: 'epub',
+            fileModifiedTime: epub.lastModifiedSync().millisecondsSinceEpoch,
+          ),
+        ),
+      ))!;
+      final navigatorKey = GlobalKey<NavigatorState>();
+
+      Future<PageController> openReader(Book book) async {
+        navigatorKey.currentState!.push(
+          MaterialPageRoute<void>(builder: (_) => NativeReaderPage(book: book)),
+        );
+        await tester.pump();
+        await tester.runAsync(() async {
+          for (var attempt = 0; attempt < 60; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+            if (find.byType(PageView).evaluate().isNotEmpty) return;
+          }
+        });
+        await _pumpUntil(
+          tester,
+          () => find.byType(PageView).evaluate().isNotEmpty,
+        );
+        return tester.widget<PageView>(find.byType(PageView)).controller!;
+      }
+
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: navigatorKey,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SizedBox.shrink(),
+          ),
+        );
+        final firstBook = (await tester.runAsync(
+          () => BookDao().getBookById(bookId),
+        ))!;
+        final controller = await openReader(firstBook);
+        final targetControllerPage = controller.initialPage + 5;
+        unawaited(
+          controller.animateToPage(
+            targetControllerPage,
+            duration: const Duration(seconds: 1),
+            curve: Curves.linear,
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 650));
+
+        final pageView = tester.widget<PageView>(find.byType(PageView));
+        final activeControllerPage = pageView.controller!.page!.round();
+        expect(activeControllerPage, greaterThan(controller.initialPage));
+        final activeLeaf = _pageLeafForControllerPage(tester, pageView);
+        expect(activeLeaf.metadata.pageNumber, greaterThan(1));
+
+        await tester.binding.handlePopRoute();
+        await tester.runAsync(() async {
+          for (var attempt = 0; attempt < 60; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+            if (find.byType(NativeReaderPage).evaluate().isEmpty) return;
+          }
+        });
+        await _pumpUntil(
+          tester,
+          () => find.byType(NativeReaderPage).evaluate().isEmpty,
+        );
+
+        final savedBook = (await tester.runAsync(
+          () => BookDao().getBookById(bookId),
+        ))!;
+        final savedLocator = savedBook.toCanonicalLocator();
+        expect(savedLocator?.textAnchor?.startOffsetUtf16, greaterThan(0));
+
+        final restoredController = await openReader(savedBook);
+        final restoredPageView = tester.widget<PageView>(find.byType(PageView));
+        expect(restoredController.initialPage, greaterThan(0));
+        final restoredLeaf = _pageLeafForControllerPage(
+          tester,
+          restoredPageView,
+        );
+        expect(
+          restoredLeaf.metadata.chapterTitle,
+          activeLeaf.metadata.chapterTitle,
+        );
+        expect(
+          restoredLeaf.metadata.pageNumber,
+          activeLeaf.metadata.pageNumber,
+        );
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.binding.setSurfaceSize(null);
+        debugDefaultTargetPlatformOverride = null;
+        directory.deleteSync(recursive: true);
+      }
+    },
+  );
+}
+
+ReaderPaperPageLeaf _pageLeafForControllerPage(
+  WidgetTester tester,
+  PageView pageView,
+) {
+  final delegate = pageView.childrenDelegate as SliverChildBuilderDelegate;
+  return delegate.builder(
+        tester.element(find.byType(PageView)),
+        pageView.controller!.page!.round(),
+      )!
+      as ReaderPaperPageLeaf;
 }
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {

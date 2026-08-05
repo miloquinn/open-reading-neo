@@ -121,9 +121,45 @@ extension _NativeReaderSession on _NativeReaderPageState {
     _exitInProgress = true;
     BookOpenTransition.beginExit();
     unawaited(_flushReadingSession());
+    await _persistCurrentReaderPosition(reason: 'exit');
     await _flushPendingPositionSave();
+    debugPrint('[reader-progress] exit position queue flushed');
     if (!mounted) return;
+    _setReaderState(() => _exitPositionCommitted = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    debugPrint('[reader-progress] pop reader after exit position commit');
     Navigator.of(context).pop();
+  }
+
+  Future<void> _persistCurrentReaderPosition({required String reason}) {
+    final chapters = _loadedChapters;
+    if (chapters.isEmpty) return Future<void>.value();
+
+    // PageView intentionally defers the current page while a drag or fling is
+    // active. A route exit must commit that exact target before flushing the
+    // write queue, otherwise the previous chapter opening is restored.
+    if (_pageMode == NativePageMode.horizontalSlide &&
+        _pendingHorizontalPage != null) {
+      final pending = _pendingHorizontalPage!;
+      debugPrint(
+        '[reader-progress] commit pending page on $reason '
+        'chapter=${pending.page.chapterIndex} page=${pending.page.pageIndex} '
+        'offset=${pending.page.content.startOffset}',
+      );
+      _publishPendingHorizontalPage(chapters);
+      return Future<void>.value();
+    }
+
+    if (_visiblePages.isEmpty) return Future<void>.value();
+    final chapterIndex = _chapterIndex.clamp(0, chapters.length - 1);
+    final pageIndex = _pageIndex.clamp(0, _visiblePages.length - 1);
+    final page = _visiblePages[pageIndex];
+    debugPrint(
+      '[reader-progress] save visible page on $reason '
+      'chapter=$chapterIndex page=$pageIndex offset=${page.startOffset}',
+    );
+    return _saveCanonicalProgress(chapters[chapterIndex], page, chapterIndex);
   }
 
   Future<void> _flushPendingPositionSave() => _positionSaveQueue.flush();

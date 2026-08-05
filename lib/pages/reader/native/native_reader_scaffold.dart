@@ -20,7 +20,10 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
       key: const ValueKey('reader-system-ui-region'),
       value: systemUiOverlayStyle,
       child: PopScope(
-        canPop: !_tapZoneEditorVisible,
+        // A route pop used to dispose the reader before its last horizontal
+        // page, which can be held until the PageView settles, was persisted.
+        // Keep the route until _exitReader has committed that page.
+        canPop: _exitPositionCommitted,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) {
             BookOpenTransition.beginExit();

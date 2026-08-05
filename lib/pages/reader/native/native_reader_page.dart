@@ -258,6 +258,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _initialPositionRestored = false;
   bool _initialPositionRestoreScheduled = false;
   bool _exitInProgress = false;
+  bool _exitPositionCommitted = false;
   String? _lastSavedLocation;
   late final ReaderPositionSaveQueue _positionSaveQueue =
       ReaderPositionSaveQueue(
@@ -379,6 +380,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(_flushReadingSession());
+      unawaited(_persistCurrentReaderPosition(reason: 'lifecycle'));
       unawaited(_flushPendingPositionSave());
     }
   }

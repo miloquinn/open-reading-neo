@@ -536,8 +536,10 @@ MemberAccountException _friendlyError(DioException error) {
     final Map value => value['message'] as String?,
     _ => json['message'] as String?,
   };
+  final validationMessage = _validationErrorMessage(detail);
   final message =
       serverMessage ??
+      validationMessage ??
       switch (code) {
         'authorization_pending' => '等待在浏览器中完成授权',
         'slow_down' => '授权查询过于频繁，请稍后重试',
@@ -552,6 +554,7 @@ MemberAccountException _friendlyError(DioException error) {
         409 => '该邮箱或用户名已被使用',
         413 => '上传的文件过大',
         415 => '不支持该文件格式',
+        422 => '提交的信息不符合要求，请检查后重试',
         429 => '操作过于频繁，请稍后再试',
         final code when code != null && code >= 500 && code <= 599 =>
           '账号服务暂时不可用，请稍后再试',
@@ -568,6 +571,28 @@ MemberAccountException _friendlyError(DioException error) {
     code: code,
     retryAfter: retryAfter,
   );
+}
+
+String? _validationErrorMessage(Object? detail) {
+  if (detail is! List) return null;
+  for (final violation in detail) {
+    if (violation is! Map) continue;
+    final location = violation['loc'];
+    if (location is! List) continue;
+    final field = location.whereType<String>().lastOrNull;
+    switch (field) {
+      case 'email':
+        return '邮箱格式不正确，请检查后重试';
+      case 'username':
+        return '用户名不符合要求，请使用 3-30 位小写字母、数字或下划线';
+      case 'password':
+        return '密码不符合要求，请使用 12-128 位字符';
+      case 'code':
+      case 'challenge_id':
+        return '验证码无效或已过期，请重新获取';
+    }
+  }
+  return null;
 }
 
 Map<String, dynamic> _map(Object? value) =>

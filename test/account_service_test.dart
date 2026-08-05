@@ -61,6 +61,71 @@ void main() {
     },
   );
 
+  test('registration validation errors explain the invalid field', () async {
+    final storage = _MemoryTokenStore();
+    final adapter = _RouteAdapter((options) {
+      expect(options.uri.path, '/api/v1/auth/password/register');
+      return _json({
+        'detail': [
+          {
+            'type': 'value_error',
+            'loc': ['body', 'code'],
+            'msg': 'invalid verification code',
+          },
+        ],
+      }, status: 422);
+    });
+    final client = _client(adapter, storage);
+
+    await expectLater(
+      client.registerPassword(
+        email: 'reader@example.com',
+        challengeId: 'challenge-1',
+        code: '123456',
+        username: 'reader',
+        password: 'a secure password',
+      ),
+      throwsA(
+        isA<MemberAccountException>().having(
+          (error) => error.message,
+          'message',
+          '验证码无效或已过期，请重新获取',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'email validation errors are not reported as connection failures',
+    () async {
+      final storage = _MemoryTokenStore();
+      final adapter = _RouteAdapter((options) {
+        expect(options.uri.path, '/api/v1/auth/password/register/code');
+        return _json({
+          'detail': [
+            {
+              'type': 'value_error',
+              'loc': ['body', 'email'],
+              'msg': 'not a valid email address',
+            },
+          ],
+        }, status: 422);
+      });
+      final client = _client(adapter, storage);
+
+      await expectLater(
+        client.requestCode('not-an-email', MemberEmailCodePurpose.registration),
+        throwsA(
+          isA<MemberAccountException>().having(
+            (error) => error.message,
+            'message',
+            '邮箱格式不正确，请检查后重试',
+          ),
+        ),
+      );
+    },
+  );
+
   test(
     'apple login posts the identity token and stores the rotated session',
     () async {

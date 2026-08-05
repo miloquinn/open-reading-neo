@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -500,16 +501,36 @@ void main() {
       );
 
       final titlePage = jumpedController.page!;
-      final previous = jumpedController.previousPage(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
+      final settledChildCount = tester
+          .widget<PageView>(readerPageView)
+          .childrenDelegate
+          .estimatedChildCount!;
+      final pageViewRect = tester.getRect(readerPageView);
+      final backwardGesture = await tester.startGesture(
+        Offset(pageViewRect.left + 8, pageViewRect.center.dy),
       );
+      await backwardGesture.moveBy(Offset(pageViewRect.width * 0.65, 0));
+      await tester.pump();
+      final heldPage = jumpedController.page!;
+      expect(heldPage, isNot(heldPage.roundToDouble()));
+      expect(
+        tester.widget<PageView>(readerPageView).controller,
+        same(jumpedController),
+      );
+      expect(
+        tester
+            .widget<PageView>(readerPageView)
+            .childrenDelegate
+            .estimatedChildCount,
+        settledChildCount,
+      );
+
+      await backwardGesture.up();
       await tester.pumpAndSettle();
-      await previous;
       final previousPageController = tester
           .widget<PageView>(readerPageView)
           .controller!;
-      expect(previousPageController, isNot(same(jumpedController)));
+      expect(previousPageController, same(jumpedController));
       final pageView = tester.widget<PageView>(readerPageView);
       final delegate = pageView.childrenDelegate as SliverChildBuilderDelegate;
       final visibleLeaf = delegate.builder(
@@ -525,63 +546,112 @@ void main() {
     },
   );
 
-  testWidgets('TXT horizontal paging keeps the legacy unkeyed delegate', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({
-      ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
-    });
-    bookFile.writeAsStringSync(
-      List.generate(3, (chapterIndex) {
-        final chapterNumber = chapterIndex + 1;
-        final body = List.generate(
-          28,
-          (paragraphIndex) => '第$chapterNumber章第$paragraphIndex段，用于水平分页回归测试。',
-        ).join('\n\n');
-        return '第$chapterNumber章 测试章节\n\n$body';
-      }).join('\n\n'),
-    );
-    await tester.binding.setSurfaceSize(const Size(400, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'TXT horizontal paging keeps its legacy delegate stable during a chapter turn',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
+      });
+      bookFile.writeAsStringSync(
+        List.generate(4, (chapterIndex) {
+          final chapterNumber = chapterIndex + 1;
+          final body = List.generate(
+            28,
+            (paragraphIndex) => '第$chapterNumber章第$paragraphIndex段，用于水平分页回归测试。',
+          ).join('\n\n');
+          return '第$chapterNumber章 测试章节\n\n$body';
+        }).join('\n\n'),
+      );
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: NativeReaderPage(
-          book: Book(
-            title: 'TXT 水平分页回归',
-            filePath: bookFile.path,
-            format: 'txt',
-            textEncoding: 'utf8',
-            fileModifiedTime: bookFile
-                .lastModifiedSync()
-                .millisecondsSinceEpoch,
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NativeReaderPage(
+            book: Book(
+              title: 'TXT 水平分页回归',
+              filePath: bookFile.path,
+              format: 'txt',
+              textEncoding: 'utf8',
+              fileModifiedTime: bookFile
+                  .lastModifiedSync()
+                  .millisecondsSinceEpoch,
+            ),
           ),
         ),
-      ),
-    );
-    final pageView = find.descendant(
-      of: find.byType(NativeReaderPage),
-      matching: find.byType(PageView),
-    );
-    await tester.runAsync(() async {
-      for (var attempt = 0; attempt < 40; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await tester.pump();
-        if (pageView.evaluate().isNotEmpty) return;
-      }
-    });
-    await _pumpUntilFound(tester, pageView);
+      );
+      final pageView = find.descendant(
+        of: find.byType(NativeReaderPage),
+        matching: find.byType(PageView),
+      );
+      await tester.runAsync(() async {
+        for (var attempt = 0; attempt < 40; attempt++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+          if (pageView.evaluate().isNotEmpty) return;
+        }
+      });
+      await _pumpUntilFound(tester, pageView);
 
-    final delegate = tester.widget<PageView>(pageView).childrenDelegate;
-    expect(delegate, isA<SliverChildBuilderDelegate>());
-    expect(
-      (delegate as SliverChildBuilderDelegate).findChildIndexCallback,
-      isNull,
-    );
-    expect(tester.takeException(), isNull);
-  });
+      final pageViewWidget = tester.widget<PageView>(pageView);
+      final delegate = pageViewWidget.childrenDelegate;
+      expect(delegate, isA<SliverChildBuilderDelegate>());
+      expect(
+        (delegate as SliverChildBuilderDelegate).findChildIndexCallback,
+        isNull,
+      );
+
+      final currentPage = pageViewWidget.controller?.page?.round() ?? 0;
+      final firstChapterPages = <int>[];
+      final firstIndex = math.max(0, currentPage - 160);
+      final lastIndex = math.min(
+        delegate.estimatedChildCount! - 1,
+        currentPage + 160,
+      );
+      for (var index = firstIndex; index <= lastIndex; index++) {
+        final leaf = delegate.builder(tester.element(pageView), index);
+        if (leaf is! ReaderPaperPageLeaf) continue;
+        if (leaf.metadata.chapterTitle == '第1章 测试章节') {
+          firstChapterPages.add(index);
+        }
+      }
+      expect(firstChapterPages, isNotEmpty);
+
+      final controller = pageViewWidget.controller!;
+      controller.jumpToPage(firstChapterPages.last);
+      await tester.pumpAndSettle();
+      final settledChildCount = tester
+          .widget<PageView>(pageView)
+          .childrenDelegate
+          .estimatedChildCount!;
+      final rect = tester.getRect(pageView);
+      final forwardGesture = await tester.startGesture(
+        Offset(rect.right - 8, rect.center.dy),
+      );
+      await forwardGesture.moveBy(const Offset(-150, 0));
+      await tester.pump();
+      await forwardGesture.moveBy(Offset(-rect.width * 0.35, 0));
+      await tester.pump();
+
+      final heldPage = controller.page!;
+      expect(heldPage, isNot(heldPage.roundToDouble()));
+      expect(tester.widget<PageView>(pageView).controller, same(controller));
+      expect(
+        tester.widget<PageView>(pageView).childrenDelegate.estimatedChildCount,
+        settledChildCount,
+      );
+
+      await forwardGesture.up();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<PageView>(pageView).childrenDelegate.estimatedChildCount,
+        greaterThan(settledChildCount),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('TXT initialization preloads behind the cover route', (
     tester,

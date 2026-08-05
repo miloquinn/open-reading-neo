@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
@@ -84,17 +85,11 @@ void main() {
 
         final pageView = find.byType(PageView);
         final pageViewWidget = tester.widget<PageView>(pageView);
-        final delegate =
-            pageViewWidget.childrenDelegate as SliverChildBuilderDelegate;
-        final initialChildCount = delegate.estimatedChildCount!;
-        final firstChapterPages = <int>[];
-        for (var index = 0; index < initialChildCount; index++) {
-          final leaf = delegate.builder(tester.element(pageView), index)!;
-          final metadata = (leaf as ReaderPaperPageLeaf).metadata;
-          if (metadata.chapterTitle == 'Chapter 1') {
-            firstChapterPages.add(index);
-          }
-        }
+        final firstChapterPages = _nearbyPageIndexes(
+          tester,
+          pageView,
+          'Chapter 1',
+        );
         expect(firstChapterPages, isNotEmpty);
 
         final controller = pageViewWidget.controller!;
@@ -116,6 +111,7 @@ void main() {
               widget.metadata.pageNumber == firstChapterPages.length,
         );
         expect(boundaryLeaf, findsOneWidget);
+        final boundaryElement = tester.element(boundaryLeaf);
         final rect = tester.getRect(pageView);
         final gesture = await tester.startGesture(
           Offset(rect.right - 8, rect.center.dy),
@@ -131,6 +127,7 @@ void main() {
               widget.metadata.pageNumber == 1,
         );
         expect(incomingLeaf, findsOneWidget);
+        final incomingElement = tester.element(incomingLeaf);
         expect(
           tester
               .widget<PageView>(pageView)
@@ -139,7 +136,24 @@ void main() {
           settledChildCount,
         );
 
-        await gesture.moveBy(Offset(-rect.width, 0));
+        // Cross PageView's onPageChanged threshold without releasing the
+        // pointer. Chapter-window maintenance must not alter the live page
+        // list or controller while the drag is still active.
+        await gesture.moveBy(Offset(-rect.width * 0.35, 0));
+        await tester.pump();
+        final heldPage = controller.page!;
+        expect(heldPage, isNot(heldPage.roundToDouble()));
+        expect(tester.widget<PageView>(pageView).controller, same(controller));
+        expect(
+          tester
+              .widget<PageView>(pageView)
+              .childrenDelegate
+              .estimatedChildCount,
+          settledChildCount,
+        );
+        expect(tester.element(boundaryLeaf), same(boundaryElement));
+        expect(tester.element(incomingLeaf), same(incomingElement));
+
         await gesture.up();
         await tester.pumpAndSettle();
         expect(
@@ -212,6 +226,9 @@ void main() {
         tester,
         () => find.byType(PageView).evaluate().isNotEmpty,
       );
+      final stableController = tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!;
 
       var reachedBody = false;
       for (var turn = 0; turn < 24 && !reachedBody; turn++) {
@@ -250,6 +267,256 @@ void main() {
       }
 
       expect(reachedBody, isTrue);
+      expect(
+        tester.widget<PageView>(find.byType(PageView)).controller,
+        same(stableController),
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await tester.binding.setSurfaceSize(null);
+      debugDefaultTargetPlatformOverride = null;
+      directory.deleteSync(recursive: true);
+    }
+  });
+
+  testWidgets(
+    'EPUB horizontal paging does not bounce when turning again at a warming tail',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await tester.binding.setSurfaceSize(const Size(480, 800));
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
+        ReaderSettingsStore.txtChapterTitlePageKey: false,
+      });
+      final directory = Directory.systemTemp.createTempSync(
+        'open-reading-epub-warming-tail-',
+      );
+      final epub = File('${directory.path}/warming-tail.epub');
+      epub.writeAsBytesSync(
+        _epubFixture(chapterCount: 14, imageOnlyChapterCount: 8),
+      );
+
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NativeReaderPage(
+              book: Book(
+                title: 'EPUB warming tail fixture',
+                filePath: epub.path,
+                format: 'epub',
+                fileModifiedTime: epub
+                    .lastModifiedSync()
+                    .millisecondsSinceEpoch,
+              ),
+            ),
+          ),
+        );
+        await tester.runAsync(() async {
+          for (var attempt = 0; attempt < 60; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+            if (find.byType(PageView).evaluate().isNotEmpty) return;
+          }
+        });
+        await _pumpUntil(
+          tester,
+          () => find.byType(PageView).evaluate().isNotEmpty,
+        );
+
+        final pageView = find.byType(PageView);
+        final initialPageView = tester.widget<PageView>(pageView);
+        final controller = initialPageView.controller!;
+        final publishedTail = _lastPublishedContentPageIndex(tester, pageView);
+        final tailLeaf = _pageLeafAt(tester, pageView, publishedTail);
+        final tailChapterNumber = int.parse(
+          tailLeaf.metadata.chapterTitle.split(' ').last,
+        );
+        controller.jumpToPage(publishedTail);
+        expect(controller.page, publishedTail.toDouble());
+
+        final rect = tester.getRect(pageView);
+        final gesture = await tester.startGesture(
+          Offset(rect.right - 8, rect.center.dy),
+        );
+        await gesture.moveBy(Offset(-rect.width * 0.8, 0));
+        await tester.pump();
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        });
+        await tester.pumpAndSettle();
+
+        final settledPage = controller.page!.round();
+        final settledLeaf = _pageLeafAt(tester, pageView, settledPage);
+        expect(tester.widget<PageView>(pageView).controller, same(controller));
+        expect(settledPage, publishedTail + 1);
+        expect(
+          settledLeaf.metadata.chapterTitle,
+          'Chapter ${tailChapterNumber + 1}',
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.binding.setSurfaceSize(null);
+        debugDefaultTargetPlatformOverride = null;
+        directory.deleteSync(recursive: true);
+      }
+    },
+  );
+
+  testWidgets('EPUB backward turns keep one horizontal controller', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
+    });
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    final directory = Directory.systemTemp.createTempSync(
+      'open_reading_epub_backward_window_',
+    );
+    final epub = File('${directory.path}/backward-window.epub');
+    epub.writeAsBytesSync(_epubFixture(chapterCount: 6));
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NativeReaderPage(
+            book: Book(
+              title: 'EPUB backward window fixture',
+              filePath: epub.path,
+              format: 'epub',
+              currentPage: 3,
+              fileModifiedTime: epub.lastModifiedSync().millisecondsSinceEpoch,
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(() async {
+        for (var attempt = 0; attempt < 60; attempt++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+          if (find.byType(PageView).evaluate().isNotEmpty) return;
+        }
+      });
+      await _pumpUntil(
+        tester,
+        () => find.byType(PageView).evaluate().isNotEmpty,
+      );
+
+      final pageView = find.byType(PageView);
+      final initialWidget = tester.widget<PageView>(pageView);
+      final chapterFourPages = _nearbyPageIndexes(
+        tester,
+        pageView,
+        'Chapter 4',
+      );
+      expect(chapterFourPages, isNotEmpty);
+
+      final initialController = initialWidget.controller!;
+      initialController.jumpToPage(chapterFourPages.first);
+      await tester.pumpAndSettle();
+      final firstChildCount = tester
+          .widget<PageView>(pageView)
+          .childrenDelegate
+          .estimatedChildCount!;
+      final rect = tester.getRect(pageView);
+      final firstGesture = await tester.startGesture(
+        Offset(rect.left + 8, rect.center.dy),
+      );
+      await firstGesture.moveBy(Offset(rect.width * 0.65, 0));
+      await tester.pump();
+      final firstHeldPage = initialController.page!;
+      expect(firstHeldPage, isNot(firstHeldPage.roundToDouble()));
+      expect(
+        tester.widget<PageView>(pageView).controller,
+        same(initialController),
+      );
+      expect(
+        tester.widget<PageView>(pageView).childrenDelegate.estimatedChildCount,
+        firstChildCount,
+      );
+
+      await firstGesture.up();
+      await tester.pumpAndSettle();
+      await _pumpUntil(
+        tester,
+        () => identical(
+          tester.widget<PageView>(pageView).controller,
+          initialController,
+        ),
+      );
+
+      final middleWidget = tester.widget<PageView>(pageView);
+      final chapterThreePages = _nearbyPageIndexes(
+        tester,
+        pageView,
+        'Chapter 3',
+      );
+      expect(chapterThreePages, isNotEmpty);
+
+      final middleController = middleWidget.controller!;
+      middleController.jumpToPage(chapterThreePages.first);
+      await tester.pumpAndSettle();
+      final secondChildCount = tester
+          .widget<PageView>(pageView)
+          .childrenDelegate
+          .estimatedChildCount!;
+      final secondGesture = await tester.startGesture(
+        Offset(rect.left + 8, rect.center.dy),
+      );
+      await secondGesture.moveBy(Offset(rect.width * 0.65, 0));
+      await tester.pump();
+      final secondHeldPage = middleController.page!;
+      expect(secondHeldPage, isNot(secondHeldPage.roundToDouble()));
+      expect(
+        tester.widget<PageView>(pageView).controller,
+        same(middleController),
+      );
+      expect(
+        tester.widget<PageView>(pageView).childrenDelegate.estimatedChildCount,
+        secondChildCount,
+      );
+
+      await secondGesture.up();
+      await tester.pumpAndSettle();
+      await _pumpUntil(
+        tester,
+        () => identical(
+          tester.widget<PageView>(pageView).controller,
+          middleController,
+        ),
+      );
+
+      final settledWidget = tester.widget<PageView>(pageView);
+      final settledDelegate =
+          settledWidget.childrenDelegate as SliverChildBuilderDelegate;
+      final settledChapterTitles = {
+        for (final index in _nearbyPageIndexes(tester, pageView, null))
+          (settledDelegate.builder(tester.element(pageView), index)!
+                  as ReaderPaperPageLeaf)
+              .metadata
+              .chapterTitle,
+      };
+      expect(
+        settledChapterTitles,
+        containsAll(<String>[
+          'Chapter 1',
+          'Chapter 2',
+          'Chapter 3',
+          'Chapter 4',
+        ]),
+      );
+      expect(settledChapterTitles, isNot(contains('Chapter 5')));
       expect(tester.takeException(), isNull);
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -364,6 +631,53 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
     if (condition()) return;
   }
   fail('Timed out waiting for EPUB reader state.');
+}
+
+List<int> _nearbyPageIndexes(
+  WidgetTester tester,
+  Finder pageView,
+  String? chapterTitle,
+) {
+  final widget = tester.widget<PageView>(pageView);
+  final delegate = widget.childrenDelegate as SliverChildBuilderDelegate;
+  final element = tester.element(pageView);
+  final current = widget.controller?.page?.round() ?? 0;
+  final first = math.max(0, current - 160);
+  final last = math.min(delegate.estimatedChildCount! - 1, current + 160);
+  final indexes = <int>[];
+  for (var index = first; index <= last; index++) {
+    final child = delegate.builder(element, index);
+    if (child is! ReaderPaperPageLeaf) continue;
+    if (chapterTitle == null || child.metadata.chapterTitle == chapterTitle) {
+      indexes.add(index);
+    }
+  }
+  return indexes;
+}
+
+ReaderPaperPageLeaf _pageLeafAt(
+  WidgetTester tester,
+  Finder pageView,
+  int controllerPage,
+) {
+  final widget = tester.widget<PageView>(pageView);
+  final delegate = widget.childrenDelegate as SliverChildBuilderDelegate;
+  return delegate.builder(tester.element(pageView), controllerPage)!
+      as ReaderPaperPageLeaf;
+}
+
+int _lastPublishedContentPageIndex(WidgetTester tester, Finder pageView) {
+  final widget = tester.widget<PageView>(pageView);
+  final delegate = widget.childrenDelegate as SliverChildBuilderDelegate;
+  final element = tester.element(pageView);
+  for (var index = delegate.estimatedChildCount! - 1; index >= 0; index--) {
+    final child = delegate.builder(element, index);
+    if (child is ReaderPaperPageLeaf &&
+        child.metadata.chapterTitle.isNotEmpty) {
+      return index;
+    }
+  }
+  fail('No published EPUB content page was available.');
 }
 
 List<int> _epubFixture({int chapterCount = 4, int imageOnlyChapterCount = 0}) {

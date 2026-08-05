@@ -3161,11 +3161,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     }
     if (page.chapterIndex >= _horizontalLastChapter - 1 &&
         _horizontalLastChapter < chapters.length - 1) {
-      if (_pageMode == NativePageMode.horizontalSlide) {
-        _horizontalForwardExpansionPending = true;
-      } else {
-        setState(() => _horizontalLastChapter++);
-      }
+      setState(() => _horizontalLastChapter++);
     }
     _saveCanonicalProgress(
       chapters[page.chapterIndex],
@@ -3188,19 +3184,19 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     return true;
   }
 
-  bool _commitHorizontalForwardContraction(
+  void _commitHorizontalForwardContraction(
     List<_BookPageRef> bookPages,
     List<_NativeChapter> chapters, {
     required bool usesTwoPageLayout,
   }) {
     if (!_horizontalForwardContractionPending ||
         _pageMode != NativePageMode.horizontalSlide) {
-      return false;
+      return;
     }
     final nextFirstChapter = math.max(0, _chapterIndex - 1);
     if (nextFirstChapter <= _horizontalFirstChapter) {
       _horizontalForwardContractionPending = false;
-      return false;
+      return;
     }
     final targetPage = bookPages.indexWhere(
       (page) =>
@@ -3208,7 +3204,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           page.chapterIndex == _chapterIndex &&
           page.pageIndex == _pageIndex,
     );
-    if (targetPage < 0) return false;
+    if (targetPage < 0) return;
     final removedBookPages = bookPages
         .takeWhile((page) => page.chapterIndex < nextFirstChapter)
         .length;
@@ -3222,22 +3218,15 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     );
     _pageControllerGeneration++;
     _horizontalForwardContractionPending = false;
-    final nextLastChapter = _takeHorizontalForwardExpansion(chapters);
-    setState(() {
-      _horizontalFirstChapter = nextFirstChapter;
-      if (nextLastChapter != null) {
-        _horizontalLastChapter = nextLastChapter;
-      }
-    });
+    setState(() => _horizontalFirstChapter = nextFirstChapter);
     if (previousPageController != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => previousPageController.dispose(),
       );
     }
-    return true;
   }
 
-  bool _commitHorizontalBackwardExpansion(
+  void _commitHorizontalBackwardExpansion(
     List<_NativeChapter> chapters,
     Size size,
     TextDirection direction,
@@ -3247,7 +3236,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     if (!_horizontalBackwardExpansionPending ||
         _horizontalFirstChapter <= 0 ||
         size.isEmpty) {
-      return false;
+      return;
     }
     final nextFirstChapter = _horizontalFirstChapter - 1;
     final chapter = chapters[nextFirstChapter];
@@ -3271,7 +3260,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
           ),
         );
       }
-      return false;
+      return;
     }
     _horizontalBackwardExpansionPending = false;
     _horizontalBackwardExpansionWarmPending = false;
@@ -3279,7 +3268,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       // Cover mode locates the current page by identity on every build, so
       // the window can grow without preserving a scroll position.
       setState(() => _horizontalFirstChapter = nextFirstChapter);
-      return true;
+      return;
     }
     final addedPages = _pagesFor(
       chapter,
@@ -3302,19 +3291,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       initialPage: currentControllerPage + addedControllerPages,
     );
     _pageControllerGeneration++;
-    final nextLastChapter = _takeHorizontalForwardExpansion(chapters);
-    setState(() {
-      _horizontalFirstChapter = nextFirstChapter;
-      if (nextLastChapter != null) {
-        _horizontalLastChapter = nextLastChapter;
-      }
-    });
+    setState(() => _horizontalFirstChapter = nextFirstChapter);
     if (previousPageController != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => previousPageController.dispose(),
       );
     }
-    return true;
   }
 
   Future<void> _prepareHorizontalBackwardExpansion(
@@ -3930,23 +3912,34 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       );
     }
     if (_pageMode == NativePageMode.horizontalSlide) {
-      return NotificationListener<ScrollEndNotification>(
-        onNotification: (_) {
-          final expandedBackward = _commitHorizontalBackwardExpansion(
-            chapters,
-            _paginationSize(viewport, usesTwoPageLayout),
-            Directionality.of(context),
-            readerBodyTextScaler,
-            usesTwoPageLayout: usesTwoPageLayout,
-          );
-          if (expandedBackward) return false;
-          final contractedForward = _commitHorizontalForwardContraction(
-            bookPages,
-            chapters,
-            usesTwoPageLayout: usesTwoPageLayout,
-          );
-          if (contractedForward) return false;
-          _commitHorizontalForwardExpansion(chapters);
+      return NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // Only perform window adjustments after scrolling has completely stopped.
+          // Executing contraction/expansion during scroll animation causes bookPages
+          // to change mid-flight, which manifests as a brief flash to the wrong page.
+          if (notification is ScrollEndNotification) {
+            final pageController = _pageController;
+            if (pageController == null || !pageController.hasClients) {
+              return false;
+            }
+            // Double-check that animation has truly settled
+            final isScrolling =
+                pageController.position.isScrollingNotifier.value;
+            if (!isScrolling) {
+              _commitHorizontalBackwardExpansion(
+                chapters,
+                _paginationSize(viewport, usesTwoPageLayout),
+                Directionality.of(context),
+                readerBodyTextScaler,
+                usesTwoPageLayout: usesTwoPageLayout,
+              );
+              _commitHorizontalForwardContraction(
+                bookPages,
+                chapters,
+                usesTwoPageLayout: usesTwoPageLayout,
+              );
+            }
+          }
           return false;
         },
         child: PageView.builder(

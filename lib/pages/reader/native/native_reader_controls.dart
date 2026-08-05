@@ -157,10 +157,18 @@ extension _NativeReaderControls on _NativeReaderPageState {
           : offset / chapter.plainText.length,
     );
     _anchorOffset = offset;
+    final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
+    unawaited(
+      ReadingResumeService.recordPosition(
+        bookId: bookId,
+        canonicalLocator: canonicalLocator,
+        chapterIndex: chapterIndex,
+      ),
+    );
     await _queuePositionWrite(
       () => BookDao().updateBookCanonicalLocator(
         bookId,
-        LocatorCodec.encodeCanonicalLocator(locator),
+        canonicalLocator,
         null,
         _layoutSignature,
         chapterIndex,

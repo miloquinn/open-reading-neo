@@ -692,10 +692,16 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     // 桌面端带文件参数启动时，交给入站书籍通道打开目标文件。
     if (widget.initialFilePaths.isNotEmpty) return;
     try {
-      final bookId = await ReadingResumeService.takePendingResumeBookId();
-      if (bookId == null) return;
-      final book = await BookDao().getBookById(bookId);
-      if (book == null || !mounted) return;
+      final resume = await ReadingResumeService.takePendingResume();
+      if (resume == null) return;
+      final persistedBook = await BookDao().getBookById(resume.bookId);
+      if (persistedBook == null || !mounted) return;
+      final book = resume.applyTo(persistedBook);
+      debugPrint(
+        '[reader-resume] book=${resume.bookId} '
+        'chapter=${resume.chapterIndex ?? book.currentPage} '
+        'hasCanonical=${resume.canonicalLocator?.isNotEmpty ?? false}',
+      );
       final context = _navigatorKey.currentContext;
       if (context == null || !context.mounted) return;
       if (book.isOnline) {

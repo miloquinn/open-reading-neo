@@ -620,10 +620,18 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     final readingProgress = chapterCount <= 0
         ? null
         : ((chapterIndex + chapterProgress) / chapterCount).clamp(0.0, 1.0);
+    final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
+    unawaited(
+      ReadingResumeService.recordPosition(
+        bookId: bookId,
+        canonicalLocator: canonicalLocator,
+        chapterIndex: chapterIndex,
+      ),
+    );
     return _queuePositionWrite(
       () => BookDao().updateBookCanonicalLocator(
         bookId,
-        LocatorCodec.encodeCanonicalLocator(locator),
+        canonicalLocator,
         null,
         _layoutSignature,
         chapterIndex,

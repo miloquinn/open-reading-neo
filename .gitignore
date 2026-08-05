@@ -62,6 +62,7 @@ diagrams/
 !marketing/app-store/screenshots/**
 
 # Misc utility scripts & internal docs
+scripts/build_signed_apk.sh
 extract_svg.py
 fix_svg.py
 replace_withopacity.ps1

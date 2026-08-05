@@ -83,26 +83,26 @@ import 'package:xxread/widgets/reader_top_information_bar.dart';
 import 'package:xxread/widgets/reader_vertical_paging_surface.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
-import 'themes/reader_custom_themes_page.dart';
+import 'package:xxread/pages/reader/themes/reader_custom_themes_page.dart';
 
-part 'native/native_reader_chapter.dart';
-part 'native/native_reader_pagination.dart';
-part 'native/native_reader_parsers.dart';
-part 'native/native_reader_horizontal_paging.dart';
-part 'native/native_reader_vertical_paging.dart';
-part 'native/native_reader_rendering.dart';
-part 'native/native_reader_loading.dart';
-part 'native/native_reader_configuration.dart';
-part 'native/native_reader_interaction.dart';
-part 'native/native_reader_controls.dart';
-part 'native/native_reader_navigation.dart';
-part 'native/native_reader_page_cache.dart';
-part 'native/native_reader_shell.dart';
-part 'native/native_reader_scaffold.dart';
-part 'native/native_reader_session.dart';
-part 'native/native_reader_horizontal_window.dart';
-part 'native/native_reader_document_parsers.dart';
-part 'native/native_reader_continuous_layout.dart';
+part 'native_reader_chapter.dart';
+part 'native_reader_pagination.dart';
+part 'native_reader_parsers.dart';
+part 'native_reader_horizontal_paging.dart';
+part 'native_reader_vertical_paging.dart';
+part 'native_reader_rendering.dart';
+part 'native_reader_loading.dart';
+part 'native_reader_configuration.dart';
+part 'native_reader_interaction.dart';
+part 'native_reader_controls.dart';
+part 'native_reader_navigation.dart';
+part 'native_reader_page_cache.dart';
+part 'native_reader_shell.dart';
+part 'native_reader_scaffold.dart';
+part 'native_reader_session.dart';
+part 'native_reader_horizontal_window.dart';
+part 'native_reader_document_parsers.dart';
+part 'native_reader_continuous_layout.dart';
 
 typedef NativePageMode = ReaderPageMode;
 

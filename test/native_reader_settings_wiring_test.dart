@@ -11,7 +11,7 @@ import 'package:xxread/core/reader/reader_layout.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
-import 'package:xxread/pages/reader/native_reader_page.dart';
+import 'package:xxread/pages/reader/native/native_reader_page.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 import 'package:xxread/widgets/reader_top_information_bar.dart';

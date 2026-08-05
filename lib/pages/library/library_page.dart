@@ -20,7 +20,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/book_sources/book_source_change_page.dart';
-import 'package:xxread/pages/reader/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/pages/settings/sync/book_file_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/ai/ai_preprocess_task_controller.dart';

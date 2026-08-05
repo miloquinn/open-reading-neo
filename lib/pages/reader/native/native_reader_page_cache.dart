@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 extension _NativeReaderPageCache on _NativeReaderPageState {
   List<_ReaderPageData> _pagesFor(

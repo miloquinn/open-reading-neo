@@ -16,7 +16,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
 import 'package:xxread/services/reading/reading_resume_service.dart';
-import 'package:xxread/pages/reader/paged_image_reader.dart';
+import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_transitions.dart';

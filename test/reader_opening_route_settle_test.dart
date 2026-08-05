@@ -1,7 +1,7 @@
 import 'package:flutter/animation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:xxread/pages/reader/native_reader_page.dart';
+import 'package:xxread/pages/reader/native/native_reader_page.dart';
 
 void main() {
   testWidgets('large-reader work stays blocked until the entrance completes', (

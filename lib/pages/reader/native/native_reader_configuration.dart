@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 extension _NativeReaderConfiguration on _NativeReaderPageState {
   Future<void> _loadPageMode() async {

@@ -8,7 +8,7 @@
 - `lib/main.dart`：应用启动入口
 - `lib/pages/home/home_shell_page.dart`：首页导航壳层
 - `lib/services/books/book_import_service.dart`：导入总入口
-- `lib/pages/reader/native_reader_page.dart`：当前 Flutter 原生阅读页面
+- `lib/pages/reader/native/native_reader_page.dart`：当前 Flutter 原生阅读页面
 - `lib/reader_core/`：阅读支撑实现（解析、文档模型与共享数据结构）
 - `lib/services/pagination/`：旧分页链路
 

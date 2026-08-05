@@ -12,7 +12,7 @@ import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/home/home_mobile_dashboard_page.dart';
-import 'package:xxread/pages/reader/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/utils/reader_themes.dart';

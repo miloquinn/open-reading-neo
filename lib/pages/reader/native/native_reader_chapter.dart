@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 class _NativeChapter {
   _NativeChapter({

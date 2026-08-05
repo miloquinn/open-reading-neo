@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/core/reader/paged_image_reader_settings.dart';
 import 'package:xxread/core/reader/reader_keep_screen_on.dart';
 import 'package:xxread/l10n/app_localizations.dart';
-import 'package:xxread/pages/reader/paged_image_reader.dart';
+import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_theme_background.dart';
 

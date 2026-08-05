@@ -10,7 +10,7 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
-import 'package:xxread/pages/reader/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';

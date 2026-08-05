@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 Future<Map<String, dynamic>> _parseEpubChapters(Uint8List bytes) async {
   final epub = await EpubReader.readBook(bytes);

@@ -1,4 +1,4 @@
-part of '../book_source_reader_page.dart';
+part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderCurlRendering on _BookSourceReaderPageState {
   Widget _buildCurlReader({required bool usesTwoPageLayout}) =>

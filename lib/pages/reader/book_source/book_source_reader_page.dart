@@ -73,20 +73,19 @@ import 'package:xxread/widgets/reader_top_information_bar.dart';
 import 'package:xxread/widgets/reader_vertical_paging_surface.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
-import 'paged_image_reader.dart';
+import 'package:xxread/pages/reader/image/paged_image_reader.dart';
+import 'package:xxread/pages/reader/themes/reader_custom_themes_page.dart';
 
-import 'themes/reader_custom_themes_page.dart';
-
-part 'book_source/book_source_reader_vertical_paging.dart';
-part 'book_source/book_source_reader_pagination_rendering.dart';
-part 'book_source/book_source_reader_basic_turning.dart';
-part 'book_source/book_source_reader_curl_rendering.dart';
-part 'book_source/book_source_reader_catalog_loading.dart';
-part 'book_source/book_source_reader_chapter_loading.dart';
-part 'book_source/book_source_reader_navigation.dart';
-part 'book_source/book_source_reader_settings.dart';
-part 'book_source/book_source_reader_aloud_actions.dart';
-part 'book_source/book_source_reader_shell.dart';
+part 'book_source_reader_vertical_paging.dart';
+part 'book_source_reader_pagination_rendering.dart';
+part 'book_source_reader_basic_turning.dart';
+part 'book_source_reader_curl_rendering.dart';
+part 'book_source_reader_catalog_loading.dart';
+part 'book_source_reader_chapter_loading.dart';
+part 'book_source_reader_navigation.dart';
+part 'book_source_reader_settings.dart';
+part 'book_source_reader_aloud_actions.dart';
+part 'book_source_reader_shell.dart';
 
 const double _bookSourceSpreadGutter = 24;
 const int _bookSourceReadableChapterTextLimit = 8;

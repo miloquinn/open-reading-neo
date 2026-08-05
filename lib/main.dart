@@ -23,7 +23,7 @@ import 'models/book.dart';
 import 'pages/home/home_shell_page.dart';
 import 'pages/library/import_book/import_book_page.dart';
 import 'pages/legal/user_agreement_page.dart';
-import 'pages/reader/book_source_reader_page.dart';
+import 'pages/reader/book_source/book_source_reader_page.dart';
 import 'pages/book_sources/source_verification_page.dart';
 import 'services/books/book_services.dart';
 import 'services/books/book_format_support.dart';

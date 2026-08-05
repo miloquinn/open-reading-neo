@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 List<_ReaderPageData> _paginateChapter(
   _NativeChapter chapter, {

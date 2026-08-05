@@ -1,4 +1,4 @@
-part of '../book_source_reader_page.dart';
+part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
   void _handleTapZoneAction(ReaderTapZoneAction action) {

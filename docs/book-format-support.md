@@ -109,7 +109,7 @@ zip/rar → 解压到临时/托管目录
 
 ### 3.5 PDF（专用路径，已接线 2026-07-26）
 
-- `PdfReaderPage`（`pages/reader/pdf_reader_page.dart`）：pdfx `PdfDocument` 打开，
+- `PdfReaderPage`（`pages/reader/pdf/pdf_reader_page.dart`）：pdfx `PdfDocument` 打开，
   按页渲染 PNG 位图（屏幕像素密度自适应、白底、最大宽 2160px），
   **渲染严格串行**（Android 不允许并行渲染），LRU 缓存 5 页 + 相邻页预载。  
 - UI 骨架与 CBZ 漫画共用 `paged_image_reader.dart`（翻页/缩放/跳页/进度/点击区域/阅读方向/背景色/音量键/屏幕常亮）。  
@@ -124,8 +124,8 @@ zip/rar → 解压到临时/托管目录
 
 ### 3.7 CBZ / CBT / CBR / CB7（漫画）
 
-- CBZ：**已接线**（2026-07-26）。`ComicReaderPage`（`pages/reader/comic_reader_page.dart`）+ `comic_book_parser.dart`：isolate 解 ZIP 目录建页索引（数字感知排序、过滤 __MACOSX/隐藏文件）、按需解压单页、LRU 页缓存与相邻页预载、双击/双指缩放（缩放中锁翻页）、进度写回 `currentPage`。不走文本行盒。  
-- **共享控制层**（2026-07-26）：`paged_image_reader.dart` 为漫画与 PDF 提供统一控制层——共享 3×3 点击区域（`reader_tap_zones`，RTL 下镜像列）、Android 音量键翻页与屏幕常亮、上/下一页按钮、进度滑条、跳页输入；`paged_image_reader_settings.dart` 持久化按书阅读方向（日漫 RTL）与全局页面背景色（黑/灰/白）。  
+- CBZ：**已接线**（2026-07-26）。`ComicReaderPage`（`pages/reader/comic/comic_reader_page.dart`）+ `comic_book_parser.dart`：isolate 解 ZIP 目录建页索引（数字感知排序、过滤 __MACOSX/隐藏文件）、按需解压单页、LRU 页缓存与相邻页预载、双击/双指缩放（缩放中锁翻页）、进度写回 `currentPage`。不走文本行盒。
+- **共享控制层**（2026-07-26）：`image/paged_image_reader.dart` 为漫画与 PDF 提供统一控制层——共享 3×3 点击区域（`reader_tap_zones`，RTL 下镜像列）、Android 音量键翻页与屏幕常亮、上/下一页按钮、进度滑条、跳页输入；`paged_image_reader_settings.dart` 持久化按书阅读方向（日漫 RTL）与全局页面背景色（黑/灰/白）。
 - **容器嗅探**（2026-07-26）：所有漫画格式打开与导入时按文件头识别真实容器（ZIP 前缀魔数 / `Rar!` / 7z 魔数 / offset 257 的 `ustar`），扩展名只作无魔数时的兜底。市面上大量 CBR/CB7 实为 ZIP 改名，识别后直接走 CBZ 同款管线。  
 - CBT：**已接线**。TAR 容器由 `archive` 的 `TarDecoder` 解包，页索引/解压/阅读与 CBZ 完全共用；旧式 V7 TAR 无 ustar 魔数时按扩展名兜底。  
 - CBR / CB7：真实容器为 RAR/7z 时无纯 Dart 解码，`comic_book_parser` 抛 `ComicArchiveUnsupportedException`，阅读页展示本地化提示（真 RAR→`readerComicCbrUnsupported`，其余→`readerComicArchiveUnsupported`）；元数据与封面在容器可解包时照常提取，否则回退估算值。  
@@ -141,7 +141,7 @@ zip/rar → 解压到临时/托管目录
 | TXT 增强导入 | `enhanced_txt_import_service.dart` |
 | EPUB | `book_import_service` + `epubx` + `epub_image_extractor_service` |
 | 统一分页 | `core/reader/native_text_paginator.dart` |
-| 本地阅读入口 | `pages/reader/native_reader_page.dart` |
+| 本地阅读入口 | `pages/reader/native/native_reader_page.dart` |
 | 导入队列 | `book_import_*` + `pages/library/import_book/import_book_page.dart` |
 
 **规则：** 新增/调整格式时：

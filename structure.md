@@ -116,8 +116,8 @@ lib/
 - `pages/library/import_book/import_book_page.dart`：跨平台书籍导入队列；手机确认态采用顶部安全标题栏、独立滚动书目区和页面内底部操作区，并对文件选择器返回的异常窗口 inset 做限幅。
 - `services/books/book_export_*`：统一书籍导出结果、文件名/MIME 校验和平台后端；Android 走 MediaStore `Download/开元阅读`，iOS 走系统文档导出器，桌面端走另存为并流式复制。
 - `services/books/incoming_book_*`：统一系统“打开方式/分享”入站请求、冷/热启动 FIFO、初始化/协议门禁、格式与文件头校验、单书导入后打开及多书导入队列；原生层必须先把临时 URI/URL 物化成本地暂存文件。
-- `pages/reader/native_reader_page.dart`：本地 TXT、EPUB 等内容适配器；全局阅读字体尚未从磁盘恢复并完成运行时注册时只显示主题化打开占位。正文排版读取共享的字重、字间距与对齐方式，重排后按 canonical 文本锚点恢复位置。阅读位置通过 `core/reader/reader_position_save_queue.dart` 串行写入 SQLite，主动退出会等待最后一次写入完成，避免异步写入乱序覆盖新进度。EPUB 的 NCX/Navigation Document 目录链接会保留 fragment，并映射到解析后正文的 UTF-16 offset；同一 XHTML 内的二级标题可精确跳转，活动小节按全书目录目标位置判定，章节内容跨越相邻 XHTML 时仍保持上一小节为当前状态，直到下一个锚点进入阅读位置。
-- `pages/reader/book_source_reader_page.dart`：在线书源章节内容适配器；与本地阅读器共享字体就绪门禁、字重、字间距和自然/两端对齐设置，目录或正文先返回时也不会提前使用临时字体绘制。正文请求会携带书名、作者、书籍类型、章节序号和章节标题，供依赖实体上下文的脚本规则使用。
+- `pages/reader/native/native_reader_page.dart`：本地 TXT、EPUB 等内容适配器；全局阅读字体尚未从磁盘恢复并完成运行时注册时只显示主题化打开占位。正文排版读取共享的字重、字间距与对齐方式，重排后按 canonical 文本锚点恢复位置。阅读位置通过 `core/reader/reader_position_save_queue.dart` 串行写入 SQLite，主动退出会等待最后一次写入完成，避免异步写入乱序覆盖新进度。EPUB 的 NCX/Navigation Document 目录链接会保留 fragment，并映射到解析后正文的 UTF-16 offset；同一 XHTML 内的二级标题可精确跳转，活动小节按全书目录目标位置判定，章节内容跨越相邻 XHTML 时仍保持上一小节为当前状态，直到下一个锚点进入阅读位置。
+- `pages/reader/book_source/book_source_reader_page.dart`：在线书源章节内容适配器；与本地阅读器共享字体就绪门禁、字重、字间距和自然/两端对齐设置，目录或正文先返回时也不会提前使用临时字体绘制。正文请求会携带书名、作者、书籍类型、章节序号和章节标题，供依赖实体上下文的脚本规则使用。
 - `book_sources/services/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
 - `pages/book_sources/source_search_page.dart`：在线书源搜索与发现；大型书源库的范围条按需构建，“全部书源”通过最多 8 个 worker 有界并发搜索，按单源超时渐进追加结果，清空、切换范围或离页时取消当前请求。手机入口先打开加载页，再在后台解析注册表并替换为搜索页。
 - `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型阅读书源聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和能力标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/可执行状态、分组筛选和针对当前结果的批量操作。
@@ -180,7 +180,7 @@ lib/
 - **目标架构**：文字书最终都进入 `NativeTextPaginator` 统一分页；ZIP/RAR 为容器解压后再分流；PDF/漫画走专用渲染。
 - 文件选择器扩展名只使用 `BookFormatRegistry.pickerExtensions`（当前含 txt/epub/pdf/mobi/azw/azw3/fb2/rtf/doc/docx/html/htm/xhtml/md/markdown/cbz/cbt/cbr/cb7；zip/rar 为 planned，实现前不进选择器）。
 - 漫画容器（cbz/cbt/cbr/cb7）统一进 `ComicReaderPage`；`comic_book_parser.dart` 按文件头识别真实容器（ZIP/TAR 可解，改名的 CBR/CB7 自动识别），真 RAR/7z 抛类型化异常并展示本地化「转 CBZ」提示。
-- 漫画与 PDF 共用 `pages/reader/paged_image_reader.dart` 控制层：共享 3×3 点击区域（RTL 镜像列）、Android 音量键翻页与屏幕常亮，底栏含上/下一页、进度滑条与跳页输入；`core/reader/paged_image_reader_settings.dart` 按书持久化阅读方向（日漫从右到左）、全局持久化页面背景色（黑/灰/白），屏幕常亮与音量键开关与文字阅读器共用同一偏好键。
+- 漫画与 PDF 共用 `pages/reader/image/paged_image_reader.dart` 控制层：共享 3×3 点击区域（RTL 镜像列）、Android 音量键翻页与屏幕常亮，底栏含上/下一页、进度滑条与跳页输入；`core/reader/paged_image_reader_settings.dart` 按书持久化阅读方向（日漫从右到左）、全局持久化页面背景色（黑/灰/白），屏幕常亮与音量键开关与文字阅读器共用同一偏好键。
 - Lightink 1.22 对照：TXT/EPUB 完整文本引擎；ZIP/RAR 容器；MOBI/AZW3 仅 UI 级；PDF 无阅读引擎。Open Reading 在 Kindle/PDF/FB2 等上目标不低于并部分超过 Lightink。
 
 ## 阅读器架构

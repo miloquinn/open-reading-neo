@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 extension _NativeReaderShell on _NativeReaderPageState {
   Widget _buildPage(

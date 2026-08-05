@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 extension _NativeReaderScaffold on _NativeReaderPageState {
   Widget _buildReaderPage(BuildContext context) {

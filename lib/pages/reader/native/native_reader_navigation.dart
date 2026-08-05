@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 extension _NativeReaderNavigation on _NativeReaderPageState {
   _ReaderPageData _bookmarkPageFor(List<_ReaderPageData> pages) {

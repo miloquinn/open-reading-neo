@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 
 import 'package:xxread/models/book.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
-import 'package:xxread/pages/reader/comic_reader_page.dart';
-import 'package:xxread/pages/reader/native_reader_page.dart';
-import 'package:xxread/pages/reader/pdf_reader_page.dart';
+import 'package:xxread/pages/reader/comic/comic_reader_page.dart';
+import 'package:xxread/pages/reader/native/native_reader_page.dart';
+import 'package:xxread/pages/reader/pdf/pdf_reader_page.dart';
 import 'package:xxread/services/books/book_storage_repair_service.dart';
 import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';

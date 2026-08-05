@@ -28,7 +28,7 @@ NativeReaderPage
 2. `lib/pages/home/home_shell_page.dart`：主导航和页面装配。
 3. `lib/pages/library/library_page.dart`：本地书库与打开书籍入口。
 4. `lib/core/reader/native_reader_service.dart`：阅读路由边界。
-5. `lib/pages/reader/native_reader_page.dart`：原生阅读、分页和交互实现。
+5. `lib/pages/reader/native/native_reader_page.dart`：原生阅读、分页和交互实现。
 6. `lib/core/reader/canonical_locator.dart`：稳定阅读定位模型。
 7. `lib/services/books/`：导入、数据库、图片、笔记与进度。
 8. `lib/reader_core/`：格式解析和统一文档支撑。

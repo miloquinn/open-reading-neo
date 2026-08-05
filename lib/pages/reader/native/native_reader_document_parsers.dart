@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 List<_NativeChapter> _parseHtmlDocument(String source, String fallbackTitle) {
   final document = html_parser.parse(source);

@@ -1,4 +1,4 @@
-part of '../book_source_reader_page.dart';
+part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
   Future<void> _initialize() async {

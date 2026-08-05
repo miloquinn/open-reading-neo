@@ -1,4 +1,4 @@
-part of '../native_reader_page.dart';
+part of 'native_reader_page.dart';
 
 class _HorizontalPageIndexMap {
   static const _reserve = 1 << 16;

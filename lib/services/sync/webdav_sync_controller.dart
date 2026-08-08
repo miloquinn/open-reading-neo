@@ -17,13 +17,12 @@ class WebDavSyncController extends ChangeNotifier {
   WebDavSyncController({
     SecureSyncConfigStore? configStore,
     SyncChangeStore? changeStore,
-    SyncEngine? engine,
+    this._engine,
     WebDavClientFactory? clientFactory,
     WebDavBookFileService? bookFileService,
   }) : _configStore = configStore ?? SecureSyncConfigStore(),
        _changeStore = changeStore ?? SyncChangeStore(),
-       _clientFactory = clientFactory ?? WebDavClient.standard,
-       _engine = engine {
+       _clientFactory = clientFactory ?? WebDavClient.standard {
     _bookFileService =
         bookFileService ?? WebDavBookFileService(configStore: _configStore);
   }

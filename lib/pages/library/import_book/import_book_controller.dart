@@ -54,10 +54,9 @@ class ImportQueueItem {
 
 class ImportBookController extends ChangeNotifier {
   ImportBookController({
-    required BookFileImporter importer,
-    required BookImportSourcePreparer sourcePreparer,
-  }) : _importer = importer,
-       _sourcePreparer = sourcePreparer;
+    required this._importer,
+    required this._sourcePreparer,
+  });
 
   final BookFileImporter _importer;
   final BookImportSourcePreparer _sourcePreparer;

@@ -32,8 +32,8 @@ class AppCacheManager {
     SourceCoverCache? sourceCoverCache,
     AccountAvatarCache? accountAvatarCache,
     BookSourceResponseCache? sourceResponseCache,
-    Directory? temporaryDirectory,
-    Directory? applicationSupportDirectory,
+    this._temporaryDirectory,
+    this._applicationSupportDirectory,
     Future<Directory> Function()? legacyPaginationCacheDirectory,
     Future<void> Function()? clearFlutterImageCache,
     int Function()? imageCacheBytesReader,
@@ -41,8 +41,6 @@ class AppCacheManager {
        _accountAvatarCache = accountAvatarCache ?? AccountAvatarCache.instance,
        _sourceResponseCache =
            sourceResponseCache ?? BookSourceResponseCache.instance,
-       _temporaryDirectory = temporaryDirectory,
-       _applicationSupportDirectory = applicationSupportDirectory,
        _legacyPaginationCacheDirectory =
            legacyPaginationCacheDirectory ??
            _defaultLegacyPaginationCacheDirectory,

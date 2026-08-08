@@ -18,20 +18,14 @@ typedef IncomingBookProcessingHandler = void Function(bool processing);
 
 class IncomingBookService {
   IncomingBookService({
-    required IncomingBookRequestSource bridge,
-    required IncomingBookMaterializer materializer,
-    required BookFileImporter importer,
-    required IncomingBookOpenBook openBook,
-    required IncomingBookOpenImportQueue openImportQueue,
-    IncomingBookFailureHandler? onFailure,
-    IncomingBookProcessingHandler? onProcessing,
-  }) : _bridge = bridge,
-       _materializer = materializer,
-       _importer = importer,
-       _openBook = openBook,
-       _openImportQueue = openImportQueue,
-       _onFailure = onFailure,
-       _onProcessing = onProcessing;
+    required this._bridge,
+    required this._materializer,
+    required this._importer,
+    required this._openBook,
+    required this._openImportQueue,
+    this._onFailure,
+    this._onProcessing,
+  });
 
   final IncomingBookRequestSource _bridge;
   final IncomingBookMaterializer _materializer;

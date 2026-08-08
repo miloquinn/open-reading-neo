@@ -30,10 +30,9 @@ class ReaderTextLayout {
     required this.sourceText,
     required this.sourceOffset,
     required this.text,
-    required List<_ReaderTextRun> runs,
-    required List<int> sourceBoundaries,
-  }) : _runs = runs,
-       _sourceBoundaries = sourceBoundaries;
+    required this._runs,
+    required this._sourceBoundaries,
+  });
 
   factory ReaderTextLayout.build(
     String sourceText, {

@@ -8,9 +8,8 @@ import 'secure_sync_config.dart';
 import 'sync_models.dart';
 
 class WebDavClient {
-  WebDavClient({required Dio dio, required StoredSyncCredentials credentials})
-    : _dio = dio,
-      _credentials = credentials,
+  WebDavClient({required this._dio, required StoredSyncCredentials credentials})
+    : _credentials = credentials,
       _origin = validateWebDavConfiguration(credentials.configuration);
 
   factory WebDavClient.standard(StoredSyncCredentials credentials) {

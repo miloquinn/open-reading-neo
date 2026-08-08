@@ -268,8 +268,7 @@ class UpdateCheckService {
         websiteLatestReleaseUrl,
         queryParameters: {
           'platform': target.platform,
-          if (target.architecture case final architecture?)
-            'architecture': architecture,
+          'architecture': ?target.architecture,
           'channel': 'stable',
         },
         options: Options(headers: {'Accept': 'application/json'}),

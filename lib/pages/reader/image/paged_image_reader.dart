@@ -681,8 +681,13 @@ class _ZoomablePageViewState extends State<_ZoomablePageView> {
       const scale = 2.4;
       if (position != null) {
         _transform.value = Matrix4.identity()
-          ..translate(-position.dx * (scale - 1), -position.dy * (scale - 1))
-          ..scale(scale);
+          ..translateByDouble(
+            -position.dx * (scale - 1),
+            -position.dy * (scale - 1),
+            0,
+            1,
+          )
+          ..scaleByDouble(scale, scale, scale, 1);
       }
     }
     _reportZoom();

@@ -350,7 +350,7 @@ class WebDavBookFileService {
       final bookUpdates = <String, Object?>{
         'title': restoredTitle,
         'author': restoredAuthor,
-        if (restoredCoverPath != null) 'cover_image_path': restoredCoverPath,
+        'cover_image_path': ?restoredCoverPath,
       };
       if (descriptor.sourceId != null && descriptor.sourceBookId != null) {
         restoredBook = restoredBook.copyWith(

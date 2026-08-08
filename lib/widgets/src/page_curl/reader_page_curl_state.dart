@@ -1287,9 +1287,9 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         final animationReady = _animationReady;
         final boundaryPages = <GlobalKey, ReaderPageSnapshot>{
           _currentKey: widget.currentPage,
-          if (widget.backwardPage case final page?) _backwardKey: page,
-          if (widget.forwardPage case final page?) _forwardKey: page,
-          if (widget.outgoingBackPage case final page?) _outgoingBackKey: page,
+          _backwardKey: ?widget.backwardPage,
+          _forwardKey: ?widget.forwardPage,
+          _outgoingBackKey: ?widget.outgoingBackPage,
         };
         if (_activeSourcePage != null && _activeSourceKey != null) {
           boundaryPages[_activeSourceKey!] = _activeSourcePage!;

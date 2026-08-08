@@ -118,7 +118,7 @@ extension _DetailedStatsSharedView on _DetailedStatsPageState {
                   ),
                 ),
               ),
-              if (trailing != null) trailing,
+              ?trailing,
             ],
           ),
           const SizedBox(height: 18),
@@ -183,7 +183,7 @@ extension _DetailedStatsSharedView on _DetailedStatsPageState {
           width: width,
           height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
+          errorBuilder: (_, _, _) =>
               _buildGeneratedBookCover(book, width, height),
         ),
       );

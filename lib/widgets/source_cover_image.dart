@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -95,7 +93,7 @@ class _SourceCoverImageState extends State<SourceCoverImage> {
           cacheWidth: widget.cacheWidth,
           cacheHeight: widget.cacheHeight,
           gaplessPlayback: true,
-          errorBuilder: (_, __, ___) {
+          errorBuilder: (_, _, _) {
             _retryAfterDecodeFailure();
             return widget.fallback;
           },

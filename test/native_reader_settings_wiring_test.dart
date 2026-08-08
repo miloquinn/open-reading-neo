@@ -607,8 +607,9 @@ void main() {
           for (var attempt = 0; attempt < 30; attempt++) {
             await Future<void>.delayed(const Duration(milliseconds: 50));
             await tester.pump();
-            if (find.byType(ReaderShaderPageCurl).evaluate().length >= 2)
+            if (find.byType(ReaderShaderPageCurl).evaluate().length >= 2) {
               return;
+            }
           }
         });
         await _pumpUntilFound(tester, find.byType(ReaderShaderPageCurl));

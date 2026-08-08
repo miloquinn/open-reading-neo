@@ -15,12 +15,11 @@ typedef WebDavClientFactory =
 
 class SyncEngine {
   SyncEngine({
-    required SecureSyncConfigStore configStore,
+    required this._configStore,
     required SyncChangeStore changeStore,
     MetadataSyncAdapters? adapters,
     WebDavClientFactory? clientFactory,
-  }) : _configStore = configStore,
-       _changeStore = changeStore,
+  }) : _changeStore = changeStore,
        _adapters = adapters ?? MetadataSyncAdapters(store: changeStore),
        _clientFactory = clientFactory ?? WebDavClient.standard;
 

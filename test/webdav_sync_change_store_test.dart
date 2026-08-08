@@ -53,14 +53,14 @@ void main() {
     expect(
       await store.applyRemoteBatch(
         batch,
-        applyWinner: (_, __) async => businessApplies++,
+        applyWinner: (_, _) async => businessApplies++,
       ),
       1,
     );
     expect(
       await store.applyRemoteBatch(
         batch,
-        applyWinner: (_, __) async => businessApplies++,
+        applyWinner: (_, _) async => businessApplies++,
       ),
       0,
     );

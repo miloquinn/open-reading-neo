@@ -66,11 +66,9 @@ class ReaderLeafStatusData {
 class ReaderLeafStatusController extends ChangeNotifier
     with WidgetsBindingObserver {
   ReaderLeafStatusController({
-    ReaderBatteryStatusSource batterySource =
-        const MethodChannelReaderBatteryStatusSource(),
+    this._batterySource = const MethodChannelReaderBatteryStatusSource(),
     DateTime Function()? now,
-  }) : _batterySource = batterySource,
-       _now = now ?? DateTime.now,
+  }) : _now = now ?? DateTime.now,
        _value = ReaderLeafStatusData(
          time: _minute(now?.call() ?? DateTime.now()),
          revision: 0,

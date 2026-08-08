@@ -172,7 +172,7 @@ class _ContributorsViewState extends State<ContributorsView> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: contributors.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  separatorBuilder: (_, _) => const SizedBox(width: 14),
                   itemBuilder: (context, index) {
                     return _buildContributor(contributors[index]);
                   },
@@ -211,7 +211,7 @@ class _ContributorsViewState extends State<ContributorsView> {
                   child: Image.network(
                     contributor.avatarUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => ColoredBox(
+                    errorBuilder: (_, _, _) => ColoredBox(
                       color: scheme.surfaceContainerHighest,
                       child: Icon(
                         Icons.person_outline_rounded,

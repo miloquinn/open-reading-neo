@@ -39,7 +39,7 @@ class SourceCoverCache {
   SourceCoverCache({
     Dio? dio,
     SourceCoverLoader? loader,
-    Directory? cacheDirectory,
+    this._cacheDirectory,
     this.maxConcurrent = 4,
     this.retryDelay = const Duration(milliseconds: 350),
     this.maxDiskAge = const Duration(days: 7),
@@ -49,7 +49,6 @@ class SourceCoverCache {
   }) : assert(maxConcurrent > 0),
        assert(maxImageBytes > 0),
        assert(maxMemoryBytes > 0),
-       _cacheDirectory = cacheDirectory,
        _networkPolicy = networkPolicy {
     _dio =
         dio ??

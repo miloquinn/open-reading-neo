@@ -84,4 +84,63 @@ void main() {
     await dao.deleteForBook(1);
     expect(await database.query('reader_pagination_cache'), isEmpty);
   });
+
+  test('replaces the legacy v21 cache table without touching books', () async {
+    await database.execute(
+      'DROP TABLE ${PaginationCacheSchemaMigration.tableName}',
+    );
+    await database.execute('''
+      CREATE TABLE ${PaginationCacheSchemaMigration.tableName}(
+        cache_key TEXT PRIMARY KEY,
+        book_id TEXT NOT NULL,
+        chapter_id TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await database.insert(PaginationCacheSchemaMigration.tableName, {
+      'cache_key': 'legacy-key',
+      'book_id': '1',
+      'chapter_id': 'legacy-chapter',
+      'payload': '{}',
+      'updated_at': 1,
+    });
+
+    await PaginationCacheSchemaMigration.migrate(database);
+
+    final columns = await database.rawQuery(
+      'PRAGMA table_info(${PaginationCacheSchemaMigration.tableName})',
+    );
+    expect(columns.map((row) => row['name']).toSet(), {
+      'book_id',
+      'book_revision',
+      'layout_fingerprint',
+      'chapter_index',
+      'payload',
+      'updated_at',
+    });
+    expect(
+      await database.query(PaginationCacheSchemaMigration.tableName),
+      isEmpty,
+    );
+    expect(
+      await database.query('books', where: 'id = ?', whereArgs: [1]),
+      hasLength(1),
+    );
+  });
+
+  test('keeps current cache rows when migration runs again', () async {
+    await dao.upsert(
+      bookId: 1,
+      bookRevision: 'revision-current',
+      layoutFingerprint: 'layout-current',
+      chapterIndex: 2,
+      payload: Uint8List.fromList([7, 8, 9]),
+    );
+
+    await PaginationCacheSchemaMigration.migrate(database);
+
+    final restored = await dao.loadForBook(1, 'revision-current');
+    expect(restored['layout-current'], orderedEquals(<int>[7, 8, 9]));
+  });
 }

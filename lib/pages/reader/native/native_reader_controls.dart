@@ -387,6 +387,8 @@ extension _NativeReaderControls on _NativeReaderPageState {
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const ReplaceRulesPage()));
     if (!mounted) return;
+    await _clearPersistedPaginationCache();
+    if (!mounted) return;
     _setReaderState(() {
       _bookMemoryCache.remove(_bookCacheKey);
       _navigationMemoryCache.remove(_bookCacheKey);

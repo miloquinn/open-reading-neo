@@ -35,7 +35,9 @@ import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/core/reader/reader_system_ui.dart';
 import 'package:xxread/core/reader/reader_tap_zones.dart';
 import 'package:xxread/core/reader/reader_text_characters.dart';
+import 'package:xxread/core/reader/reader_text_layout.dart';
 import 'package:xxread/core/reader/reader_text_pagination.dart';
+import 'package:xxread/core/reader/reader_pagination_cache_codec.dart';
 import 'package:xxread/core/reader/reader_theme_order.dart';
 import 'package:xxread/core/reader/reader_vertical_paging.dart';
 import 'package:xxread/core/reader/reader_volume_key_controller.dart';
@@ -51,6 +53,7 @@ import 'package:xxread/services/books/bookmark_dao.dart';
 import 'package:xxread/services/books/enhanced_txt_import_service.dart';
 import 'package:xxread/services/books/epub_native_parser.dart';
 import 'package:xxread/services/books/kindle_book_parser.dart';
+import 'package:xxread/services/books/pagination_cache_dao.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/reading/reading_resume_service.dart';
@@ -87,6 +90,7 @@ import 'package:xxread/pages/reader/themes/reader_custom_themes_page.dart';
 
 part 'native_reader_chapter.dart';
 part 'native_reader_pagination.dart';
+part 'native_reader_pagination_cache.dart';
 part 'native_reader_parsers.dart';
 part 'native_reader_horizontal_paging.dart';
 part 'native_reader_vertical_paging.dart';
@@ -189,11 +193,15 @@ class NativeReaderPage extends StatefulWidget {
     required this.book,
     this.initialTheme,
     @visibleForTesting this.onPaginationCacheMiss,
+    @visibleForTesting this.paginationCacheDao,
+    @visibleForTesting this.usePaginationMemoryCache = true,
   });
 
   final Book book;
   final ReaderThemePalette? initialTheme;
   final ValueChanged<int>? onPaginationCacheMiss;
+  final PaginationCacheDao? paginationCacheDao;
+  final bool usePaginationMemoryCache;
 
   @override
   State<NativeReaderPage> createState() => _NativeReaderPageState();
@@ -201,7 +209,7 @@ class NativeReaderPage extends StatefulWidget {
 
 class _NativeReaderPageState extends State<NativeReaderPage>
     with WidgetsBindingObserver {
-  late final Future<List<_NativeChapter>> _chaptersFuture;
+  late Future<List<_NativeChapter>> _chaptersFuture;
   PageController? _pageController;
   int _pageControllerGeneration = 0;
   bool _horizontalChapterJumpPending = false;
@@ -238,7 +246,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   final Set<String> _queuedHorizontalPaginationWarms = {};
   final Map<String, GlobalKey> _continuousPartKeys = {};
   final Map<String, List<_ContinuousReaderPart>> _continuousPartCache = {};
-  late final Map<String, List<_ReaderPageData>> _pageCache;
+  late Map<String, List<_ReaderPageData>> _pageCache;
+  late final PaginationCacheDao _paginationCacheDao =
+      widget.paginationCacheDao ?? PaginationCacheDao();
+  final Map<String, Uint8List> _persistedPaginationPayloads = {};
+  Future<void> _paginationCacheLoadFuture = Future<void>.value();
+  Future<void> _paginationCacheWriteQueue = Future<void>.value();
   List<_NativeChapter> _loadedChapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
   int? _lastNavigationJumpPosition;

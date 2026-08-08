@@ -13,6 +13,7 @@ import 'package:xxread/data/migration/reading_schema_migration.dart';
 import 'package:xxread/data/migration/book_import_schema_migration.dart';
 import 'package:xxread/data/migration/reader_annotation_schema_migration.dart';
 import 'package:xxread/data/migration/webdav_sync_schema_migration.dart';
+import 'package:xxread/data/migration/pagination_cache_schema_migration.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -21,7 +22,7 @@ class DatabaseService {
 
   static Database? _database;
   static const String _dbName = 'xxread_v2.db';
-  static const int _dbVersion = 21;
+  static const int _dbVersion = 22;
   static Future<Database>? _openingDatabase;
 
   Future<Database> get database async {
@@ -364,6 +365,9 @@ class DatabaseService {
     if (oldVersion < 21) {
       await db.execute('ALTER TABLE books ADD COLUMN reading_progress REAL');
     }
+    if (oldVersion < 22) {
+      await PaginationCacheSchemaMigration.migrate(db);
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -465,6 +469,7 @@ class DatabaseService {
     await _createBookNotesIndexes(db);
     await ReaderAnnotationSchemaMigration.migrate(db);
     await WebDavSyncSchemaMigration.migrate(db);
+    await PaginationCacheSchemaMigration.migrate(db);
   }
 
   /// 创建books表索引

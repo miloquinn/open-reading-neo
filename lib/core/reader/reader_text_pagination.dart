@@ -31,17 +31,28 @@ class ReaderTextPage {
     this.startOffset = 0,
     int? endOffset,
     this.layout,
+    int? layoutStart,
+    int? layoutEnd,
     this.displayStart = 0,
     int? displayEnd,
     this.isChapterTitle = false,
   }) : endOffset = endOffset ?? startOffset + text.length,
-       displayEnd = displayEnd ?? displayStart + text.length;
+       layoutStart = layoutStart ?? displayStart,
+       layoutEnd = layoutEnd ?? (displayEnd ?? displayStart + text.length),
+       displayEnd = displayEnd ?? displayStart + text.length,
+       assert((layoutStart ?? displayStart) <= displayStart),
+       assert(
+         (displayEnd ?? displayStart + text.length) <=
+             (layoutEnd ?? (displayEnd ?? displayStart + text.length)),
+       );
 
   const ReaderTextPage.chapterTitle({int sourceOffset = 0})
     : text = '',
       startOffset = sourceOffset,
       endOffset = sourceOffset,
       layout = null,
+      layoutStart = 0,
+      layoutEnd = 0,
       displayStart = 0,
       displayEnd = 0,
       isChapterTitle = true;
@@ -52,6 +63,8 @@ class ReaderTextPage {
   final int startOffset;
   final int endOffset;
   final ReaderTextLayout? layout;
+  final int layoutStart;
+  final int layoutEnd;
 
   /// Absolute boundaries in [layout] that are actually painted.
   final int displayStart;
@@ -250,6 +263,8 @@ List<ReaderTextPage> _paginateReaderText({
         startOffset: layout.sourceOffsetForDisplayOffset(range.start),
         endOffset: layout.sourceOffsetForDisplayOffset(range.end),
         layout: layout,
+        layoutStart: range.start,
+        layoutEnd: range.end,
         displayStart: range.visibleStart,
         displayEnd: range.visibleEnd,
       ),

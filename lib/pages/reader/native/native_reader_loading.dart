@@ -4,7 +4,8 @@ extension _NativeReaderLoading on _NativeReaderPageState {
   void _initializeReaderDependencies() {
     if (_readerDependenciesInitialized) return;
     final cacheKey = _bookCacheKey;
-    if (_isLargeTxtBook) {
+    _paginationCacheLoadFuture = _loadPersistedPaginationCache();
+    if (_isLargeTxtBook || !widget.usePaginationMemoryCache) {
       // Large TXT books already retain their chapter text in memory. Keeping
       // another static cache prevents that memory from being released after
       // leaving the reader and can push Android into heavy GC or an OOM.
@@ -39,6 +40,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
   Future<List<_NativeChapter>> _prepareLoadedChapters(
     Future<List<_NativeChapter>> chaptersFuture,
   ) async {
+    await _paginationCacheLoadFuture;
     final chapters = await chaptersFuture;
     if (chapters.isEmpty) return chapters;
     for (final chapter in chapters) {

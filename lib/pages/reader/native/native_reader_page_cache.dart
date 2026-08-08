@@ -20,42 +20,66 @@ extension _NativeReaderPageCache on _NativeReaderPageState {
     if (!_pageCache.containsKey(key) && _pageCache.length >= maxCachedLayouts) {
       _pageCache.remove(_pageCache.keys.first);
     }
-    if (!_pageCache.containsKey(key)) {
-      widget.onPaginationCacheMiss?.call(chapterIndex);
-    }
-    return _pageCache.putIfAbsent(key, () {
-      final verticalChrome = _pageMode == NativePageMode.verticalScroll
-          ? _verticalChrome
-          : null;
-      return developer.Timeline.timeSync(
-        'paginateChapter',
-        arguments: {'chapter': chapterIndex, 'chars': chapter.plainText.length},
-        () => _paginateChapter(
-          chapter,
-          maxWidth: readerTextContentWidth(size.width, _horizontalMargin),
-          maxHeight:
-              verticalChrome?.contentHeight(size.height) ??
-              readerTextContentHeight(
-                size.height,
-                _effectiveTopMargin,
-                _effectiveBottomMargin,
-              ),
-          flowStyle: _readerTextFlowStyle(
-            direction: direction,
-            textScaler: textScaler,
-          ),
-          style: _readerTextStyle,
-          firstLineIndent: _firstLineIndent,
-          paragraphSpacing: _paragraphSpacing,
-          normalizeParagraphBreaks: _normalizesParagraphBreaks(
-            widget.book.format,
-          ),
-          showDedicatedChapterTitlePage:
-              widget.book.format.toLowerCase() != 'txt' ||
-              _txtChapterTitlePageEnabled,
+    final memoryCached = _pageCache[key];
+    if (memoryCached != null) return memoryCached;
+
+    final persistedPayload = _persistedPaginationPayloads[key];
+    if (persistedPayload != null) {
+      final restored = _restoreNativePagination(
+        payload: persistedPayload,
+        chapter: chapter,
+        firstLineIndent: _firstLineIndent,
+        paragraphSpacing: _paragraphSpacing,
+        normalizeParagraphBreaks: _normalizesParagraphBreaks(
+          widget.book.format,
         ),
       );
-    });
+      if (restored != null) {
+        _pageCache[key] = restored;
+        return restored;
+      }
+      _persistedPaginationPayloads.remove(key);
+    }
+
+    widget.onPaginationCacheMiss?.call(chapterIndex);
+    final verticalChrome = _pageMode == NativePageMode.verticalScroll
+        ? _verticalChrome
+        : null;
+    final pages = developer.Timeline.timeSync(
+      'paginateChapter',
+      arguments: {'chapter': chapterIndex, 'chars': chapter.plainText.length},
+      () => _paginateChapter(
+        chapter,
+        maxWidth: readerTextContentWidth(size.width, _horizontalMargin),
+        maxHeight:
+            verticalChrome?.contentHeight(size.height) ??
+            readerTextContentHeight(
+              size.height,
+              _effectiveTopMargin,
+              _effectiveBottomMargin,
+            ),
+        flowStyle: _readerTextFlowStyle(
+          direction: direction,
+          textScaler: textScaler,
+        ),
+        style: _readerTextStyle,
+        firstLineIndent: _firstLineIndent,
+        paragraphSpacing: _paragraphSpacing,
+        normalizeParagraphBreaks: _normalizesParagraphBreaks(
+          widget.book.format,
+        ),
+        showDedicatedChapterTitlePage:
+            widget.book.format.toLowerCase() != 'txt' ||
+            _txtChapterTitlePageEnabled,
+      ),
+    );
+    _pageCache[key] = pages;
+    _persistNativePagination(
+      layoutFingerprint: key,
+      chapterIndex: chapterIndex,
+      pages: pages,
+    );
+    return pages;
   }
 
   void _scheduleBookPaginationWarm(
@@ -190,5 +214,5 @@ extension _NativeReaderPageCache on _NativeReaderPageState {
         '${_pageMode == NativePageMode.verticalScroll ? _verticalChrome.paginationSignature : _readerSafeArea.paginationSignature}:'
         '${_readerFont.id}:'
         '${widget.book.format.toLowerCase() == 'txt' ? _txtChapterTitlePageEnabled : true}',
-  ).cacheKey('native-line-v7');
+  ).cacheKey('native-line-v8');
 }

@@ -175,7 +175,10 @@ class RegisteredBookSource {
     if (sourceConfig != null) 'sourceConfig': sourceConfig,
   };
 
-  RegisteredBookSource copyWith({bool? enabled}) {
+  RegisteredBookSource copyWith({
+    bool? enabled,
+    Map<String, dynamic>? sourceConfig,
+  }) {
     return RegisteredBookSource(
       id: id,
       name: name,
@@ -195,7 +198,7 @@ class RegisteredBookSource {
       enabled: enabled ?? this.enabled,
       addedAt: addedAt,
       sourceProtocol: sourceProtocol,
-      sourceConfig: sourceConfig,
+      sourceConfig: sourceConfig ?? this.sourceConfig,
     );
   }
 }

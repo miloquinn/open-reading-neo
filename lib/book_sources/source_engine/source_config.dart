@@ -59,6 +59,7 @@ class ReadingSourceConfig {
   bool get enabledCookieJar => raw['enabledCookieJar'] == true;
   int get lastUpdateTime => _integer(raw['lastUpdateTime']);
   int get respondTime => _integer(raw['respondTime']);
+  String get concurrentRate => _string(raw['concurrentRate']);
 
   Uri get baseUri => _sourceBaseUri(raw)!;
 

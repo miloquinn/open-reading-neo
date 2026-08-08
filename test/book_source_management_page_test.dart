@@ -162,23 +162,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('bookSourceCard-org.example.long-source')),
-      findsOneWidget,
+    final card = find.byKey(
+      const ValueKey('bookSourceCard-org.example.long-source'),
     );
+    expect(card, findsOneWidget);
     expect(
       find.text('A deliberately long connected source name'),
       findsOneWidget,
     );
-    expect(find.text('categories'), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byKey(
-          const ValueKey('bookSourceCard-org.example.long-source'),
-        ),
-        matching: find.text('Enabled'),
-      ),
-      findsOneWidget,
+      tester
+          .widget<Switch>(
+            find.descendant(of: card, matching: find.byType(Switch)),
+          )
+          .value,
+      isTrue,
     );
     expect(tester.takeException(), isNull);
   });
@@ -367,7 +365,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byType(PopupMenuItem<String>).first);
+    await tester.tap(find.text('Operator and rights'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

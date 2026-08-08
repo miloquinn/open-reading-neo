@@ -12,6 +12,8 @@ import 'source_script_engine_platform.dart';
 import 'source_login_session.dart';
 import 'source_login_ui.dart';
 import 'source_interaction_coordinator.dart';
+import 'source_concurrency_limiter.dart';
+import 'source_debug.dart';
 import '../services/book_download_cancellation.dart';
 
 class SourceRuntime {
@@ -19,10 +21,20 @@ class SourceRuntime {
     SourceTransport? transport,
     SourceScriptEvaluator? scriptEvaluator,
     SourceLoginSessionStore? loginSessionStore,
+    SourceConcurrencyLimiter? concurrencyLimiter,
+    this.debugRecorder,
   }) : _transport = transport ?? SourceHttpTransport() {
     _scriptEvaluator = scriptEvaluator;
     _loginSessionStore = loginSessionStore ?? SecureSourceLoginSessionStore();
+    _concurrencyLimiter = concurrencyLimiter ?? SourceConcurrencyLimiter();
   }
+
+  /// When set, traces every request and flow stage made through this
+  /// runtime. Meant for a single dedicated runtime driving one debug
+  /// session — a shared, long-lived runtime should never have one attached,
+  /// since concurrent unrelated calls would interleave in its trace.
+  SourceDebugRecorder? debugRecorder;
+  String? _debugStage;
 
   static const int _maxSearchItems = 100;
   static const int _maxChapters = 30000;
@@ -35,19 +47,52 @@ class SourceRuntime {
   );
   SourceScriptEvaluator? _scriptEvaluator;
   late final SourceLoginSessionStore _loginSessionStore;
+  late final SourceConcurrencyLimiter _concurrencyLimiter;
   final Map<String, Map<String, Object?>> _bookRuleStates = {};
   final Map<String, Map<String, Object?>> _bookEntityContexts = {};
   final Map<String, Map<String, Object?>> _chapterRuleContexts = {};
+  // getBook()'s fetch of the info page is reused, once, by whichever part of
+  // getChapters() would otherwise re-fetch that same URL (resolving tocUrl,
+  // or reading the chapter list straight off the info page on sites that
+  // don't declare a separate one). Consumed on first use so a getChapters()
+  // call made without a preceding getBook() still fetches fresh.
+  final Map<String, SourceResponse> _bookInfoResponses = {};
   final Map<String, SourceLoginSession> _loginSessions = {};
   final Set<String> _dirtyLoginSessions = {};
 
   SourceScriptEvaluator get _scripts =>
       _scriptEvaluator ??= QuickJsSourceScriptEvaluator();
 
+  /// Runs [action] as flow stage [stage], reporting start/success/failure to
+  /// [debugRecorder] when one is attached. [_debugStage] is only meaningful
+  /// while [action] is running, so nested `_request`/`_sendScriptNetwork`
+  /// calls made during it are attributed to this stage automatically.
+  Future<T> _tracedStage<T>(
+    String stage,
+    Future<T> Function() action, {
+    String Function(T)? describe,
+  }) async {
+    final recorder = debugRecorder;
+    if (recorder == null) return action();
+    _debugStage = stage;
+    recorder.stageStarted(stage);
+    try {
+      final result = await action();
+      recorder.stageSucceeded(stage, describe?.call(result) ?? '');
+      return result;
+    } catch (error) {
+      recorder.stageFailed(stage, error);
+      rethrow;
+    } finally {
+      _debugStage = null;
+    }
+  }
+
   void close({bool force = true}) {
     _bookRuleStates.clear();
     _bookEntityContexts.clear();
     _chapterRuleContexts.clear();
+    _bookInfoResponses.clear();
     _loginSessions.clear();
     _dirtyLoginSessions.clear();
     _scriptEvaluator?.dispose();
@@ -57,6 +102,24 @@ class SourceRuntime {
   }
 
   Future<BookSourceSearchPage> search(
+    RegisteredBookSource registered,
+    String query, {
+    int page = 1,
+    int pageSize = 20,
+    BookDownloadCancellation? cancellation,
+  }) => _tracedStage(
+    'search',
+    () => _searchImpl(
+      registered,
+      query,
+      page: page,
+      pageSize: pageSize,
+      cancellation: cancellation,
+    ),
+    describe: (page) => '${page.items.length} result(s)',
+  );
+
+  Future<BookSourceSearchPage> _searchImpl(
     RegisteredBookSource registered,
     String query, {
     int page = 1,
@@ -128,6 +191,22 @@ class SourceRuntime {
     required String? category,
     int page = 1,
     int pageSize = 20,
+  }) => _tracedStage(
+    'explore',
+    () => _browseImpl(
+      registered,
+      category: category,
+      page: page,
+      pageSize: pageSize,
+    ),
+    describe: (page) => '${page.items.length} result(s)',
+  );
+
+  Future<BookSourceSearchPage> _browseImpl(
+    RegisteredBookSource registered, {
+    required String? category,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final source = _source(registered);
     final catalog = await _exploreCatalog(source);
@@ -180,6 +259,17 @@ class SourceRuntime {
     RegisteredBookSource registered,
     String bookId, {
     Map<String, String> sourceVariables = const {},
+  }) => _tracedStage(
+    'info',
+    () => _getBookImpl(registered, bookId, sourceVariables: sourceVariables),
+    describe: (book) =>
+        '"${book.title}" by ${book.author.isEmpty ? 'unknown author' : book.author}',
+  );
+
+  Future<BookSourceBook> _getBookImpl(
+    RegisteredBookSource registered,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
   }) async {
     final source = _source(registered);
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
@@ -190,6 +280,7 @@ class SourceRuntime {
       requestTarget,
       variables: _requestVariables(ruleState, {'bookUrl': bookId}),
     );
+    _rememberBookInfoResponse(source, bookId, response);
     final document = _document(
       source,
       response,
@@ -261,6 +352,17 @@ class SourceRuntime {
     RegisteredBookSource registered,
     String bookId, {
     Map<String, String> sourceVariables = const {},
+  }) => _tracedStage(
+    'toc',
+    () =>
+        _getChaptersImpl(registered, bookId, sourceVariables: sourceVariables),
+    describe: (chapters) => '${chapters.length} chapter(s)',
+  );
+
+  Future<List<BookSourceChapter>> _getChaptersImpl(
+    RegisteredBookSource registered,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
   }) async {
     final source = _source(registered);
     final ruleState = _ruleStateFor(source, bookId, sourceVariables);
@@ -274,8 +376,9 @@ class SourceRuntime {
     for (var hop = 0; hop < _maxPageHops && nextUrl.isNotEmpty; hop++) {
       if (!seenPages.add(nextUrl)) break;
       final requestTarget = _decodeSourceDataTarget(nextUrl) ?? nextUrl;
-      final response = await _request(
+      final response = await _requestReusingBookInfo(
         source,
+        bookId,
         requestTarget,
         variables: _requestVariables(ruleState, {'bookUrl': bookId}),
       );
@@ -340,6 +443,22 @@ class SourceRuntime {
   }
 
   Future<BookSourceChapterContent> getChapterContent(
+    RegisteredBookSource registered, {
+    required String bookId,
+    required String chapterId,
+    Map<String, String> sourceVariables = const {},
+  }) => _tracedStage(
+    'content',
+    () => _getChapterContentImpl(
+      registered,
+      bookId: bookId,
+      chapterId: chapterId,
+      sourceVariables: sourceVariables,
+    ),
+    describe: (content) => '${content.content.length} character(s)',
+  );
+
+  Future<BookSourceChapterContent> _getChapterContentImpl(
     RegisteredBookSource registered, {
     required String bookId,
     required String chapterId,
@@ -444,8 +563,9 @@ class SourceRuntime {
     final rule = source.rule('ruleBookInfo');
     final tocRule = _optionalRule(rule, 'tocUrl');
     if (tocRule.isEmpty) return bookId;
-    final response = await _request(
+    final response = await _requestReusingBookInfo(
       source,
+      bookId,
       _decodeSourceDataTarget(bookId) ?? bookId,
       variables: _requestVariables(ruleState, {'bookUrl': bookId}),
     );
@@ -538,17 +658,73 @@ class SourceRuntime {
       template,
       variables,
     );
-    final response = await _transport.send(
-      SourceRequestTemplate.parse(
-        expandedTemplate,
-        baseUri: source.baseUri,
-        variables: variables,
-        sourceHeaders: await _sourceHeaders(source),
-        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
-      ),
+    final request = SourceRequestTemplate.parse(
+      expandedTemplate,
+      baseUri: source.baseUri,
+      variables: variables,
+      sourceHeaders: await _sourceHeaders(source),
+      cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+    );
+    await _concurrencyLimiter.acquire(
+      source.stableId,
+      source.concurrentRate,
       cancellation: cancellation,
     );
-    return _applyLoginCheck(source, response);
+    final stopwatch = debugRecorder == null ? null : (Stopwatch()..start());
+    try {
+      final response = await _transport.send(
+        request,
+        cancellation: cancellation,
+      );
+      debugRecorder?.recordNetwork(
+        stage: _debugStage ?? '',
+        method: request.method.name.toUpperCase(),
+        url: request.url,
+        statusCode: response.statusCode,
+        bodyPreview: _debugPreview(response.body),
+        elapsed: stopwatch?.elapsed,
+      );
+      return await _applyLoginCheck(source, response);
+    } catch (error) {
+      debugRecorder?.recordNetwork(
+        stage: _debugStage ?? '',
+        method: request.method.name.toUpperCase(),
+        url: request.url,
+        error: error,
+        elapsed: stopwatch?.elapsed,
+      );
+      rethrow;
+    }
+  }
+
+  /// Like [_request], but reuses getBook()'s cached fetch of the info page
+  /// when [target] resolves to that same page — avoiding a second fetch of a
+  /// page getChapters() only needs to resolve tocUrl from, or to read the
+  /// chapter list directly off of on single-page sites.
+  Future<SourceResponse> _requestReusingBookInfo(
+    ReadingSourceConfig source,
+    String bookId,
+    String target, {
+    required Map<String, String> variables,
+  }) async {
+    if (target == (_decodeSourceDataTarget(bookId) ?? bookId)) {
+      final cached = _bookInfoResponses.remove(_bookStateKey(source, bookId));
+      if (cached != null) return cached;
+    }
+    return _request(source, target, variables: variables);
+  }
+
+  void _rememberBookInfoResponse(
+    ReadingSourceConfig source,
+    String bookId,
+    SourceResponse response,
+  ) {
+    final key = _bookStateKey(source, bookId);
+    _bookInfoResponses.remove(key);
+    _bookInfoResponses[key] = response;
+    while (_bookInfoResponses.length > _maxRememberedBookStates) {
+      _bookInfoResponses.remove(_bookInfoResponses.keys.first);
+    }
   }
 
   Future<void> _ensureLoginSession(ReadingSourceConfig source) async {
@@ -1362,6 +1538,9 @@ class SourceRuntime {
       if (includeSourceHeaders) ...await _sourceHeaders(source),
       ...request.headers,
     };
+    await _concurrencyLimiter.acquire(source.stableId, source.concurrentRate);
+
+    final SourceRequestTemplate outgoing;
     if (method == 'WEBVIEW') {
       final baseRequest = SourceRequestTemplate.parse(
         request.url,
@@ -1369,17 +1548,45 @@ class SourceRuntime {
         sourceHeaders: headers,
         cookieJarKey: source.enabledCookieJar ? source.stableId : null,
       );
-      final response = await _transport.send(
-        SourceRequestTemplate(
-          url: baseRequest.url,
-          method: SourceRequestMethod.get,
-          headers: baseRequest.headers,
-          charset: baseRequest.charset,
-          useWebView: true,
-          webJs: request.webJs,
-          webViewHtml: request.body,
-          cookieJarKey: baseRequest.cookieJarKey,
-        ),
+      outgoing = SourceRequestTemplate(
+        url: baseRequest.url,
+        method: SourceRequestMethod.get,
+        headers: baseRequest.headers,
+        charset: baseRequest.charset,
+        useWebView: true,
+        webJs: request.webJs,
+        webViewHtml: request.body,
+        cookieJarKey: baseRequest.cookieJarKey,
+      );
+    } else {
+      var template = request.url;
+      if (method == 'POST') {
+        template =
+            '$template,${jsonEncode({'method': 'POST', 'body': request.body ?? '', if (headers.isNotEmpty) 'headers': headers})}';
+        headers.clear();
+      } else if (method == 'HEAD') {
+        template =
+            '$template,${jsonEncode({'method': 'HEAD', if (headers.isNotEmpty) 'headers': headers})}';
+        headers.clear();
+      }
+      outgoing = SourceRequestTemplate.parse(
+        template,
+        baseUri: source.baseUri,
+        sourceHeaders: headers,
+        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+      );
+    }
+
+    final stopwatch = debugRecorder == null ? null : (Stopwatch()..start());
+    try {
+      final response = await _transport.send(outgoing);
+      debugRecorder?.recordNetwork(
+        stage: _debugStage ?? '',
+        method: outgoing.method.name.toUpperCase(),
+        url: outgoing.url,
+        statusCode: response.statusCode,
+        bodyPreview: _debugPreview(response.body),
+        elapsed: stopwatch?.elapsed,
       );
       return SourceScriptNetworkResult(
         body: response.body,
@@ -1388,33 +1595,24 @@ class SourceRuntime {
         headers: response.headers,
         cookies: response.cookies,
       );
+    } catch (error) {
+      debugRecorder?.recordNetwork(
+        stage: _debugStage ?? '',
+        method: outgoing.method.name.toUpperCase(),
+        url: outgoing.url,
+        error: error,
+        elapsed: stopwatch?.elapsed,
+      );
+      rethrow;
     }
-    var template = request.url;
-    if (method == 'POST') {
-      template =
-          '$template,${jsonEncode({'method': 'POST', 'body': request.body ?? '', if (headers.isNotEmpty) 'headers': headers})}';
-      headers.clear();
-    } else if (method == 'HEAD') {
-      template =
-          '$template,${jsonEncode({'method': 'HEAD', if (headers.isNotEmpty) 'headers': headers})}';
-      headers.clear();
-    }
-    final response = await _transport.send(
-      SourceRequestTemplate.parse(
-        template,
-        baseUri: source.baseUri,
-        sourceHeaders: headers,
-        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
-      ),
-    );
-    return SourceScriptNetworkResult(
-      body: response.body,
-      finalUrl: response.finalUri.toString(),
-      statusCode: response.statusCode,
-      headers: response.headers,
-      cookies: response.cookies,
-    );
   }
+}
+
+String _debugPreview(String body) {
+  const maxLength = 50000;
+  return body.length > maxLength
+      ? '${body.substring(0, maxLength)}\n…(${body.length - maxLength} more characters)'
+      : body;
 }
 
 String? _decodeInteractionHtml(String value) {

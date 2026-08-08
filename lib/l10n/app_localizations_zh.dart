@@ -375,6 +375,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesCheckSelected => '校验所选';
+
+  @override
+  String bookSourcesHealthCheckSummary(int healthy, int total) {
+    return '已校验 $total 个源，$healthy 个正常';
+  }
+
+  @override
   String get bookSourcesUrlLabel => '书源地址';
 
   @override
@@ -488,6 +496,65 @@ class AppLocalizationsZh extends AppLocalizations {
   String sourceLoginFailed(String details) {
     return '无法更新书源登录会话：$details';
   }
+
+  @override
+  String get sourceDebugMenuLabel => '调试';
+
+  @override
+  String get sourceDebugTitle => '书源调试';
+
+  @override
+  String get sourceDebugInputHint => '输入搜索关键词，或粘贴书籍/目录/正文链接';
+
+  @override
+  String get sourceDebugRun => '运行';
+
+  @override
+  String get sourceDebugStop => '停止';
+
+  @override
+  String get sourceDebugClear => '清空日志';
+
+  @override
+  String get sourceDebugEmpty => '输入关键词或链接后点击运行，即可查看书源解析的每一步。';
+
+  @override
+  String get sourceDebugCopy => '复制';
+
+  @override
+  String get sourceDebugCopied => '已复制到剪贴板';
+
+  @override
+  String get sourceHealthMenuLabel => '重新校验';
+
+  @override
+  String get sourceHealthHealthy => '运行正常';
+
+  @override
+  String get sourceHealthPartial => '部分失效';
+
+  @override
+  String get sourceHealthTimedOut => '校验超时';
+
+  @override
+  String sourceHealthFailedCapabilities(String capabilities) {
+    return '失效项：$capabilities';
+  }
+
+  @override
+  String get sourceHealthCapabilitySearch => '搜索';
+
+  @override
+  String get sourceHealthCapabilityDiscover => '发现';
+
+  @override
+  String get sourceHealthCapabilityInfo => '详情';
+
+  @override
+  String get sourceHealthCapabilityCatalog => '目录';
+
+  @override
+  String get sourceHealthCapabilityContent => '正文';
 
   @override
   String get sourceVerificationTitle => '书源验证';
@@ -5581,6 +5648,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get bookSourcesCheckSelected => '檢查所選';
+
+  @override
+  String bookSourcesHealthCheckSummary(int healthy, int total) {
+    return '已檢查 $total 個來源，$healthy 個正常';
+  }
+
+  @override
   String get bookSourcesUrlLabel => '書源位址';
 
   @override
@@ -5694,6 +5769,65 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String sourceLoginFailed(String details) {
     return '無法更新書源登入工作階段：$details';
   }
+
+  @override
+  String get sourceDebugMenuLabel => '偵錯';
+
+  @override
+  String get sourceDebugTitle => '書源偵錯';
+
+  @override
+  String get sourceDebugInputHint => '輸入搜尋關鍵字，或貼上書籍/目錄/正文連結';
+
+  @override
+  String get sourceDebugRun => '執行';
+
+  @override
+  String get sourceDebugStop => '停止';
+
+  @override
+  String get sourceDebugClear => '清除紀錄';
+
+  @override
+  String get sourceDebugEmpty => '輸入關鍵字或連結後點擊執行，即可查看書源解析的每一步。';
+
+  @override
+  String get sourceDebugCopy => '複製';
+
+  @override
+  String get sourceDebugCopied => '已複製到剪貼簿';
+
+  @override
+  String get sourceHealthMenuLabel => '重新檢查';
+
+  @override
+  String get sourceHealthHealthy => '運作正常';
+
+  @override
+  String get sourceHealthPartial => '部分失效';
+
+  @override
+  String get sourceHealthTimedOut => '檢查逾時';
+
+  @override
+  String sourceHealthFailedCapabilities(String capabilities) {
+    return '失效項目：$capabilities';
+  }
+
+  @override
+  String get sourceHealthCapabilitySearch => '搜尋';
+
+  @override
+  String get sourceHealthCapabilityDiscover => '發現';
+
+  @override
+  String get sourceHealthCapabilityInfo => '詳情';
+
+  @override
+  String get sourceHealthCapabilityCatalog => '目錄';
+
+  @override
+  String get sourceHealthCapabilityContent => '正文';
 
   @override
   String get sourceVerificationTitle => '書源驗證';

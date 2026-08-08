@@ -394,6 +394,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesCheckSelected => 'Check selected';
+
+  @override
+  String bookSourcesHealthCheckSummary(int healthy, int total) {
+    return '$healthy of $total source(s) are healthy';
+  }
+
+  @override
   String get bookSourcesUrlLabel => 'Source address';
 
   @override
@@ -512,6 +520,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String sourceLoginFailed(String details) {
     return 'Could not update the source sign-in session: $details';
   }
+
+  @override
+  String get sourceDebugMenuLabel => 'Debug';
+
+  @override
+  String get sourceDebugTitle => 'Source debugger';
+
+  @override
+  String get sourceDebugInputHint =>
+      'Enter a search keyword, or paste a book/catalog/chapter URL';
+
+  @override
+  String get sourceDebugRun => 'Run';
+
+  @override
+  String get sourceDebugStop => 'Stop';
+
+  @override
+  String get sourceDebugClear => 'Clear log';
+
+  @override
+  String get sourceDebugEmpty =>
+      'Enter a keyword or URL and tap Run to see each step of how this source resolves it.';
+
+  @override
+  String get sourceDebugCopy => 'Copy';
+
+  @override
+  String get sourceDebugCopied => 'Copied to clipboard';
+
+  @override
+  String get sourceHealthMenuLabel => 'Check health';
+
+  @override
+  String get sourceHealthHealthy => 'Healthy';
+
+  @override
+  String get sourceHealthPartial => 'Partially broken';
+
+  @override
+  String get sourceHealthTimedOut => 'Check timed out';
+
+  @override
+  String sourceHealthFailedCapabilities(String capabilities) {
+    return 'Broken: $capabilities';
+  }
+
+  @override
+  String get sourceHealthCapabilitySearch => 'search';
+
+  @override
+  String get sourceHealthCapabilityDiscover => 'discover';
+
+  @override
+  String get sourceHealthCapabilityInfo => 'book info';
+
+  @override
+  String get sourceHealthCapabilityCatalog => 'catalog';
+
+  @override
+  String get sourceHealthCapabilityContent => 'content';
 
   @override
   String get sourceVerificationTitle => 'Source verification';

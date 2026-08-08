@@ -712,6 +712,51 @@ void main() {
         );
         expect(content.content, '<p>正文</p>');
         expect(content.contentType, 'text/html');
+        expect(
+          transport.requests
+              .where((r) => r.url.toString() == 'https://books.test/book/1')
+              .length,
+          1,
+          reason:
+              'getBook() and getChapters() should share one fetch of the info page',
+        );
+      },
+    );
+
+    test(
+      'getChapters reuses the info page fetch when the source has no separate toc page',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+          <h1>剑来</h1><p class="author">烽火</p>
+          <ul id="chapters"><li><a href="/chapter/1">第一章</a></li></ul>
+        ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['ruleBookInfo'] = {
+            'name': 'h1@text',
+            'author': 'class.author@text',
+            // No tocUrl rule: the chapter list lives on the info page itself.
+          };
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(
+          source,
+          'https://books.test/book/1',
+        );
+        final chapters = await runtime.getChapters(source, book.id);
+
+        expect(chapters.single.title, '第一章');
+        expect(
+          transport.requests
+              .where((r) => r.url.toString() == 'https://books.test/book/1')
+              .length,
+          1,
+        );
       },
     );
 

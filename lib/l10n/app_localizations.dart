@@ -759,6 +759,18 @@ abstract class AppLocalizations {
   /// **'Delete {count} selected sources? Local books are not affected.'**
   String bookSourcesDeleteSelectedMessage(int count);
 
+  /// No description provided for @bookSourcesCheckSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Check selected'**
+  String get bookSourcesCheckSelected;
+
+  /// No description provided for @bookSourcesHealthCheckSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{healthy} of {total} source(s) are healthy'**
+  String bookSourcesHealthCheckSummary(int healthy, int total);
+
   /// No description provided for @bookSourcesUrlLabel.
   ///
   /// In en, this message translates to:
@@ -974,6 +986,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not update the source sign-in session: {details}'**
   String sourceLoginFailed(String details);
+
+  /// No description provided for @sourceDebugMenuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug'**
+  String get sourceDebugMenuLabel;
+
+  /// No description provided for @sourceDebugTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source debugger'**
+  String get sourceDebugTitle;
+
+  /// No description provided for @sourceDebugInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a search keyword, or paste a book/catalog/chapter URL'**
+  String get sourceDebugInputHint;
+
+  /// No description provided for @sourceDebugRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get sourceDebugRun;
+
+  /// No description provided for @sourceDebugStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get sourceDebugStop;
+
+  /// No description provided for @sourceDebugClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear log'**
+  String get sourceDebugClear;
+
+  /// No description provided for @sourceDebugEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a keyword or URL and tap Run to see each step of how this source resolves it.'**
+  String get sourceDebugEmpty;
+
+  /// No description provided for @sourceDebugCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get sourceDebugCopy;
+
+  /// No description provided for @sourceDebugCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get sourceDebugCopied;
+
+  /// No description provided for @sourceHealthMenuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check health'**
+  String get sourceHealthMenuLabel;
+
+  /// No description provided for @sourceHealthHealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'Healthy'**
+  String get sourceHealthHealthy;
+
+  /// No description provided for @sourceHealthPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partially broken'**
+  String get sourceHealthPartial;
+
+  /// No description provided for @sourceHealthTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Check timed out'**
+  String get sourceHealthTimedOut;
+
+  /// No description provided for @sourceHealthFailedCapabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Broken: {capabilities}'**
+  String sourceHealthFailedCapabilities(String capabilities);
+
+  /// No description provided for @sourceHealthCapabilitySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'search'**
+  String get sourceHealthCapabilitySearch;
+
+  /// No description provided for @sourceHealthCapabilityDiscover.
+  ///
+  /// In en, this message translates to:
+  /// **'discover'**
+  String get sourceHealthCapabilityDiscover;
+
+  /// No description provided for @sourceHealthCapabilityInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'book info'**
+  String get sourceHealthCapabilityInfo;
+
+  /// No description provided for @sourceHealthCapabilityCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'catalog'**
+  String get sourceHealthCapabilityCatalog;
+
+  /// No description provided for @sourceHealthCapabilityContent.
+  ///
+  /// In en, this message translates to:
+  /// **'content'**
+  String get sourceHealthCapabilityContent;
 
   /// No description provided for @sourceVerificationTitle.
   ///

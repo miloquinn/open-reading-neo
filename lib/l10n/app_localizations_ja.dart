@@ -379,6 +379,14 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesCheckSelected => '選択項目をチェック';
+
+  @override
+  String bookSourcesHealthCheckSummary(int healthy, int total) {
+    return '$total 件のソースをチェックし、$healthy 件が正常でした';
+  }
+
+  @override
   String get bookSourcesUrlLabel => 'ソースのアドレス';
 
   @override
@@ -494,6 +502,65 @@ class AppLocalizationsJa extends AppLocalizations {
   String sourceLoginFailed(String details) {
     return 'ソースのログインセッションを更新できませんでした: $details';
   }
+
+  @override
+  String get sourceDebugMenuLabel => 'デバッグ';
+
+  @override
+  String get sourceDebugTitle => 'ソースデバッグ';
+
+  @override
+  String get sourceDebugInputHint => '検索キーワードを入力するか、書籍/目次/本文のURLを貼り付けてください';
+
+  @override
+  String get sourceDebugRun => '実行';
+
+  @override
+  String get sourceDebugStop => '停止';
+
+  @override
+  String get sourceDebugClear => 'ログを消去';
+
+  @override
+  String get sourceDebugEmpty => 'キーワードまたはURLを入力して実行を押すと、このソースが解決される手順を確認できます。';
+
+  @override
+  String get sourceDebugCopy => 'コピー';
+
+  @override
+  String get sourceDebugCopied => 'クリップボードにコピーしました';
+
+  @override
+  String get sourceHealthMenuLabel => '再チェック';
+
+  @override
+  String get sourceHealthHealthy => '正常';
+
+  @override
+  String get sourceHealthPartial => '一部失効';
+
+  @override
+  String get sourceHealthTimedOut => 'チェックがタイムアウトしました';
+
+  @override
+  String sourceHealthFailedCapabilities(String capabilities) {
+    return '失効項目：$capabilities';
+  }
+
+  @override
+  String get sourceHealthCapabilitySearch => '検索';
+
+  @override
+  String get sourceHealthCapabilityDiscover => '発見';
+
+  @override
+  String get sourceHealthCapabilityInfo => '詳細';
+
+  @override
+  String get sourceHealthCapabilityCatalog => '目次';
+
+  @override
+  String get sourceHealthCapabilityContent => '本文';
 
   @override
   String get sourceVerificationTitle => 'ソースの確認';

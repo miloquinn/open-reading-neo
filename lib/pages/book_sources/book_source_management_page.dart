@@ -8,8 +8,10 @@ import 'package:xxread/book_sources/source_engine/source_import_service.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/book_sources/services/book_source_health_check_service.dart';
 import 'package:xxread/book_sources/services/book_source_import_analyzer.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
+import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
@@ -18,6 +20,7 @@ import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/source_cover_image.dart';
 
+import 'source_debug_page.dart';
 import 'source_login_page.dart';
 
 /// Low-frequency configuration for online content providers.
@@ -43,12 +46,17 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   BookSourceClient? _client;
   SourceImportService? _importService;
   BookSourceImportAnalyzer? _importAnalyzer;
+  BookSourceHealthCheckService? _healthCheckService;
 
   BookSourceClient get _sourceClient => _client ??= BookSourceClient();
   SourceImportService get _additionalImportService =>
       _importService ??= SourceImportService();
   BookSourceImportAnalyzer get _sourceImportAnalyzer => _importAnalyzer ??=
       BookSourceImportAnalyzer(additionalImporter: _additionalImportService);
+  BookSourceHealthCheckService get _sourceHealthCheckService =>
+      _healthCheckService ??= BookSourceHealthCheckService(
+        registry: _registry,
+      );
   List<RegisteredBookSource> _sources = const [];
   final Set<String> _selectedSourceIds = {};
   bool _loading = true;
@@ -57,6 +65,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   _BookSourceFilter _filter = _BookSourceFilter.all;
   String? _selectedGroup;
   int _sourceDisplayLimit = _initialSourceBatchSize;
+  ({int completed, int total})? _healthCheckProgress;
+  bool _protocolCardExpanded = false;
 
   @override
   void initState() {
@@ -543,6 +553,23 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           icon: const Icon(Icons.toggle_off_outlined),
           label: Text(context.l10n.bookSourcesDisableSelected),
         ),
+        OutlinedButton.icon(
+          onPressed:
+              _selectedSourceIds.isEmpty || _healthCheckProgress != null
+              ? null
+              : _checkSelectedSourcesHealth,
+          icon: _healthCheckProgress == null
+              ? const Icon(Icons.health_and_safety_outlined)
+              : const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+          label: Text(
+            _healthCheckProgress == null
+                ? context.l10n.bookSourcesCheckSelected
+                : '${_healthCheckProgress!.completed}/${_healthCheckProgress!.total}',
+          ),
+        ),
         TextButton.icon(
           onPressed: _selectedSourceIds.isEmpty ? null : _removeSelectedSources,
           icon: const Icon(Icons.delete_outline_rounded),
@@ -576,6 +603,71 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     final sources = await _registry.setEnabledAll(allowedIds, enabled);
     if (!mounted) return;
     setState(() => _sources = sources);
+  }
+
+  Future<void> _checkSelectedSourcesHealth() async {
+    final targets = _sources
+        .where((source) => _selectedSourceIds.contains(source.id))
+        .toList(growable: false);
+    if (targets.isEmpty || _healthCheckProgress != null) return;
+    setState(() => _healthCheckProgress = (completed: 0, total: targets.length));
+    List<RegisteredBookSource> updated = const [];
+    try {
+      updated = await _sourceHealthCheckService.checkAll(
+        targets,
+        onProgress: (completed, total) {
+          if (!mounted) return;
+          setState(() => _healthCheckProgress = (completed: completed, total: total));
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _healthCheckProgress = null);
+    }
+    if (!mounted || updated.isEmpty) return;
+    final byId = {for (final source in updated) source.id: source};
+    setState(() {
+      _sources = [
+        for (final source in _sources) byId[source.id] ?? source,
+      ];
+    });
+    final healthy = updated
+        .where((source) => sourceHealthCheckResultOf(source)?.healthy == true)
+        .length;
+    showSideToast(
+      context,
+      context.l10n.bookSourcesHealthCheckSummary(healthy, updated.length),
+      kind: healthy == updated.length
+          ? SideToastKind.success
+          : SideToastKind.error,
+    );
+  }
+
+  Future<void> _checkSourceHealth(RegisteredBookSource source) async {
+    RegisteredBookSource updated;
+    try {
+      updated = await _sourceHealthCheckService.checkOne(source);
+    } on Object catch (error) {
+      if (!mounted) return;
+      showSideToast(context, '$error', kind: SideToastKind.error);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sources = [
+        for (final existing in _sources)
+          if (existing.id == updated.id) updated else existing,
+      ];
+    });
+    final result = sourceHealthCheckResultOf(updated);
+    showSideToast(
+      context,
+      result?.healthy == true
+          ? context.l10n.sourceHealthHealthy
+          : _sourceHealthIssueSummary(result),
+      kind: result?.healthy == true
+          ? SideToastKind.success
+          : SideToastKind.error,
+    );
   }
 
   Future<void> _removeSelectedSources() async {
@@ -659,144 +751,44 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     RegisteredBookSource source, {
     required bool additionalProtocolsEnabled,
   }) {
-    final scheme = Theme.of(context).colorScheme;
     final canEnable =
         source.capabilities.isNotEmpty &&
         (source.sourceProtocol == BookSourceProtocolKind.orsp ||
             additionalProtocolsEnabled);
     final selected = _selectedSourceIds.contains(source.id);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 640;
-          return Container(
-            key: ValueKey('bookSourceCard-${source.id}'),
-            padding: EdgeInsets.fromLTRB(
-              compact ? 16 : 18,
-              compact ? 16 : 14,
-              compact ? 10 : 8,
-              compact ? 12 : 14,
-            ),
-            decoration: _panelDecoration(radius: 20),
-            child: compact
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_selectionMode)
-                            Checkbox(
-                              value: selected,
-                              onChanged: (_) => _toggleSourceSelection(source),
-                            )
-                          else
-                            _buildSourceIcon(source, size: 52),
-                          const SizedBox(width: 13),
-                          Expanded(child: _buildSourceSummary(source)),
-                          _buildSourceMenu(source),
-                        ],
-                      ),
-                      if (source.capabilities.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        _buildCapabilityChips(source),
-                      ],
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.only(left: 12),
-                        decoration: BoxDecoration(
-                          color: scheme.surfaceContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                source.enabled
-                                    ? context.l10n.bookSourcesEnabled
-                                    : context.l10n.bookSourcesDisabled,
-                                style: TextStyle(
-                                  color: source.enabled
-                                      ? scheme.primary
-                                      : scheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            Switch.adaptive(
-                              value: source.enabled,
-                              onChanged: !canEnable
-                                  ? null
-                                  : (enabled) =>
-                                        _setSourceEnabled(source, enabled),
-                            ),
-                            if (source.sourceProtocol ==
-                                BookSourceProtocolKind.orsp)
-                              IconButton(
-                                tooltip: context.l10n.bookSourcesRefresh,
-                                onPressed: () => _refreshSource(source),
-                                icon: const Icon(Icons.refresh_rounded),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      if (_selectionMode)
-                        Checkbox(
-                          value: selected,
-                          onChanged: (_) => _toggleSourceSelection(source),
-                        )
-                      else
-                        _buildSourceIcon(source),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSourceSummary(source),
-                            if (source.capabilities.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              _buildCapabilityChips(source),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        source.enabled
-                            ? context.l10n.bookSourcesEnabled
-                            : context.l10n.bookSourcesDisabled,
-                        style: TextStyle(
-                          color: source.enabled
-                              ? scheme.primary
-                              : scheme.onSurfaceVariant,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (!_selectionMode)
-                        Switch.adaptive(
-                          value: source.enabled,
-                          onChanged: !canEnable
-                              ? null
-                              : (enabled) => _setSourceEnabled(source, enabled),
-                        ),
-                      if (!_selectionMode &&
-                          source.sourceProtocol == BookSourceProtocolKind.orsp)
-                        IconButton(
-                          tooltip: context.l10n.bookSourcesRefresh,
-                          onPressed: () => _refreshSource(source),
-                          icon: const Icon(Icons.refresh_rounded),
-                        ),
-                      if (!_selectionMode) _buildSourceMenu(source),
-                    ],
-                  ),
-          );
-        },
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        key: ValueKey('bookSourceCard-${source.id}'),
+        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+        decoration: _panelDecoration(radius: 16),
+        child: Row(
+          children: [
+            if (_selectionMode)
+              Checkbox(
+                value: selected,
+                onChanged: (_) => _toggleSourceSelection(source),
+              )
+            else
+              _buildSourceIcon(source, size: 40),
+            const SizedBox(width: 12),
+            Expanded(child: _buildSourceSummary(source)),
+            const SizedBox(width: 4),
+            if (!_selectionMode)
+              Tooltip(
+                message: source.enabled
+                    ? context.l10n.bookSourcesEnabled
+                    : context.l10n.bookSourcesDisabled,
+                child: Switch.adaptive(
+                  value: source.enabled,
+                  onChanged: !canEnable
+                      ? null
+                      : (enabled) => _setSourceEnabled(source, enabled),
+                ),
+              ),
+            if (!_selectionMode) _buildSourceMenu(source),
+          ],
+        ),
       ),
     );
   }
@@ -805,54 +797,56 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     final scheme = Theme.of(context).colorScheme;
     final groups = _sourceGroups(source);
     final runnable = source.capabilities.isNotEmpty;
+    final health = sourceHealthCheckResultOf(source);
+    // Only call out what's unusual — a working, unchecked, ungrouped source
+    // needs no badges at all; that's the expected, quiet default.
+    final badges = <Widget>[
+      if (source.sourceProtocol == BookSourceProtocolKind.readingSource &&
+          !runnable)
+        _buildSourceMetaPill(
+          context.l10n.bookSourcesPendingCompatibility,
+          Icons.extension_off,
+          scheme.error,
+        ),
+      if (health != null && !health.healthy)
+        _buildSourceMetaPill(
+          health.timedOut
+              ? context.l10n.sourceHealthTimedOut
+              : context.l10n.sourceHealthPartial,
+          Icons.warning_amber_rounded,
+          scheme.error,
+        ),
+      for (final group in groups.take(2))
+        _buildSourceMetaPill(
+          group,
+          Icons.folder_outlined,
+          scheme.onSurfaceVariant,
+        ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           source.name,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            height: 1.2,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 2),
         Text(
           source.description.isEmpty
               ? source.apiBaseUrl.host
               : source.description,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: scheme.onSurfaceVariant,
-            fontSize: 13,
-            height: 1.4,
-          ),
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
         ),
-        if (source.sourceProtocol == BookSourceProtocolKind.readingSource ||
-            groups.isNotEmpty) ...[
-          const SizedBox(height: 7),
-          Wrap(
-            spacing: 7,
-            runSpacing: 5,
-            children: [
-              if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
-                _buildSourceMetaPill(
-                  runnable
-                      ? context.l10n.bookSourcesRunnable
-                      : context.l10n.bookSourcesPendingCompatibility,
-                  runnable ? Icons.check_circle_outline : Icons.extension_off,
-                  runnable ? scheme.primary : scheme.onSurfaceVariant,
-                ),
-              for (final group in groups.take(2))
-                _buildSourceMetaPill(
-                  group,
-                  Icons.folder_outlined,
-                  scheme.onSurfaceVariant,
-                ),
-            ],
-          ),
+        if (badges.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Wrap(spacing: 6, runSpacing: 4, children: badges),
         ],
       ],
     );
@@ -862,8 +856,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 3),
         Text(
           label,
           style: TextStyle(
@@ -876,38 +870,31 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     );
   }
 
-  Widget _buildCapabilityChips(RegisteredBookSource source) {
-    final scheme = Theme.of(context).colorScheme;
-    final capabilities = source.capabilities.toList()..sort();
-    return Wrap(
-      spacing: 7,
-      runSpacing: 7,
-      children: capabilities
-          .map(
-            (capability) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(
-                color: scheme.secondaryContainer.withValues(alpha: 0.82),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                capability,
-                style: TextStyle(
-                  color: scheme.onSecondaryContainer,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
+  String _sourceHealthIssueSummary(SourceHealthCheckResult? result) {
+    if (result == null || result.timedOut) {
+      return context.l10n.sourceHealthTimedOut;
+    }
+    final labels = result.failed.map(_healthCapabilityLabel).join(', ');
+    return context.l10n.sourceHealthFailedCapabilities(labels);
   }
+
+  String _healthCapabilityLabel(SourceHealthCapability capability) =>
+      switch (capability) {
+        SourceHealthCapability.search => context.l10n.sourceHealthCapabilitySearch,
+        SourceHealthCapability.discover =>
+          context.l10n.sourceHealthCapabilityDiscover,
+        SourceHealthCapability.info => context.l10n.sourceHealthCapabilityInfo,
+        SourceHealthCapability.catalog =>
+          context.l10n.sourceHealthCapabilityCatalog,
+        SourceHealthCapability.content =>
+          context.l10n.sourceHealthCapabilityContent,
+      };
 
   Widget _buildSourceMenu(RegisteredBookSource source) {
     return PopupMenuButton<String>(
       tooltip: context.l10n.bookSourcesRemove,
       onSelected: (value) {
+        if (value == 'refresh') _refreshSource(source);
         if (value == 'rights') _showSourceRightsDialog(source);
         if (value == 'login') {
           Navigator.of(context).push(
@@ -916,9 +903,28 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             ),
           );
         }
+        if (value == 'debug') {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SourceDebugPage(source: source),
+            ),
+          );
+        }
+        if (value == 'health') _checkSourceHealth(source);
         if (value == 'remove') _confirmRemoveSource(source);
       },
       itemBuilder: (context) => [
+        if (source.sourceProtocol == BookSourceProtocolKind.orsp)
+          PopupMenuItem(
+            value: 'refresh',
+            child: Row(
+              children: [
+                const Icon(Icons.refresh_rounded),
+                const SizedBox(width: 10),
+                Text(context.l10n.bookSourcesRefresh),
+              ],
+            ),
+          ),
         if (source.sourceProtocol == BookSourceProtocolKind.orsp)
           PopupMenuItem(
             value: 'rights',
@@ -933,6 +939,28 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 const Icon(Icons.key_rounded),
                 const SizedBox(width: 10),
                 Text(context.l10n.sourceLoginTitle),
+              ],
+            ),
+          ),
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
+          PopupMenuItem(
+            value: 'debug',
+            child: Row(
+              children: [
+                const Icon(Icons.bug_report_outlined),
+                const SizedBox(width: 10),
+                Text(context.l10n.sourceDebugMenuLabel),
+              ],
+            ),
+          ),
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
+          PopupMenuItem(
+            value: 'health',
+            child: Row(
+              children: [
+                const Icon(Icons.health_and_safety_outlined),
+                const SizedBox(width: 10),
+                Text(context.l10n.sourceHealthMenuLabel),
               ],
             ),
           ),
@@ -984,56 +1012,93 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
 
   Widget _buildProtocolCard() {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: _panelDecoration(radius: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.api_rounded, color: scheme.primary),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.bookSourcesProtocolTitle,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: _panelDecoration(radius: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              key: const Key('bookSourcesProtocolCardToggle'),
+              onTap: () => setState(
+                () => _protocolCardExpanded = !_protocolCardExpanded,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  context.l10n.bookSourcesProtocolDescription,
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                child: Row(
                   children: [
-                    TextButton.icon(
-                      onPressed: _showProtocolDialog,
-                      icon: const Icon(Icons.schema_outlined, size: 18),
-                      label: Text(context.l10n.bookSourcesProtocolDetails),
+                    Icon(Icons.api_rounded, size: 18, color: scheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        context.l10n.bookSourcesProtocolTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                    TextButton.icon(
-                      onPressed: _openProtocolRepository,
-                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                      label: Text(context.l10n.bookSourcesProtocolRepository),
-                    ),
-                    TextButton.icon(
-                      onPressed: _openRightsReport,
-                      icon: const Icon(Icons.report_outlined, size: 18),
-                      label: Text(context.l10n.bookSourcesRightsReport),
+                    Icon(
+                      _protocolCardExpanded
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            if (_protocolCardExpanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.bookSourcesProtocolDescription,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _showProtocolDialog,
+                          icon: const Icon(Icons.schema_outlined, size: 18),
+                          label: Text(context.l10n.bookSourcesProtocolDetails),
+                        ),
+                        TextButton.icon(
+                          onPressed: _openProtocolRepository,
+                          icon: const Icon(
+                            Icons.open_in_new_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            context.l10n.bookSourcesProtocolRepository,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _openRightsReport,
+                          icon: const Icon(Icons.report_outlined, size: 18),
+                          label: Text(context.l10n.bookSourcesRightsReport),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

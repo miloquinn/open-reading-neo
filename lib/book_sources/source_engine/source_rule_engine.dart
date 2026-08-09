@@ -226,9 +226,15 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     );
     if (transformed.pattern == null) return input;
     try {
+      // Sources commonly ship a trailing `##.*some watermark.*` to strip one
+      // injected line from otherwise multi-paragraph content. With `.`
+      // crossing newlines, that greedy pattern matches from the start of the
+      // string through the last occurrence of the watermark and erases the
+      // entire chapter instead of just that line, so this mirrors the
+      // reference engine's line-scoped (non-dotAll) regex semantics.
       return replaceSourceRegex(
         input,
-        RegExp(transformed.pattern!, multiLine: true, dotAll: true),
+        RegExp(transformed.pattern!, multiLine: true, dotAll: false),
         transformed.replacement,
       );
     } on FormatException {

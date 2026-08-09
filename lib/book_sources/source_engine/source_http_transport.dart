@@ -370,9 +370,11 @@ class SourceHttpTransport
             redirects--;
             continue;
           }
-          if (error.response == null &&
-              method != SourceRequestMethod.post &&
-              retries < 2) {
+          // Unlike the HTTP 400 case above, no response at all means the
+          // server never confirmed it saw the request, so replaying it
+          // (including POST) is not a duplicate-submission risk the way
+          // replaying a request that already got a real response would be.
+          if (error.response == null && retries < 2) {
             connectionRetries[current] = retries + 1;
             if (redirectState != null) {
               redirectStates.remove(redirectState);

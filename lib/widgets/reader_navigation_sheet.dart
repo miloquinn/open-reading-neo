@@ -41,6 +41,7 @@ class ReaderNavigationSheet extends StatefulWidget {
     this.currentChapterOffset,
     this.currentChapterText,
     this.currentNavigationPosition,
+    this.resolveCurrentNavigationPosition,
   });
 
   final ReaderThemePalette palette;
@@ -52,6 +53,10 @@ class ReaderNavigationSheet extends StatefulWidget {
   final int? currentChapterOffset;
   final String? currentChapterText;
   final int? currentNavigationPosition;
+  // Pinpointing the exact EPUB subsection can require scanning the current
+  // chapter's text, which must not run on the frame that opens this sheet.
+  // When supplied, it is called once after the first frame instead.
+  final int Function()? resolveCurrentNavigationPosition;
   final ValueChanged<int> onChapterSelected;
   final ValueChanged<ReaderNavigationChapter>? onNavigationChapterSelected;
   final ValueChanged<Bookmark> onBookmarkSelected;
@@ -77,6 +82,8 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
 
   List<_ReaderNavigationTreeEntry> _treeEntries = const [];
   List<_ReaderNavigationTreeEntry>? _visibleCache;
+  int? _resolvedNavigationPosition;
+  bool _navigationPositionResolved = false;
 
   @override
   void initState() {
@@ -84,7 +91,12 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(_handleTabChanged);
     _treeEntries = _computeTreeEntries();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+    _resolvedNavigationPosition = widget.currentNavigationPosition;
+    _navigationPositionResolved =
+        widget.resolveCurrentNavigationPosition == null;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _resolveAndScrollToCurrent(animate: false),
+    );
   }
 
   @override
@@ -110,8 +122,23 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       _visibleCache = null;
     }
     if (oldWidget.currentChapterIndex != widget.currentChapterIndex) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+      _resolvedNavigationPosition = widget.currentNavigationPosition;
+      _navigationPositionResolved =
+          widget.resolveCurrentNavigationPosition == null;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _resolveAndScrollToCurrent(animate: true),
+      );
     }
+  }
+
+  void _resolveAndScrollToCurrent({required bool animate}) {
+    final resolver = widget.resolveCurrentNavigationPosition;
+    if (resolver != null && !_navigationPositionResolved) {
+      _resolvedNavigationPosition = resolver();
+      _navigationPositionResolved = true;
+      if (mounted) setState(() {});
+    }
+    _scrollToCurrent(animate: animate);
   }
 
   bool _sameChapterTree(
@@ -201,7 +228,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   }
 
   int get _currentChapterPosition {
-    final suppliedPosition = widget.currentNavigationPosition;
+    final suppliedPosition = _resolvedNavigationPosition;
     if (suppliedPosition != null &&
         suppliedPosition >= 0 &&
         suppliedPosition < _treeEntries.length) {
@@ -213,6 +240,12 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     ];
     if (matchingPositions.length <= 1) {
       return matchingPositions.isEmpty ? -1 : matchingPositions.single;
+    }
+    if (!_navigationPositionResolved) {
+      // Picking the exact subsection among several sharing this chapter
+      // needs a text scan; use the chapter's first entry until the
+      // deferred resolver above refines this.
+      return matchingPositions.first;
     }
 
     final text = widget.currentChapterText;
@@ -247,7 +280,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     });
   }
 
-  void _scrollToCurrent() {
+  void _scrollToCurrent({bool animate = true}) {
     if (!_chapterScrollController.hasClients || widget.chapters.isEmpty) {
       return;
     }
@@ -257,7 +290,9 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
         _query = '';
         _visibleCache = null;
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToCurrent(animate: animate),
+      );
       return;
     }
     final entries = _treeEntries;
@@ -273,7 +308,9 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     }
     if (expandedAncestor) {
       setState(() => _visibleCache = null);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToCurrent(animate: animate),
+      );
       return;
     }
     final visiblePosition = _collapsedChapterPositions.isEmpty
@@ -291,11 +328,15 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     final rawTarget = currentTop - position.viewportDimension * 0.32;
     final alignedTarget = (rawTarget / _chapterExtent).floor() * _chapterExtent;
     final target = alignedTarget.clamp(0.0, position.maxScrollExtent);
-    _chapterScrollController.animateTo(
-      target,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
+    if (animate) {
+      _chapterScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _chapterScrollController.jumpTo(target);
+    }
   }
 
   @override

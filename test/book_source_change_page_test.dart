@@ -180,6 +180,64 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'an author-matching candidate that arrives later moves above an earlier mismatch',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 900);
+      addTearDown(tester.view.reset);
+      final service = _CandidateOrderService();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: BookSourceChangePage(
+            sources: [_oldSource, _mismatchSource, _matchSource],
+            currentSource: _oldSource,
+            currentBook: _oldBook,
+            service: service,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(
+        find.byKey(const ValueKey('bookSourceChangeCandidate-mismatch-source')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('bookSourceChangeCandidate-match-source')),
+        findsNothing,
+      );
+
+      service.releaseSecond();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('bookSourceChangeCandidate-match-source')),
+        findsOneWidget,
+      );
+      final matchY = tester
+          .getTopLeft(
+            find.byKey(
+              const ValueKey('bookSourceChangeCandidate-match-source'),
+            ),
+          )
+          .dy;
+      final mismatchY = tester
+          .getTopLeft(
+            find.byKey(
+              const ValueKey('bookSourceChangeCandidate-mismatch-source'),
+            ),
+          )
+          .dy;
+      expect(matchY, lessThan(mismatchY));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('quick search pauses before scanning every source', (
     tester,
   ) async {
@@ -229,6 +287,8 @@ void main() {
 
 final _oldSource = _source('old-source', 'Old source');
 final _newSource = _source('new-source', 'New source');
+final _mismatchSource = _source('mismatch-source', 'Mismatch source');
+final _matchSource = _source('match-source', 'Match source');
 
 RegisteredBookSource _source(String id, String name) => RegisteredBookSource(
   id: id,
@@ -315,6 +375,72 @@ class _PageChangeService extends BookSourceChangeService {
     chapterProgress: 0.5,
     responseTime: const Duration(milliseconds: 240),
   );
+}
+
+class _CandidateOrderService extends BookSourceChangeService {
+  final _second = Completer<void>();
+
+  void releaseSecond() => _second.complete();
+
+  @override
+  Future<BookSourceChangePosition> loadPosition({
+    required RegisteredBookSource source,
+    required BookSourceBook book,
+    Book? shelfBook,
+  }) async => const BookSourceChangePosition(
+    chapterIndex: 0,
+    chapterProgress: 0,
+    chapterTitle: '',
+    chapterCount: 0,
+  );
+
+  @override
+  Stream<BookSourceChangeSearchEvent> search({
+    required Iterable<RegisteredBookSource> sources,
+    required String title,
+    required String author,
+    required bool checkAuthor,
+    String? currentSourceId,
+    Set<String> excludedSourceIds = const {},
+    int? sourceLimit,
+    int? candidateLimit,
+  }) async* {
+    yield BookSourceChangeSearchEvent(
+      source: _mismatchSource,
+      completed: 1,
+      candidates: [
+        BookSourceChangeCandidate(
+          source: _mismatchSource,
+          book: const BookSourceBook(
+            id: 'mismatch-book',
+            title: 'Test book',
+            author: 'A Different Author',
+            description: '',
+            categories: [],
+          ),
+          authorMatches: false,
+        ),
+      ],
+    );
+    await _second.future;
+    yield BookSourceChangeSearchEvent(
+      source: _matchSource,
+      completed: 2,
+      candidates: [
+        BookSourceChangeCandidate(
+          source: _matchSource,
+          book: const BookSourceBook(
+            id: 'match-book',
+            title: 'Test book',
+            author: 'Author',
+            description: '',
+            categories: [],
+          ),
+          authorMatches: true,
+        ),
+      ],
+    );
+  }
 }
 
 class _CloseTrackingChangeService extends _PageChangeService {

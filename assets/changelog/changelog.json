@@ -2,6 +2,47 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.5.8",
+            "notes": {
+                "en": [
+                    "Refined the book source management page layout",
+                    "Refined the discover page search bar layout",
+                    "Refactored the text layout engine for smoother page turns and scrolling performance",
+                    "Fixed a bug where some book sources' search and discover results had book links merged together, causing book detail pages to fail with a 404 error",
+                    "Fixed a bug where some book sources' content cleanup rules could wipe out an entire chapter, leaving the content blank",
+                    "Fixed a bug where opening a book source's table of contents could show chapters out of order",
+                    "Fixed the stat cards on the Detailed Statistics overview tab overflowing at the bottom under certain screen widths or larger system font sizes"
+                ],
+                "zh": [
+                    "优化书源管理页的界面布局",
+                    "优化发现页搜索框的界面布局",
+                    "重构文字排版引擎，提升翻页与滚动性能",
+                    "修复部分书源搜索、发现结果中书籍链接被错误拼接，导致打开详情页报 404 的问题",
+                    "修复部分书源正文清理规则误伤整章内容，导致正文显示为空的问题",
+                    "修复部分书源打开目录时章节顺序错位的问题",
+                    "修复详细统计页“总览”标签下数据卡片在部分屏幕宽度或系统字体放大时底部溢出的问题"
+                ],
+                "zh-TW": [
+                    "優化書源管理頁的介面佈局",
+                    "優化發現頁搜尋框的介面佈局",
+                    "重構文字排版引擎，提升翻頁與捲動效能",
+                    "修復部分書源搜尋、發現結果中書籍連結被錯誤拼接，導致開啟詳情頁顯示 404 的問題",
+                    "修復部分書源正文清理規則誤傷整章內容，導致正文顯示為空的問題",
+                    "修復部分書源開啟目錄時章節順序錯位的問題",
+                    "修復詳細統計頁「總覽」標籤下數據卡片在部分螢幕寬度或系統字體放大時底部溢出的問題"
+                ],
+                "ja": [
+                    "書源管理ページのレイアウトを改善しました",
+                    "発見ページの検索欄のレイアウトを改善しました",
+                    "テキスト組版エンジンをリファクタリングし、ページめくりとスクロールの性能を向上させました",
+                    "一部の書源で検索・発見結果の書籍リンクが誤って連結され、詳細ページを開くと404エラーになる問題を修正しました",
+                    "一部の書源で本文のクリーニング規則が章全体を誤って削除し、本文が空白になる問題を修正しました",
+                    "一部の書源で目次を開いた際に章の順序がずれる問題を修正しました",
+                    "詳細統計の「総覧」タブにある統計カードが、画面幅やシステムのフォントサイズによって下端がはみ出す問題を修正しました"
+                ]
+            }
+        },
+        {
             "version": "2.5.3",
             "notes": {
                 "en": [

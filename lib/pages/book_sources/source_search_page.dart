@@ -13,6 +13,7 @@ import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 import 'widgets/source_search_settings_sheet.dart';
+import 'models/book_search_relevance.dart';
 import 'models/sourced_book.dart';
 import 'widgets/sourced_book_actions.dart';
 import 'widgets/sourced_book_cards.dart';
@@ -71,6 +72,8 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   final Set<BookDownloadCancellation> _activeSearchCancellations = {};
   final List<SourcedBook> _results = [];
   final Set<String> _resultKeys = {};
+  final Map<String, int> _resultArrivalOrder = {};
+  int _nextResultArrivalOrder = 0;
   final Map<String, _SearchPageState> _pageStates = {};
   late final bool _ownsClient = widget.client == null;
   late final BookSourceClient _client =
@@ -268,10 +271,28 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
         hasMore: batch.hasMore,
       );
     }
+    var added = false;
     for (final item in batch.items) {
       final key = '${item.source.id}\u0000${item.book.id}';
-      if (_resultKeys.add(key)) _results.add(item);
+      if (!_resultKeys.add(key)) continue;
+      _resultArrivalOrder[key] = _nextResultArrivalOrder++;
+      _results.add(item);
+      added = true;
     }
+    // Higher-relevance results move to the front even if they arrive later;
+    // ties keep arrival order.
+    if (added) _results.sort(_compareResultRelevance);
+  }
+
+  int _compareResultRelevance(SourcedBook a, SourcedBook b) {
+    final relevance = sourcedBookRelevance(
+      _activeQuery,
+      b,
+    ).compareTo(sourcedBookRelevance(_activeQuery, a));
+    if (relevance != 0) return relevance;
+    final orderA = _resultArrivalOrder['${a.source.id}\u0000${a.book.id}'] ?? 0;
+    final orderB = _resultArrivalOrder['${b.source.id}\u0000${b.book.id}'] ?? 0;
+    return orderA.compareTo(orderB);
   }
 
   Future<void> _search() async {
@@ -294,6 +315,8 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       _activeQuery = query;
       _results.clear();
       _resultKeys.clear();
+      _resultArrivalOrder.clear();
+      _nextResultArrivalOrder = 0;
       _pageStates.clear();
       _loadingMore = false;
       _loadMoreFailed = false;
@@ -391,6 +414,8 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
     setState(() {
       _results.clear();
       _resultKeys.clear();
+      _resultArrivalOrder.clear();
+      _nextResultArrivalOrder = 0;
       _pageStates.clear();
       _hasSearched = false;
       _failedSourceCount = 0;
@@ -470,30 +495,54 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
 
   Widget _buildQueryField(List<RegisteredBookSource> enabledSources) {
     final canSearch = enabledSources.isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: TextField(
-        key: const Key('bookSourceQueryControl'),
-        controller: _queryController,
-        focusNode: _queryFocus,
-        enabled: canSearch,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => _search(),
-        decoration: InputDecoration(
-          hintText: context.l10n.bookSourcesSearchHint,
-          border: InputBorder.none,
-          suffixIcon: _queryController.text.isEmpty
-              ? null
-              : IconButton(
-                  key: const Key('bookSourceSearchClearButton'),
-                  tooltip: MaterialLocalizations.of(
-                    context,
-                  ).deleteButtonTooltip,
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: _clearSearch,
-                ),
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        padding: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: scheme.outline.withValues(alpha: 0.22),
+            width: 0.9,
+          ),
         ),
-        onChanged: (_) => setState(() {}),
+        child: TextField(
+          key: const Key('bookSourceQueryControl'),
+          controller: _queryController,
+          focusNode: _queryFocus,
+          enabled: canSearch,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => _search(),
+          style: const TextStyle(fontSize: 16),
+          decoration: InputDecoration(
+            hintText: context.l10n.bookSourcesSearchHint,
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              size: 20,
+              color: scheme.onSurfaceVariant,
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 48,
+              minHeight: 0,
+            ),
+            suffixIcon: _queryController.text.isEmpty
+                ? null
+                : IconButton(
+                    key: const Key('bookSourceSearchClearButton'),
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).deleteButtonTooltip,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: _clearSearch,
+                  ),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
       ),
     );
   }
@@ -536,6 +585,8 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
         _searching = false;
         _results.clear();
         _resultKeys.clear();
+        _resultArrivalOrder.clear();
+        _nextResultArrivalOrder = 0;
         _pageStates.clear();
       }
     });

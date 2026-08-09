@@ -265,17 +265,6 @@ class _HeaderAndFilters extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          context.l10n.bookSourceManagementSubtitle,
-          style: TextStyle(color: scheme.onSurfaceVariant, height: 1.45),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          context.l10n.bookSourcesManageTitle,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        Text(
           context.l10n.bookSourcesVisibleCount(
             visibleCount,
             state.sources.length,
@@ -302,7 +291,7 @@ class _HeaderAndFilters extends StatelessWidget {
             filled: true,
             fillColor: scheme.surfaceContainerLow,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
               borderSide: BorderSide.none,
             ),
           ),

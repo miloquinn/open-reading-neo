@@ -248,7 +248,10 @@ void main() {
     }
 
     expect(client.requestedPages, [1, 2]);
-    // 第 11 本书在首屏之外，滚到底部让 Sliver 构建它再断言。
+    // 第 11 本书在首屏之外，滚到底部让 Sliver 构建它再断言。搜索框改为带
+    // 图标的圆角容器后头部更高，多滚一屏确保结果仍然可见。
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -1600));
+    await tester.pumpAndSettle();
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -1600));
     await tester.pumpAndSettle();
     expect(find.text('Book 11'), findsOneWidget);
@@ -573,6 +576,54 @@ void main() {
   });
 
   testWidgets(
+    'a more relevant result that arrives later moves above an earlier weak match',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+
+      final weakSource = _sourceWithId('weak-source', 'Weak Source');
+      final strongSource = _sourceWithId('strong-source', 'Strong Source');
+      final client = _RelevanceOrderClient();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SourceSearchPage(
+            sources: [weakSource, strongSource],
+            client: client,
+            shelfService: BookSourceShelfService(client: client),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final queryField = find.byKey(const Key('bookSourceQueryControl'));
+      await tester.enterText(queryField, 'Target');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+
+      // The weak match (title does not contain the query at all) arrives first.
+      client.releaseWeak();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(find.text('Unrelated Novel'), findsOneWidget);
+      expect(find.text('Target Book'), findsNothing);
+
+      // The exact title match arrives later but should still land above it.
+      client.releaseStrong();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Target Book'), findsOneWidget);
+      expect(find.text('Unrelated Novel'), findsOneWidget);
+      final strongY = tester.getTopLeft(find.text('Target Book')).dy;
+      final weakY = tester.getTopLeft(find.text('Unrelated Novel')).dy;
+      expect(strongY, lessThan(weakY));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'discover page selects a reading source, channel, and next page',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -665,6 +716,47 @@ class _DelayedScopeClient extends BookSourceClient {
         BookSourceBook(
           id: '${source.id}-book',
           title: 'Book of ${source.name}',
+          author: 'Author',
+          description: '',
+          categories: const [],
+        ),
+      ],
+      page: page,
+      pageSize: pageSize,
+      total: 1,
+      hasMore: false,
+    );
+  }
+}
+
+class _RelevanceOrderClient extends BookSourceClient {
+  final _weak = Completer<void>();
+  final _strong = Completer<void>();
+
+  void releaseWeak() => _weak.complete();
+  void releaseStrong() => _strong.complete();
+
+  @override
+  Future<BookSourceSearchPage> search(
+    RegisteredBookSource source,
+    String query, {
+    int page = 1,
+    int pageSize = 20,
+    BookDownloadCancellation? cancellation,
+  }) async {
+    final String title;
+    if (source.id == 'weak-source') {
+      await _weak.future;
+      title = 'Unrelated Novel';
+    } else {
+      await _strong.future;
+      title = 'Target Book';
+    }
+    return BookSourceSearchPage(
+      items: [
+        BookSourceBook(
+          id: '${source.id}-book',
+          title: title,
           author: 'Author',
           description: '',
           categories: const [],

@@ -283,32 +283,36 @@ extension _DetailedStatsOverviewView on _DetailedStatsPageState {
               ),
             ],
           ),
-          const Spacer(),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text.rich(
-              TextSpan(
-                children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text.rich(
                   TextSpan(
-                    text: value,
-                    style: TextStyle(
-                      fontSize: 34,
-                      height: 1,
-                      fontWeight: FontWeight.w700,
-                      color: palette.ink,
-                      letterSpacing: -0.8,
-                    ),
+                    children: [
+                      TextSpan(
+                        text: value,
+                        style: TextStyle(
+                          fontSize: 34,
+                          height: 1,
+                          fontWeight: FontWeight.w700,
+                          color: palette.ink,
+                          letterSpacing: -0.8,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' $unit',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: palette.mutedInk,
+                        ),
+                      ),
+                    ],
                   ),
-                  TextSpan(
-                    text: ' $unit',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: palette.mutedInk,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

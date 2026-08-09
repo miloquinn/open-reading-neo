@@ -55,6 +55,8 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
   List<BookSourceChangeCandidate> _candidates = <BookSourceChangeCandidate>[];
   final List<BookSourceChangeCandidate> _pendingCandidates = [];
   final Set<String> _candidateKeys = {};
+  final Map<String, int> _candidateArrivalOrder = {};
+  int _nextCandidateArrivalOrder = 0;
   final Set<String> _searchedSourceIds = {};
   BookSourceChangeCandidate? _selected;
   ValidatedBookSourceChange? _validated;
@@ -137,6 +139,8 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
     _pendingCandidates.clear();
     if (!continueSearch) {
       _candidateKeys.clear();
+      _candidateArrivalOrder.clear();
+      _nextCandidateArrivalOrder = 0;
       _searchedSourceIds.clear();
     }
     _pendingCompleted = _searchedSourceIds.length;
@@ -173,7 +177,9 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
           _searchedSourceIds.add(event.source.id);
           for (final item in event.candidates) {
             final key = '${item.source.id}\u0000${item.book.id}';
-            if (_candidateKeys.add(key)) _pendingCandidates.add(item);
+            if (!_candidateKeys.add(key)) continue;
+            _candidateArrivalOrder[key] = _nextCandidateArrivalOrder++;
+            _pendingCandidates.add(item);
           }
           _pendingCompleted = completedOffset + event.completed;
           if (event.error != null) _pendingFailed++;
@@ -200,6 +206,9 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
     _pendingFailed = 0;
     setState(() {
       _candidates.addAll(added);
+      // Candidates whose author matches the current book move to the front,
+      // even if they arrived later; ties keep arrival order.
+      _candidates.sort(_compareCandidateRelevance);
       _completed = completed;
       _failed += failed;
       if (done) {
@@ -207,6 +216,21 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
         _hasMoreSources = _searchedSourceIds.length < _total;
       }
     });
+  }
+
+  int _compareCandidateRelevance(
+    BookSourceChangeCandidate a,
+    BookSourceChangeCandidate b,
+  ) {
+    final authorRank = (b.authorMatches ? 1 : 0).compareTo(
+      a.authorMatches ? 1 : 0,
+    );
+    if (authorRank != 0) return authorRank;
+    final orderA =
+        _candidateArrivalOrder['${a.source.id}\u0000${a.book.id}'] ?? 0;
+    final orderB =
+        _candidateArrivalOrder['${b.source.id}\u0000${b.book.id}'] ?? 0;
+    return orderA.compareTo(orderB);
   }
 
   Future<void> _selectCandidate(BookSourceChangeCandidate candidate) async {

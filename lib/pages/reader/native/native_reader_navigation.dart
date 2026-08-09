@@ -270,10 +270,6 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     // Prepared once while the book is loading. Opening the sheet must not
     // allocate one navigation model per chapter on the interaction frame.
     final navigationChapters = _navigationChapters;
-    final currentNavigationPosition = _currentNavigationPosition(
-      navigationChapters,
-      chapters,
-    );
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -292,7 +288,10 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
             currentChapterIndex: _chapterIndex,
             currentChapterOffset: _anchorOffset,
             currentChapterText: chapters[_chapterIndex].plainText,
-            currentNavigationPosition: currentNavigationPosition,
+            // Locating the exact EPUB subsection can scan the current
+            // chapter's text; deferred so it never runs on this tap frame.
+            resolveCurrentNavigationPosition: () =>
+                _currentNavigationPosition(navigationChapters, chapters),
             bookmarks: _bookmarks,
             annotations: _annotations,
             currentAnchorKey: currentAnchorKey,

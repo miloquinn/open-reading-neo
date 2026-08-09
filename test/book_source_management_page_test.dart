@@ -40,7 +40,6 @@ void main() {
 
     expect(await BookSourceRegistry().load(), isEmpty);
     expect(find.text('Manage sources'), findsOneWidget);
-    expect(find.text('Connected sources'), findsOneWidget);
     expect(find.byKey(const Key('bookSourcesToolButton')), findsOneWidget);
     expect(find.text('Open Reading Source Protocol'), findsOneWidget);
     expect(tester.takeException(), isNull);

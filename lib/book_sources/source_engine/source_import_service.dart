@@ -47,7 +47,10 @@ class SourceImportPreview {
 class SourceImportService {
   SourceImportService({
     Dio? dio,
-    BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
+    Dio? systemDio,
+    BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(
+      allowSyntheticDns: true,
+    ),
   }) : _networkPolicy = networkPolicy,
        _dio =
            dio ??
@@ -60,7 +63,17 @@ class SourceImportService {
              )
              ..httpClientAdapter = IOHttpClientAdapter(
                createHttpClient: networkPolicy.createPinnedHttpClient,
-             ));
+             )),
+       _systemDio =
+           systemDio ??
+           dio ??
+           Dio(
+             BaseOptions(
+               connectTimeout: const Duration(seconds: 8),
+               receiveTimeout: const Duration(seconds: 20),
+               sendTimeout: const Duration(seconds: 8),
+             ),
+           );
 
   /// Large aggregate source lists commonly exceed 20 MiB. Keep a finite
   /// boundary for malformed or hostile responses without rejecting normal
@@ -71,9 +84,13 @@ class SourceImportService {
   static const int maxNestedDepth = 2;
 
   final Dio _dio;
+  final Dio _systemDio;
   final BookSourceNetworkPolicy _networkPolicy;
 
-  void close({bool force = true}) => _dio.close(force: force);
+  void close({bool force = true}) {
+    _dio.close(force: force);
+    if (!identical(_systemDio, _dio)) _systemDio.close(force: force);
+  }
 
   Future<Uint8List> downloadBytes(String input) async {
     final uri = Uri.tryParse(input.trim());
@@ -191,10 +208,18 @@ class SourceImportService {
   Future<Uint8List> _download(Uri initial) async {
     var current = initial;
     for (var redirects = 0; redirects <= 5; redirects++) {
-      await _networkPolicy.validate(current);
+      final resolvedAddresses = await _networkPolicy.resolve(current);
+      // Mirrors SourceHttpTransport: virtual-DNS clients (Surge/Clash/etc.)
+      // route the reserved 198.18.0.0/15 range through a local tunnel that
+      // the pinned connection factory bypasses, turning valid responses into
+      // HTTP 400. Use the system client for that explicitly allowed range.
+      final client =
+          resolvedAddresses.any(BookSourceNetworkPolicy.isSyntheticDnsAddress)
+          ? _systemDio
+          : _dio;
       final cancelToken = CancelToken();
       try {
-        final response = await _dio.getUri<List<int>>(
+        final response = await client.getUri<List<int>>(
           current,
           options: Options(
             responseType: ResponseType.bytes,

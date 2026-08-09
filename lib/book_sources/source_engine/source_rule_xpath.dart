@@ -47,6 +47,16 @@ List<Object?> evaluateSourceXPath(
                 ...element.querySelectorAll('[$attribute]'),
             ]
           : current;
+      if (!listMode) {
+        // XPath 1.0 converts a node-set to a string using the first node in
+        // document order, not by concatenating every matched node — matching
+        // that avoids mangled URLs when `@href` etc. matches multiple nodes.
+        for (final element in targets) {
+          final value = element.attributes[attribute];
+          if (value != null) return [value];
+        }
+        return const [''];
+      }
       return targets
           .map((element) => element.attributes[attribute] ?? '')
           .toList(growable: false);

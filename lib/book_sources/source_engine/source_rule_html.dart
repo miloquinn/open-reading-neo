@@ -25,15 +25,24 @@ List<Object?> evaluateSourceHtmlRule(
   var current = roots;
   for (var index = 0; index < segments.length; index++) {
     final segment = segments[index].trim();
-    final terminal = sourceHtmlTerminalValue(current, segment);
-    if (terminal != null && index == segments.length - 1) return terminal;
+    final isLast = index == segments.length - 1;
+    final terminal = sourceHtmlTerminalValue(
+      current,
+      segment,
+      singleValue: isLast && !listMode,
+    );
+    if (terminal != null && isLast) return terminal;
     current = selectSourceHtml(current, segment, includeRoots: index == 0);
     if (current.isEmpty) return const [];
   }
   return listMode ? current : current.map((node) => node.text).toList();
 }
 
-List<Object?>? sourceHtmlTerminalValue(List<Element> nodes, String segment) {
+List<Object?>? sourceHtmlTerminalValue(
+  List<Element> nodes,
+  String segment, {
+  required bool singleValue,
+}) {
   return switch (segment) {
     'text' => nodes.map((node) => node.text).toList(),
     'ownText' => nodes.map(sourceOwnText).toList(),
@@ -43,9 +52,23 @@ List<Object?>? sourceHtmlTerminalValue(List<Element> nodes, String segment) {
     _
         when sourceHtmlAttributeNames.contains(segment.toLowerCase()) ||
             nodes.any((node) => node.attributes.containsKey(segment)) =>
-      nodes.map((node) => node.attributes[segment] ?? '').toList(),
+      singleValue
+          ? [_sourceFirstAttributeValue(nodes, segment)]
+          : nodes.map((node) => node.attributes[segment] ?? '').toList(),
     _ => null,
   };
+}
+
+/// Mirrors jsoup's `Elements.attr()`: the first matched element that carries
+/// the attribute wins, instead of concatenating every matched element's
+/// value together (which produced mangled URLs when a rule such as
+/// `tag.a@href` matched more than one anchor inside a single item).
+String _sourceFirstAttributeValue(List<Element> nodes, String segment) {
+  for (final node in nodes) {
+    final value = node.attributes[segment];
+    if (value != null) return value;
+  }
+  return '';
 }
 
 List<Element> selectSourceHtml(

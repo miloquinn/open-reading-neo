@@ -114,8 +114,16 @@ class LibrarySelectionSnapshot {
 class LibraryPage extends StatefulWidget {
   final LibraryPageController? controller;
   final Future<List<Book>> Function()? booksLoader;
+  final BookSourceShelfService? sourceShelfService;
+  final BookSourceShelfService Function()? sourceShelfServiceFactory;
 
-  const LibraryPage({super.key, this.controller, this.booksLoader});
+  const LibraryPage({
+    super.key,
+    this.controller,
+    this.booksLoader,
+    this.sourceShelfService,
+    this.sourceShelfServiceFactory,
+  }) : assert(sourceShelfService == null || sourceShelfServiceFactory == null);
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
@@ -132,7 +140,10 @@ class _LibraryPageState extends State<LibraryPage> {
   Object? _loadError;
   final _bookDao = BookDao();
   late final BookDeletionService _bookDeletionService;
-  final _sourceShelfService = BookSourceShelfService();
+  late final bool _ownsSourceShelfService = widget.sourceShelfService == null;
+  late final BookSourceShelfService _sourceShelfService =
+      widget.sourceShelfService ??
+      (widget.sourceShelfServiceFactory ?? BookSourceShelfService.new)();
   StreamSubscription<void>? _librarySubscription;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -302,11 +313,21 @@ class _LibraryPageState extends State<LibraryPage> {
     if (widget.controller?._state == this) {
       widget.controller?._state = null;
     }
-    _librarySubscription?.cancel();
+    final librarySubscription = _librarySubscription;
+    _librarySubscription = null;
+    _booksRevision++;
     _searchDebounce?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
+    unawaited(_closeOwnedResources(librarySubscription));
     super.dispose();
+  }
+
+  Future<void> _closeOwnedResources(
+    StreamSubscription<void>? librarySubscription,
+  ) async {
+    await librarySubscription?.cancel();
+    if (_ownsSourceShelfService) _sourceShelfService.close();
   }
 
   void _toggleSearchBar() {

@@ -8,7 +8,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
-import 'widgets/sourced_book_widgets.dart';
+import 'widgets/sourced_book_cards.dart';
 
 class BookSourceChangePage extends StatefulWidget {
   const BookSourceChangePage({
@@ -19,7 +19,9 @@ class BookSourceChangePage extends StatefulWidget {
     this.sourcesFuture,
     this.shelfBook,
     this.service,
-  }) : assert(sources != null || sourcesFuture != null);
+    this.serviceFactory,
+  }) : assert(service == null || serviceFactory == null),
+       assert(sources != null || sourcesFuture != null);
 
   final List<RegisteredBookSource>? sources;
   final Future<List<RegisteredBookSource>>? sourcesFuture;
@@ -27,6 +29,7 @@ class BookSourceChangePage extends StatefulWidget {
   final BookSourceBook currentBook;
   final Book? shelfBook;
   final BookSourceChangeService? service;
+  final BookSourceChangeService Function()? serviceFactory;
 
   @override
   State<BookSourceChangePage> createState() => _BookSourceChangePageState();
@@ -36,8 +39,10 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
   static const int _quickSourceLimit = 60;
   static const int _quickCandidateLimit = 8;
 
+  late final bool _ownsService = widget.service == null;
   late final BookSourceChangeService _service =
-      widget.service ?? BookSourceChangeService();
+      widget.service ??
+      (widget.serviceFactory ?? BookSourceChangeService.new)();
   late final TextEditingController _queryController = TextEditingController(
     text: widget.currentBook.title,
   );
@@ -77,10 +82,20 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
 
   @override
   void dispose() {
-    _searchSubscription?.cancel();
+    final searchSubscription = _searchSubscription;
+    _searchSubscription = null;
+    _generation++;
     _resultFlushTimer?.cancel();
     _queryController.dispose();
+    unawaited(_closeOwnedService(searchSubscription));
     super.dispose();
+  }
+
+  Future<void> _closeOwnedService(
+    StreamSubscription<BookSourceChangeSearchEvent>? searchSubscription,
+  ) async {
+    await searchSubscription?.cancel();
+    if (_ownsService) _service.close();
   }
 
   Future<BookSourceChangePosition> _loadPosition() async {

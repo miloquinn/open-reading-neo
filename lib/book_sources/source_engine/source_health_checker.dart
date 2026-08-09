@@ -2,8 +2,8 @@ import 'dart:async';
 
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
-import 'source_request.dart';
 import 'source_runtime.dart';
+import 'source_transport.dart';
 
 /// One capability a book source can independently succeed or fail at.
 /// `info`/`catalog`/`content` form a dependent chain — each is only attempted

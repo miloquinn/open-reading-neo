@@ -11,6 +11,7 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
+import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/book_sources/services/source_cover_cache.dart';
 import 'package:xxread/core/reader/reader_page_turn_geometry.dart';
 import 'package:xxread/core/reader/reader_margin_settings.dart';
@@ -36,6 +37,82 @@ void main() {
 
   tearDown(() {
     GlassEffectConfig.setDisableAllGlassEffects(false);
+  });
+
+  testWidgets(
+    'reader closes owned resources to cancel pending initialization',
+    (tester) async {
+      final closeOrder = <String>[];
+      final client = _CloseTrackingDelayedClient(closeOrder);
+      late final _CloseTrackingReaderShelfService shelfService;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: BookSourceReaderPage(
+            source: _testSource(),
+            book: const BookSourceBook(
+              id: 'book-1',
+              title: 'Ownership test',
+              author: 'Author',
+              description: '',
+              categories: [],
+            ),
+            clientFactory: () => client,
+            shelfServiceFactory: (resolvedClient) {
+              shelfService = _CloseTrackingReaderShelfService(
+                resolvedClient,
+                closeOrder,
+              );
+              return shelfService;
+            },
+            initialTheme: ReaderThemes.day,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(closeOrder, ['shelf', 'client']);
+      expect(shelfService.closeCount, 1);
+      expect(client.closeCount, 1);
+    },
+  );
+
+  testWidgets('reader does not close borrowed resources', (tester) async {
+    final closeOrder = <String>[];
+    final client = _CloseTrackingImmediateClient(closeOrder);
+    final shelfService = _CloseTrackingReaderShelfService(client, closeOrder);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceReaderPage(
+          source: _testSource(),
+          book: const BookSourceBook(
+            id: 'book-1',
+            title: 'Borrowed ownership test',
+            author: 'Author',
+            description: '',
+            categories: [],
+          ),
+          client: client,
+          shelfService: shelfService,
+          initialTheme: ReaderThemes.day,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+
+    expect(closeOrder, isEmpty);
+    shelfService.close();
+    client.close();
   });
 
   testWidgets(
@@ -1577,6 +1654,48 @@ class _DelayedOpeningBookSourceClient extends BookSourceClient {
       content: 'Opening body',
       contentType: 'text/plain',
     );
+  }
+}
+
+class _CloseTrackingDelayedClient extends _DelayedOpeningBookSourceClient {
+  _CloseTrackingDelayedClient(this.closeOrder);
+
+  final List<String> closeOrder;
+  int closeCount = 0;
+
+  @override
+  void close({bool force = true}) {
+    closeCount++;
+    closeOrder.add('client');
+    completeCatalog();
+    super.close(force: force);
+  }
+}
+
+class _CloseTrackingImmediateClient extends _FakeBookSourceClient {
+  _CloseTrackingImmediateClient(this.closeOrder);
+
+  final List<String> closeOrder;
+
+  @override
+  void close({bool force = true}) {
+    closeOrder.add('client');
+    super.close(force: force);
+  }
+}
+
+class _CloseTrackingReaderShelfService extends BookSourceShelfService {
+  _CloseTrackingReaderShelfService(BookSourceClient client, this.closeOrder)
+    : super(client: client);
+
+  final List<String> closeOrder;
+  int closeCount = 0;
+
+  @override
+  void close() {
+    closeCount++;
+    closeOrder.add('shelf');
+    super.close();
   }
 }
 

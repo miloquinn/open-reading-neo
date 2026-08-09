@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/library/library_page.dart';
@@ -12,6 +14,52 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
+  testWidgets('library closes only a factory-created source shelf service', (
+    tester,
+  ) async {
+    final ownedService = _CloseTrackingLibraryShelfService();
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => AppSettingsNotifier(),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LibraryPage(
+            booksLoader: () async => const [],
+            sourceShelfServiceFactory: () => ownedService,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    expect(ownedService.closeCount, 1);
+
+    final borrowedService = _CloseTrackingLibraryShelfService();
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => AppSettingsNotifier(),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LibraryPage(
+            booksLoader: () async => const [],
+            sourceShelfService: borrowedService,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(borrowedService.closeCount, 0);
+    borrowedService.close();
   });
 
   testWidgets('loads books and filters by title or author', (tester) async {
@@ -121,3 +169,18 @@ void main() {
     await tester.pump();
   });
 }
+
+class _CloseTrackingLibraryShelfService extends BookSourceShelfService {
+  _CloseTrackingLibraryShelfService()
+    : super(clientFactory: _CloseTrackingLibraryClient.new);
+
+  int closeCount = 0;
+
+  @override
+  void close() {
+    closeCount++;
+    super.close();
+  }
+}
+
+class _CloseTrackingLibraryClient extends BookSourceClient {}

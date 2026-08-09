@@ -40,6 +40,105 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('discover page closes only factory-created source resources', (
+    tester,
+  ) async {
+    final ownedClient = _CloseTrackingBookSourceClient();
+    late final _CloseTrackingShelfService ownedShelf;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourcesPage(
+          clientFactory: () => ownedClient,
+          shelfServiceFactory: (client) {
+            ownedShelf = _CloseTrackingShelfService(client);
+            return ownedShelf;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+
+    expect(ownedShelf.closeCount, 1);
+    expect(ownedClient.closeCount, 1);
+
+    final borrowedClient = _CloseTrackingBookSourceClient();
+    final borrowedShelf = _CloseTrackingShelfService(borrowedClient);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourcesPage(
+          client: borrowedClient,
+          shelfService: borrowedShelf,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(borrowedShelf.closeCount, 0);
+    expect(borrowedClient.closeCount, 0);
+    borrowedShelf.close();
+    borrowedClient.close();
+  });
+
+  testWidgets('search page closes only factory-created source resources', (
+    tester,
+  ) async {
+    final ownedClient = _CloseTrackingBookSourceClient();
+    late final _CloseTrackingShelfService ownedShelf;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SourceSearchPage(
+          sources: const [],
+          clientFactory: () => ownedClient,
+          shelfServiceFactory: (client) {
+            ownedShelf = _CloseTrackingShelfService(client);
+            return ownedShelf;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(ownedShelf.closeCount, 1);
+    expect(ownedClient.closeCount, 1);
+
+    final borrowedClient = _CloseTrackingBookSourceClient();
+    final borrowedShelf = _CloseTrackingShelfService(borrowedClient);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SourceSearchPage(
+          sources: const [],
+          client: borrowedClient,
+          shelfService: borrowedShelf,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(borrowedShelf.closeCount, 0);
+    expect(borrowedClient.closeCount, 0);
+    borrowedShelf.close();
+    borrowedClient.close();
+  });
+
   testWidgets('search page focuses the query field and searches on submit', (
     tester,
   ) async {
@@ -514,6 +613,28 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _CloseTrackingBookSourceClient extends BookSourceClient {
+  int closeCount = 0;
+
+  @override
+  void close({bool force = true}) {
+    closeCount++;
+    super.close(force: force);
+  }
+}
+
+class _CloseTrackingShelfService extends BookSourceShelfService {
+  _CloseTrackingShelfService(BookSourceClient client) : super(client: client);
+
+  int closeCount = 0;
+
+  @override
+  void close() {
+    closeCount++;
+    super.close();
+  }
 }
 
 class _DelayedScopeClient extends BookSourceClient {

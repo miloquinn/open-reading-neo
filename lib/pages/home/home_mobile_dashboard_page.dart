@@ -96,9 +96,22 @@ class HomeDashboardController extends ChangeNotifier {
 }
 
 class HomeMobileDashboardPage extends StatefulWidget {
-  const HomeMobileDashboardPage({super.key, this.controller});
+  const HomeMobileDashboardPage({
+    super.key,
+    this.controller,
+    this.client,
+    this.shelfService,
+    this.clientFactory,
+    this.shelfServiceFactory,
+  }) : assert(client == null || clientFactory == null),
+       assert(shelfService == null || shelfServiceFactory == null);
 
   final HomeDashboardController? controller;
+  final BookSourceClient? client;
+  final BookSourceShelfService? shelfService;
+  final BookSourceClient Function()? clientFactory;
+  final BookSourceShelfService Function(BookSourceClient client)?
+  shelfServiceFactory;
 
   @visibleForTesting
   static Widget? buildOnlineReader({
@@ -128,6 +141,8 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
   final _bookDao = BookDao();
   late final BookSourceClient _sourceClient;
   late final BookSourceShelfService _sourceShelfService;
+  late final bool _ownsSourceClient;
+  late final bool _ownsSourceShelfService;
   StreamSubscription<void>? _libraryChangedSubscription;
 
   Map<String, int> _summaryStats = {};
@@ -142,8 +157,14 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _sourceClient = BookSourceClient();
-    _sourceShelfService = BookSourceShelfService(client: _sourceClient);
+    _ownsSourceClient = widget.client == null;
+    _sourceClient =
+        widget.client ?? (widget.clientFactory ?? BookSourceClient.new)();
+    _ownsSourceShelfService = widget.shelfService == null;
+    _sourceShelfService =
+        widget.shelfService ??
+        (widget.shelfServiceFactory ??
+            (client) => BookSourceShelfService(client: client))(_sourceClient);
     widget.controller?.addListener(_handleRefreshRequest);
     _loadAllStats();
     _libraryChangedSubscription = LibraryEventBus().stream.listen((_) {
@@ -170,8 +191,19 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller?.removeListener(_handleRefreshRequest);
-    _libraryChangedSubscription?.cancel();
+    final libraryChangedSubscription = _libraryChangedSubscription;
+    _libraryChangedSubscription = null;
+    _loadGeneration++;
+    unawaited(_closeOwnedResources(libraryChangedSubscription));
     super.dispose();
+  }
+
+  Future<void> _closeOwnedResources(
+    StreamSubscription<void>? libraryChangedSubscription,
+  ) async {
+    await libraryChangedSubscription?.cancel();
+    if (_ownsSourceShelfService) _sourceShelfService.close();
+    if (_ownsSourceClient) _sourceClient.close();
   }
 
   void _handleRefreshRequest() {

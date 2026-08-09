@@ -1,7 +1,7 @@
 import '../models/registered_book_source.dart';
 import 'source_config.dart';
+import 'source_http_transport.dart';
 import 'source_runtime.dart';
-import 'source_request.dart';
 
 typedef SourceVerificationProgress =
     void Function(int completed, int total, int available);

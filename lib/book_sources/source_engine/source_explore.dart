@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import '../protocol/book_source_protocol.dart';
-import 'source_request.dart';
+import 'source_request_template.dart';
 
 /// A safe, declarative discovery channel extracted from a reading source.
 ///

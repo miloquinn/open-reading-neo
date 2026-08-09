@@ -4,24 +4,25 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:xxread/book_sources/source_engine/source_import_service.dart';
-import 'package:xxread/book_sources/models/registered_book_source.dart';
-import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
-import 'package:xxread/book_sources/services/book_source_client.dart';
-import 'package:xxread/book_sources/services/book_source_health_check_service.dart';
-import 'package:xxread/book_sources/services/book_source_import_analyzer.dart';
-import 'package:xxread/book_sources/services/book_source_registry.dart';
-import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
-import 'package:xxread/services/core/app_settings_service.dart';
-import 'package:xxread/utils/layout_helper.dart';
-import 'package:xxread/utils/localization_extension.dart';
-import 'package:xxread/utils/page_style_helper.dart';
-import 'package:xxread/widgets/floating_subpage_scaffold.dart';
-import 'package:xxread/widgets/side_toast.dart';
-import 'package:xxread/widgets/source_cover_image.dart';
 
+import '../../book_sources/models/registered_book_source.dart';
+import '../../book_sources/protocol/book_source_protocol.dart';
+import '../../book_sources/services/book_source_import_analyzer.dart';
+import '../../book_sources/source_engine/source_health_checker.dart';
+import '../../book_sources/source_engine/source_import_service.dart';
+import '../../services/core/app_settings_service.dart';
+import '../../utils/layout_helper.dart';
+import '../../utils/localization_extension.dart';
+import '../../widgets/floating_subpage_scaffold.dart';
+import '../../widgets/side_toast.dart';
+import 'controllers/book_source_add_controller.dart';
+import 'controllers/book_source_management_controller.dart';
 import 'source_debug_page.dart';
 import 'source_login_page.dart';
+import 'widgets/book_source_add_panel.dart';
+import 'widgets/book_source_group_picker.dart';
+import 'widgets/book_source_management_list.dart';
+import 'widgets/book_source_management_source_card.dart';
 
 /// Low-frequency configuration for online content providers.
 ///
@@ -36,72 +37,33 @@ class BookSourceManagementPage extends StatefulWidget {
 }
 
 class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
-  static const int _initialSourceBatchSize = 24;
-  static const int _sourceBatchSize = 24;
   static const double _loadMoreExtent = 800;
 
-  final BookSourceRegistry _registry = BookSourceRegistry();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  BookSourceClient? _client;
-  SourceImportService? _importService;
-  BookSourceImportAnalyzer? _importAnalyzer;
-  BookSourceHealthCheckService? _healthCheckService;
-
-  BookSourceClient get _sourceClient => _client ??= BookSourceClient();
-  SourceImportService get _additionalImportService =>
-      _importService ??= SourceImportService();
-  BookSourceImportAnalyzer get _sourceImportAnalyzer => _importAnalyzer ??=
-      BookSourceImportAnalyzer(additionalImporter: _additionalImportService);
-  BookSourceHealthCheckService get _sourceHealthCheckService =>
-      _healthCheckService ??= BookSourceHealthCheckService(
-        registry: _registry,
-      );
-  List<RegisteredBookSource> _sources = const [];
-  final Set<String> _selectedSourceIds = {};
-  bool _loading = true;
-  bool _selectionMode = false;
-  String _searchQuery = '';
-  _BookSourceFilter _filter = _BookSourceFilter.all;
-  String? _selectedGroup;
-  int _sourceDisplayLimit = _initialSourceBatchSize;
-  ({int completed, int total})? _healthCheckProgress;
+  late final BookSourceManagementController _controller;
   bool _protocolCardExpanded = false;
 
   @override
   void initState() {
     super.initState();
+    _controller = BookSourceManagementController()..addListener(_onChanged);
     _scrollController.addListener(_loadMoreSourcesIfNeeded);
-    unawaited(_loadSources());
+    unawaited(_controller.load());
   }
 
-  Future<void> _loadSources() async {
-    final sources = await _registry.loadInBackground();
-    if (!mounted) return;
-    setState(() {
-      _sources = sources;
-      _loading = false;
-      _sourceDisplayLimit = _initialSourceBatchSize;
-    });
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
   void _loadMoreSourcesIfNeeded() {
-    if (_loading || !_scrollController.hasClients) return;
+    if (_controller.state.loading || !_scrollController.hasClients) return;
     if (!_scrollController.position.isScrollingNotifier.value) return;
     if (_scrollController.position.extentAfter > _loadMoreExtent) return;
-    final sourceCount = _visibleSources.length;
-    if (_sourceDisplayLimit >= sourceCount) return;
-    setState(() {
-      final nextLimit = _sourceDisplayLimit + _sourceBatchSize;
-      _sourceDisplayLimit = nextLimit < sourceCount ? nextLimit : sourceCount;
-    });
+    _controller.loadMore();
   }
 
-  void _updateSourceView(VoidCallback update) {
-    setState(() {
-      update();
-      _sourceDisplayLimit = _initialSourceBatchSize;
-    });
+  void _resetScroll() {
     if (_scrollController.hasClients && _scrollController.offset != 0) {
       _scrollController.jumpTo(0);
     }
@@ -113,14 +75,14 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       ..removeListener(_loadMoreSourcesIfNeeded)
       ..dispose();
     _searchController.dispose();
-    _client?.close();
-    _importService?.close();
+    _controller
+      ..removeListener(_onChanged)
+      ..dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     var additionalProtocolsEnabled = false;
     try {
       additionalProtocolsEnabled = context
@@ -129,6 +91,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     } on ProviderNotFoundException {
       // Standalone embeds without app settings retain the default-off state.
     }
+    _controller.setAdditionalProtocolsEnabled(additionalProtocolsEnabled);
+    final state = _controller.state;
     return FloatingSubpageScaffold(
       title: context.l10n.bookSourceManagementTitle,
       actions: [
@@ -150,7 +114,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
               itemKey: const Key('bookSourcesSelectionModeButton'),
               child: ListTile(
                 leading: Icon(
-                  _selectionMode
+                  state.selectionMode
                       ? Icons.close_rounded
                       : Icons.checklist_rounded,
                 ),
@@ -161,12 +125,9 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           onSelected: (action) {
             switch (action) {
               case _BookSourceHeaderAction.add:
-                _showAddSourceDialog();
+                unawaited(_showAddSourceDialog());
               case _BookSourceHeaderAction.select:
-                setState(() {
-                  _selectionMode = !_selectionMode;
-                  _selectedSourceIds.clear();
-                });
+                _controller.toggleSelectionMode();
             }
           },
         ),
@@ -175,699 +136,157 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 920),
-          child: _buildSourceList(additionalProtocolsEnabled, scheme),
+          child: BookSourceManagementList(
+            state: state,
+            searchController: _searchController,
+            scrollController: _scrollController,
+            additionalProtocolsEnabled: additionalProtocolsEnabled,
+            protocolExpanded: _protocolCardExpanded,
+            onQueryChanged: (query) {
+              _controller.setQuery(query);
+              _resetScroll();
+            },
+            onClearQuery: () {
+              _searchController.clear();
+              _controller.setQuery('');
+              _resetScroll();
+            },
+            onFilterChanged: (filter) {
+              _controller.setFilter(filter);
+              _resetScroll();
+            },
+            onChooseGroup: _showGroupPicker,
+            onResetFilters: () {
+              _searchController.clear();
+              _controller.resetFilters();
+              _resetScroll();
+            },
+            onToggleSelectAll: _controller.toggleSelectAllVisible,
+            onEnableSelected: () =>
+                unawaited(_controller.setSelectedSourcesEnabled(true)),
+            onDisableSelected: () =>
+                unawaited(_controller.setSelectedSourcesEnabled(false)),
+            onCheckSelected: () => unawaited(_checkSelectedSourcesHealth()),
+            onRemoveSelected: () => unawaited(_removeSelectedSources()),
+            onToggleSourceSelection: (source) =>
+                _controller.toggleSourceSelection(source.id),
+            onSourceEnabledChanged: (source, enabled) =>
+                unawaited(_controller.setSourceEnabled(source, enabled)),
+            onSourceAction: _handleSourceAction,
+            onToggleProtocol: () =>
+                setState(() => _protocolCardExpanded = !_protocolCardExpanded),
+            onShowProtocolDetails: _showProtocolDialog,
+            onOpenProtocolRepository: () =>
+                unawaited(_openProtocolRepository()),
+            onOpenRightsReport: () => unawaited(_openRightsReport()),
+          ),
         ),
       ),
     );
   }
-
-  Widget _buildSourceList(bool additionalProtocolsEnabled, ColorScheme scheme) {
-    final visibleSources = _visibleSources;
-    final allOrspSources = visibleSources
-        .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
-        .toList(growable: false);
-    final allAdditionalSources = visibleSources
-        .where((source) => source.sourceProtocol != BookSourceProtocolKind.orsp)
-        .toList(growable: false);
-    final orsp = allOrspSources
-        .take(_sourceDisplayLimit)
-        .toList(growable: false);
-    final remainingLimit = _sourceDisplayLimit - orsp.length;
-    final additional = allAdditionalSources
-        .take(remainingLimit > 0 ? remainingLimit : 0)
-        .toList(growable: false);
-    final displayedSourceCount = orsp.length + additional.length;
-    return Scrollbar(
-      key: const Key('bookSourceManagementScrollbar'),
-      controller: _scrollController,
-      thumbVisibility: true,
-      interactive: true,
-      child: CustomScrollView(
-        key: const Key('bookSourceManagementList'),
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: FloatingSubpageScaffold.headerExtentOf(context),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    context.l10n.bookSourceManagementSubtitle,
-                    style: TextStyle(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _buildManagementHeader(visibleSources.length),
-                  const SizedBox(height: 12),
-                  _buildSearchAndFilters(),
-                  if (_selectionMode) ...[
-                    const SizedBox(height: 12),
-                    _buildBulkActions(additionalProtocolsEnabled),
-                  ],
-                  const SizedBox(height: 12),
-                ],
-              ),
-            ),
-          ),
-          if (_loading)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_sources.isEmpty)
-            _paddedSliver(_buildNoSourcesCard())
-          else if (visibleSources.isEmpty)
-            _paddedSliver(_buildNoMatchingSourcesCard())
-          else ...[
-            if (orsp.isNotEmpty)
-              ..._buildSourceGroupSlivers(
-                title: context.l10n.bookSourcesProtocolGroupOrsp,
-                sources: orsp,
-                totalCount: allOrspSources.length,
-                additionalProtocolsEnabled: additionalProtocolsEnabled,
-              ),
-            if (additional.isNotEmpty)
-              ..._buildSourceGroupSlivers(
-                title: context.l10n.bookSourcesProtocolGroupAdditional,
-                sources: additional,
-                totalCount: allAdditionalSources.length,
-                additionalProtocolsEnabled: additionalProtocolsEnabled,
-              ),
-            if (displayedSourceCount < visibleSources.length)
-              const SliverPadding(
-                key: Key('bookSourceManagementLoadingMore'),
-                padding: EdgeInsets.symmetric(vertical: 12),
-                sliver: SliverToBoxAdapter(
-                  child: Center(
-                    child: SizedBox.square(
-                      dimension: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-          if (_loading || displayedSourceCount >= visibleSources.length)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
-              sliver: SliverToBoxAdapter(child: _buildProtocolCard()),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManagementHeader(int visibleCount) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                context.l10n.bookSourcesManageTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              Text(
-                context.l10n.bookSourcesVisibleCount(
-                  visibleCount,
-                  _sources.length,
-                ),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNoSourcesCard() {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _panelDecoration(radius: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.travel_explore_rounded, color: scheme.primary),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.bookSourcesNoSourcesTitle,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  context.l10n.bookSourcesNoSourcesDescription,
-                  style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<RegisteredBookSource> get _visibleSources {
-    final query = _searchQuery.trim().toLowerCase();
-    return _sources
-        .where((source) {
-          final groups = _sourceGroups(source);
-          final matchesState = switch (_filter) {
-            _BookSourceFilter.all => true,
-            _BookSourceFilter.enabled => source.enabled,
-            _BookSourceFilter.disabled => !source.enabled,
-            _BookSourceFilter.runnable => source.capabilities.isNotEmpty,
-            _BookSourceFilter.pending => source.capabilities.isEmpty,
-          };
-          if (!matchesState) return false;
-          final selectedGroup = _selectedGroup;
-          if (selectedGroup != null && !groups.contains(selectedGroup)) {
-            return false;
-          }
-          if (query.isEmpty) return true;
-          return source.name.toLowerCase().contains(query) ||
-              source.description.toLowerCase().contains(query) ||
-              source.apiBaseUrl.toString().toLowerCase().contains(query) ||
-              groups.any((group) => group.toLowerCase().contains(query));
-        })
-        .toList(growable: false);
-  }
-
-  List<String> get _availableGroups {
-    final groups = <String>{};
-    for (final source in _sources) {
-      groups.addAll(_sourceGroups(source));
-    }
-    return groups.toList()..sort();
-  }
-
-  List<String> _sourceGroups(RegisteredBookSource source) {
-    final raw = source.sourceConfig?['bookSourceGroup'];
-    if (raw is! String || raw.trim().isEmpty) return const [];
-    return raw
-        .split(RegExp(r'[,;，；\n]'))
-        .map((group) => group.trim())
-        .where((group) => group.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  Widget _buildSearchAndFilters() {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          key: const Key('bookSourceManagementSearchField'),
-          controller: _searchController,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: context.l10n.bookSourcesManagementSearchHint,
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: _searchQuery.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: context.l10n.bookSourcesClearSearch,
-                    onPressed: () {
-                      _searchController.clear();
-                      _updateSourceView(() => _searchQuery = '');
-                    },
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-            filled: true,
-            fillColor: scheme.surfaceContainerLow,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          onChanged: (value) => _updateSourceView(() => _searchQuery = value),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 42,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (final filter in _BookSourceFilter.values) ...[
-                ChoiceChip(
-                  key: Key('bookSourceFilter-${filter.name}'),
-                  selected: _filter == filter,
-                  label: Text(_filterLabel(filter)),
-                  onSelected: (_) => _updateSourceView(() => _filter = filter),
-                ),
-                const SizedBox(width: 8),
-              ],
-              if (_availableGroups.isNotEmpty)
-                ActionChip(
-                  key: const Key('bookSourceGroupFilter'),
-                  avatar: const Icon(Icons.folder_outlined, size: 18),
-                  label: Text(
-                    _selectedGroup ?? context.l10n.bookSourcesAllGroups,
-                  ),
-                  onPressed: _showGroupPicker,
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _filterLabel(_BookSourceFilter filter) => switch (filter) {
-    _BookSourceFilter.all => context.l10n.statsRangeAll,
-    _BookSourceFilter.enabled => context.l10n.bookSourcesEnabled,
-    _BookSourceFilter.disabled => context.l10n.bookSourcesDisabled,
-    _BookSourceFilter.runnable => context.l10n.bookSourcesRunnable,
-    _BookSourceFilter.pending => context.l10n.bookSourcesPendingCompatibility,
-  };
 
   Future<void> _showGroupPicker() async {
-    final groups = _availableGroups;
+    final state = _controller.state;
     final selected = await showModalBottomSheet<String>(
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (sheetContext) =>
-          _BookSourceGroupPicker(groups: groups, selected: _selectedGroup),
+      builder: (context) => BookSourceGroupPicker(
+        groups: state.availableGroups,
+        selected: state.selectedGroup,
+      ),
     );
     if (!mounted || selected == null) return;
     final normalized = selected.isEmpty ? null : selected;
-    if (normalized == _selectedGroup) return;
-    _updateSourceView(() => _selectedGroup = normalized);
+    if (normalized == _controller.state.selectedGroup) return;
+    _controller.setGroup(normalized);
+    _resetScroll();
   }
 
-  Widget _paddedSliver(Widget child) {
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      sliver: SliverToBoxAdapter(child: child),
-    );
-  }
-
-  Widget _buildNoMatchingSourcesCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _panelDecoration(radius: 20),
-      child: Row(
-        children: [
-          const Icon(Icons.filter_alt_off_outlined),
-          const SizedBox(width: 12),
-          Expanded(child: Text(context.l10n.bookSourcesNoMatchingSources)),
-          TextButton(
-            onPressed: () {
-              _searchController.clear();
-              _updateSourceView(() {
-                _searchQuery = '';
-                _filter = _BookSourceFilter.all;
-                _selectedGroup = null;
-              });
-            },
-            child: Text(context.l10n.bookSourcesResetFilters),
+  void _handleSourceAction(
+    RegisteredBookSource source,
+    BookSourceManagementSourceAction action,
+  ) {
+    switch (action) {
+      case BookSourceManagementSourceAction.refresh:
+        unawaited(_refreshSource(source));
+      case BookSourceManagementSourceAction.rights:
+        unawaited(_showSourceRightsDialog(source));
+      case BookSourceManagementSourceAction.login:
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SourceLoginPage(source: source),
+            ),
           ),
-        ],
-      ),
-    );
+        );
+      case BookSourceManagementSourceAction.debug:
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SourceDebugPage(source: source),
+            ),
+          ),
+        );
+      case BookSourceManagementSourceAction.health:
+        unawaited(_checkSourceHealth(source));
+      case BookSourceManagementSourceAction.remove:
+        unawaited(_confirmRemoveSource(source));
+    }
   }
 
-  Widget _buildBulkActions(bool additionalProtocolsEnabled) {
-    final allIds = _visibleSources.map((source) => source.id).toSet();
-    final allSelected =
-        allIds.isNotEmpty && _selectedSourceIds.containsAll(allIds);
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        OutlinedButton.icon(
-          onPressed: () => setState(() {
-            if (allSelected) {
-              _selectedSourceIds.clear();
-            } else {
-              _selectedSourceIds
-                ..clear()
-                ..addAll(allIds);
-            }
-          }),
-          icon: Icon(
-            allSelected ? Icons.deselect_rounded : Icons.select_all_rounded,
-          ),
-          label: Text(
-            allSelected
-                ? context.l10n.bookSourcesClearSelection
-                : context.l10n.bookSourcesSelectAll,
-          ),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: _selectedSourceIds.isEmpty
-              ? null
-              : () => _setSelectedSourcesEnabled(
-                  true,
-                  additionalProtocolsEnabled,
-                ),
-          icon: const Icon(Icons.toggle_on_outlined),
-          label: Text(context.l10n.bookSourcesEnableSelected),
-        ),
-        OutlinedButton.icon(
-          onPressed: _selectedSourceIds.isEmpty
-              ? null
-              : () => _setSelectedSourcesEnabled(
-                  false,
-                  additionalProtocolsEnabled,
-                ),
-          icon: const Icon(Icons.toggle_off_outlined),
-          label: Text(context.l10n.bookSourcesDisableSelected),
-        ),
-        OutlinedButton.icon(
-          onPressed:
-              _selectedSourceIds.isEmpty || _healthCheckProgress != null
-              ? null
-              : _checkSelectedSourcesHealth,
-          icon: _healthCheckProgress == null
-              ? const Icon(Icons.health_and_safety_outlined)
-              : const SizedBox.square(
-                  dimension: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-          label: Text(
-            _healthCheckProgress == null
-                ? context.l10n.bookSourcesCheckSelected
-                : '${_healthCheckProgress!.completed}/${_healthCheckProgress!.total}',
-          ),
-        ),
-        TextButton.icon(
-          onPressed: _selectedSourceIds.isEmpty ? null : _removeSelectedSources,
-          icon: const Icon(Icons.delete_outline_rounded),
-          label: Text(context.l10n.bookSourcesDeleteSelected),
-        ),
-      ],
-    );
-  }
-
-  void _toggleSourceSelection(RegisteredBookSource source) {
-    setState(() {
-      if (!_selectedSourceIds.add(source.id)) {
-        _selectedSourceIds.remove(source.id);
-      }
-    });
-  }
-
-  Future<void> _setSelectedSourcesEnabled(
-    bool enabled,
-    bool additionalProtocolsEnabled,
-  ) async {
-    final allowedIds = _sources
-        .where(
-          (source) =>
-              _selectedSourceIds.contains(source.id) &&
-              (!enabled ||
-                  source.sourceProtocol == BookSourceProtocolKind.orsp ||
-                  additionalProtocolsEnabled),
-        )
-        .map((source) => source.id);
-    final sources = await _registry.setEnabledAll(allowedIds, enabled);
+  Future<void> _refreshSource(RegisteredBookSource source) async {
+    final refreshed = await _controller.refreshSource(source);
     if (!mounted) return;
-    setState(() => _sources = sources);
+    showSideToast(
+      context,
+      refreshed
+          ? context.l10n.bookSourcesRefreshed
+          : context.l10n.bookSourcesRefreshFailed,
+      kind: refreshed ? SideToastKind.success : SideToastKind.error,
+    );
   }
 
   Future<void> _checkSelectedSourcesHealth() async {
-    final targets = _sources
-        .where((source) => _selectedSourceIds.contains(source.id))
-        .toList(growable: false);
-    if (targets.isEmpty || _healthCheckProgress != null) return;
-    setState(() => _healthCheckProgress = (completed: 0, total: targets.length));
-    List<RegisteredBookSource> updated = const [];
     try {
-      updated = await _sourceHealthCheckService.checkAll(
-        targets,
-        onProgress: (completed, total) {
-          if (!mounted) return;
-          setState(() => _healthCheckProgress = (completed: completed, total: total));
-        },
+      final updated = await _controller.checkSelectedSourcesHealth();
+      if (!mounted || updated.isEmpty) return;
+      final healthy = updated
+          .where((source) => sourceHealthCheckResultOf(source)?.healthy == true)
+          .length;
+      showSideToast(
+        context,
+        context.l10n.bookSourcesHealthCheckSummary(healthy, updated.length),
+        kind: healthy == updated.length
+            ? SideToastKind.success
+            : SideToastKind.error,
       );
-    } finally {
-      if (mounted) setState(() => _healthCheckProgress = null);
+    } on Object catch (error) {
+      if (mounted) {
+        showSideToast(context, '$error', kind: SideToastKind.error);
+      }
     }
-    if (!mounted || updated.isEmpty) return;
-    final byId = {for (final source in updated) source.id: source};
-    setState(() {
-      _sources = [
-        for (final source in _sources) byId[source.id] ?? source,
-      ];
-    });
-    final healthy = updated
-        .where((source) => sourceHealthCheckResultOf(source)?.healthy == true)
-        .length;
-    showSideToast(
-      context,
-      context.l10n.bookSourcesHealthCheckSummary(healthy, updated.length),
-      kind: healthy == updated.length
-          ? SideToastKind.success
-          : SideToastKind.error,
-    );
   }
 
   Future<void> _checkSourceHealth(RegisteredBookSource source) async {
-    RegisteredBookSource updated;
     try {
-      updated = await _sourceHealthCheckService.checkOne(source);
+      final updated = await _controller.checkSourceHealth(source);
+      if (!mounted || updated == null) return;
+      final result = sourceHealthCheckResultOf(updated);
+      showSideToast(
+        context,
+        result?.healthy == true
+            ? context.l10n.sourceHealthHealthy
+            : _sourceHealthIssueSummary(result),
+        kind: result?.healthy == true
+            ? SideToastKind.success
+            : SideToastKind.error,
+      );
     } on Object catch (error) {
-      if (!mounted) return;
-      showSideToast(context, '$error', kind: SideToastKind.error);
-      return;
+      if (mounted) {
+        showSideToast(context, '$error', kind: SideToastKind.error);
+      }
     }
-    if (!mounted) return;
-    setState(() {
-      _sources = [
-        for (final existing in _sources)
-          if (existing.id == updated.id) updated else existing,
-      ];
-    });
-    final result = sourceHealthCheckResultOf(updated);
-    showSideToast(
-      context,
-      result?.healthy == true
-          ? context.l10n.sourceHealthHealthy
-          : _sourceHealthIssueSummary(result),
-      kind: result?.healthy == true
-          ? SideToastKind.success
-          : SideToastKind.error,
-    );
-  }
-
-  Future<void> _removeSelectedSources() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.l10n.bookSourcesDeleteSelected),
-        content: Text(
-          context.l10n.bookSourcesDeleteSelectedMessage(
-            _selectedSourceIds.length,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.bookSourcesCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.bookSourcesConfirm),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final sources = await _registry.removeAll(_selectedSourceIds);
-    if (!mounted) return;
-    setState(() {
-      _sources = sources;
-      _selectedSourceIds.clear();
-      _selectionMode = false;
-    });
-  }
-
-  List<Widget> _buildSourceGroupSlivers({
-    required String title,
-    required List<RegisteredBookSource> sources,
-    required int totalCount,
-    required bool additionalProtocolsEnabled,
-  }) {
-    return [
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
-        sliver: SliverToBoxAdapter(
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Text(
-                '$totalCount',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
-            return _buildSourceCard(
-              sources[index],
-              additionalProtocolsEnabled: additionalProtocolsEnabled,
-            );
-          }, childCount: sources.length),
-        ),
-      ),
-    ];
-  }
-
-  Widget _buildSourceCard(
-    RegisteredBookSource source, {
-    required bool additionalProtocolsEnabled,
-  }) {
-    final canEnable =
-        source.capabilities.isNotEmpty &&
-        (source.sourceProtocol == BookSourceProtocolKind.orsp ||
-            additionalProtocolsEnabled);
-    final selected = _selectedSourceIds.contains(source.id);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        key: ValueKey('bookSourceCard-${source.id}'),
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-        decoration: _panelDecoration(radius: 16),
-        child: Row(
-          children: [
-            if (_selectionMode)
-              Checkbox(
-                value: selected,
-                onChanged: (_) => _toggleSourceSelection(source),
-              )
-            else
-              _buildSourceIcon(source, size: 40),
-            const SizedBox(width: 12),
-            Expanded(child: _buildSourceSummary(source)),
-            const SizedBox(width: 4),
-            if (!_selectionMode)
-              Tooltip(
-                message: source.enabled
-                    ? context.l10n.bookSourcesEnabled
-                    : context.l10n.bookSourcesDisabled,
-                child: Switch.adaptive(
-                  value: source.enabled,
-                  onChanged: !canEnable
-                      ? null
-                      : (enabled) => _setSourceEnabled(source, enabled),
-                ),
-              ),
-            if (!_selectionMode) _buildSourceMenu(source),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSourceSummary(RegisteredBookSource source) {
-    final scheme = Theme.of(context).colorScheme;
-    final groups = _sourceGroups(source);
-    final runnable = source.capabilities.isNotEmpty;
-    final health = sourceHealthCheckResultOf(source);
-    // Only call out what's unusual — a working, unchecked, ungrouped source
-    // needs no badges at all; that's the expected, quiet default.
-    final badges = <Widget>[
-      if (source.sourceProtocol == BookSourceProtocolKind.readingSource &&
-          !runnable)
-        _buildSourceMetaPill(
-          context.l10n.bookSourcesPendingCompatibility,
-          Icons.extension_off,
-          scheme.error,
-        ),
-      if (health != null && !health.healthy)
-        _buildSourceMetaPill(
-          health.timedOut
-              ? context.l10n.sourceHealthTimedOut
-              : context.l10n.sourceHealthPartial,
-          Icons.warning_amber_rounded,
-          scheme.error,
-        ),
-      for (final group in groups.take(2))
-        _buildSourceMetaPill(
-          group,
-          Icons.folder_outlined,
-          scheme.onSurfaceVariant,
-        ),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          source.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          source.description.isEmpty
-              ? source.apiBaseUrl.host
-              : source.description,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
-        ),
-        if (badges.isNotEmpty) ...[
-          const SizedBox(height: 5),
-          Wrap(spacing: 6, runSpacing: 4, children: badges),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildSourceMetaPill(String label, IconData icon, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: color),
-        const SizedBox(width: 3),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
   }
 
   String _sourceHealthIssueSummary(SourceHealthCheckResult? result) {
@@ -880,7 +299,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
 
   String _healthCapabilityLabel(SourceHealthCapability capability) =>
       switch (capability) {
-        SourceHealthCapability.search => context.l10n.sourceHealthCapabilitySearch,
+        SourceHealthCapability.search =>
+          context.l10n.sourceHealthCapabilitySearch,
         SourceHealthCapability.discover =>
           context.l10n.sourceHealthCapabilityDiscover,
         SourceHealthCapability.info => context.l10n.sourceHealthCapabilityInfo,
@@ -890,262 +310,26 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           context.l10n.sourceHealthCapabilityContent,
       };
 
-  Widget _buildSourceMenu(RegisteredBookSource source) {
-    return PopupMenuButton<String>(
-      tooltip: context.l10n.bookSourcesRemove,
-      onSelected: (value) {
-        if (value == 'refresh') _refreshSource(source);
-        if (value == 'rights') _showSourceRightsDialog(source);
-        if (value == 'login') {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => SourceLoginPage(source: source),
-            ),
-          );
-        }
-        if (value == 'debug') {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => SourceDebugPage(source: source),
-            ),
-          );
-        }
-        if (value == 'health') _checkSourceHealth(source);
-        if (value == 'remove') _confirmRemoveSource(source);
-      },
-      itemBuilder: (context) => [
-        if (source.sourceProtocol == BookSourceProtocolKind.orsp)
-          PopupMenuItem(
-            value: 'refresh',
-            child: Row(
-              children: [
-                const Icon(Icons.refresh_rounded),
-                const SizedBox(width: 10),
-                Text(context.l10n.bookSourcesRefresh),
-              ],
-            ),
+  Future<void> _removeSelectedSources() async {
+    final count = _controller.state.selectedSourceIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.bookSourcesDeleteSelected),
+        content: Text(context.l10n.bookSourcesDeleteSelectedMessage(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.bookSourcesCancel),
           ),
-        if (source.sourceProtocol == BookSourceProtocolKind.orsp)
-          PopupMenuItem(
-            value: 'rights',
-            child: Text(context.l10n.bookSourcesRightsDetails),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.bookSourcesConfirm),
           ),
-        if (source.sourceProtocol == BookSourceProtocolKind.readingSource &&
-            '${source.sourceConfig?['loginUrl'] ?? ''}'.trim().isNotEmpty)
-          PopupMenuItem(
-            value: 'login',
-            child: Row(
-              children: [
-                const Icon(Icons.key_rounded),
-                const SizedBox(width: 10),
-                Text(context.l10n.sourceLoginTitle),
-              ],
-            ),
-          ),
-        if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
-          PopupMenuItem(
-            value: 'debug',
-            child: Row(
-              children: [
-                const Icon(Icons.bug_report_outlined),
-                const SizedBox(width: 10),
-                Text(context.l10n.sourceDebugMenuLabel),
-              ],
-            ),
-          ),
-        if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
-          PopupMenuItem(
-            value: 'health',
-            child: Row(
-              children: [
-                const Icon(Icons.health_and_safety_outlined),
-                const SizedBox(width: 10),
-                Text(context.l10n.sourceHealthMenuLabel),
-              ],
-            ),
-          ),
-        PopupMenuItem(
-          value: 'remove',
-          child: Row(
-            children: [
-              const Icon(Icons.delete_outline_rounded),
-              const SizedBox(width: 10),
-              Text(context.l10n.bookSourcesRemove),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSourceIcon(RegisteredBookSource source, {double size = 48}) {
-    final scheme = Theme.of(context).colorScheme;
-    final initial = source.name.characters.firstOrNull?.toUpperCase() ?? '?';
-    final fallback = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(size * 0.29),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: scheme.onSecondaryContainer,
-          fontWeight: FontWeight.w800,
-        ),
+        ],
       ),
     );
-    if (source.iconUrl == null) return fallback;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(size * 0.29),
-      child: SourceCoverImage(
-        url: source.iconUrl!,
-        fallback: fallback,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-      ),
-    );
-  }
-
-  Widget _buildProtocolCard() {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: _panelDecoration(radius: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            InkWell(
-              key: const Key('bookSourcesProtocolCardToggle'),
-              onTap: () => setState(
-                () => _protocolCardExpanded = !_protocolCardExpanded,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.api_rounded, size: 18, color: scheme.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        context.l10n.bookSourcesProtocolTitle,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      _protocolCardExpanded
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_protocolCardExpanded)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.bookSourcesProtocolDescription,
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _showProtocolDialog,
-                          icon: const Icon(Icons.schema_outlined, size: 18),
-                          label: Text(context.l10n.bookSourcesProtocolDetails),
-                        ),
-                        TextButton.icon(
-                          onPressed: _openProtocolRepository,
-                          icon: const Icon(
-                            Icons.open_in_new_rounded,
-                            size: 18,
-                          ),
-                          label: Text(
-                            context.l10n.bookSourcesProtocolRepository,
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _openRightsReport,
-                          icon: const Icon(Icons.report_outlined, size: 18),
-                          label: Text(context.l10n.bookSourcesRightsReport),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  BoxDecoration _panelDecoration({required double radius}) {
-    final palette = PageStyleHelper.palette(context);
-    return BoxDecoration(
-      color: palette.card,
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: palette.border),
-    );
-  }
-
-  Future<void> _setSourceEnabled(
-    RegisteredBookSource source,
-    bool enabled,
-  ) async {
-    final sources = await _registry.setEnabled(source.id, enabled);
-    if (!mounted) return;
-    setState(() => _sources = sources);
-  }
-
-  Future<void> _refreshSource(RegisteredBookSource source) async {
-    try {
-      final sources = await _registry.refresh(source, _sourceClient);
-      if (!mounted) return;
-      setState(() => _sources = sources);
-      showSideToast(
-        context,
-        context.l10n.bookSourcesRefreshed,
-        kind: SideToastKind.success,
-      );
-    } on BookSourceProtocolException {
-      if (!mounted) return;
-      showSideToast(
-        context,
-        context.l10n.bookSourcesRefreshFailed,
-        kind: SideToastKind.error,
-      );
-    } catch (_) {
-      if (!mounted) return;
-      showSideToast(
-        context,
-        context.l10n.bookSourcesRefreshFailed,
-        kind: SideToastKind.error,
-      );
-    }
+    if (confirmed == true) await _controller.removeSelectedSources();
   }
 
   Future<void> _confirmRemoveSource(RegisteredBookSource source) async {
@@ -1166,10 +350,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
-    final sources = await _registry.remove(source.id);
-    if (!mounted) return;
-    setState(() => _sources = sources);
+    if (confirmed == true) await _controller.removeSource(source.id);
   }
 
   Future<void> _showSourceRightsDialog(RegisteredBookSource source) async {
@@ -1257,41 +438,12 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 
   Future<void> _showAddSourceDialog() async {
-    final controller = TextEditingController();
-    var connecting = false;
+    final textController = TextEditingController();
+    final addController = BookSourceAddController();
     var responsibilityAccepted = false;
-    var mode = _AddSourceMode.link;
-    BookSourceImportAnalysis? analysis;
-    String? errorText;
+    var mode = BookSourceAddMode.link;
 
-    Future<void> analyzeLink(
-      BuildContext routeContext,
-      StateSetter setRouteState,
-    ) async {
-      setRouteState(() {
-        connecting = true;
-        errorText = null;
-      });
-      try {
-        final result = await _sourceImportAnalyzer.analyzeUrl(controller.text);
-        if (!routeContext.mounted) return;
-        setRouteState(() {
-          analysis = result;
-          connecting = false;
-        });
-      } catch (error) {
-        if (!routeContext.mounted) return;
-        setRouteState(() {
-          connecting = false;
-          errorText = error.toString();
-        });
-      }
-    }
-
-    Future<void> chooseFile(
-      BuildContext routeContext,
-      StateSetter setRouteState,
-    ) async {
+    Future<void> chooseFile(StateSetter setRouteState) async {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['json'],
@@ -1301,79 +453,59 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       if (result == null || result.files.isEmpty) return;
       final file = result.files.single;
       if (file.size > SourceImportService.maxImportBytes) {
-        setRouteState(() => errorText = 'Source file exceeds 64 MiB.');
+        setRouteState(() {});
+        _showAddFileError(addController, 'Source file exceeds 64 MiB.');
         return;
       }
       final bytes = file.bytes;
       if (bytes == null) {
-        setRouteState(() => errorText = 'Could not read source file.');
+        _showAddFileError(addController, 'Could not read source file.');
+        setRouteState(() {});
         return;
       }
-      setRouteState(() {
-        connecting = true;
-        errorText = null;
-        analysis = null;
-      });
-      try {
-        final detected = await _sourceImportAnalyzer.analyzeBytesAsync(bytes);
-        if (!routeContext.mounted) return;
-        setRouteState(() {
-          analysis = detected;
-          connecting = false;
-        });
-      } catch (error) {
-        if (!routeContext.mounted) return;
-        setRouteState(() {
-          connecting = false;
-          errorText = error.toString();
-        });
-      }
+      final pending = addController.analyzeBytes(bytes);
+      setRouteState(() {});
+      await pending;
+      setRouteState(() {});
+    }
+
+    Future<void> analyzeLink(StateSetter setRouteState) async {
+      final pending = addController.analyzeUrl(textController.text);
+      setRouteState(() {});
+      await pending;
+      setRouteState(() {});
     }
 
     Future<void> addDetected(
       BuildContext routeContext,
       StateSetter setRouteState,
     ) async {
-      final detected = analysis;
+      final detected = addController.state.analysis;
       if (detected == null) return;
       if (detected.kind == BookSourceImportKind.additional &&
           !_additionalProtocolsEnabled()) {
-        setRouteState(() {
-          errorText = context.l10n.bookSourcesAdvancedFeatureRequired;
-        });
+        _showAddFileError(
+          addController,
+          context.l10n.bookSourcesAdvancedFeatureRequired,
+        );
+        setRouteState(() {});
         return;
       }
-      setRouteState(() {
-        connecting = true;
-        errorText = null;
-      });
-      try {
-        late final List<RegisteredBookSource> sources;
-        var importedAdditionalCount = 0;
-        if (detected.kind == BookSourceImportKind.orsp) {
-          sources = await _registry.upsert(detected.sources.single);
-        } else {
-          final preview = detected.additionalPreview!;
-          importedAdditionalCount = preview.sources.length;
-          sources = await _registry.upsertAll(preview.toRegisteredSources());
-        }
-        if (!mounted || !routeContext.mounted) return;
-        Navigator.pop(routeContext);
-        setState(() => _sources = sources);
-        showSideToast(
-          context,
-          detected.kind == BookSourceImportKind.orsp
-              ? '${context.l10n.bookSourcesAdded}: ${detected.sources.single.name}'
-              : context.l10n.additionalSourcesImported(importedAdditionalCount),
-          kind: SideToastKind.success,
-        );
-      } catch (error) {
-        if (!routeContext.mounted) return;
-        setRouteState(() {
-          connecting = false;
-          errorText = error.toString();
-        });
-      }
+      final pending = addController.commit();
+      setRouteState(() {});
+      final result = await pending;
+      if (!mounted || !routeContext.mounted) return;
+      setRouteState(() {});
+      if (result == null) return;
+      Navigator.pop(routeContext);
+      _controller.replaceSources(result.sources);
+      showSideToast(
+        context,
+        result.analysis.kind == BookSourceImportKind.orsp
+            ? '${context.l10n.bookSourcesAdded}: ${result.analysis.sources.single.name}'
+            : context.l10n.additionalSourcesImported(result.importedCount),
+        kind: SideToastKind.success,
+      );
     }
 
     Widget buildPanel(
@@ -1381,25 +513,25 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       StateSetter setRouteState, {
       required bool sheet,
     }) {
-      return _AddBookSourcePanel(
-        controller: controller,
-        connecting: connecting,
+      final addState = addController.state;
+      return BookSourceAddPanel(
+        controller: textController,
+        connecting: addState.loading,
         responsibilityAccepted: responsibilityAccepted,
         mode: mode,
-        analysis: analysis,
-        errorText: errorText,
+        analysis: addState.analysis,
+        errorText: addState.error?.toString(),
         sheet: sheet,
         onModeChanged: (value) => setRouteState(() {
           mode = value;
-          analysis = null;
-          errorText = null;
+          addController.clear();
         }),
         onResponsibilityChanged: (value) =>
             setRouteState(() => responsibilityAccepted = value),
         onCancel: () => Navigator.pop(routeContext),
-        onAnalyzeLink: () => analyzeLink(routeContext, setRouteState),
-        onChooseFile: () => chooseFile(routeContext, setRouteState),
-        onAdd: () => addDetected(routeContext, setRouteState),
+        onAnalyzeLink: () => unawaited(analyzeLink(setRouteState)),
+        onChooseFile: () => unawaited(chooseFile(setRouteState)),
+        onAdd: () => unawaited(addDetected(routeContext, setRouteState)),
       );
     }
 
@@ -1428,7 +560,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     } else {
       await showDialog<void>(
         context: context,
-        barrierDismissible: !connecting,
+        barrierDismissible: !addController.state.loading,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setDialogState) => Dialog(
             child: ConstrainedBox(
@@ -1439,7 +571,12 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         ),
       );
     }
-    controller.dispose();
+    textController.dispose();
+    addController.dispose();
+  }
+
+  void _showAddFileError(BookSourceAddController controller, Object error) {
+    controller.setError(error);
   }
 
   bool _additionalProtocolsEnabled() {
@@ -1524,320 +661,4 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 }
 
-enum _BookSourceFilter { all, enabled, disabled, runnable, pending }
-
 enum _BookSourceHeaderAction { add, select }
-
-class _BookSourceGroupPicker extends StatefulWidget {
-  const _BookSourceGroupPicker({required this.groups, required this.selected});
-
-  final List<String> groups;
-  final String? selected;
-
-  @override
-  State<_BookSourceGroupPicker> createState() => _BookSourceGroupPickerState();
-}
-
-class _BookSourceGroupPickerState extends State<_BookSourceGroupPicker> {
-  String _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _query.trim().toLowerCase();
-    final groups = widget.groups
-        .where((group) => query.isEmpty || group.toLowerCase().contains(query))
-        .toList(growable: false);
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.72,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Text(
-              context.l10n.bookSourcesChooseGroup,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              key: const Key('bookSourceGroupSearchField'),
-              decoration: InputDecoration(
-                hintText: context.l10n.bookSourcesSearchGroups,
-                prefixIcon: const Icon(Icons.search_rounded),
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (value) => setState(() => _query = value),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView.builder(
-              itemCount: groups.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return ListTile(
-                    leading: Icon(
-                      widget.selected == null
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_off,
-                    ),
-                    title: Text(context.l10n.bookSourcesAllGroups),
-                    onTap: () => Navigator.pop(context, ''),
-                  );
-                }
-                final group = groups[index - 1];
-                return ListTile(
-                  leading: Icon(
-                    widget.selected == group
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_off,
-                  ),
-                  title: Text(group),
-                  onTap: () => Navigator.pop(context, group),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-enum _AddSourceMode { link, file }
-
-class _AddBookSourcePanel extends StatelessWidget {
-  final TextEditingController controller;
-  final bool connecting;
-  final bool responsibilityAccepted;
-  final _AddSourceMode mode;
-  final BookSourceImportAnalysis? analysis;
-  final String? errorText;
-  final bool sheet;
-  final ValueChanged<_AddSourceMode> onModeChanged;
-  final ValueChanged<bool> onResponsibilityChanged;
-  final VoidCallback onCancel;
-  final VoidCallback onAnalyzeLink;
-  final VoidCallback onChooseFile;
-  final VoidCallback onAdd;
-
-  const _AddBookSourcePanel({
-    required this.controller,
-    required this.connecting,
-    required this.responsibilityAccepted,
-    required this.mode,
-    required this.analysis,
-    required this.errorText,
-    required this.sheet,
-    required this.onModeChanged,
-    required this.onResponsibilityChanged,
-    required this.onCancel,
-    required this.onAnalyzeLink,
-    required this.onChooseFile,
-    required this.onAdd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      type: MaterialType.transparency,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20, sheet ? 4 : 24, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.l10n.bookSourcesAdd,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SegmentedButton<_AddSourceMode>(
-              key: const Key('bookSourceAddMode'),
-              segments: [
-                ButtonSegment(
-                  value: _AddSourceMode.link,
-                  icon: const Icon(Icons.link_rounded),
-                  label: Text(context.l10n.bookSourcesImportLink),
-                ),
-                ButtonSegment(
-                  value: _AddSourceMode.file,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: Text(context.l10n.additionalSourcesChooseFile),
-                ),
-              ],
-              selected: {mode},
-              onSelectionChanged: connecting
-                  ? null
-                  : (selection) => onModeChanged(selection.first),
-            ),
-            const SizedBox(height: 20),
-            if (mode == _AddSourceMode.link) ...[
-              TextField(
-                key: const Key('bookSourceUnifiedUrlField'),
-                controller: controller,
-                enabled: !connecting,
-                autofocus: false,
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  labelText: context.l10n.bookSourcesUrlLabel,
-                  hintText: context.l10n.bookSourcesUrlHint,
-                  prefixIcon: const Icon(Icons.link_rounded),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ] else
-              OutlinedButton.icon(
-                key: const Key('bookSourceChooseJsonButton'),
-                onPressed: connecting ? null : onChooseFile,
-                icon: const Icon(Icons.upload_file_outlined),
-                label: Text(context.l10n.additionalSourcesChooseFile),
-              ),
-            if (analysis case final detected?) ...[
-              const SizedBox(height: 14),
-              _DetectedSourceSummary(analysis: detected),
-            ],
-            if (errorText != null) ...[
-              const SizedBox(height: 10),
-              Text(errorText!, style: TextStyle(color: scheme.error)),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer.withValues(alpha: 0.32),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: scheme.primary.withValues(alpha: 0.18),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.shield_outlined, size: 21, color: scheme.primary),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: Text(
-                      context.l10n.bookSourcesNoOfficialSourcesNotice,
-                      style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            CheckboxListTile(
-              key: const Key('bookSourceResponsibilityCheckbox'),
-              value: responsibilityAccepted,
-              enabled: !connecting,
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              title: Text(
-                context.l10n.bookSourcesResponsibilityAck,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.4,
-                ),
-              ),
-              onChanged: connecting
-                  ? null
-                  : (value) => onResponsibilityChanged(value ?? false),
-            ),
-            if (connecting) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(context.l10n.bookSourcesConnecting),
-                ],
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: connecting ? null : onCancel,
-                    child: Text(context.l10n.bookSourcesCancel),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    key: const Key('bookSourceConnectButton'),
-                    onPressed: connecting || !responsibilityAccepted
-                        ? null
-                        : analysis == null
-                        ? mode == _AddSourceMode.link
-                              ? onAnalyzeLink
-                              : null
-                        : onAdd,
-                    child: Text(
-                      analysis == null
-                          ? context.l10n.bookSourcesAnalyze
-                          : context.l10n.bookSourcesConfirm,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetectedSourceSummary extends StatelessWidget {
-  const _DetectedSourceSummary({required this.analysis});
-
-  final BookSourceImportAnalysis analysis;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final preview = analysis.additionalPreview;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            analysis.kind == BookSourceImportKind.orsp
-                ? context.l10n.bookSourcesDetectedOrsp
-                : context.l10n.bookSourcesDetectedAdditional,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 5),
-          if (analysis.kind == BookSourceImportKind.orsp)
-            Text(analysis.sources.single.name)
-          else if (preview != null)
-            Text(
-              context.l10n.additionalSourcesQuickPreview(
-                preview.sources.length,
-                preview.skipped,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}

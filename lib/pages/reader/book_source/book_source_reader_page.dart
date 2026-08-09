@@ -100,6 +100,9 @@ class BookSourceReaderPage extends StatefulWidget {
   final BookSourceClient? client;
   final BookSourceReadingProgressStore progressStore;
   final BookSourceShelfService? shelfService;
+  final BookSourceClient Function()? clientFactory;
+  final BookSourceShelfService Function(BookSourceClient client)?
+  shelfServiceFactory;
   final ReaderThemePalette? initialTheme;
   final SourceCoverCache? remoteImageCache;
 
@@ -110,9 +113,12 @@ class BookSourceReaderPage extends StatefulWidget {
     this.client,
     this.progressStore = const BookSourceReadingProgressStore(),
     this.shelfService,
+    this.clientFactory,
+    this.shelfServiceFactory,
     this.initialTheme,
     this.remoteImageCache,
-  });
+  }) : assert(client == null || clientFactory == null),
+       assert(shelfService == null || shelfServiceFactory == null);
 
   @override
   State<BookSourceReaderPage> createState() => _BookSourceReaderPageState();
@@ -120,9 +126,14 @@ class BookSourceReaderPage extends StatefulWidget {
 
 class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     with WidgetsBindingObserver {
-  late final BookSourceClient _client = widget.client ?? BookSourceClient();
+  late final bool _ownsClient = widget.client == null;
+  late final BookSourceClient _client =
+      widget.client ?? (widget.clientFactory ?? BookSourceClient.new)();
+  late final bool _ownsShelfService = widget.shelfService == null;
   late final BookSourceShelfService _shelfService =
-      widget.shelfService ?? BookSourceShelfService(client: _client);
+      widget.shelfService ??
+      (widget.shelfServiceFactory ??
+          (client) => BookSourceShelfService(client: client))(_client);
   late final SourceCoverCache _remoteImageCache =
       widget.remoteImageCache ?? SourceCoverCache.instance;
   PageController _pageController = PageController();
@@ -448,6 +459,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     _controlsTimer?.cancel();
     _pagedLayoutWarmTimer?.cancel();
     _readerAloudController?.dispose();
+    _chapterLoadSerial++;
     unawaited(_saveProgress());
     unawaited(_flushReadingSession());
     _verticalPagePositionsListener.itemPositions.removeListener(
@@ -466,7 +478,13 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     unawaited(ReaderKeepScreenOnController.deactivate(this));
     unawaited(ReaderSystemUiController.restore());
     unawaited(ReadingResumeService.markClosed(_shelfBookId));
+    _closeOwnedResources();
     super.dispose();
+  }
+
+  void _closeOwnedResources() {
+    if (_ownsShelfService) _shelfService.close();
+    if (_ownsClient) _client.close();
   }
 
   SystemUiOverlayStyle get _readerSystemUiOverlayStyle =>

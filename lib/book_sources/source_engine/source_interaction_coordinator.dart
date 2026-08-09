@@ -2,6 +2,15 @@ import 'dart:async';
 
 import 'source_script_contract.dart';
 
+abstract interface class SourceInteractionCoordinatorPort {
+  Future<SourceScriptInteractionResult> request({
+    required String sourceId,
+    required String sourceName,
+    required SourceScriptInteractionRequest interaction,
+    Duration timeout = const Duration(minutes: 5),
+  });
+}
+
 class SourceInteractionTicket {
   const SourceInteractionTicket({
     required this.requestId,
@@ -16,7 +25,7 @@ class SourceInteractionTicket {
   final SourceScriptInteractionRequest request;
 }
 
-class SourceInteractionCoordinator {
+class SourceInteractionCoordinator implements SourceInteractionCoordinatorPort {
   SourceInteractionCoordinator._();
 
   SourceInteractionCoordinator.forTesting();
@@ -31,6 +40,7 @@ class SourceInteractionCoordinator {
 
   Stream<SourceInteractionTicket> get requests => _requests.stream;
 
+  @override
   Future<SourceScriptInteractionResult> request({
     required String sourceId,
     required String sourceName,

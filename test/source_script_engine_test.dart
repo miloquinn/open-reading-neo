@@ -1,10 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:xxread/book_sources/source_engine/source_config.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
 import 'package:xxread/book_sources/source_engine/source_rule_engine.dart';
+import 'package:xxread/book_sources/source_engine/source_script_bootstrap.dart';
+import 'package:xxread/book_sources/source_engine/source_script_crypto_api.dart';
 import 'package:xxread/book_sources/source_engine/source_script_engine.dart';
+import 'package:xxread/book_sources/source_engine/source_script_host_api.dart';
+import 'package:xxread/book_sources/source_engine/source_script_state.dart';
+import 'package:xxread/book_sources/source_engine/source_script_text_api.dart';
 
 void main() {
   test('QuickJS evaluates source bindings and pure java helpers', () {
@@ -715,4 +722,115 @@ void main() {
       );
     },
   );
+
+  test(
+    'failed asynchronous scripts do not poison the serialized queue',
+    () async {
+      final evaluator = QuickJsSourceScriptEvaluator();
+      addTearDown(evaluator.dispose);
+      final source = ReadingSourceConfig.fromJson({
+        'bookSourceName': 'Queue source',
+        'bookSourceUrl': 'https://queue.test',
+      });
+
+      await expectLater(
+        evaluator.evaluateAsync(
+          'throw new Error("broken")',
+          SourceScriptContext(source: source),
+        ),
+        throwsA(isA<BookSourceProtocolException>()),
+      );
+      await expectLater(
+        evaluator.evaluateAsync('40 + 2', SourceScriptContext(source: source)),
+        completion(42),
+      );
+    },
+  );
+
+  test('network replay limit keeps its exact error contract', () async {
+    final evaluator = QuickJsSourceScriptEvaluator();
+    addTearDown(evaluator.dispose);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Limited source',
+      'bookSourceUrl': 'https://limit.test',
+    });
+
+    await expectLater(
+      evaluator.evaluateAsync(
+        "for (var i=0;i<13;i++) java.ajax('/' + i); 'done'",
+        SourceScriptContext(
+          source: source,
+          networkHandler: (request) async => SourceScriptNetworkResult(
+            body: request.url,
+            finalUrl: request.url,
+          ),
+        ),
+      ),
+      throwsA(
+        isA<BookSourceProtocolException>().having(
+          (error) => error.message,
+          'message',
+          'Source script exceeded the network request limit.',
+        ),
+      ),
+    );
+  });
+
+  test('bootstrap safely embeds scripts containing quotes and delimiters', () {
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Escaping source',
+      'bookSourceUrl': 'https://escaping.test',
+    });
+    final payload = SourceScriptBootstrap.payload(
+      "'quote: \\' and </script> and \\n newline'",
+      SourceScriptContext(source: source),
+      SourceScriptState(),
+    );
+    final bootstrap = SourceScriptBootstrap.build(payload);
+
+    expect(bootstrap, contains(r'\\n'));
+    expect(bootstrap, isNot(contains(r'<\/script>')));
+    expect(bootstrap, contains(jsonEncode(payload)));
+  });
+
+  test('host router rejects malformed and unknown messages', () {
+    final host = SourceScriptHostApi();
+
+    expect(host.handle(null), isNull);
+    expect(host.handle('invalid'), isNull);
+    expect(host.handle(const {'op': 'unknown', 'args': []}), isNull);
+  });
+
+  test('script cache state expires values and preserves unexpired values', () {
+    final state = SourceScriptState();
+    final now = DateTime(2026, 1, 1);
+    state.cache['expired'] = SourceScriptCacheEntry(
+      value: 'old',
+      expiresAt: now.subtract(const Duration(seconds: 1)),
+    );
+    state.cache['fresh'] = SourceScriptCacheEntry(
+      value: {'nested': 7},
+      expiresAt: now.add(const Duration(seconds: 1)),
+    );
+
+    expect(state.readCache('expired', now), isNull);
+    expect(state.cache, isNot(contains('expired')));
+    expect(state.readCache('fresh', now), {'nested': 7});
+  });
+
+  test('pure crypto and text host APIs retain known vectors', () {
+    const crypto = SourceScriptCryptoApi();
+    const text = SourceScriptTextApi();
+
+    expect(
+      crypto.handle('digestHex', ['abc', 'sha256']),
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
+    expect(
+      crypto.handle('hmacHex', ['data', 'HmacSHA256', 'key']),
+      '5031fe3d989c6d1537a013fa6e739da23463fdaec3b70137d828e36ace221bd0',
+    );
+    expect(text.handle('toNumChapter', ['第十二章']), '第12章');
+    expect(text.handle('traditionalToSimplified', ['韓漫與熱門漫畫']), '韩漫与热门漫画');
+  });
 }

@@ -1,45 +1,19 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dio/dio.dart';
-import 'package:gbk_codec/gbk_codec.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/source_engine/source_config.dart';
 import 'package:xxread/book_sources/source_engine/source_login_session.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
-import 'package:xxread/book_sources/source_engine/source_rule_engine.dart';
 import 'package:xxread/book_sources/source_engine/source_runtime.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('SourceRequestTemplate', () {
-    test('parses variables and limited POST options', () {
-      final request = SourceRequestTemplate.parse(
-        '/search,{"method":"POST","body":"q={{key}}&p={{page}}",'
-        '"charset":"GBK","headers":{"Referer":"https://books.test/"}}',
-        baseUri: Uri.parse('https://books.test/root/'),
-        variables: const {'key': '剑 来', 'page': '2'},
-      );
-
-      expect(request.url, Uri.parse('https://books.test/search'));
-      expect(request.method, SourceRequestMethod.post);
-      expect(request.body, 'q=%E5%89%91+%E6%9D%A5&p=2');
-      expect(request.charset, 'gbk');
-      expect(request.headers['User-Agent'], sourceDefaultUserAgent);
-      expect(request.headers['Referer'], 'https://books.test/');
-      expect(
-        request.headers['Content-Type'],
-        'application/x-www-form-urlencoded; charset=gbk',
-      );
-    });
-
     test('expands native source header variables before requests', () async {
       final transport = _FakeTransport({
         'https://books.test/search?q=test&page=1': '''
@@ -208,467 +182,12 @@ void main() {
         );
       },
     );
-
-    test('accepts non-executable single-quoted legacy options', () {
-      final request = SourceRequestTemplate.parse(
-        "/search,{'method':'POST','body':'q={{key}}','charset':'gbk'}",
-        baseUri: Uri.parse('https://books.test/'),
-        variables: const {'key': '剑来'},
-      );
-
-      expect(request.method, SourceRequestMethod.post);
-      expect(request.charset, 'gbk');
-      expect(request.body, 'q=%E5%89%91%E6%9D%A5');
-    });
-
-    test('accepts a bare User-Agent in legacy request options', () {
-      final request = SourceRequestTemplate.parse(
-        '/search,{"method":"POST","body":"q={{key}}",'
-        '"headers":"ExampleBrowser/1.0"}',
-        baseUri: Uri.parse('https://books.test/'),
-        variables: const {'key': 'test'},
-      );
-
-      expect(request.headers['User-Agent'], 'ExampleBrowser/1.0');
-    });
-
-    test('preserves background-browser request options', () {
-      final request = SourceRequestTemplate.parse(
-        "/search,{'webView':true,'webJs':'document.body.dataset.ready=1'}",
-        baseUri: Uri.parse('https://books.test/'),
-      );
-
-      expect(request.useWebView, isTrue);
-      expect(request.webJs, 'document.body.dataset.ready=1');
-    });
-
-    test('rejects unsupported methods and sensitive headers', () {
-      expect(
-        () => SourceRequestTemplate.parse(
-          '/,{"method":"PUT"}',
-          baseUri: Uri.parse('https://books.test'),
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
-      );
-      expect(
-        SourceRequestTemplate.parse(
-          '/search?offset={{(page-1)*20}}',
-          baseUri: Uri.parse('https://books.test'),
-          variables: const {'page': '2'},
-        ).url,
-        Uri.parse('https://books.test/search?offset=20'),
-      );
-      expect(
-        () => SourceRequestTemplate.parse(
-          '/,{"headers":{"Content-Length":"123"}}',
-          baseUri: Uri.parse('https://books.test'),
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
-      );
-      final withCookie = SourceRequestTemplate.parse(
-        '/',
-        baseUri: Uri.parse('https://books.test'),
-        sourceHeaders: const {'Cookie': 'session=source'},
-      );
-      expect(withCookie.headers['Cookie'], 'session=source');
-      final virtualHost = SourceRequestTemplate.parse(
-        '/',
-        baseUri: Uri.parse('https://203.0.113.8'),
-        sourceHeaders: const {'Host': 'books.test'},
-      );
-      expect(virtualHost.headers['Host'], 'books.test');
-      expect(
-        () => SourceRequestTemplate.parse(
-          '/',
-          baseUri: Uri.parse('https://203.0.113.8'),
-          sourceHeaders: const {'Host': 'books.test\r\nX-Test: injected'},
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
-      );
-    });
-
-    test('accepts HEAD without a body', () {
-      final request = SourceRequestTemplate.parse(
-        '/probe,{"method":"HEAD"}',
-        baseUri: Uri.parse('https://books.test'),
-      );
-
-      expect(request.method, SourceRequestMethod.head);
-      expect(request.body, isNull);
-    });
-  });
-
-  group('SourceRuleEngine', () {
-    const engine = SourceRuleEngine();
-
-    test(
-      'supports legacy DOM rules, CSS, fallback, concatenate and replace',
-      () {
-        final document = SourceRuleDocument.parse(
-          '<ul class="books">'
-          '<li><a href="/1"><b>第一本</b></a><span>甲</span></li>'
-          '<li><a href="/2"><b>第二本</b></a><span>乙</span></li>'
-          '</ul>',
-          Uri.parse('https://books.test/search'),
-        );
-        final items = engine.evaluateList(
-          document,
-          document.value,
-          'class.books@li!0',
-        );
-
-        expect(items, hasLength(1));
-        expect(
-          engine.evaluateString(
-            document,
-            items.single,
-            '.missing@text||a@b@text',
-          ),
-          '第二本',
-        );
-        expect(
-          engine.evaluateString(
-            document,
-            items.single,
-            'a@text&&span@text##第二##第 2###',
-          ),
-          '第 2本乙',
-        );
-        expect(
-          engine.evaluateString(
-            document,
-            items.single,
-            'a@href',
-            resolveUrl: true,
-          ),
-          'https://books.test/2',
-        );
-      },
-    );
-
-    test('supports whitespace-separated legacy class names', () {
-      final document = SourceRuleDocument.parse(
-        '<div class="alpha beta">Matched</div>',
-        Uri.parse('https://books.test/'),
-      );
-
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          'class. alpha beta@text',
-        ),
-        'Matched',
-      );
-    });
-
-    test('supports reading-source interleaving and bracket indexes', () {
-      final document = SourceRuleDocument.parse(
-        '<ul class="left"><li>L1</li><li>L2</li><li>L3</li></ul>'
-        '<ul class="right"><li>R1</li><li>R2</li><li>R3</li></ul>',
-        Uri.parse('https://books.test/'),
-      );
-
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          'class.left@li[0:1]@text%%class.right@li[1:2]@text',
-        ),
-        'L1R2L2R3',
-      );
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          'class.left@li[!1]@text',
-        ),
-        'L1L3',
-      );
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          'class.left@li[-1:0]@text',
-        ),
-        'L3L2L1',
-      );
-    });
-
-    test('supports reading-source all and direct text node terminals', () {
-      final document = SourceRuleDocument.parse(
-        '<section><p>first <b>bold</b> tail</p><p>second</p></section>',
-        Uri.parse('https://books.test/'),
-      );
-
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          'section@p.0@textNodes',
-        ),
-        'first\ntail',
-      );
-      expect(
-        engine.evaluateString(document, document.value, 'section@p@all'),
-        '<p>first <b>bold</b> tail</p><p>second</p>',
-      );
-    });
-
-    test('supports basic JSON properties, indexes, wildcard and templates', () {
-      final document = SourceRuleDocument.parse(
-        '{"books":[{"id":7,"title":"山海"}]}',
-        Uri.parse('https://api.test/'),
-      );
-      final books = engine.evaluateList(
-        document,
-        document.value,
-        r'$.books[*]',
-      );
-
-      expect(books, hasLength(1));
-      expect(engine.evaluateString(document, books.single, r'$.title'), '山海');
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          r'@json:$.books[0].title',
-        ),
-        '山海',
-      );
-      expect(
-        engine.evaluateString(
-          document,
-          books.single,
-          r'/books/{{$.id}}',
-          resolveUrl: true,
-        ),
-        'https://api.test/books/7',
-      );
-    });
-
-    test('supports recursive and filtered reading source JSONPath rules', () {
-      final document = SourceRuleDocument.parse(
-        '{"data":{"books":['
-        '{"title":"旧书","score":5},'
-        '{"title":"好书","score":9}'
-        ']}}',
-        Uri.parse('https://api.test/'),
-      );
-
-      expect(
-        engine
-            .evaluateList(
-              document,
-              document.value,
-              r'$..books[?(@.score >= 8)]',
-            )
-            .map((book) => engine.evaluateString(document, book, r'$.title')),
-        ['好书'],
-      );
-      expect(
-        engine.evaluateString(document, document.value, r'$..title'),
-        '旧书好书',
-      );
-    });
-
-    test(
-      'supports CSS attributes, text lookup and regex capture replacement',
-      () {
-        final document = SourceRuleDocument.parse(
-          '<meta property="og:novel:author" content="甲">'
-          '<meta property="og:novel:category" content="玄幻">'
-          '<meta property="og:novel:status" content="连载中">'
-          '<meta property="og:novel:update_time" content="今天">'
-          '<meta property="og:novel:title" content="书名">'
-          '<p data-author="作者：乙<">正文</p><a href="/next">下一页</a>',
-          Uri.parse('https://books.test/chapter'),
-        );
-
-        expect(
-          engine.evaluateString(
-            document,
-            document.value,
-            '[property="og:novel:author"]@content',
-          ),
-          '甲',
-        );
-        expect(
-          engine.evaluateList(
-            document,
-            document.value,
-            r'[property~=category|status|time]@content',
-          ),
-          ['玄幻', '连载中', '今天'],
-        );
-        expect(
-          engine.evaluateString(
-            document,
-            document.value,
-            'text.下一页@href',
-            resolveUrl: true,
-          ),
-          'https://books.test/next',
-        );
-        final paragraph = engine
-            .evaluateList(document, document.value, 'p')
-            .single;
-        expect(
-          engine.evaluateString(
-            document,
-            paragraph,
-            r'data-author##作者：([^<]+)<##$1###',
-          ),
-          '乙',
-        );
-      },
-    );
-
-    test('supports common XPath attributes, predicates, and sibling axes', () {
-      final document = SourceRuleDocument.parse('''
-        <html><head>
-          <meta property="og:title" content="XPath Book">
-        </head><body>
-          <a class="start" href="/start">Start Reading</a>
-          <ul><li><span>one</span><a href="/c1">One</a></li></ul>
-          <div id="list"><dt>volume</dt><dt>chapters</dt>
-            <dd><a href="/c2">Two</a></dd><dd><a href="/c3">Three</a></dd>
-          </div>
-        </body></html>
-        ''', Uri.parse('https://books.test/book/1'));
-
-      expect(
-        engine.evaluateString(
-          document,
-          null,
-          '//meta[@property="og:title"]/@content',
-        ),
-        'XPath Book',
-      );
-      expect(
-        engine.evaluateString(
-          document,
-          null,
-          '//a[text()="Start Reading"]/@href',
-          resolveUrl: true,
-        ),
-        'https://books.test/start',
-      );
-      final siblingLinks = engine.evaluateList(
-        document,
-        null,
-        '//*[@id="list"]//dt[2]/following-sibling::dd/a',
-      );
-      expect(
-        siblingLinks.map(
-          (item) => engine.evaluateString(document, item, 'text'),
-        ),
-        ['Two', 'Three'],
-      );
-      expect(engine.evaluateList(document, null, '//li[span]/a'), hasLength(1));
-    });
-
-    test('accepts explicit and additive CSS prefixes', () {
-      final document = SourceRuleDocument.parse(
-        '<ul class="librarylist"><li><a class="name">Book</a></li></ul>',
-        Uri.parse('https://books.test'),
-      );
-
-      expect(
-        engine.evaluateList(document, null, '+@css:.librarylist li'),
-        hasLength(1),
-      );
-      expect(engine.evaluateString(document, null, '@css:.name@text'), 'Book');
-    });
-
-    test('joins content nodes by line before applying cleanup rules', () async {
-      final document = SourceRuleDocument.parse(
-        '<section id="Context"><article>'
-        '<p>Chapter One</p><p>Readable body</p>'
-        '</article></section>',
-        Uri.parse('https://books.test/chapter/1'),
-      );
-
-      expect(
-        await engine.evaluateStringAsync(
-          document,
-          null,
-          'id.Context@article@p@html##Chapter.*',
-          joinSeparator: '\n',
-          regexDotAll: false,
-        ),
-        'Readable body',
-      );
-      expect(
-        await engine.evaluateStringAsync(
-          document,
-          null,
-          r'id.Context@article@p@html##Chapter[\s\S]*',
-          joinSeparator: '\n',
-          regexDotAll: false,
-        ),
-        isEmpty,
-      );
-    });
-
-    test('supports staged regex lists and numbered capture fields', () {
-      final document = SourceRuleDocument.parse(
-        '<h2>章节目录</h2><ul>'
-        '<li><a href="/1">第一章</a></li>'
-        '<li><a href="/2">第二章</a></li></ul>',
-        Uri.parse('https://books.test/book'),
-      );
-      final chapters = engine.evaluateList(
-        document,
-        null,
-        r':章节目录</h2>[\s\S]*?/ul&&href="([^"]*)"[^>]*>([^<]*)',
-      );
-
-      expect(chapters, hasLength(2));
-      expect(engine.evaluateString(document, chapters.first, r'$2'), '第一章');
-      expect(
-        engine.evaluateString(
-          document,
-          chapters.first,
-          r'$1',
-          resolveUrl: true,
-        ),
-        'https://books.test/1',
-      );
-    });
-
-    test('stores and reads source rule state with put/get syntax', () {
-      final document = SourceRuleDocument.parse(
-        '{"id":7,"author":"Alice"}',
-        Uri.parse('https://books.test/'),
-      );
-
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          r'$.author@put:{gid:$.id}',
-        ),
-        'Alice',
-      );
-      expect(
-        engine.evaluateString(
-          document,
-          document.value,
-          '/book/@get:{gid}',
-          resolveUrl: true,
-        ),
-        'https://books.test/book/7',
-      );
-    });
   });
 
   group('SourceRuntime', () {
-    test(
-      'normalizes the complete text reading chain to protocol DTOs',
-      () async {
-        final transport = _FakeTransport({
-          'https://books.test/search?q=%E5%89%91%E6%9D%A5&page=1': '''
+    test('normalizes the complete text reading chain to protocol DTOs', () async {
+      final transport = _FakeTransport({
+        'https://books.test/search?q=%E5%89%91%E6%9D%A5&page=1': '''
           <div class="book">
             <a href="/book/1"><span class="name">剑来</span></a>
             <span class="author">烽火</span>
@@ -676,52 +195,51 @@ void main() {
             <img src="/cover/1.jpg">
           </div>
         ''',
-          'https://books.test/book/1': '''
+        'https://books.test/book/1': '''
           <h1>剑来</h1><p class="author">烽火</p>
           <p class="intro">少年远游。</p><a class="toc" href="/book/1/toc">目录</a>
         ''',
-          'https://books.test/book/1/toc': '''
+        'https://books.test/book/1/toc': '''
           <ul id="chapters"><li><a href="/chapter/1">第一章</a></li></ul>
         ''',
-          'https://books.test/chapter/1': '''
+        'https://books.test/chapter/1': '''
           <article id="content"><p>正文</p><div class="ad">广告</div></article>
         ''',
-        });
-        final source = _htmlSource().toRegisteredSource(enabled: true);
-        final runtime = SourceRuntime(transport: transport);
+      });
+      final source = _htmlSource().toRegisteredSource(enabled: true);
+      final runtime = SourceRuntime(transport: transport);
 
-        final search = await runtime.search(source, '剑来');
-        expect(search.items.single.id, 'https://books.test/book/1');
-        expect(search.items.single.title, '剑来');
-        expect(search.items.single.author, '烽火');
-        expect(search.items.single.categories, ['玄幻', '连载']);
-        expect(
-          search.items.single.coverUrl,
-          Uri.parse('https://books.test/cover/1.jpg'),
-        );
+      final search = await runtime.search(source, '剑来');
+      expect(search.items.single.id, 'https://books.test/book/1');
+      expect(search.items.single.title, '剑来');
+      expect(search.items.single.author, '烽火');
+      expect(search.items.single.categories, ['玄幻', '连载']);
+      expect(
+        search.items.single.coverUrl,
+        Uri.parse('https://books.test/cover/1.jpg'),
+      );
 
-        final book = await runtime.getBook(source, search.items.single.id);
-        expect(book.description, '少年远游。');
-        final chapters = await runtime.getChapters(source, book.id);
-        expect(chapters.single.title, '第一章');
-        expect(chapters.single.id, 'https://books.test/chapter/1');
-        final content = await runtime.getChapterContent(
-          source,
-          bookId: book.id,
-          chapterId: chapters.single.id,
-        );
-        expect(content.content, '<p>正文</p>');
-        expect(content.contentType, 'text/html');
-        expect(
-          transport.requests
-              .where((r) => r.url.toString() == 'https://books.test/book/1')
-              .length,
-          1,
-          reason:
-              'getBook() and getChapters() should share one fetch of the info page',
-        );
-      },
-    );
+      final book = await runtime.getBook(source, search.items.single.id);
+      expect(book.description, '少年远游。');
+      final chapters = await runtime.getChapters(source, book.id);
+      expect(chapters.single.title, '第一章');
+      expect(chapters.single.id, 'https://books.test/chapter/1');
+      final content = await runtime.getChapterContent(
+        source,
+        bookId: book.id,
+        chapterId: chapters.single.id,
+      );
+      expect(content.content, '<p>正文</p>');
+      expect(content.contentType, 'text/html');
+      expect(
+        transport.requests
+            .where((r) => r.url.toString() == 'https://books.test/book/1')
+            .length,
+        1,
+        reason:
+            'getBook() and getChapters() should share one fetch of the info page',
+      );
+    });
 
     test(
       'getChapters reuses the info page fetch when the source has no separate toc page',
@@ -744,10 +262,7 @@ void main() {
         final runtime = SourceRuntime(transport: transport);
         addTearDown(runtime.close);
 
-        final book = await runtime.getBook(
-          source,
-          'https://books.test/book/1',
-        );
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
         final chapters = await runtime.getChapters(source, book.id);
 
         expect(chapters.single.title, '第一章');
@@ -806,6 +321,65 @@ void main() {
       );
       expect(content.content, contains('依赖章节上下文的正文'));
     });
+
+    test(
+      'a leading "latest chapters" widget does not shadow the full catalog',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+            <h1>剑来</h1><p class="author">烽火</p>
+            <a class="toc" href="/book/1/toc">目录</a>
+          ''',
+          'https://books.test/book/1/toc': '''
+            <div id="latest">
+              <li><a href="/chapter/5">第五章</a></li>
+              <li><a href="/chapter/4">第四章</a></li>
+              <li><a href="/chapter/3">第三章</a></li>
+            </div>
+            <ul id="chapters">
+              <li><a href="/chapter/1">第一章</a></li>
+              <li><a href="/chapter/2">第二章</a></li>
+              <li><a href="/chapter/3">第三章</a></li>
+              <li><a href="/chapter/4">第四章</a></li>
+              <li><a href="/chapter/5">第五章</a></li>
+            </ul>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['ruleToc'] = {
+            // Matches every <li> on the page, including the "latest
+            // chapters" widget rendered above the full catalog — a common
+            // pattern on real sites and a common way for imported sources
+            // to be scoped too loosely.
+            'chapterList': 'tag.li',
+            'chapterName': 'a@text',
+            'chapterUrl': 'a@href',
+          };
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+
+        expect(
+          chapters.map((chapter) => chapter.title).toList(),
+          ['第一章', '第二章', '第三章', '第四章', '第五章'],
+          reason:
+              'the widget\'s duplicate entries must not push later chapters '
+              'to the front of the catalog',
+        );
+        expect(chapters.map((chapter) => chapter.order).toList(), [
+          0,
+          1,
+          2,
+          3,
+          4,
+        ]);
+      },
+    );
 
     test(
       'rejects short login and verification shells as chapter content',
@@ -1256,396 +830,6 @@ void main() {
       ),
     );
   });
-
-  group('SourceHttpTransport', () {
-    HttpServer? server;
-
-    tearDown(() async {
-      await server?.close(force: true);
-    });
-
-    test('exposes the isolated cookie jar to source scripts', () {
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-      );
-      addTearDown(transport.close);
-      final uri = Uri.parse('https://cookies.test/path');
-
-      transport.setScriptCookies('source-1', uri, 'sid=abc; theme=dark');
-      expect(
-        transport.scriptCookieHeader('source-1', uri),
-        'sid=abc; theme=dark',
-      );
-      expect(transport.scriptCookieHeader('source-2', uri), isEmpty);
-
-      transport.removeScriptCookies('source-1', uri);
-      expect(transport.scriptCookieHeader('source-1', uri), isEmpty);
-    });
-
-    test(
-      'retries safe HTTP 400 responses through the system network',
-      () async {
-        final pinned = Dio()..httpClientAdapter = _SequenceAdapter([400]);
-        final system = Dio()
-          ..httpClientAdapter = _SequenceAdapter([200], body: 'books');
-        final transport = SourceHttpTransport(
-          dio: pinned,
-          systemDio: system,
-          networkPolicy: BookSourceNetworkPolicy(
-            lookup: (_) async => [InternetAddress('93.184.216.34')],
-          ),
-        );
-        addTearDown(transport.close);
-
-        final response = await transport.send(
-          SourceRequestTemplate.parse(
-            'https://books.test/channel',
-            baseUri: Uri.parse('https://books.test'),
-          ),
-        );
-
-        expect(response.body, 'books');
-        expect((pinned.httpClientAdapter as _SequenceAdapter).requests, 1);
-        expect((system.httpClientAdapter as _SequenceAdapter).requests, 1);
-      },
-    );
-
-    test('does not replay POST after HTTP 400', () async {
-      final pinned = Dio()..httpClientAdapter = _SequenceAdapter([400]);
-      final system = Dio()
-        ..httpClientAdapter = _SequenceAdapter([200], body: 'unexpected');
-      final transport = SourceHttpTransport(
-        dio: pinned,
-        systemDio: system,
-        networkPolicy: BookSourceNetworkPolicy(
-          lookup: (_) async => [InternetAddress('93.184.216.34')],
-        ),
-      );
-      addTearDown(transport.close);
-
-      await expectLater(
-        transport.send(
-          SourceRequestTemplate.parse(
-            'https://books.test/submit,{"method":"POST","body":"q=1"}',
-            baseUri: Uri.parse('https://books.test'),
-          ),
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
-      );
-      expect((pinned.httpClientAdapter as _SequenceAdapter).requests, 1);
-      expect((system.httpClientAdapter as _SequenceAdapter).requests, 0);
-    });
-
-    test(
-      'returns response status headers and cookies to source scripts',
-      () async {
-        final boundServer = server = await HttpServer.bind(
-          InternetAddress.loopbackIPv4,
-          0,
-        );
-        boundServer.listen((request) async {
-          request.response.statusCode = HttpStatus.ok;
-          request.response.headers.set('X-Source-Test', 'ready');
-          request.response.cookies.add(Cookie('sid', 'abc')..path = '/');
-          request.response.write('body');
-          await request.response.close();
-        });
-        final transport = SourceHttpTransport(
-          networkPolicy: const BookSourceNetworkPolicy(
-            allowPrivateNetwork: true,
-          ),
-        );
-        addTearDown(transport.close);
-
-        final response = await transport.send(
-          SourceRequestTemplate.parse(
-            'http://${boundServer.address.address}:${boundServer.port}/metadata',
-            baseUri: Uri.parse('https://unused.test'),
-            cookieJarKey: 'source-1',
-          ),
-        );
-
-        expect(response.statusCode, HttpStatus.ok);
-        expect(response.headers['x-source-test'], 'ready');
-        expect(response.cookies['sid'], 'abc');
-      },
-    );
-
-    test('sends HEAD and returns metadata without a response body', () async {
-      final boundServer = server = await HttpServer.bind(
-        InternetAddress.loopbackIPv4,
-        0,
-      );
-      final method = Completer<String>();
-      boundServer.listen((request) async {
-        method.complete(request.method);
-        request.response.statusCode = HttpStatus.noContent;
-        request.response.headers.set('X-Head', 'ready');
-        await request.response.close();
-      });
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-      );
-      addTearDown(transport.close);
-
-      final response = await transport.send(
-        SourceRequestTemplate.parse(
-          'http://${boundServer.address.address}:${boundServer.port}/probe,'
-          '{"method":"HEAD"}',
-          baseUri: Uri.parse('https://unused.test'),
-        ),
-      );
-
-      expect(await method.future, 'HEAD');
-      expect(response.body, isEmpty);
-      expect(response.statusCode, HttpStatus.noContent);
-      expect(response.headers['x-head'], 'ready');
-    });
-
-    test('sends and decodes bounded GBK POST responses', () async {
-      final boundServer = server = await HttpServer.bind(
-        InternetAddress.loopbackIPv4,
-        0,
-      );
-      final received = Completer<List<int>>();
-      boundServer.listen((request) async {
-        received.complete(
-          await request.fold<List<int>>([], (a, b) => a..addAll(b)),
-        );
-        request.response.headers.contentType = ContentType(
-          'text',
-          'plain',
-          charset: 'gbk',
-        );
-        request.response.add(gbk_bytes.encode('结果'));
-        await request.response.close();
-      });
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-      );
-      addTearDown(transport.close);
-      final response = await transport.send(
-        SourceRequestTemplate.parse(
-          'http://${boundServer.address.address}:${boundServer.port}/search,'
-          '{"method":"POST","body":"关键词=剑来","charset":"gbk"}',
-          baseUri: Uri.parse('https://unused.test'),
-        ),
-      );
-
-      expect(response.body, '结果');
-      expect(await received.future, gbk_bytes.encode('关键词=剑来'));
-    });
-
-    test('keeps source cookies across same-URL redirects', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      var requests = 0;
-      server!.listen((request) async {
-        requests++;
-        final hasSession = request.cookies.any(
-          (cookie) => cookie.name == 'session' && cookie.value == 'ready',
-        );
-        if (!hasSession) {
-          request.response.cookies.add(Cookie('session', 'ready')..path = '/');
-          request.response.statusCode = HttpStatus.found;
-          request.response.headers.set(HttpHeaders.locationHeader, '/channel');
-        } else {
-          request.response.write('books');
-        }
-        await request.response.close();
-      });
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-      );
-      addTearDown(transport.close);
-
-      final response = await transport.send(
-        SourceRequestTemplate.parse(
-          'http://${server!.address.address}:${server!.port}/channel',
-          baseUri: Uri.parse('https://unused.test'),
-          cookieJarKey: 'source-1',
-        ),
-      );
-
-      expect(response.body, 'books');
-      expect(requests, 2);
-    });
-
-    test(
-      'keeps redirect cookies within a request when persistence is disabled',
-      () async {
-        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        final receivedCookies = <String, String?>{};
-        server!.listen((request) async {
-          final session = request.cookies
-              .where((cookie) => cookie.name == 'session')
-              .firstOrNull;
-          receivedCookies[request.uri.path] = session?.value;
-          if (request.uri.path == '/start') {
-            request.response.cookies.add(
-              Cookie('session', 'redirect-only')..path = '/',
-            );
-            request.response.statusCode = HttpStatus.found;
-            request.response.headers.set(
-              HttpHeaders.locationHeader,
-              '/channel',
-            );
-          } else {
-            request.response.write(
-              request.uri.path == '/channel' ? 'books' : 'clean',
-            );
-          }
-          await request.response.close();
-        });
-        final transport = SourceHttpTransport(
-          networkPolicy: const BookSourceNetworkPolicy(
-            allowPrivateNetwork: true,
-          ),
-        );
-        addTearDown(transport.close);
-
-        final baseUri = Uri.parse('https://unused.test');
-        final response = await transport.send(
-          SourceRequestTemplate.parse(
-            'http://${server!.address.address}:${server!.port}/start',
-            baseUri: baseUri,
-          ),
-        );
-        final nextResponse = await transport.send(
-          SourceRequestTemplate.parse(
-            'http://${server!.address.address}:${server!.port}/probe',
-            baseUri: baseUri,
-          ),
-        );
-
-        expect(response.body, 'books');
-        expect(receivedCookies['/start'], isNull);
-        expect(receivedCookies['/channel'], 'redirect-only');
-        expect(nextResponse.body, 'clean');
-        expect(receivedCookies['/probe'], isNull);
-      },
-    );
-
-    test('matches browser method semantics for POST redirects', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      final methods = <String>[];
-      server!.listen((request) async {
-        methods.add(request.method);
-        if (request.uri.path == '/submit') {
-          request.response.statusCode = HttpStatus.found;
-          request.response.headers.set(HttpHeaders.locationHeader, '/result');
-        } else {
-          request.response.write('ok');
-        }
-        await request.response.close();
-      });
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-      );
-      addTearDown(transport.close);
-
-      final response = await transport.send(
-        SourceRequestTemplate.parse(
-          'http://${server!.address.address}:${server!.port}/submit,'
-          '{"method":"POST","body":"q=test"}',
-          baseUri: Uri.parse('https://unused.test'),
-        ),
-      );
-
-      expect(response.body, 'ok');
-      expect(methods, ['POST', 'GET']);
-    });
-
-    test(
-      'decodes malformed GBK responses without initializing codec decoder',
-      () async {
-        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        server!.listen((request) async {
-          request.response.headers.contentType = ContentType(
-            'text',
-            'plain',
-            charset: 'gbk',
-          );
-          request.response.add(<int>[0xBD, 0xE1, 0xB9]);
-          await request.response.close();
-        });
-        final transport = SourceHttpTransport(
-          networkPolicy: const BookSourceNetworkPolicy(
-            allowPrivateNetwork: true,
-          ),
-        );
-        addTearDown(transport.close);
-
-        final response = await transport.send(
-          SourceRequestTemplate.parse(
-            'http://${server!.address.address}:${server!.port}/',
-            baseUri: Uri.parse('https://unused.test'),
-          ),
-        );
-
-        expect(response.body, startsWith('结'));
-        expect(response.body, hasLength(2));
-      },
-    );
-
-    test('rejects responses over the configured bound', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server!.listen((request) async {
-        request.response.add(utf8.encode('12345'));
-        await request.response.close();
-      });
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-        maxResponseBytes: 4,
-      );
-      addTearDown(transport.close);
-
-      expect(
-        () => transport.send(
-          SourceRequestTemplate.parse(
-            'http://${server!.address.address}:${server!.port}/',
-            baseUri: Uri.parse('https://unused.test'),
-          ),
-        ),
-        throwsA(isA<BookSourceProtocolException>()),
-      );
-    });
-
-    test('cancels an in-flight HTTP request', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      final started = Completer<void>();
-      final release = Completer<void>();
-      server!.listen((request) async {
-        if (!started.isCompleted) started.complete();
-        await release.future;
-        try {
-          request.response.write('late response');
-          await request.response.close();
-        } catch (_) {
-          // The client is expected to close the request before this response.
-        }
-      });
-      final transport = SourceHttpTransport(
-        networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),
-      );
-      addTearDown(transport.close);
-      final cancellation = BookDownloadCancellation();
-      final request = transport.send(
-        SourceRequestTemplate.parse(
-          'http://${server!.address.address}:${server!.port}/slow',
-          baseUri: Uri.parse('https://unused.test'),
-        ),
-        cancellation: cancellation,
-      );
-      await started.future;
-
-      cancellation.cancel();
-      await expectLater(
-        request,
-        throwsA(isA<BookDownloadCancelledException>()),
-      );
-      release.complete();
-    });
-  });
 }
 
 ReadingSourceConfig _htmlSource() => ReadingSourceConfig.fromJson({
@@ -1718,34 +902,6 @@ class _FakeTransport implements SourceTransport {
     }
     return SourceResponse(body: body, finalUri: request.url);
   }
-}
-
-class _SequenceAdapter implements HttpClientAdapter {
-  _SequenceAdapter(this.statuses, {this.body = ''});
-
-  final List<int> statuses;
-  final String body;
-  int requests = 0;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final index = requests++;
-    final status = statuses[index.clamp(0, statuses.length - 1)];
-    return ResponseBody.fromString(
-      body,
-      status,
-      headers: {
-        HttpHeaders.contentTypeHeader: ['text/plain; charset=utf-8'],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
 }
 
 class _MemoryLoginSessionStore implements SourceLoginSessionStore {

@@ -15,6 +15,50 @@ import 'package:xxread/pages/book_sources/book_source_change_page.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  testWidgets('change page closes only a factory-created service', (
+    tester,
+  ) async {
+    final ownedService = _CloseTrackingChangeService();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceChangePage(
+          sources: const [],
+          currentSource: _oldSource,
+          currentBook: _oldBook,
+          serviceFactory: () => ownedService,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    expect(ownedService.closeCount, 1);
+
+    final borrowedService = _CloseTrackingChangeService();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceChangePage(
+          sources: const [],
+          currentSource: _oldSource,
+          currentBook: _oldBook,
+          service: borrowedService,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(borrowedService.closeCount, 0);
+    borrowedService.close();
+  });
+
   testWidgets(
     'candidate must be validated before source switching is enabled',
     (tester) async {
@@ -271,6 +315,16 @@ class _PageChangeService extends BookSourceChangeService {
     chapterProgress: 0.5,
     responseTime: const Duration(milliseconds: 240),
   );
+}
+
+class _CloseTrackingChangeService extends _PageChangeService {
+  int closeCount = 0;
+
+  @override
+  void close() {
+    closeCount++;
+    super.close();
+  }
 }
 
 class _FastEmptyClient extends BookSourceClient {

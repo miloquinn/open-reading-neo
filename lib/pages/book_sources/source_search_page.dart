@@ -13,7 +13,9 @@ import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 
 import 'widgets/source_search_settings_sheet.dart';
-import 'widgets/sourced_book_widgets.dart';
+import 'models/sourced_book.dart';
+import 'widgets/sourced_book_actions.dart';
+import 'widgets/sourced_book_cards.dart';
 
 /// 跨已启用书源的聚合搜索页。
 ///
@@ -23,6 +25,9 @@ class SourceSearchPage extends StatefulWidget {
   final Future<List<RegisteredBookSource>>? sourcesFuture;
   final BookSourceClient? client;
   final BookSourceShelfService? shelfService;
+  final BookSourceClient Function()? clientFactory;
+  final BookSourceShelfService Function(BookSourceClient client)?
+  shelfServiceFactory;
 
   /// 显式传入时覆盖用户在设置面板里保存的并发数/超时；主要供测试使用。
   final int? maxConcurrentSearches;
@@ -34,9 +39,13 @@ class SourceSearchPage extends StatefulWidget {
     this.sourcesFuture,
     this.client,
     this.shelfService,
+    this.clientFactory,
+    this.shelfServiceFactory,
     this.maxConcurrentSearches,
     this.perSourceSearchTimeout,
-  }) : assert(maxConcurrentSearches == null || maxConcurrentSearches > 0),
+  }) : assert(client == null || clientFactory == null),
+       assert(shelfService == null || shelfServiceFactory == null),
+       assert(maxConcurrentSearches == null || maxConcurrentSearches > 0),
        assert(sources != null || sourcesFuture != null);
 
   /// 解析实际参与搜索的书源集合；发现页与测试也复用这份规则。
@@ -63,10 +72,14 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
   final List<SourcedBook> _results = [];
   final Set<String> _resultKeys = {};
   final Map<String, _SearchPageState> _pageStates = {};
-  late final BookSourceClient _client = widget.client ?? BookSourceClient();
+  late final bool _ownsClient = widget.client == null;
+  late final BookSourceClient _client =
+      widget.client ?? (widget.clientFactory ?? BookSourceClient.new)();
+  late final bool _ownsShelfService = widget.shelfService == null;
   late final BookSourceShelfService _shelfService =
-      widget.shelfService ?? BookSourceShelfService(client: _client);
-  bool get _ownsClient => widget.client == null;
+      widget.shelfService ??
+      (widget.shelfServiceFactory ??
+          (client) => BookSourceShelfService(client: client))(_client);
   late final SourcedBookActions _actions = SourcedBookActions(
     context: context,
     client: _client,
@@ -178,6 +191,7 @@ class _SourceSearchPageState extends State<SourceSearchPage> {
       ..dispose();
     _queryController.dispose();
     _queryFocus.dispose();
+    if (_ownsShelfService) _shelfService.close();
     if (_ownsClient) _client.close();
     super.dispose();
   }

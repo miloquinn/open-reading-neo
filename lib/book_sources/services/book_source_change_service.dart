@@ -98,19 +98,42 @@ class BookSourceChangeConflict implements Exception {
 class BookSourceChangeService {
   BookSourceChangeService({
     BookSourceClient? client,
+    BookSourceClient Function()? clientFactory,
     BookSourceShelfService? shelfService,
+    BookSourceShelfService Function(BookSourceClient client)?
+    shelfServiceFactory,
     BookSourceReadingProgressStore? progressStore,
     this.maxConcurrentSearches = 12,
     this.perSourceSearchTimeout = const Duration(seconds: 6),
-  }) : client = client ?? BookSourceClient(),
-       shelfService = shelfService ?? BookSourceShelfService(),
-       progressStore = progressStore ?? const BookSourceReadingProgressStore();
+  }) : assert(client == null || clientFactory == null),
+       assert(shelfService == null || shelfServiceFactory == null),
+       progressStore = progressStore ?? const BookSourceReadingProgressStore() {
+    final resolvedClient = client ?? (clientFactory ?? BookSourceClient.new)();
+    this.client = resolvedClient;
+    this.shelfService =
+        shelfService ??
+        (shelfServiceFactory ??
+            (resolvedClient) =>
+                BookSourceShelfService(client: resolvedClient))(resolvedClient);
+    _ownsClient = client == null;
+    _ownsShelfService = shelfService == null;
+  }
 
-  final BookSourceClient client;
-  final BookSourceShelfService shelfService;
+  late final BookSourceClient client;
+  late final BookSourceShelfService shelfService;
   final BookSourceReadingProgressStore progressStore;
   final int maxConcurrentSearches;
   final Duration perSourceSearchTimeout;
+  late final bool _ownsClient;
+  late final bool _ownsShelfService;
+  bool _closed = false;
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    if (_ownsShelfService) shelfService.close();
+    if (_ownsClient) client.close();
+  }
 
   Future<BookSourceChangePosition> loadPosition({
     required RegisteredBookSource source,

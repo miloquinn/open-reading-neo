@@ -57,17 +57,28 @@ class BookSourceShelfService {
   BookSourceShelfService({
     BookDao? bookDao,
     BookSourceClient? client,
+    BookSourceClient Function()? clientFactory,
     SourceCoverCache? sourceCoverCache,
     Directory? downloadDirectory,
-  }) : _downloadDirectory = downloadDirectory,
+  }) : assert(client == null || clientFactory == null),
+       _downloadDirectory = downloadDirectory,
        _bookDao = bookDao ?? BookDao(),
-       _client = client ?? BookSourceClient(),
+       _client = client ?? (clientFactory ?? BookSourceClient.new)(),
+       _ownsClient = client == null,
        _sourceCoverCache = sourceCoverCache ?? SourceCoverCache.instance;
 
   final BookDao _bookDao;
   final BookSourceClient _client;
+  final bool _ownsClient;
   final SourceCoverCache _sourceCoverCache;
   final Directory? _downloadDirectory;
+  bool _closed = false;
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    if (_ownsClient) _client.close();
+  }
 
   Future<Book?> findShelfBook({
     required String sourceId,

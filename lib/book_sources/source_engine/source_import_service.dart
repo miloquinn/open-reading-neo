@@ -42,6 +42,27 @@ class SourceImportPreview {
             source.toRegisteredSource(compatibilityReport: reportFor(source)),
       )
       .toList(growable: false);
+
+  /// Materializes a large import result away from the Flutter UI isolate.
+  /// The preview already contains compatibility reports, so pass those across
+  /// instead of scanning every source again during the commit tap.
+  Future<List<RegisteredBookSource>> toRegisteredSourcesAsync() {
+    final request = <String, Object?>{
+      'sources': sources.map((source) => source.raw).toList(growable: false),
+      'reports': <String, Map<String, Object?>>{
+        for (final source in sources)
+          source.stableId: {
+            'level': reportFor(source).level.name,
+            'issues': reportFor(
+              source,
+            ).issues.map((issue) => issue.name).toList(growable: false),
+          },
+      },
+    };
+    return compute(_materializeRegisteredSources, request).then(
+      (maps) => maps.map(RegisteredBookSource.fromJson).toList(growable: false),
+    );
+  }
 }
 
 class SourceImportService {
@@ -147,62 +168,87 @@ class SourceImportService {
     );
   }
 
-  Future<SourceImportPreview> loadUrl(String input) async {
+  Future<SourceImportPreview> loadUrl(
+    String input, {
+    Uint8List? initialBytes,
+  }) async {
     final uri = Uri.tryParse(input.trim());
     if (uri == null ||
         !uri.hasAuthority ||
         (uri.scheme != 'http' && uri.scheme != 'https')) {
       throw const FormatException('Import URL must use HTTP or HTTPS.');
     }
-    final byUrl = <String, ReadingSourceConfig>{};
-    final errors = <String>[];
     final visited = <String>{};
-    await _loadRecursive(
+    final tree = await _loadRecursive(
       uri,
       depth: 0,
       visited: visited,
-      byUrl: byUrl,
-      errors: errors,
+      initialBytes: initialBytes,
     );
     return SourceImportPreview(
-      sources: List.unmodifiable(byUrl.values),
-      errors: List.unmodifiable(errors),
+      sources: List.unmodifiable(tree.sources.values),
+      errors: List.unmodifiable(tree.errors),
     );
   }
 
-  Future<void> _loadRecursive(
+  Future<_SourceImportTree> _loadRecursive(
     Uri uri, {
     required int depth,
     required Set<String> visited,
-    required Map<String, ReadingSourceConfig> byUrl,
-    required List<String> errors,
+    Uint8List? initialBytes,
   }) async {
     if (depth > maxNestedDepth) {
-      errors.add('$uri: nested import depth exceeds $maxNestedDepth.');
-      return;
+      return _SourceImportTree(
+        errors: ['$uri: nested import depth exceeds $maxNestedDepth.'],
+      );
     }
-    if (!visited.add(uri.toString())) return;
+    if (!visited.add(uri.toString())) return const _SourceImportTree();
     if (visited.length > maxNestedUrls + 1) {
       throw const FormatException('Too many nested source URLs.');
     }
-    final bytes = await _download(uri);
+    final bytes = initialBytes ?? await _download(uri);
     final parsed = await _parseBytesAsync(bytes);
-    for (final source in parsed.sources) {
-      byUrl[source.url] = source;
-      if (byUrl.length > maxSources) {
-        throw const FormatException('Too many sources in import.');
+    final byUrl = <String, ReadingSourceConfig>{
+      for (final source in parsed.sources) source.url: source,
+    };
+    final errors = <String>[...parsed.errors.map((error) => '$uri: $error')];
+    final nestedResults = await _mapWithConcurrency(
+      parsed.sourceUrls,
+      _maxNestedConcurrent,
+      (nested) => _loadRecursive(nested, depth: depth + 1, visited: visited),
+    );
+    // Merge in declaration order to preserve the historical last-write-wins
+    // behavior for duplicate URLs in nested source lists.
+    for (final nested in nestedResults) {
+      byUrl.addAll(nested.sources);
+      errors.addAll(nested.errors);
+    }
+    if (byUrl.length > maxSources) {
+      throw const FormatException('Too many sources in import.');
+    }
+    return _SourceImportTree(sources: byUrl, errors: errors);
+  }
+
+  Future<List<T>> _mapWithConcurrency<T>(
+    List<Uri> values,
+    int concurrency,
+    Future<T> Function(Uri value) operation,
+  ) async {
+    if (values.isEmpty) return const [];
+    final results = List<T?>.filled(values.length, null);
+    var next = 0;
+    Future<void> worker() async {
+      while (true) {
+        final index = next++;
+        if (index >= values.length) return;
+        results[index] = await operation(values[index]);
       }
     }
-    errors.addAll(parsed.errors.map((error) => '$uri: $error'));
-    for (final nested in parsed.sourceUrls) {
-      await _loadRecursive(
-        nested,
-        depth: depth + 1,
-        visited: visited,
-        byUrl: byUrl,
-        errors: errors,
-      );
-    }
+
+    await Future.wait(
+      List.generate(values.length.clamp(1, concurrency), (_) => worker()),
+    );
+    return results.cast<T>();
   }
 
   Future<Uint8List> _download(Uri initial) async {
@@ -270,4 +316,37 @@ class SourceImportService {
       duplicates: result.duplicates,
     );
   }
+}
+
+const int _maxNestedConcurrent = 4;
+
+class _SourceImportTree {
+  const _SourceImportTree({this.sources = const {}, this.errors = const []});
+
+  final Map<String, ReadingSourceConfig> sources;
+  final List<String> errors;
+}
+
+List<Map<String, dynamic>> _materializeRegisteredSources(
+  Map<String, Object?> request,
+) {
+  final rawSources = request['sources']! as List;
+  final reports = request['reports']! as Map;
+  return rawSources
+      .map((raw) {
+        final source = ReadingSourceConfig.fromJson(
+          (raw as Map).map((key, value) => MapEntry('$key', value)),
+        );
+        final reportData = reports[source.stableId] as Map;
+        final report = SourceCompatibilityReport(
+          level: SourceCompatibilityLevel.values.byName(
+            '${reportData['level']}',
+          ),
+          issues: (reportData['issues'] as List)
+              .map((issue) => SourceCompatibilityIssue.values.byName('$issue'))
+              .toSet(),
+        );
+        return source.toRegisteredSource(compatibilityReport: report).toJson();
+      })
+      .toList(growable: false);
 }

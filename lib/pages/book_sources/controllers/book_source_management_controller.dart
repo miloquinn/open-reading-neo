@@ -7,7 +7,14 @@ import '../../../book_sources/services/book_source_client.dart';
 import '../../../book_sources/services/book_source_health_check_service.dart';
 import '../../../book_sources/services/book_source_registry.dart';
 
-enum BookSourceManagementFilter { all, enabled, disabled, runnable, pending }
+enum BookSourceManagementFilter {
+  all,
+  enabled,
+  disabled,
+  runnable,
+  pending,
+  requiresLogin,
+}
 
 enum BookSourceManagementMutation { enable, refresh, remove, health }
 
@@ -62,6 +69,9 @@ class BookSourceManagementState {
           BookSourceManagementFilter.disabled => !source.enabled,
           BookSourceManagementFilter.runnable => source.capabilities.isNotEmpty,
           BookSourceManagementFilter.pending => source.capabilities.isEmpty,
+          BookSourceManagementFilter.requiresLogin => sourceRequiresLogin(
+            source,
+          ),
         };
         if (!matchesState) return false;
         if (selectedGroup case final selected?) {
@@ -145,6 +155,12 @@ List<String> bookSourceGroups(RegisteredBookSource source) {
         .where((group) => group.isNotEmpty),
   );
 }
+
+/// Whether this source declares its own login flow (a Legado-style
+/// `loginUrl` script), as opposed to needing no authentication at all.
+bool sourceRequiresLogin(RegisteredBookSource source) =>
+    source.sourceProtocol == BookSourceProtocolKind.readingSource &&
+    '${source.sourceConfig?['loginUrl'] ?? ''}'.trim().isNotEmpty;
 
 class BookSourceManagementController extends ChangeNotifier {
   BookSourceManagementController({

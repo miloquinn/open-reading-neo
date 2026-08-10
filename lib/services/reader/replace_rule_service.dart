@@ -384,26 +384,58 @@ class ReplaceRuleService extends ChangeNotifier {
   }
 }
 
-final RegExp _leadingInlineFlags = RegExp(r'^\(\?([ims]+)\)');
+final RegExp _inlineFlags = RegExp(r'\(\?([ims]+)\)');
 
 RegExp _compileReplacePattern(String pattern) {
   var source = pattern;
   var caseSensitive = true;
   var multiLine = false;
   var dotAll = false;
-  while (true) {
-    final match = _leadingInlineFlags.firstMatch(source);
-    if (match == null) break;
+  // Legado/JVM sources commonly place flags at the beginning or after an
+  // alternation. Dart takes these options on the RegExp constructor instead.
+  source = source.replaceAllMapped(_inlineFlags, (match) {
     final flags = match.group(1)!;
     if (flags.contains('i')) caseSensitive = false;
     if (flags.contains('m')) multiLine = true;
     if (flags.contains('s')) dotAll = true;
-    source = source.substring(match.end);
-  }
+    return '';
+  });
+  // Java's horizontal whitespace class has no Dart spelling. Keep newlines
+  // out so line-oriented cleanup rules retain their source boundaries.
+  source = _replaceHorizontalWhitespace(source);
   return RegExp(
     source,
     caseSensitive: caseSensitive,
     multiLine: multiLine,
     dotAll: dotAll,
   );
+}
+
+String _replaceHorizontalWhitespace(String source) {
+  final output = StringBuffer();
+  var inClass = false;
+  for (var index = 0; index < source.length; index++) {
+    final character = source[index];
+    if (character == r'\' && index + 1 < source.length) {
+      final escaped = source[index + 1];
+      if (escaped == 'h') {
+        output.write(inClass ? r'\t ' : r'(?:\t| )');
+        index++;
+        continue;
+      }
+      if (escaped == 'H') {
+        output.write(inClass ? r'\s\S' : r'[\s\S]');
+        index++;
+        continue;
+      }
+      output.write(character);
+      output.write(escaped);
+      index++;
+      continue;
+    }
+    if (character == '[') inClass = true;
+    if (character == ']' && inClass) inClass = false;
+    output.write(character);
+  }
+  return output.toString();
 }

@@ -13,6 +13,20 @@ import '../../services/core/app_settings_service.dart';
 
 export 'book_source_registry_storage.dart' show BookSourceRegistryStorage;
 
+/// Result of [BookSourceRegistry.upsertAll]: the full registry after the
+/// write, plus any imported sources that were held back because they would
+/// have silently taken over an existing source's id from a different origin.
+@immutable
+class BookSourceUpsertAllResult {
+  const BookSourceUpsertAllResult({
+    required this.sources,
+    required this.conflicted,
+  });
+
+  final List<RegisteredBookSource> sources;
+  final List<RegisteredBookSource> conflicted;
+}
+
 class BookSourceRegistry {
   BookSourceRegistry({BookSourceRegistryStorage? storage})
     : _storage = storage ?? const DefaultBookSourceRegistryStorage();
@@ -136,10 +150,20 @@ class BookSourceRegistry {
 
   /// Adds or refreshes a bounded import batch in one serialized write.
   /// Existing entries keep their local enabled state and original add time.
-  Future<List<RegisteredBookSource>> upsertAll(
+  ///
+  /// A batch commonly re-imports sources the user already has (the same
+  /// aggregate file, fetched again; overlapping entries across several
+  /// collections). Those are normal, expected duplicates and must not stop
+  /// the rest of the batch from importing. Only a genuine identity conflict —
+  /// the same id/URL now claiming a different origin, which could otherwise
+  /// silently hijack an existing source's API endpoint — is held back; it is
+  /// reported via [BookSourceUpsertAllResult.conflicted] instead of aborting
+  /// the whole import.
+  Future<BookSourceUpsertAllResult> upsertAll(
     Iterable<RegisteredBookSource> imported,
   ) async {
-    return _mutate(() async {
+    final conflicted = <RegisteredBookSource>[];
+    final sources = await _mutate(() async {
       final sources = (await _load()).toList();
       final indexes = <String, int>{
         for (var index = 0; index < sources.length; index++)
@@ -159,10 +183,8 @@ class BookSourceRegistry {
             previous.apiBaseUrl.host == source.apiBaseUrl.host &&
             previous.sourceProtocol == source.sourceProtocol;
         if (!sameOrigin) {
-          throw BookSourceProtocolException(
-            'A source with id "${source.id}" is already registered from a '
-            'different origin or protocol.',
-          );
+          conflicted.add(source);
+          continue;
         }
         sources[index] = RegisteredBookSource(
           // Preserve the original ID when migrating imported-source naming;
@@ -190,6 +212,10 @@ class BookSourceRegistry {
       }
       return _saveAndPublish(sources);
     });
+    return BookSourceUpsertAllResult(
+      sources: sources,
+      conflicted: List.unmodifiable(conflicted),
+    );
   }
 
   Future<List<RegisteredBookSource>> setEnabled(String id, bool enabled) async {
@@ -300,7 +326,12 @@ class BookSourceRegistry {
   }
 
   Future<void> _save(List<RegisteredBookSource> sources) async {
-    final raw = jsonEncode(sources.map((source) => source.toJson()).toList());
+    final maps = sources
+        .map((source) => source.toJson())
+        .toList(growable: false);
+    final raw = maps.length < 128
+        ? jsonEncode(maps)
+        : await compute(_encodeStoredSourceMaps, maps);
     final hasExternalRegistry = await _storage.read() != null;
     if (await _storage.write(raw)) {
       final preferences = await SharedPreferences.getInstance();
@@ -403,12 +434,14 @@ RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
   }
   try {
     final compatible = ReadingSourceConfig.fromJson(source.sourceConfig!);
-    final report = const SourceCompatibilityScanner().scan(compatible);
+    // Compatibility is policy, not source data. Always rescan so upgrades
+    // (for example image sources becoming supported) take effect immediately.
+    final effectiveReport = const SourceCompatibilityScanner().scan(compatible);
     return compatible.toRegisteredSource(
       id: source.id,
       enabled: source.enabled,
       readingChainVerified: isReadingChainVerifiedSource(source),
-      compatibilityReport: report,
+      compatibilityReport: effectiveReport,
       addedAt: source.addedAt,
     );
   } on FormatException {
@@ -417,3 +450,6 @@ RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
     return source;
   }
 }
+
+String _encodeStoredSourceMaps(List<Map<String, dynamic>> maps) =>
+    jsonEncode(maps);

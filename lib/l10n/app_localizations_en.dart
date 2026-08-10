@@ -289,6 +289,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesPendingCompatibility => 'No runnable rules';
 
   @override
+  String get bookSourcesRequiresLogin => 'Requires login';
+
+  @override
   String get bookSourcesManagementSearchHint =>
       'Search name, URL, notes, or group';
 
@@ -519,6 +522,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String sourceLoginFailed(String details) {
     return 'Could not update the source sign-in session: $details';
+  }
+
+  @override
+  String sourceLoginDiscoveryNotice(String sourceName) {
+    return '“$sourceName” provides sign-in for account-only content.';
   }
 
   @override
@@ -2411,6 +2419,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String additionalSourcesImported(int count) {
     return 'Imported $count sources';
+  }
+
+  @override
+  String additionalSourcesImportedWithConflicts(int count, int conflicted) {
+    return 'Imported $count sources; skipped $conflicted whose id is already registered from a different origin';
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'source_script_contract.dart';
+import 'source_script_network_guard.dart';
 import 'source_script_state.dart';
 
 const sourceScriptHostChannel = 'OpenReadingSourceHost';
@@ -60,7 +61,19 @@ class SourceScriptBootstrap {
   }
 
   static String build(Map<String, Object?> payload) {
-    final encoded = jsonEncode(payload);
+    // A source's own defensive `try { java.ajax(...) } catch (e) {...}`
+    // would otherwise silently swallow the internal marker error this
+    // engine throws to request a real (async) network/interaction round
+    // trip — see source_script_network_guard.dart.
+    final guardedPayload = Map<String, Object?>.from(payload)
+      ..['script'] = guardNetworkCatchBlocks('${payload['script'] ?? ''}')
+      ..['sharedScript'] = guardNetworkCatchBlocks(
+        '${payload['sharedScript'] ?? ''}',
+      );
+    final encoded = jsonEncode(guardedPayload);
+    final sharedFunctionExports = _sharedFunctionExports(
+      guardedPayload['sharedScript'],
+    );
     return '''
 (() => {
   const __payload = $encoded;
@@ -608,6 +621,7 @@ class SourceScriptBootstrap {
   }
   const __program = '(function(){\\n' +
     (__payload.sharedScript || '') +
+    '\\n' + ${jsonEncode(sharedFunctionExports)} +
     '\\nreturn eval(' + JSON.stringify(__payload.script) + ');\\n})()';
   let __value = (0, eval)(__program);
   if (__value === undefined || typeof __value === 'function') __value = '';
@@ -623,6 +637,30 @@ class SourceScriptBootstrap {
   });
 })()
 ''';
+  }
+
+  // Legado exposes shared jsLib functions on the script context object. Keep
+  // the library lexically scoped to avoid `let`/`const` collisions between
+  // invocations, then export its top-level functions so source code using
+  // `this.getToken()` or `this.getVariable()` keeps working.
+  static String _sharedFunctionExports(Object? sharedScript) {
+    final script = sharedScript is String ? sharedScript : '';
+    final names = RegExp(
+      r'\bfunction\s+([A-Za-z_$][\w$]*)',
+    ).allMatches(script).map((match) => match.group(1)!).toSet();
+    return names
+        .map(
+          (name) =>
+              '''
+if (typeof $name === "function") {
+  var __openReadingOriginal_$name = $name;
+  $name = function() {
+    return __openReadingOriginal_$name.apply(globalThis, arguments);
+  };
+  globalThis[${jsonEncode(name)}] = $name;
+}''',
+        )
+        .join('\n');
   }
 }
 

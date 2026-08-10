@@ -277,6 +277,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesPendingCompatibility => '実行可能なルールなし';
 
   @override
+  String get bookSourcesRequiresLogin => 'ログインが必要';
+
+  @override
   String get bookSourcesManagementSearchHint => '名前、URL、メモ、グループを検索';
 
   @override
@@ -501,6 +504,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String sourceLoginFailed(String details) {
     return 'ソースのログインセッションを更新できませんでした: $details';
+  }
+
+  @override
+  String sourceLoginDiscoveryNotice(String sourceName) {
+    return '「$sourceName」はアカウント限定コンテンツのログインに対応しています。';
   }
 
   @override
@@ -2330,6 +2338,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String additionalSourcesImported(int count) {
     return '$count 件のソースをインポートしました';
+  }
+
+  @override
+  String additionalSourcesImportedWithConflicts(int count, int conflicted) {
+    return '$count 件をインポートし、別のオリジンで既に登録済みの $conflicted 件をスキップしました';
   }
 
   @override

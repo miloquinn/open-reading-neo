@@ -110,8 +110,8 @@ void main() {
     final image = scanner.scan(
       ReadingSourceConfig.fromJson(_source(type: 2, name: 'Images')),
     );
-    expect(image.level, SourceCompatibilityLevel.unsupported);
-    expect(image.canRun, isFalse);
+    expect(image.level, SourceCompatibilityLevel.partial);
+    expect(image.canRun, isTrue);
 
     final cookieJar = scanner.scan(
       ReadingSourceConfig.fromJson(_source(cookies: true, name: 'Cookie jar')),
@@ -347,8 +347,9 @@ void main() {
         _source(name: 'Updated'),
       ).toRegisteredSource(enabled: true, readingChainVerified: true);
       final saved = await registry.upsertAll([updated]);
-      expect(saved.single.name, 'Updated');
-      expect(saved.single.enabled, isTrue);
+      expect(saved.conflicted, isEmpty);
+      expect(saved.sources.single.name, 'Updated');
+      expect(saved.sources.single.enabled, isTrue);
       expect(await registry.loadRunnable(), isEmpty);
       expect(await registry.loadRunnableInBackground(), isEmpty);
 
@@ -356,6 +357,46 @@ void main() {
       await prefs.setBool(additionalSourceProtocolsPreferenceKey, true);
       expect(await registry.loadRunnable(), hasLength(1));
       expect(await registry.loadRunnableInBackground(), hasLength(1));
+    },
+  );
+
+  test(
+    'bulk import skips only the sources whose id conflicts with a '
+    'different origin, instead of aborting the whole batch',
+    () async {
+      final registry = BookSourceRegistry();
+      // Two "app" sources that share a non-URL bookSourceUrl (common for
+      // aggregator sources whose real host lives inside their script), but
+      // whose embedded scripts point at different hosts — a genuine identity
+      // conflict, not a re-import of the same source.
+      final original = ReadingSourceConfig.fromJson({
+        ..._source(name: 'App Source'),
+        'bookSourceUrl': 'App Source',
+        'jsLib': 'let hosts = ["https://a.example"];',
+      }).toRegisteredSource(enabled: true);
+      await registry.upsertAll([original]);
+
+      final impostor = ReadingSourceConfig.fromJson({
+        ..._source(name: 'App Source (impostor)'),
+        'bookSourceUrl': 'App Source',
+        'jsLib': 'let hosts = ["https://b.example"];',
+      }).toRegisteredSource(enabled: true);
+      final freshSource = ReadingSourceConfig.fromJson(
+        _source(name: 'Brand New', url: 'https://new.example'),
+      ).toRegisteredSource(enabled: true);
+
+      final result = await registry.upsertAll([impostor, freshSource]);
+
+      expect(result.conflicted, hasLength(1));
+      expect(result.conflicted.single.name, 'App Source (impostor)');
+      expect(
+        result.sources.map((source) => source.name),
+        containsAll(['App Source', 'Brand New']),
+      );
+      expect(
+        result.sources.map((source) => source.name),
+        isNot(contains('App Source (impostor)')),
+      );
     },
   );
 }

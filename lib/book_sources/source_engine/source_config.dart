@@ -228,7 +228,6 @@ class SourceCompatibilityScanner {
     const blocked = {
       SourceCompatibilityIssue.audio,
       SourceCompatibilityIssue.video,
-      SourceCompatibilityIssue.image,
       SourceCompatibilityIssue.file,
       SourceCompatibilityIssue.missingSearch,
       SourceCompatibilityIssue.missingReadingRules,

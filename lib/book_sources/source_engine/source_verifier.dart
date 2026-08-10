@@ -135,7 +135,9 @@ class SourceVerifier {
           chapterId: chapters.first.id,
           sourceVariables: book.sourceVariables,
         );
-        if (content.content.trim().isNotEmpty) return true;
+        if (content.content.trim().isNotEmpty || content.images.isNotEmpty) {
+          return true;
+        }
       } catch (_) {
         // Try the next neutral probe query. Failed sources are discarded.
       }

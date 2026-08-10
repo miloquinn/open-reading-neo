@@ -9,9 +9,15 @@ import '../../services/book_source_response_cache.dart';
 import '../book_source_protocol.dart';
 
 class OrspHttpPipeline {
-  OrspHttpPipeline(this._dio, this._networkPolicy, this._responseCache);
+  OrspHttpPipeline(
+    this._dio,
+    this._networkPolicy,
+    this._responseCache, {
+    required this._systemDio,
+  });
 
   final Dio _dio;
+  final Dio _systemDio;
   final BookSourceNetworkPolicy _networkPolicy;
   final BookSourceResponseCache _responseCache;
 
@@ -34,8 +40,12 @@ class OrspHttpPipeline {
     try {
       var current = uri;
       for (var redirects = 0; redirects <= 5; redirects++) {
-        await _networkPolicy.validate(current);
-        final response = await _dio.getUri<Object?>(
+        final addresses = await _networkPolicy.resolve(current);
+        final client =
+            addresses.any(BookSourceNetworkPolicy.isSyntheticDnsAddress)
+            ? _systemDio
+            : _dio;
+        final response = await client.getUri<Object?>(
           current,
           options: Options(
             receiveTimeout: receiveTimeout,

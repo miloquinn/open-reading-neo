@@ -214,6 +214,7 @@ class SourceHttpTransport
     // disabled (for example, CDN/WAF cookies set by an HTTP -> HTTPS redirect).
     final redirectCookies = _cookieJar.createTransientJar();
     final redirectStates = <String>{};
+    final redirectHops = <String>[];
     final connectionRetries = <Uri, int>{};
     final systemFallbacks = <Uri>{};
     CancelToken? activeCancelToken;
@@ -262,8 +263,19 @@ class SourceHttpTransport
           redirectState =
               '${method.name}\u0000$current\u0000${mergedCookies ?? ''}';
           if (!redirectStates.add(redirectState)) {
-            throw const BookSourceProtocolException(
-              'reading source source entered a redirect loop.',
+            final sameUrlThroughout =
+                redirectHops.isNotEmpty &&
+                redirectHops.every((hop) => hop.contains(' $current -> '));
+            final explanation = sameUrlThroughout
+                ? ' This source keeps redirecting back to the exact same '
+                      'address without ever completing — typically an '
+                      'anti-bot/challenge response this app cannot solve. '
+                      'Try switching this source to a different line/host.'
+                : '';
+            throw BookSourceProtocolException(
+              'reading source source entered a redirect loop:$explanation '
+              '${redirectHops.join(' -> ')} -> '
+              '${method.name.toUpperCase()} $current (repeats).',
             );
           }
           final response = await requestClient.requestUri<List<int>>(
@@ -327,14 +339,16 @@ class SourceHttpTransport
             );
           }
           if (redirects == maxRedirects) {
-            throw const BookSourceProtocolException(
-              'reading source source redirected too many times.',
+            throw BookSourceProtocolException(
+              'reading source source redirected too many times: '
+              '${redirectHops.join(' -> ')}.',
             );
           }
           final next = BookSourceNetworkPolicy.redirectTarget(
             current,
             response.headers.value(HttpHeaders.locationHeader),
           );
+          redirectHops.add('${method.name.toUpperCase()} $current -> $status');
           if (current.authority != next.authority) {
             headers.removeWhere(
               (name, _) =>

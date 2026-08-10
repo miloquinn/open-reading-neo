@@ -52,7 +52,9 @@ class SourceHealthCheckResult {
 /// Reads back the most recently persisted [SourceHealthCheckResult] for
 /// [source], if any. Returns null for a source that has never been checked
 /// or whose stored result could not be parsed.
-SourceHealthCheckResult? sourceHealthCheckResultOf(RegisteredBookSource source) {
+SourceHealthCheckResult? sourceHealthCheckResultOf(
+  RegisteredBookSource source,
+) {
   final raw = source.sourceConfig?['_openReadingHealthCheck'];
   if (raw is! Map) return null;
   try {
@@ -205,7 +207,7 @@ class SourceHealthChecker {
         chapterId: chapters.first.id,
         sourceVariables: book.sourceVariables,
       );
-      if (content.content.trim().isEmpty) {
+      if (content.content.trim().isEmpty && content.images.isEmpty) {
         throw const BookSourceProtocolException('empty');
       }
     } on Object {

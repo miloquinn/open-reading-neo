@@ -5,7 +5,6 @@ import '../../../utils/localization_extension.dart';
 import '../../../widgets/floating_subpage_scaffold.dart';
 import '../controllers/book_source_management_controller.dart';
 import 'book_source_management_source_card.dart';
-import 'book_source_protocol_panel.dart';
 
 class BookSourceManagementList extends StatelessWidget {
   const BookSourceManagementList({
@@ -14,7 +13,6 @@ class BookSourceManagementList extends StatelessWidget {
     required this.searchController,
     required this.scrollController,
     required this.additionalProtocolsEnabled,
-    required this.protocolExpanded,
     required this.onQueryChanged,
     required this.onClearQuery,
     required this.onFilterChanged,
@@ -28,17 +26,12 @@ class BookSourceManagementList extends StatelessWidget {
     required this.onToggleSourceSelection,
     required this.onSourceEnabledChanged,
     required this.onSourceAction,
-    required this.onToggleProtocol,
-    required this.onShowProtocolDetails,
-    required this.onOpenProtocolRepository,
-    required this.onOpenRightsReport,
   });
 
   final BookSourceManagementState state;
   final TextEditingController searchController;
   final ScrollController scrollController;
   final bool additionalProtocolsEnabled;
-  final bool protocolExpanded;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
   final ValueChanged<BookSourceManagementFilter> onFilterChanged;
@@ -57,10 +50,6 @@ class BookSourceManagementList extends StatelessWidget {
     BookSourceManagementSourceAction action,
   )
   onSourceAction;
-  final VoidCallback onToggleProtocol;
-  final VoidCallback onShowProtocolDetails;
-  final VoidCallback onOpenProtocolRepository;
-  final VoidCallback onOpenRightsReport;
 
   @override
   Widget build(BuildContext context) {
@@ -151,19 +140,7 @@ class BookSourceManagementList extends StatelessWidget {
                 ),
               ),
           ],
-          if (state.loading || displayedCount >= visible.length)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
-              sliver: SliverToBoxAdapter(
-                child: BookSourceProtocolPanel(
-                  expanded: protocolExpanded,
-                  onToggle: onToggleProtocol,
-                  onShowDetails: onShowProtocolDetails,
-                  onOpenRepository: onOpenProtocolRepository,
-                  onOpenRightsReport: onOpenRightsReport,
-                ),
-              ),
-            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 36)),
         ],
       ),
     );
@@ -264,16 +241,6 @@ class _HeaderAndFilters extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          context.l10n.bookSourcesVisibleCount(
-            visibleCount,
-            state.sources.length,
-          ),
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 12),
         TextField(
           key: const Key('bookSourceManagementSearchField'),
           controller: searchController,
@@ -307,6 +274,9 @@ class _HeaderAndFilters extends StatelessWidget {
                 ChoiceChip(
                   key: Key('bookSourceFilter-${filter.name}'),
                   selected: state.filter == filter,
+                  avatar: filter == BookSourceManagementFilter.requiresLogin
+                      ? const Icon(Icons.key_rounded, size: 18)
+                      : null,
                   label: Text(_filterLabel(context, filter)),
                   onSelected: (_) => onFilterChanged(filter),
                 ),
@@ -335,7 +305,20 @@ class _HeaderAndFilters extends StatelessWidget {
             onRemoveSelected: onRemoveSelected,
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            context.l10n.bookSourcesVisibleCount(
+              visibleCount,
+              state.sources.length,
+            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        const SizedBox(height: 8),
       ],
     );
   }
@@ -350,6 +333,8 @@ class _HeaderAndFilters extends StatelessWidget {
     BookSourceManagementFilter.runnable => context.l10n.bookSourcesRunnable,
     BookSourceManagementFilter.pending =>
       context.l10n.bookSourcesPendingCompatibility,
+    BookSourceManagementFilter.requiresLogin =>
+      context.l10n.bookSourcesRequiresLogin,
   };
 }
 

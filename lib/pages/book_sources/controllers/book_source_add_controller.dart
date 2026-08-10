@@ -42,11 +42,17 @@ class BookSourceAddCommitResult {
     required this.sources,
     required this.analysis,
     required this.importedCount,
+    this.conflictedCount = 0,
   });
 
   final List<RegisteredBookSource> sources;
   final BookSourceImportAnalysis analysis;
   final int importedCount;
+
+  /// Sources skipped because their id was already registered from a
+  /// different origin — a likely id collision, not the same source. Everyone
+  /// else in the batch still imports normally.
+  final int conflictedCount;
 }
 
 const _unchanged = Object();
@@ -109,13 +115,17 @@ class BookSourceAddController extends ChangeNotifier {
     try {
       late final List<RegisteredBookSource> sources;
       late final int importedCount;
+      var conflictedCount = 0;
       if (analysis.kind == BookSourceImportKind.orsp) {
         sources = await _registry.upsert(analysis.sources.single);
         importedCount = 1;
       } else {
-        final imported = analysis.additionalPreview!.toRegisteredSources();
-        sources = await _registry.upsertAll(imported);
-        importedCount = imported.length;
+        final imported = await analysis.additionalPreview!
+            .toRegisteredSourcesAsync();
+        final result = await _registry.upsertAll(imported);
+        sources = result.sources;
+        conflictedCount = result.conflicted.length;
+        importedCount = imported.length - conflictedCount;
       }
       if (!_isCurrent(generation)) return null;
       _emit(
@@ -125,6 +135,7 @@ class BookSourceAddController extends ChangeNotifier {
         sources: List.unmodifiable(sources),
         analysis: analysis,
         importedCount: importedCount,
+        conflictedCount: conflictedCount,
       );
     } on Object catch (error) {
       if (!_isCurrent(generation)) return null;

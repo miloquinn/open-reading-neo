@@ -387,7 +387,20 @@ class BookSourceChapterContent {
   factory BookSourceChapterContent.fromJson(Map<String, dynamic> json) {
     final contentType =
         (json['contentType'] as String?)?.trim() ?? 'text/plain';
-    const allowedContentTypes = {'text/plain', 'text/markdown', 'text/html'};
+    const allowedContentTypes = {
+      'text/plain',
+      'text/markdown',
+      'text/html',
+      'image/sequence',
+    };
+    final isImageSequence = contentType == 'image/sequence';
+    if (isImageSequence &&
+        json['content'] is String &&
+        (json['content'] as String).trim().isNotEmpty) {
+      throw const BookSourceProtocolException(
+        'Image sequence chapters must leave content empty.',
+      );
+    }
     if (!allowedContentTypes.contains(contentType)) {
       throw BookSourceProtocolException(
         'Unsupported chapter content type: $contentType',
@@ -400,7 +413,9 @@ class BookSourceChapterContent {
       // from the content response. The reader can safely fall back to the
       // title already returned by the chapter catalog.
       title: (json['title'] as String?)?.trim() ?? '',
-      content: _requiredString(json, 'content'),
+      content: isImageSequence
+          ? (json['content'] as String? ?? '')
+          : _requiredString(json, 'content'),
       contentType: contentType,
       images: (json['images'] as List? ?? const [])
           .map((value) => BookSourceRemoteImage.fromJson(_jsonMap(value)))

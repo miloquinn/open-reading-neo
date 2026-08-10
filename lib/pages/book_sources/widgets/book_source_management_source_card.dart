@@ -159,6 +159,12 @@ class _SourceSummary extends StatelessWidget {
     final runnable = source.capabilities.isNotEmpty;
     final health = sourceHealthCheckResultOf(source);
     final badges = <Widget>[
+      if (sourceRequiresLogin(source))
+        _MetaPill(
+          label: context.l10n.sourceLoginTitle,
+          icon: Icons.key_rounded,
+          color: scheme.primary,
+        ),
       if (source.sourceProtocol == BookSourceProtocolKind.readingSource &&
           !runnable)
         _MetaPill(
@@ -271,8 +277,7 @@ class _SourceMenu extends StatelessWidget {
             value: BookSourceManagementSourceAction.rights.name,
             child: Text(context.l10n.bookSourcesRightsDetails),
           ),
-        if (source.sourceProtocol == BookSourceProtocolKind.readingSource &&
-            '${source.sourceConfig?['loginUrl'] ?? ''}'.trim().isNotEmpty)
+        if (sourceRequiresLogin(source))
           PopupMenuItem(
             value: BookSourceManagementSourceAction.login.name,
             child: Row(

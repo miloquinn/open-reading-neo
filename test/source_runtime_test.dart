@@ -182,6 +182,42 @@ void main() {
         );
       },
     );
+
+    test(
+      'shared login helpers can call sibling helpers through this',
+      () async {
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['loginUi'] = jsonEncode([
+            {'name': 'account', 'type': 'text'},
+          ])
+          ..['jsLib'] = '''
+          const html = `function toggleLogs() {}`;
+          function getVariable(name) {
+            return source.getLoginInfoMap().get(name);
+          }
+          function getToken() {
+            return this.getVariable('account');
+          }
+        '''
+          ..['loginUrl'] = '''
+          function login() {
+            var info = source.getLoginInfoMap();
+            info.put('token', getToken());
+            source.putLoginInfo(info);
+          }
+        ''';
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final store = _MemoryLoginSessionStore();
+        final runtime = SourceRuntime(loginSessionStore: store);
+        addTearDown(runtime.close);
+
+        await runtime.login(source, const {'account': 'reader'});
+
+        expect((await store.read(source.id)).loginInfo['token'], 'reader');
+      },
+    );
   });
 
   group('SourceRuntime', () {
@@ -449,6 +485,48 @@ void main() {
         expect(content.images.first.headers, {
           'Referer': 'https://books.test/',
         });
+      },
+    );
+
+    test(
+      'accepts image-only Legado chapters, lazy attributes, srcset, and page joins',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/chapter/image-1': '''
+            <div class="pages">
+              <img data-lazy="/images/1.webp">
+              <img data-original="/images/2.webp">
+            </div>
+          ''',
+          'https://books.test/chapter/image-2':
+              '<img srcset="/images/3.webp 1x, /images/3@2x.webp 2x">',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['enabledCookieJar'] = true
+          ..['header'] = {'Referer': 'https://books.test/'}
+          ..['ruleContent'] = {
+            'content': 'class.pages@html',
+            'nextContentUrl': 'a.next@href',
+          };
+        final source = ReadingSourceConfig.fromJson(raw).toRegisteredSource();
+        final runtime = SourceRuntime(
+          transport: transport,
+          loginSessionStore: _MemoryLoginSessionStore(),
+        );
+        addTearDown(runtime.close);
+
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: 'https://books.test/book/1',
+          chapterId: 'https://books.test/chapter/image-1',
+        );
+
+        expect(content.content, contains('data-lazy'));
+        expect(content.images.map((image) => image.url), [
+          Uri.parse('https://books.test/images/1.webp'),
+          Uri.parse('https://books.test/images/2.webp'),
+        ]);
+        expect(content.images.first.headers['Referer'], 'https://books.test/');
       },
     );
 

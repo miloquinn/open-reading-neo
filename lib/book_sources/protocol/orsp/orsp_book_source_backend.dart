@@ -69,11 +69,13 @@ class OrspBookSourceBackend implements OrspBookSourceBackendPort {
   Future<DiscoveredBookSource> discover(String input) async {
     final manifestUrl = normalizeManifestUri(input);
     try {
-      final json = await _pipeline.cachedJson(
-        key: OrspHttpPipeline.discoveryCacheKey(manifestUrl),
-        ttl: discoveryCacheTtl,
-        uri: manifestUrl,
-        validate: BookSourceManifest.fromJson,
+      final json = await _pipeline.withRetries(
+        () => _pipeline.cachedJson(
+          key: OrspHttpPipeline.discoveryCacheKey(manifestUrl),
+          ttl: discoveryCacheTtl,
+          uri: manifestUrl,
+          validate: BookSourceManifest.fromJson,
+        ),
       );
       return DiscoveredBookSource(
         manifestUrl: manifestUrl,

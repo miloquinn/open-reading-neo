@@ -19,13 +19,18 @@ class BookSourceClientResources {
     this._ownsDio,
     this._runtime,
     this._closeDio,
+    this._systemDio,
+    this._ownsSystemDio,
   );
 
   factory BookSourceClientResources.create({
     Dio? dio,
+    Dio? systemDio,
     BookSourceChapterCache? chapterCache,
     BookSourceResponseCache? responseCache,
-    BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
+    BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(
+      allowSyntheticDns: true,
+    ),
     @visibleForTesting Dio Function()? dioFactory,
     @visibleForTesting SourceRuntime? runtime,
     @visibleForTesting SourceRuntime Function()? runtimeFactory,
@@ -40,6 +45,8 @@ class BookSourceClientResources {
     final ownsDio = dio == null;
     final resolvedDio =
         dio ?? (dioFactory ?? () => _createDio(networkPolicy))();
+    final ownsSystemDio = systemDio == null && dio == null;
+    final resolvedSystemDio = systemDio ?? dio ?? _createSystemDio();
     final lazyRuntime = _LazyRuntime(
       injected: runtime,
       factory: runtimeFactory ?? SourceRuntime.new,
@@ -52,6 +59,7 @@ class BookSourceClientResources {
             resolvedDio,
             networkPolicy,
             responseCache ?? BookSourceResponseCache.instance,
+            systemDio: resolvedSystemDio,
           ),
           chapterCache ?? const BookSourceChapterCache(),
         );
@@ -68,6 +76,8 @@ class BookSourceClientResources {
       ownsDio,
       lazyRuntime,
       closeDio ?? _defaultCloseDio,
+      resolvedSystemDio,
+      ownsSystemDio,
     );
   }
 
@@ -77,6 +87,8 @@ class BookSourceClientResources {
   final bool _ownsDio;
   final _LazyRuntime _runtime;
   final void Function(Dio dio, {required bool force}) _closeDio;
+  final Dio _systemDio;
+  final bool _ownsSystemDio;
   bool _closed = false;
 
   void close({bool force = true}) {
@@ -84,6 +96,7 @@ class BookSourceClientResources {
     _closed = true;
     _runtime.closeIfOwned(force: force);
     if (_ownsDio) _closeDio(_dio, force: force);
+    if (_ownsSystemDio) _systemDio.close(force: force);
   }
 
   static Dio _createDio(BookSourceNetworkPolicy networkPolicy) =>
@@ -101,6 +114,18 @@ class BookSourceClientResources {
         ..httpClientAdapter = IOHttpClientAdapter(
           createHttpClient: networkPolicy.createPinnedHttpClient,
         );
+
+  static Dio _createSystemDio() => Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 12),
+      sendTimeout: const Duration(seconds: 8),
+      headers: const {
+        'Accept': 'application/json',
+        'X-Open-Reading-Protocol': openReadingSourceProtocolVersion,
+      },
+    ),
+  );
 
   static void _defaultCloseDio(Dio dio, {required bool force}) {
     dio.close(force: force);

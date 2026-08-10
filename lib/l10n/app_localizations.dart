@@ -575,6 +575,12 @@ abstract class AppLocalizations {
   /// **'No runnable rules'**
   String get bookSourcesPendingCompatibility;
 
+  /// No description provided for @bookSourcesRequiresLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires login'**
+  String get bookSourcesRequiresLogin;
+
   /// No description provided for @bookSourcesManagementSearchHint.
   ///
   /// In en, this message translates to:
@@ -986,6 +992,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not update the source sign-in session: {details}'**
   String sourceLoginFailed(String details);
+
+  /// No description provided for @sourceLoginDiscoveryNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'“{sourceName}” provides sign-in for account-only content.'**
+  String sourceLoginDiscoveryNotice(String sourceName);
 
   /// No description provided for @sourceDebugMenuLabel.
   ///
@@ -4320,6 +4332,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Imported {count} sources'**
   String additionalSourcesImported(int count);
+
+  /// No description provided for @additionalSourcesImportedWithConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} sources; skipped {conflicted} whose id is already registered from a different origin'**
+  String additionalSourcesImportedWithConflicts(int count, int conflicted);
 
   /// Section title grouping donation, about info and contributors
   ///

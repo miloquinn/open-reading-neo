@@ -90,6 +90,76 @@ void main() {
       expect((system.httpClientAdapter as _SequenceAdapter).requests, 0);
     });
 
+    test(
+      'a redirect loop error names each hop that led to it',
+      () async {
+        final adapter = _SelfRedirectAdapter();
+        final dio = Dio()..httpClientAdapter = adapter;
+        final transport = SourceHttpTransport(
+          dio: dio,
+          networkPolicy: BookSourceNetworkPolicy(
+            lookup: (_) async => [InternetAddress('93.184.216.34')],
+          ),
+        );
+        addTearDown(transport.close);
+
+        await expectLater(
+          transport.send(
+            SourceRequestTemplate.parse(
+              'https://books.test/login,{"method":"POST","body":"a=1"}',
+              baseUri: Uri.parse('https://books.test'),
+            ),
+          ),
+          throwsA(
+            isA<BookSourceProtocolException>().having(
+              (error) => error.message,
+              'message',
+              allOf(
+                contains('entered a redirect loop'),
+                contains('POST https://books.test/login -> 302'),
+                contains('GET https://books.test/login -> 302'),
+                contains('anti-bot/challenge'),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'a loop between two different URLs is not mislabeled as a challenge',
+      () async {
+        final adapter = _PingPongRedirectAdapter();
+        final dio = Dio()..httpClientAdapter = adapter;
+        final transport = SourceHttpTransport(
+          dio: dio,
+          networkPolicy: BookSourceNetworkPolicy(
+            lookup: (_) async => [InternetAddress('93.184.216.34')],
+          ),
+        );
+        addTearDown(transport.close);
+
+        await expectLater(
+          transport.send(
+            SourceRequestTemplate.parse(
+              'https://books.test/a',
+              baseUri: Uri.parse('https://books.test'),
+            ),
+          ),
+          throwsA(
+            isA<BookSourceProtocolException>().having(
+              (error) => error.message,
+              'message',
+              allOf(
+                contains('entered a redirect loop'),
+                isNot(contains('anti-bot/challenge')),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
     test('strips authority credentials across redirects', () async {
       final adapter = _RedirectAdapter();
       final dio = Dio()..httpClientAdapter = adapter;
@@ -503,6 +573,53 @@ class _RedirectAdapter implements HttpClientAdapter {
       );
     }
     return ResponseBody.fromString('done', HttpStatus.ok);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// Always redirects back to the exact same URL, the way a bot-challenge edge
+/// that never sets a satisfying cookie would.
+class _SelfRedirectAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      '',
+      HttpStatus.found,
+      headers: {
+        HttpHeaders.locationHeader: ['https://books.test/login'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// Alternates redirecting between two different URLs (A -> B -> A -> ...),
+/// unlike [_SelfRedirectAdapter]'s single-URL bounce.
+class _PingPongRedirectAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final target = options.uri.path.endsWith('/a')
+        ? 'https://books.test/b'
+        : 'https://books.test/a';
+    return ResponseBody.fromString(
+      '',
+      HttpStatus.found,
+      headers: {
+        HttpHeaders.locationHeader: [target],
+      },
+    );
   }
 
   @override

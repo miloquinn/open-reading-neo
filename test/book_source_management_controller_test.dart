@@ -69,6 +69,26 @@ void main() {
     controller.dispose();
   });
 
+  test('the requires-login filter isolates sources with a login script', () {
+    final controller = BookSourceManagementController();
+    final needsLogin = _source(
+      'needs-login',
+      protocol: BookSourceProtocolKind.readingSource,
+      loginUrl: 'function login() {}',
+    );
+    final noLogin = _source(
+      'no-login',
+      protocol: BookSourceProtocolKind.readingSource,
+    );
+    final orspSource = _source('orsp');
+    controller.replaceSources([needsLogin, noLogin, orspSource]);
+
+    controller.setFilter(BookSourceManagementFilter.requiresLogin);
+
+    expect(controller.state.visibleSources, [needsLogin]);
+    controller.dispose();
+  });
+
   test(
     'selection and bulk enable enforce additional-protocol restrictions',
     () async {
@@ -182,6 +202,7 @@ RegisteredBookSource _source(
   String? name,
   bool enabled = true,
   String? group,
+  String? loginUrl,
   BookSourceProtocolKind protocol = BookSourceProtocolKind.orsp,
 }) {
   return RegisteredBookSource(
@@ -198,19 +219,23 @@ RegisteredBookSource _source(
     enabled: enabled,
     addedAt: DateTime.utc(2026),
     sourceProtocol: protocol,
-    sourceConfig: _sourceConfig(protocol, group),
+    sourceConfig: _sourceConfig(protocol, group, loginUrl),
   );
 }
 
 Map<String, dynamic>? _sourceConfig(
   BookSourceProtocolKind protocol,
   String? group,
+  String? loginUrl,
 ) {
-  if (protocol != BookSourceProtocolKind.readingSource && group == null) {
+  if (protocol != BookSourceProtocolKind.readingSource &&
+      group == null &&
+      loginUrl == null) {
     return null;
   }
   final config = <String, dynamic>{};
   if (group != null) config['bookSourceGroup'] = group;
+  if (loginUrl != null) config['loginUrl'] = loginUrl;
   return config;
 }
 

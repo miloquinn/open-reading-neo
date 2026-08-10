@@ -92,6 +92,24 @@ void main() {
     );
   });
 
+  test('adapts Legado inline flags and horizontal whitespace', () {
+    const rule = ReplaceRule(
+      id: 'legado',
+      name: 'legado',
+      pattern: r'广告|(?i)APP\h+下载',
+      replacement: '',
+    );
+    expect(service.applyRules([rule], '广告 APP  下载', bookTitle: '书'), ' ');
+
+    const classRule = ReplaceRule(
+      id: 'legado-class',
+      name: 'legado-class',
+      pattern: r'字[\h\-]数',
+      replacement: '',
+    );
+    expect(service.applyRules([classRule], '字-数 字 数', bookTitle: '书'), ' ');
+  });
+
   test('separates title and content rules', () {
     const titleRule = ReplaceRule(
       id: 'title',

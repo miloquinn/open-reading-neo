@@ -19,12 +19,16 @@ export 'book_source_gateway.dart' show BookSourceGateway, DiscoveredBookSource;
 class BookSourceClient implements BookSourceGateway {
   BookSourceClient({
     Dio? dio,
+    Dio? systemDio,
     BookSourceChapterCache? chapterCache,
     BookSourceResponseCache? responseCache,
-    BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
+    BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(
+      allowSyntheticDns: true,
+    ),
   }) : this._(
          BookSourceClientResources.create(
            dio: dio,
+           systemDio: systemDio,
            chapterCache: chapterCache,
            responseCache: responseCache,
            networkPolicy: networkPolicy,

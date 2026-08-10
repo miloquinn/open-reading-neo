@@ -42,8 +42,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final BookSourceManagementController _controller;
-  bool _protocolCardExpanded = false;
-
   @override
   void initState() {
     super.initState();
@@ -121,6 +119,28 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 title: Text(context.l10n.bookSourcesSelect),
               ),
             ),
+            FloatingSubpageMenuItem(
+              value: _BookSourceHeaderAction.protocolDetails,
+              itemKey: const Key('bookSourcesProtocolButton'),
+              child: ListTile(
+                leading: const Icon(Icons.api_rounded),
+                title: Text(context.l10n.bookSourcesProtocolTitle),
+              ),
+            ),
+            FloatingSubpageMenuItem(
+              value: _BookSourceHeaderAction.protocolRepository,
+              child: ListTile(
+                leading: const Icon(Icons.open_in_new_rounded),
+                title: Text(context.l10n.bookSourcesProtocolRepository),
+              ),
+            ),
+            FloatingSubpageMenuItem(
+              value: _BookSourceHeaderAction.rightsReport,
+              child: ListTile(
+                leading: const Icon(Icons.report_outlined),
+                title: Text(context.l10n.bookSourcesRightsReport),
+              ),
+            ),
           ],
           onSelected: (action) {
             switch (action) {
@@ -128,6 +148,12 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 unawaited(_showAddSourceDialog());
               case _BookSourceHeaderAction.select:
                 _controller.toggleSelectionMode();
+              case _BookSourceHeaderAction.protocolDetails:
+                _showProtocolDialog();
+              case _BookSourceHeaderAction.protocolRepository:
+                unawaited(_openProtocolRepository());
+              case _BookSourceHeaderAction.rightsReport:
+                unawaited(_openRightsReport());
             }
           },
         ),
@@ -141,7 +167,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             searchController: _searchController,
             scrollController: _scrollController,
             additionalProtocolsEnabled: additionalProtocolsEnabled,
-            protocolExpanded: _protocolCardExpanded,
             onQueryChanged: (query) {
               _controller.setQuery(query);
               _resetScroll();
@@ -173,12 +198,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             onSourceEnabledChanged: (source, enabled) =>
                 unawaited(_controller.setSourceEnabled(source, enabled)),
             onSourceAction: _handleSourceAction,
-            onToggleProtocol: () =>
-                setState(() => _protocolCardExpanded = !_protocolCardExpanded),
-            onShowProtocolDetails: _showProtocolDialog,
-            onOpenProtocolRepository: () =>
-                unawaited(_openProtocolRepository()),
-            onOpenRightsReport: () => unawaited(_openRightsReport()),
           ),
         ),
       ),
@@ -501,9 +520,17 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       _controller.replaceSources(result.sources);
       showSideToast(
         context,
-        result.analysis.kind == BookSourceImportKind.orsp
-            ? '${context.l10n.bookSourcesAdded}: ${result.analysis.sources.single.name}'
-            : context.l10n.additionalSourcesImported(result.importedCount),
+        switch (result.analysis.kind) {
+          BookSourceImportKind.orsp =>
+            '${context.l10n.bookSourcesAdded}: ${result.analysis.sources.single.name}',
+          BookSourceImportKind.additional when result.conflictedCount > 0 =>
+            context.l10n.additionalSourcesImportedWithConflicts(
+              result.importedCount,
+              result.conflictedCount,
+            ),
+          BookSourceImportKind.additional => context.l10n
+              .additionalSourcesImported(result.importedCount),
+        },
         kind: SideToastKind.success,
       );
     }
@@ -661,4 +688,10 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 }
 
-enum _BookSourceHeaderAction { add, select }
+enum _BookSourceHeaderAction {
+  add,
+  select,
+  protocolDetails,
+  protocolRepository,
+  rightsReport,
+}

@@ -88,6 +88,7 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
         context,
       ).showSnackBar(SnackBar(content: Text(context.l10n.sourceLoginSaved)));
     } on Object catch (error) {
+      debugPrint('[SourceLoginPage] login failed: $error');
       if (!mounted) return;
       setState(() => _error = _message(error));
     } finally {

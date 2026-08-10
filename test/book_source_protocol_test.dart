@@ -11,6 +11,8 @@ import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_chapter_cache.dart';
 import 'package:xxread/book_sources/services/book_source_network_policy.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
+import 'package:xxread/book_sources/protocol/orsp/orsp_http_pipeline.dart';
+import 'package:xxread/book_sources/services/book_source_response_cache.dart';
 
 class _ManifestClient extends BookSourceClient {
   _ManifestClient(this.source);
@@ -23,6 +25,34 @@ class _ManifestClient extends BookSourceClient {
 
 void main() {
   group('Open Reading Source Protocol', () {
+    test('uses the system client for synthetic DNS discovery', () async {
+      final pinned = _JsonSequenceAdapter(['{}']);
+      final system = _JsonSequenceAdapter([
+        '{"protocol":"open-reading-source","protocolVersion":"1.5","id":"org.example.books","name":"Example Books","apiBaseUrl":"https://example.org/api/","capabilities":["search","detail","catalog","content"]}',
+      ]);
+      final pinnedDio = Dio()..httpClientAdapter = pinned;
+      final systemDio = Dio()..httpClientAdapter = system;
+      final pipeline = OrspHttpPipeline(
+        pinnedDio,
+        BookSourceNetworkPolicy(
+          allowSyntheticDns: true,
+          lookup: (_) async => [InternetAddress('198.18.1.90')],
+        ),
+        BookSourceResponseCache(),
+        systemDio: systemDio,
+      );
+
+      final json = await pipeline.getBounded(
+        Uri.parse('https://example.org/.well-known/open-reading-source.json'),
+      );
+
+      expect((json as Map)['protocol'], 'open-reading-source');
+      expect(pinned.requestCount, 0);
+      expect(system.requestCount, 1);
+      pinnedDio.close(force: true);
+      systemDio.close(force: true);
+    });
+
     test('parses a compatible manifest', () {
       final manifest = BookSourceManifest.fromJson({
         'protocol': 'open-reading-source',
@@ -229,6 +259,26 @@ void main() {
 
       expect(content.title, isEmpty);
       expect(content.content, '<p>Chapter body</p>');
+    });
+
+    test('parses image sequence chapters without text layout payload', () {
+      final content = BookSourceChapterContent.fromJson({
+        'bookId': 'book-1',
+        'chapterId': 'chapter-1',
+        'title': '第 1 话',
+        'contentType': 'image/sequence',
+        'content': '',
+        'images': [
+          {
+            'url': 'https://cdn.example/1.webp',
+            'headers': {'Referer': 'https://example.org/'},
+          },
+        ],
+      });
+
+      expect(content.contentType, 'image/sequence');
+      expect(content.content, isEmpty);
+      expect(content.images, hasLength(1));
     });
 
     test('parses a legacy single-page chapter response', () {

@@ -125,6 +125,7 @@
   "bookSourcesDisabled": "Disabled",
   "bookSourcesRunnable": "Ready to use",
   "bookSourcesPendingCompatibility": "No runnable rules",
+  "bookSourcesRequiresLogin": "Requires login",
   "bookSourcesManagementSearchHint": "Search name, URL, notes, or group",
   "bookSourcesClearSearch": "Clear search",
   "bookSourcesAllGroups": "All groups",
@@ -198,6 +199,8 @@
   "sourceLoginCleared": "Source sign-in session cleared",
   "sourceLoginFailed": "Could not update the source sign-in session: {details}",
   "@sourceLoginFailed": {"placeholders":{"details":{"type":"String"}}},
+  "sourceLoginDiscoveryNotice": "“{sourceName}” provides sign-in for account-only content.",
+  "@sourceLoginDiscoveryNotice": {"placeholders":{"sourceName":{"type":"String"}}},
   "sourceDebugMenuLabel": "Debug",
   "sourceDebugTitle": "Source debugger",
   "sourceDebugInputHint": "Enter a search keyword, or paste a book/catalog/chapter URL",
@@ -2250,6 +2253,8 @@
   "additionalSourcesImportConfirm": "Import all",
   "additionalSourcesImported": "Imported {count} sources",
   "@additionalSourcesImported": {"placeholders":{"count":{"type":"int"}}},
+  "additionalSourcesImportedWithConflicts": "Imported {count} sources; skipped {conflicted} whose id is already registered from a different origin",
+  "@additionalSourcesImportedWithConflicts": {"placeholders":{"count":{"type":"int"},"conflicted":{"type":"int"}}},
   "@settingsSectionGeneral": {
     "description": "Section title grouping language and system toggles"
   },

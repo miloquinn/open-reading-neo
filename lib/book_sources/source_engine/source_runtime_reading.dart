@@ -1,4 +1,6 @@
 import '../models/registered_book_source.dart';
+import 'package:html/dom.dart' as dom;
+import 'package:html/parser.dart' as html_parser;
 import '../protocol/book_source_protocol.dart';
 import 'source_config.dart';
 import 'source_runtime_catalog.dart';
@@ -166,6 +168,7 @@ class SourceRuntimeReading {
     final parts = <String>[];
     final seenPages = <String>{};
     var nextUrl = chapterId;
+    var previousUrl = '';
     for (var hop = 0; hop < _maxPageHops && nextUrl.isNotEmpty; hop++) {
       if (!seenPages.add(nextUrl)) break;
       final response = await _requests.request(
@@ -230,16 +233,20 @@ class SourceRuntimeReading {
         rule,
         'nextContentUrl',
       );
+      if (nextUrl == previousUrl) nextUrl = '';
+      previousUrl = nextUrl;
     }
-    if (parts.isEmpty || parts.every(_looksLikePlaceholderContent)) {
+    final joinedContent = parts.join('\n\n');
+    final imageHeaders = await _requests.sourceHeaders(source);
+    final images = _chapterImages(source, joinedContent, imageHeaders);
+    if ((parts.isEmpty || parts.every(_looksLikePlaceholderContent)) &&
+        images.isEmpty) {
       throw const BookSourceProtocolException(
         'Compatible source did not return chapter content.',
       );
     }
     _state.rememberRuleState(source, bookId, ruleState);
     await _sessions.flush(source);
-    final joinedContent = parts.join('\n\n');
-    final imageHeaders = await _requests.sourceHeaders(source);
     final rememberedChapter = _state.chapterContext(source, bookId, chapterId);
     return BookSourceChapterContent(
       bookId: bookId,
@@ -249,7 +256,7 @@ class SourceRuntimeReading {
           '${rememberedChapter['title'] ?? ''}',
       content: joinedContent,
       contentType: 'text/html',
-      images: _chapterImages(source, joinedContent, imageHeaders),
+      images: images,
     );
   }
 
@@ -293,21 +300,21 @@ class SourceRuntimeReading {
   ) {
     final images = <BookSourceRemoteImage>[];
     final seen = <String>{};
-    final pattern = RegExp(
-      r'''(?:src|data-src|data-original)\s*=\s*(["'])(.*?)\1(?=\s*(?:/?>|[A-Za-z_:][\w:.-]*\s*=))''',
-      caseSensitive: false,
-      dotAll: true,
-    );
-    for (final match in pattern.allMatches(content)) {
-      final asset = parseRemoteAsset(
-        match.group(2)!,
-        source.baseUri,
-        sourceHeaders,
-      );
-      if (asset == null || !seen.add(asset.url.toString())) continue;
+    void addAsset(SourceRuntimeRemoteAsset asset) {
+      final key = asset.url.toString();
       final headers = <String, String>{...asset.headers};
       final cookie = _requests.cookieHeader(source, asset.url);
       if (cookie.isNotEmpty) headers['Cookie'] = cookie;
+      if (!seen.add(key)) {
+        if (headers.isEmpty) return;
+        final index = images.indexWhere((image) => image.url == asset.url);
+        if (index < 0) return;
+        images[index] = BookSourceRemoteImage(
+          url: asset.url,
+          headers: Map.unmodifiable({...images[index].headers, ...headers}),
+        );
+        return;
+      }
       images.add(
         BookSourceRemoteImage(
           url: asset.url,
@@ -315,7 +322,79 @@ class SourceRuntimeReading {
         ),
       );
     }
+
+    final fragment = html_parser.parseFragment(content);
+    const attributeNames = [
+      'src',
+      'data-src',
+      'data-original',
+      'data-original-src',
+      'data-lazy',
+      'data-lazy-src',
+      'data-url',
+      'data-image',
+      'data-srcset',
+      'srcset',
+    ];
+    void visit(Iterable<dom.Node> nodes) {
+      for (final node in nodes) {
+        if (node is dom.Element) {
+          for (final name in attributeNames) {
+            final raw = node.attributes[name];
+            if (raw == null || raw.trim().isEmpty) continue;
+            final value = _firstSrcSetValue(raw);
+            final asset = parseRemoteAsset(
+              value,
+              source.baseUri,
+              sourceHeaders,
+            );
+            if (asset == null) continue;
+            addAsset(asset);
+            break;
+          }
+          visit(node.nodes);
+        }
+      }
+    }
+
+    visit(fragment.nodes);
+    // Legado asset options use a non-HTML suffix such as
+    // `url,{headers:{Referer:'...'}}`; nested quotes make some HTML parsers
+    // truncate the attribute. Recover that narrow legacy shape from the raw
+    // payload after the standards-compliant DOM pass.
+    final legacyPattern = RegExp(
+      r'''(?:src|data-src|data-original|data-original-src|data-lazy|data-lazy-src|data-url|data-image)\s*=\s*(["'])(.*?)\1''',
+      caseSensitive: false,
+      dotAll: true,
+    );
+    for (final match in legacyPattern.allMatches(content)) {
+      final raw = match.group(2)!;
+      if (!raw.contains(RegExp(r',\s*\{'))) continue;
+      final asset = parseRemoteAsset(raw, source.baseUri, sourceHeaders);
+      if (asset == null) continue;
+      addAsset(asset);
+    }
+    final legacyOptionsPattern = RegExp(
+      r'''(?:src|data-src|data-original|data-original-src|data-lazy|data-lazy-src|data-url|data-image)\s*=\s*["'](.*?,\s*\{headers:.*?\}\})["']''',
+      caseSensitive: false,
+      dotAll: true,
+    );
+    for (final match in legacyOptionsPattern.allMatches(content)) {
+      final asset = parseRemoteAsset(
+        match.group(1)!,
+        source.baseUri,
+        sourceHeaders,
+      );
+      if (asset == null) continue;
+      addAsset(asset);
+    }
     return images;
+  }
+
+  String _firstSrcSetValue(String raw) {
+    final first = raw.split(',').first.trim();
+    final whitespace = first.indexOf(RegExp(r'\s'));
+    return whitespace < 0 ? first : first.substring(0, whitespace);
   }
 }
 

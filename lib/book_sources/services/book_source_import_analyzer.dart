@@ -55,7 +55,10 @@ class BookSourceImportAnalyzer {
       final result = await analyzeBytesAsync(bytes, documentUri: uri);
       if (result.kind == BookSourceImportKind.additional &&
           result.additionalPreview!.sources.isEmpty) {
-        final nested = await _additionalImporter.loadUrl(input);
+        final nested = await _additionalImporter.loadUrl(
+          input,
+          initialBytes: bytes,
+        );
         if (nested.sources.isEmpty) {
           throw const FormatException(
             'No recognized book sources were found at this URL.',

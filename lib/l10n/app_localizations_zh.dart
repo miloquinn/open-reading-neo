@@ -274,6 +274,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesPendingCompatibility => '缺少可执行规则';
 
   @override
+  String get bookSourcesRequiresLogin => '需要登录';
+
+  @override
   String get bookSourcesManagementSearchHint => '搜索名称、网址、备注或分组';
 
   @override
@@ -495,6 +498,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String sourceLoginFailed(String details) {
     return '无法更新书源登录会话：$details';
+  }
+
+  @override
+  String sourceLoginDiscoveryNotice(String sourceName) {
+    return '此发现页书源“$sourceName”提供登录功能，登录后才能使用需要账号的内容。';
   }
 
   @override
@@ -2311,6 +2319,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String additionalSourcesImported(int count) {
     return '已导入 $count 个书源';
+  }
+
+  @override
+  String additionalSourcesImportedWithConflicts(int count, int conflicted) {
+    return '已导入 $count 个书源，另有 $conflicted 个因 ID 与已有来源不同而跳过';
   }
 
   @override
@@ -5547,6 +5560,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesPendingCompatibility => '缺少可執行規則';
 
   @override
+  String get bookSourcesRequiresLogin => '需要登入';
+
+  @override
   String get bookSourcesManagementSearchHint => '搜尋名稱、網址、備註或群組';
 
   @override
@@ -5768,6 +5784,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String sourceLoginFailed(String details) {
     return '無法更新書源登入工作階段：$details';
+  }
+
+  @override
+  String sourceLoginDiscoveryNotice(String sourceName) {
+    return '「$sourceName」提供登入功能，登入後才能使用需要帳號的內容。';
   }
 
   @override
@@ -7544,6 +7565,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String additionalSourcesImported(int count) {
     return '已匯入 $count 個書源';
+  }
+
+  @override
+  String additionalSourcesImportedWithConflicts(int count, int conflicted) {
+    return '已匯入 $count 個書源，另有 $conflicted 個因 ID 與現有來源不同而跳過';
   }
 
   @override

@@ -20,6 +20,7 @@ import 'source_login_page.dart';
 import 'widgets/book_source_category_picker.dart';
 import 'widgets/book_source_discovery_sections.dart';
 import 'widgets/book_source_list_directory.dart';
+import 'widgets/book_source_list_reveal.dart';
 import 'models/sourced_book.dart';
 import 'widgets/sourced_book_actions.dart';
 import 'widgets/sourced_book_cards.dart';
@@ -148,6 +149,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   late final BookSourcesPageController _layoutController;
   late final bool _ownsLayoutController;
   late final BookSourcesController _controller;
+  final Set<String> _revealedListSourceIds = <String>{};
+  final Set<String> _revealedBookIds = <String>{};
+  String? _bookRevealScope;
+  double? _listDirectoryScrollOffset;
 
   BookSourcesState get _state => _controller.state;
 
@@ -388,11 +393,21 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
           edgeOffset: useRailNavigation ? 90 : mobileChrome.topBarHeight,
           onRefresh: _refreshCurrentLayout,
           child: listLayout
-              ? Scrollbar(
+              ? RawScrollbar(
                   key: const Key('bookSourceDiscoverListScrollbar'),
                   controller: _scrollController,
                   thumbVisibility: true,
                   interactive: true,
+                  thickness: 4,
+                  radius: const Radius.circular(99),
+                  minThumbLength: 44,
+                  crossAxisMargin: 2,
+                  padding: EdgeInsets.only(
+                    top: useRailNavigation ? 0 : mobileChrome.topBarHeight,
+                    bottom: useRailNavigation
+                        ? 0
+                        : mobileChrome.navContainerHeight,
+                  ),
                   child: scrollView,
                 )
               : scrollView,
@@ -704,7 +719,8 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
           onExpandSource: (group) =>
               unawaited(_controller.expandListSource(group)),
           onSelectCategory: (category) =>
-              unawaited(_controller.selectListCategory(category)),
+              unawaited(_selectListCategory(category)),
+          shouldAnimateSource: _revealedListSourceIds.add,
         ),
       ];
     }
@@ -714,7 +730,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         BookSourceListSelectionHeader(
           category: _state.selectedCategory!,
           changeLabel: context.l10n.bookSourceChangeChannel,
-          onChange: _controller.returnToListDirectory,
+          onChange: _returnToListDirectory,
         ),
         bottomPadding: 12,
       ),
@@ -725,6 +741,30 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   void _clearListSourceSearch() {
     _listSourceSearchController.clear();
     _controller.setListSourceQuery('');
+  }
+
+  Future<void> _selectListCategory(SourcedBookCategory category) async {
+    if (_scrollController.hasClients) {
+      _listDirectoryScrollOffset = _scrollController.offset;
+      _scrollController.jumpTo(0);
+    }
+    await _controller.selectListCategory(category);
+  }
+
+  void _returnToListDirectory() {
+    if (_scrollController.hasClients && _scrollController.offset != 0) {
+      _scrollController.jumpTo(0);
+    }
+    _controller.returnToListDirectory();
+    final target = _listDirectoryScrollOffset;
+    if (target == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      _scrollController.jumpTo(
+        target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    });
   }
 
   Widget _buildCategoryChannels(
@@ -766,20 +806,43 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   }) {
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      sliver: SliverList.separated(
-        itemCount: books.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          final result = books[index];
-          return _centerSectionChild(
-            SourcedBookListTile(
-              result: result,
-              onTap: () => _actions.showBookDetails(result),
-            ),
-          );
-        },
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, childIndex) {
+            if (childIndex.isOdd) return const SizedBox(height: 10);
+            final index = childIndex ~/ 2;
+            final result = books[index];
+            return BookSourceListReveal(
+              key: Key(
+                'bookSourceBookReveal-${result.source.id}-${result.book.id}',
+              ),
+              animate: _shouldAnimateBook(result),
+              order: index,
+              child: _centerSectionChild(
+                SourcedBookListTile(
+                  result: result,
+                  onTap: () => _actions.showBookDetails(result),
+                ),
+              ),
+            );
+          },
+          childCount: books.isEmpty ? 0 : (books.length * 2) - 1,
+          addAutomaticKeepAlives: false,
+        ),
       ),
     );
+  }
+
+  bool _shouldAnimateBook(SourcedBook result) {
+    final category = _state.selectedCategory;
+    final scope = category == null
+        ? '${_state.section.name}\u0000${_state.selectedSourceId ?? ''}'
+        : '${category.source.id}\u0000${category.id}';
+    if (_bookRevealScope != scope) {
+      _bookRevealScope = scope;
+      _revealedBookIds.clear();
+    }
+    return _revealedBookIds.add('${result.source.id}\u0000${result.book.id}');
   }
 
   Widget _paddedSectionSliver(

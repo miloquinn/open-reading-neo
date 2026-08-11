@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
+import 'package:xxread/pages/book_sources/widgets/book_source_list_reveal.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_cards.dart';
 
 class BookSourceListDirectory extends StatelessWidget {
@@ -18,6 +19,7 @@ class BookSourceListDirectory extends StatelessWidget {
   final ValueChanged<BookSourceListChannels> onToggleSource;
   final ValueChanged<BookSourceListChannels> onExpandSource;
   final ValueChanged<SourcedBookCategory> onSelectCategory;
+  final bool Function(String sourceId) shouldAnimateSource;
 
   const BookSourceListDirectory({
     super.key,
@@ -36,53 +38,69 @@ class BookSourceListDirectory extends StatelessWidget {
     required this.onToggleSource,
     required this.onExpandSource,
     required this.onSelectCategory,
+    required this.shouldAnimateSource,
   });
 
   @override
   Widget build(BuildContext context) {
     final itemCount = filteredGroups.isEmpty ? 2 : filteredGroups.length + 1;
+    final childCount = itemCount == 0 ? 0 : (itemCount * 2) - 1;
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      sliver: SliverList.separated(
+      sliver: SliverList(
         key: const Key('bookSourceListLayoutDirectory'),
-        itemCount: itemCount,
-        separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          final child = switch (index) {
-            0 => _SearchField(
-              controller: searchController,
-              groups: groups,
-              filteredGroups: filteredGroups,
-              query: state.listSourceQuery,
-              hint: searchHint,
-              clearTooltip: clearSearchTooltip,
-              onChanged: onQueryChanged,
-              onClear: onClearQuery,
-              onSubmitted: () {
-                if (filteredGroups.isNotEmpty) {
-                  onExpandSource(filteredGroups.first);
-                }
-              },
-            ),
-            1 when filteredGroups.isEmpty => _EmptySearch(
-              label: noMatchesLabel,
-              resetLabel: resetFiltersLabel,
-              onReset: onClearQuery,
-            ),
-            _ => _sourceEntry(filteredGroups[index - 1]),
-          };
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1048),
-              child: child,
-            ),
-          );
-        },
+        delegate: SliverChildBuilderDelegate(
+          (context, childIndex) {
+            if (childIndex.isOdd) return const SizedBox(height: 10);
+            final index = childIndex ~/ 2;
+            final child = switch (index) {
+              0 => _SearchField(
+                controller: searchController,
+                groups: groups,
+                filteredGroups: filteredGroups,
+                query: state.listSourceQuery,
+                hint: searchHint,
+                clearTooltip: clearSearchTooltip,
+                onChanged: onQueryChanged,
+                onClear: onClearQuery,
+                onSubmitted: () {
+                  if (filteredGroups.isNotEmpty) {
+                    onExpandSource(filteredGroups.first);
+                  }
+                },
+              ),
+              1 when filteredGroups.isEmpty => _EmptySearch(
+                label: noMatchesLabel,
+                resetLabel: resetFiltersLabel,
+                onReset: onClearQuery,
+              ),
+              _ => BookSourceListReveal(
+                key: Key(
+                  'bookSourceListReveal-${filteredGroups[index - 1].source.id}',
+                ),
+                animate: shouldAnimateSource(
+                  filteredGroups[index - 1].source.id,
+                ),
+                order: index - 1,
+                child: _sourceEntry(filteredGroups[index - 1]),
+              ),
+            };
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1048),
+                child: child,
+              ),
+            );
+          },
+          childCount: childCount,
+          addAutomaticKeepAlives: false,
+        ),
       ),
     );
   }
 
   Widget _sourceEntry(BookSourceListChannels group) => _SourceEntry(
+    key: ValueKey('bookSourceListEntry-${group.source.id}'),
     group: group,
     expanded: state.expandedListSourceId == group.source.id,
     loading: state.loadingListChannelSources.contains(group.source.id),
@@ -268,7 +286,7 @@ class _EmptySearch extends StatelessWidget {
   }
 }
 
-class _SourceEntry extends StatelessWidget {
+class _SourceEntry extends StatefulWidget {
   final BookSourceListChannels group;
   final bool expanded;
   final bool loading;
@@ -281,6 +299,7 @@ class _SourceEntry extends StatelessWidget {
   final ValueChanged<SourcedBookCategory> onSelectCategory;
 
   const _SourceEntry({
+    super.key,
     required this.group,
     required this.expanded,
     required this.loading,
@@ -294,124 +313,317 @@ class _SourceEntry extends StatelessWidget {
   });
 
   @override
+  State<_SourceEntry> createState() => _SourceEntryState();
+}
+
+class _SourceEntryState extends State<_SourceEntry>
+    with TickerProviderStateMixin {
+  AnimationController? _expansionController;
+  bool _contentVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentVisible = widget.expanded;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SourceEntry oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.expanded == widget.expanded) return;
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      _disposeExpansionController();
+      _contentVisible = widget.expanded;
+      return;
+    }
+    if (widget.expanded) {
+      _contentVisible = true;
+      _ensureExpansionController().forward();
+    } else {
+      final controller = _expansionController;
+      if (controller == null) {
+        _contentVisible = false;
+        return;
+      }
+      controller.reverse();
+    }
+  }
+
+  AnimationController _ensureExpansionController() {
+    return _expansionController ??= AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      reverseDuration: const Duration(milliseconds: 180),
+    )..addStatusListener(_handleExpansionStatus);
+  }
+
+  void _handleExpansionStatus(AnimationStatus status) {
+    if (status != AnimationStatus.dismissed || widget.expanded || !mounted) {
+      return;
+    }
+    setState(() {
+      _contentVisible = false;
+      _disposeExpansionController();
+    });
+  }
+
+  void _disposeExpansionController() {
+    _expansionController
+      ?..removeStatusListener(_handleExpansionStatus)
+      ..dispose();
+    _expansionController = null;
+  }
+
+  @override
+  void dispose() {
+    _disposeExpansionController();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
-      child: Container(
-        key: Key('bookSourceListSource-${group.source.id}'),
-        decoration: bookSourcePanelDecoration(context, radius: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: onToggle,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 15,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.rss_feed_rounded, color: scheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              group.source.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final controller = _expansionController;
+    return Container(
+      key: Key('bookSourceListSource-${widget.group.source.id}'),
+      decoration: bookSourcePanelDecoration(context, radius: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('bookSourceListSourceToggle-${widget.group.source.id}'),
+              borderRadius: BorderRadius.circular(18),
+              onTap: widget.onToggle,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 15,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.rss_feed_rounded, color: scheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.group.source.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              loaded
-                                  ? channelCountLabel(group.channels.length)
-                                  : group.source.apiBaseUrl.host,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: scheme.onSurfaceVariant,
-                              ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.loaded
+                                ? widget.channelCountLabel(
+                                    widget.group.channels.length,
+                                  )
+                                : widget.group.source.apiBaseUrl.host,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurfaceVariant,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      Icon(
-                        expanded
-                            ? Icons.expand_less_rounded
-                            : Icons.expand_more_rounded,
+                    ),
+                    AnimatedRotation(
+                      turns: widget.expanded ? 0.5 : 0,
+                      duration: reduceMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        Icons.expand_more_rounded,
                         color: scheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            if (expanded) ...[
-              Divider(height: 1, color: scheme.outlineVariant),
-              if (loading)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(
-                    child: SizedBox.square(
-                      dimension: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.4),
-                    ),
-                  ),
-                )
-              else if (error != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        error.toString(),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: scheme.error, fontSize: 12),
-                      ),
-                      const SizedBox(height: 6),
-                      TextButton.icon(
-                        onPressed: onRetry,
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: Text(retryLabel),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final channel in group.channels)
-                        ActionChip(
-                          key: Key(
-                            'bookSourceListChannel-${channel.source.id}-${channel.id}',
-                          ),
-                          label: Text(channel.name),
-                          onPressed: () => onSelectCategory(channel),
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ],
+          ),
+          if (_contentVisible)
+            _buildExpandedTransition(
+              context,
+              controller: controller,
+              reduceMotion: reduceMotion,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpandedTransition(
+    BuildContext context, {
+    required AnimationController? controller,
+    required bool reduceMotion,
+  }) {
+    final child = _ExpandedSourceBody(
+      loading: widget.loading,
+      error: widget.error,
+      group: widget.group,
+      retryLabel: widget.retryLabel,
+      onRetry: widget.onRetry,
+      onSelectCategory: widget.onSelectCategory,
+    );
+    if (reduceMotion || controller == null) return child;
+    final animation = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return ClipRect(
+      child: SizeTransition(
+        sizeFactor: animation,
+        alignment: Alignment.topCenter,
+        child: FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, -0.035),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
         ),
       ),
     );
   }
+}
+
+class _ExpandedSourceBody extends StatelessWidget {
+  const _ExpandedSourceBody({
+    required this.loading,
+    required this.error,
+    required this.group,
+    required this.retryLabel,
+    required this.onRetry,
+    required this.onSelectCategory,
+  });
+
+  static const int _lazyChannelThreshold = 20;
+  static const double _lazyChannelHeight = 280;
+
+  final bool loading;
+  final Object? error;
+  final BookSourceListChannels group;
+  final String retryLabel;
+  final VoidCallback onRetry;
+  final ValueChanged<SourcedBookCategory> onSelectCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Divider(height: 1, color: scheme.outlineVariant),
+        AnimatedSize(
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          clipBehavior: Clip.hardEdge,
+          child: AnimatedSwitcher(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 160),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.025),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            ),
+            child: _body(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _body(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (loading) {
+      return const Padding(
+        key: ValueKey('loading'),
+        padding: EdgeInsets.all(20),
+        child: Center(
+          child: SizedBox.square(
+            dimension: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
+    }
+    if (error != null) {
+      return Padding(
+        key: const ValueKey('error'),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              error.toString(),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: scheme.error, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(retryLabel),
+            ),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      key: const ValueKey('channels'),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+      child: group.channels.length > _lazyChannelThreshold
+          ? SizedBox(
+              key: const Key('bookSourceListLazyChannels'),
+              height: _lazyChannelHeight,
+              child: ListView.separated(
+                primary: false,
+                itemCount: group.channels.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 4),
+                itemBuilder: (context, index) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: _channelChip(group.channels[index]),
+                ),
+              ),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final channel in group.channels) _channelChip(channel),
+              ],
+            ),
+    );
+  }
+
+  Widget _channelChip(SourcedBookCategory channel) => ActionChip(
+    key: Key('bookSourceListChannel-${channel.source.id}-${channel.id}'),
+    label: Text(channel.name),
+    onPressed: () => onSelectCategory(channel),
+  );
 }

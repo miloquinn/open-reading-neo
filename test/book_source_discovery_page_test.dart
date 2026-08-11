@@ -216,7 +216,7 @@ void main() {
       find.byKey(const Key('bookSourceListLayoutDirectory')),
       findsOneWidget,
     );
-    final scrollbar = tester.widget<Scrollbar>(
+    final scrollbar = tester.widget<RawScrollbar>(
       find.byKey(const Key('bookSourceDiscoverListScrollbar')),
     );
     final scrollView = tester.widget<CustomScrollView>(
@@ -225,6 +225,8 @@ void main() {
     expect(scrollbar.thumbVisibility, isTrue);
     expect(scrollbar.interactive, isTrue);
     expect(scrollbar.controller, same(scrollView.controller));
+    expect(scrollbar.padding, isNotNull);
+    expect(scrollbar.padding!.resolve(TextDirection.ltr).top, greaterThan(0));
     expect(
       find.byKey(const Key('bookSourceDiscoverScopeControl')),
       findsNothing,
@@ -232,7 +234,21 @@ void main() {
     expect(client.categoryBrowseSourceIds, isEmpty);
     expect(client.categoryLoadSourceIds, isEmpty);
 
-    await tester.tap(find.byKey(const Key('bookSourceListSource-source-b')));
+    await tester.tap(
+      find.byKey(const Key('bookSourceListSourceToggle-source-b')),
+    );
+    await tester.pump();
+    final expandingSource = find.descendant(
+      of: find.byKey(const Key('bookSourceListSource-source-b')),
+      matching: find.byType(SizeTransition),
+    );
+    expect(expandingSource, findsOneWidget);
+    expect(tester.widget<SizeTransition>(expandingSource).sizeFactor.value, 0);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.widget<SizeTransition>(expandingSource).sizeFactor.value,
+      inExclusiveRange(0, 1),
+    );
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
@@ -243,6 +259,20 @@ void main() {
       findsNothing,
     );
     expect(client.categoryLoadSourceIds, ['source-b']);
+
+    await tester.tap(
+      find.byKey(const Key('bookSourceListSourceToggle-source-b')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('bookSourceListSourceToggle-source-b')),
+    );
+    await tester.pumpAndSettle();
 
     await tester.tap(
       find.byKey(const Key('bookSourceListChannel-source-b-source-b-fiction')),
@@ -363,6 +393,77 @@ void main() {
     );
     expect(find.text('2/2'), findsOneWidget);
   });
+
+  testWidgets(
+    'list category selection starts below the header and restores directory scroll',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 700);
+      addTearDown(tester.view.reset);
+
+      final sources = List.generate(
+        30,
+        (index) => _source('source-$index', 'Source $index'),
+        growable: false,
+      );
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode(
+          sources.map((source) => source.toJson()).toList(),
+        ),
+        BookSourcesPageController.preferenceKey: 'list',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: _DiscoveryClient())),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollViewFinder = find.byKey(
+        const Key('bookSourceDiscoverScrollView'),
+      );
+      final scrollView = tester.widget<CustomScrollView>(scrollViewFinder);
+      final controller = scrollView.controller!;
+      final sourceToggle = find.byKey(
+        const Key('bookSourceListSourceToggle-source-20'),
+      );
+      await tester.scrollUntilVisible(
+        sourceToggle,
+        500,
+        scrollable: find
+            .descendant(of: scrollViewFinder, matching: find.byType(Scrollable))
+            .first,
+      );
+      final directoryOffset = controller.offset;
+      expect(directoryOffset, greaterThan(0));
+
+      await tester.tap(sourceToggle);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const Key('bookSourceListChannel-source-20-source-20-fiction'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.offset, 0);
+      expect(
+        tester
+            .getTopLeft(find.byKey(const Key('bookSourceListSelectionHeader')))
+            .dy,
+        greaterThan(0),
+      );
+
+      await tester.tap(find.byKey(const Key('bookSourceListChangeChannel')));
+      await tester.pumpAndSettle();
+      expect(controller.offset, closeTo(directoryOffset, 1));
+      expect(sourceToggle, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'large source libraries start scoped and build source chips lazily',
@@ -613,6 +714,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(client.lastCategoryId, 'category-499');
     expect(find.text('Category 499'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('list layout lazily builds large expanded channel sets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 700);
+    addTearDown(tester.view.reset);
+
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+      BookSourcesPageController.preferenceKey: 'list',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: _LargeCategoryDiscoveryClient()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bookSourceListSource-source-a')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bookSourceListLazyChannels')), findsOneWidget);
+    expect(find.byType(ActionChip).evaluate().length, lessThan(30));
+    expect(find.text('Category 000'), findsOneWidget);
+    expect(find.text('Category 499'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

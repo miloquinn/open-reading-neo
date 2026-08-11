@@ -34,6 +34,10 @@ class PagedImageReader extends StatefulWidget {
     required this.loadPage,
     this.onPageChanged,
     this.bookId,
+    this.settingsId,
+    this.onReachedEnd,
+    this.onReachedStart,
+    this.onTableOfContents,
   });
 
   final String title;
@@ -42,6 +46,12 @@ class PagedImageReader extends StatefulWidget {
   final Future<Uint8List> Function(int index) loadPage;
   final ValueChanged<int>? onPageChanged;
   final int? bookId;
+
+  /// Stable string identity for non-local books (online source + book ID).
+  final String? settingsId;
+  final VoidCallback? onReachedEnd;
+  final VoidCallback? onReachedStart;
+  final VoidCallback? onTableOfContents;
 
   @override
   State<PagedImageReader> createState() => _PagedImageReaderState();
@@ -54,6 +64,7 @@ class _PagedImageReaderState extends State<PagedImageReader> {
   late final PageController _pageController;
   late int _currentPage;
   bool _chromeVisible = false;
+  bool _boundaryHandled = false;
 
   /// 任一页处于放大状态时禁用 PageView 滑动，把手势留给平移。
   bool _zoomed = false;
@@ -86,7 +97,9 @@ class _PagedImageReaderState extends State<PagedImageReader> {
 
   Future<void> _restoreSettings() async {
     final zones = await const ReaderSettingsStore().loadTapZones();
-    final direction = await _settingsStore.loadDirection(widget.bookId);
+    final direction = widget.settingsId == null
+        ? await _settingsStore.loadDirection(widget.bookId)
+        : await _settingsStore.loadDirectionForKey(widget.settingsId);
     final background = await _settingsStore.loadBackground();
     if (!mounted) return;
     setState(() {
@@ -113,9 +126,26 @@ class _PagedImageReaderState extends State<PagedImageReader> {
   }
 
   void _onPageChanged(int index) {
+    _boundaryHandled = false;
     setState(() => _currentPage = index);
     _preloadAround(index);
     widget.onPageChanged?.call(index);
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollEndNotification) _boundaryHandled = false;
+    if (notification is! OverscrollNotification || _boundaryHandled) {
+      return false;
+    }
+    if (_currentPage == 0 && widget.onReachedStart != null) {
+      _boundaryHandled = true;
+      widget.onReachedStart!();
+    } else if (_currentPage == widget.pageCount - 1 &&
+        widget.onReachedEnd != null) {
+      _boundaryHandled = true;
+      widget.onReachedEnd!();
+    }
+    return false;
   }
 
   void _setZoomed(bool zoomed) {
@@ -137,9 +167,21 @@ class _PagedImageReaderState extends State<PagedImageReader> {
     }
   }
 
-  void _goToNextPage() => _goToPage(_currentPage + 1);
+  void _goToNextPage() {
+    if (_currentPage >= widget.pageCount - 1) {
+      widget.onReachedEnd?.call();
+      return;
+    }
+    _goToPage(_currentPage + 1);
+  }
 
-  void _goToPreviousPage() => _goToPage(_currentPage - 1);
+  void _goToPreviousPage() {
+    if (_currentPage <= 0) {
+      widget.onReachedStart?.call();
+      return;
+    }
+    _goToPage(_currentPage - 1);
+  }
 
   void _handleTap(Offset position, Size size) {
     if (_chromeVisible) {
@@ -168,7 +210,11 @@ class _PagedImageReaderState extends State<PagedImageReader> {
   Future<void> _toggleDirection() async {
     final next = _rtl ? ImageReaderDirection.ltr : ImageReaderDirection.rtl;
     setState(() => _direction = next);
-    await _settingsStore.saveDirection(widget.bookId, next);
+    if (widget.settingsId == null) {
+      await _settingsStore.saveDirection(widget.bookId, next);
+    } else {
+      await _settingsStore.saveDirectionForKey(widget.settingsId, next);
+    }
   }
 
   Future<void> _setBackground(ImageReaderBackground background) async {
@@ -326,18 +372,21 @@ class _PagedImageReaderState extends State<PagedImageReader> {
                 behavior: HitTestBehavior.opaque,
                 onTapUp: (details) =>
                     _handleTap(details.localPosition, constraints.biggest),
-                child: PageView.builder(
-                  controller: _pageController,
-                  reverse: _rtl,
-                  physics: _zoomed
-                      ? const NeverScrollableScrollPhysics()
-                      : const PageScrollPhysics(),
-                  itemCount: widget.pageCount,
-                  onPageChanged: _onPageChanged,
-                  itemBuilder: (context, index) => _ZoomablePageView(
-                    bytes: widget.loadPage(index),
-                    onZoomChanged: _setZoomed,
-                    lightBackground: _background.isLight,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _handleScrollNotification,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    reverse: _rtl,
+                    physics: _zoomed
+                        ? const NeverScrollableScrollPhysics()
+                        : const PageScrollPhysics(),
+                    itemCount: widget.pageCount,
+                    onPageChanged: _onPageChanged,
+                    itemBuilder: (context, index) => _ZoomablePageView(
+                      bytes: widget.loadPage(index),
+                      onZoomChanged: _setZoomed,
+                      lightBackground: _background.isLight,
+                    ),
                   ),
                 ),
               ),
@@ -452,6 +501,12 @@ class _PagedImageReaderState extends State<PagedImageReader> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
+                        if (widget.onTableOfContents != null)
+                          _ChromeAction(
+                            icon: Icons.list_alt_rounded,
+                            label: l10n.readerToolbarTOC,
+                            onTap: widget.onTableOfContents!,
+                          ),
                         _ChromeAction(
                           icon: Icons.swap_horiz,
                           label: _rtl
@@ -744,11 +799,13 @@ class PagedReaderMessageScaffold extends StatelessWidget {
     required this.title,
     required this.message,
     required this.palette,
+    this.onRetry,
   });
 
   final String title;
   final String message;
   final ReaderThemePalette palette;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -782,6 +839,14 @@ class PagedReaderMessageScaffold extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: TextStyle(color: palette.text, height: 1.4),
                         ),
+                        if (onRetry != null) ...[
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: onRetry,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: Text(context.l10n.retry),
+                          ),
+                        ],
                       ],
                     ),
                   ),

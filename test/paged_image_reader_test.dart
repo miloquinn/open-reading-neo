@@ -25,6 +25,9 @@ Widget _buildReader({
   required List<int> requested,
   ValueChanged<int>? onPageChanged,
   int? bookId,
+  String? settingsId,
+  VoidCallback? onReachedEnd,
+  VoidCallback? onReachedStart,
 }) {
   return MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -40,6 +43,9 @@ Widget _buildReader({
         },
         onPageChanged: onPageChanged,
         bookId: bookId,
+        settingsId: settingsId,
+        onReachedEnd: onReachedEnd,
+        onReachedStart: onReachedStart,
       ),
     ),
   );
@@ -144,6 +150,30 @@ void main() {
 
     expect(changes, [1]);
     expect(find.text('2 / 3'), findsOneWidget);
+    await _unmountReader(tester);
+  });
+
+  testWidgets('边界翻页交给章节会话，不重复触发页码变化', (tester) async {
+    final requested = <int>[];
+    var reachedStart = 0;
+    var reachedEnd = 0;
+    await tester.pumpWidget(
+      _buildReader(
+        pageCount: 1,
+        initialPage: 0,
+        requested: requested,
+        onReachedStart: () => reachedStart++,
+        onReachedEnd: () => reachedEnd++,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapAndSettle(tester, const Offset(100, 300));
+    await _tapAndSettle(tester, const Offset(700, 300));
+
+    expect(reachedStart, 1);
+    expect(reachedEnd, 1);
+    expect(find.text('1 / 1'), findsOneWidget);
     await _unmountReader(tester);
   });
 

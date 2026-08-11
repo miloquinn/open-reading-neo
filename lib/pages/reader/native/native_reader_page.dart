@@ -19,6 +19,7 @@ import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'package:xxread/core/reader/canonical_locator.dart';
+import 'package:xxread/core/reader/horizontal_page_turn_tracker.dart';
 import 'package:xxread/core/reader/android_reader_aloud_notification.dart';
 import 'package:xxread/core/reader/indexed_text_reader.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
@@ -218,7 +219,10 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _horizontalBackwardExpansionWarmPending = false;
   bool _horizontalForwardExpansionPending = false;
   bool _horizontalForwardContractionPending = false;
-  _PendingHorizontalPage? _pendingHorizontalPage;
+  final HorizontalPageTurnTracker<_BookPageRef> _horizontalPageTurnTracker =
+      HorizontalPageTurnTracker<_BookPageRef>();
+  PendingHorizontalPage<_BookPageRef>? get _pendingHorizontalPage =>
+      _horizontalPageTurnTracker.pending;
   _PendingHorizontalForwardBoundary? _pendingHorizontalForwardBoundary;
   final ItemScrollController _verticalPageScrollController =
       ItemScrollController();

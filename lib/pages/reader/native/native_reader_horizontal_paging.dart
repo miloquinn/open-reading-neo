@@ -35,7 +35,7 @@ extension _NativeReaderHorizontalPaging on _NativeReaderPageState {
     _horizontalBackwardExpansionWarmPending = false;
     _horizontalForwardExpansionPending = false;
     _horizontalForwardContractionPending = false;
-    _pendingHorizontalPage = null;
+    _horizontalPageTurnTracker.clear();
     _pendingHorizontalForwardBoundary = null;
   }
 

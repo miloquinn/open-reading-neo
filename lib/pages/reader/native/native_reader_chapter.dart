@@ -302,16 +302,6 @@ class _BookPageRef {
   final bool isForwardBoundary;
 }
 
-class _PendingHorizontalPage {
-  const _PendingHorizontalPage({
-    required this.page,
-    required this.pagesReadDelta,
-  });
-
-  final _BookPageRef page;
-  final int pagesReadDelta;
-}
-
 class _PendingHorizontalForwardBoundary {
   const _PendingHorizontalForwardBoundary({
     required this.controllerPage,

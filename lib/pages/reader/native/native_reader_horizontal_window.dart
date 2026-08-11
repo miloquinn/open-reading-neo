@@ -5,7 +5,7 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
     int controllerPage,
     _BookPageRef boundary,
   ) {
-    _pendingHorizontalPage = null;
+    _horizontalPageTurnTracker.clear();
     _pendingHorizontalForwardBoundary = _PendingHorizontalForwardBoundary(
       controllerPage: controllerPage,
       chapterIndex: boundary.chapterIndex,
@@ -96,19 +96,16 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
         pageController?.hasClients == true &&
         pageController!.position.isScrollingNotifier.value;
     if (isActiveHorizontalTurn) {
-      final lastObservedPage = _pendingHorizontalPage?.page;
-      final referenceChapterIndex =
-          lastObservedPage?.chapterIndex ?? _chapterIndex;
-      final referencePageIndex = lastObservedPage?.pageIndex ?? _pageIndex;
-      final movedForward =
-          page.chapterIndex > referenceChapterIndex ||
-          (page.chapterIndex == referenceChapterIndex &&
-              page.pageIndex > referencePageIndex);
-      _pendingHorizontalPage = _PendingHorizontalPage(
+      _horizontalPageTurnTracker.record(
         page: page,
-        pagesReadDelta:
-            (_pendingHorizontalPage?.pagesReadDelta ?? 0) +
-            (movedForward ? 1 : 0),
+        position: ReaderPagePosition(
+          chapterIndex: page.chapterIndex,
+          pageIndex: page.pageIndex,
+        ),
+        committedPosition: ReaderPagePosition(
+          chapterIndex: _chapterIndex,
+          pageIndex: _pageIndex,
+        ),
       );
       debugPrint(
         '[reader-horizontal] defer page state until idle '
@@ -168,9 +165,8 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
   }
 
   void _publishPendingHorizontalPage(List<_NativeChapter> chapters) {
-    final pending = _pendingHorizontalPage;
+    final pending = _horizontalPageTurnTracker.take();
     if (pending == null) return;
-    _pendingHorizontalPage = null;
     _publishBookPageChanged(
       pending.page,
       chapters,

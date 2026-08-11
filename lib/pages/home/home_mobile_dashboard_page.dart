@@ -12,6 +12,7 @@ import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/core/reader/native_reader_service.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
 import 'package:xxread/pages/reading_stats/detailed_stats_page.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/library/library_event_bus_service.dart';
@@ -121,9 +122,20 @@ class HomeMobileDashboardPage extends StatefulWidget {
     ReaderThemePalette? initialTheme,
   }) {
     if (!book.isOnline) return null;
+    final source = shelfService.sourceFrom(book);
+    final sourceBook = shelfService.sourceBookFrom(book);
+    if (isOnlineComicSource(source, sourceBook)) {
+      return OnlineComicReaderPage(
+        source: source,
+        book: sourceBook,
+        client: client,
+        shelfService: shelfService,
+        initialTheme: initialTheme,
+      );
+    }
     return BookSourceReaderPage(
-      source: shelfService.sourceFrom(book),
-      book: shelfService.sourceBookFrom(book),
+      source: source,
+      book: sourceBook,
       client: client,
       shelfService: shelfService,
       initialTheme: initialTheme,

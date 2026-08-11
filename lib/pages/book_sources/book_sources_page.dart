@@ -16,6 +16,7 @@ import 'package:xxread/utils/page_style_helper.dart';
 import 'book_source_management_page.dart';
 import 'controllers/book_sources_controller.dart';
 import 'source_search_page.dart';
+import 'source_login_page.dart';
 import 'widgets/book_source_category_picker.dart';
 import 'widgets/book_source_discovery_sections.dart';
 import 'widgets/book_source_list_directory.dart';
@@ -279,6 +280,14 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     );
   }
 
+  Future<void> _openSourceLogin(RegisteredBookSource source) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SourceLoginPage(source: source, client: _client),
+      ),
+    );
+  }
+
   Future<void> _refreshCurrentLayout() async {
     await _controller.refresh();
   }
@@ -392,6 +401,51 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     );
   }
 
+  RegisteredBookSource? get _selectedLoginSource {
+    final id = _state.selectedSourceId;
+    if (id == null) return null;
+    final source = _state.discoverySources
+        .where((candidate) => candidate.id == id)
+        .firstOrNull;
+    if (source?.sourceProtocol != BookSourceProtocolKind.readingSource ||
+        '${source?.sourceConfig?['loginUrl'] ?? ''}'.trim().isEmpty) {
+      return null;
+    }
+    return source;
+  }
+
+  String? _loginPromptKey;
+
+  void _maybePromptForLogin(Object error) {
+    final source = _selectedLoginSource;
+    if (source == null || !mounted) return;
+    final key = '${source.id}:${error.toString()}';
+    if (_loginPromptKey == key) return;
+    _loginPromptKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final shouldLogin = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(context.l10n.sourceLoginTitle),
+          content: Text(context.l10n.sourceLoginDiscoveryNotice(source.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.login_rounded),
+              label: Text(context.l10n.sourceLoginTitle),
+            ),
+          ],
+        ),
+      );
+      if (shouldLogin == true && mounted) await _openSourceLogin(source);
+    });
+  }
+
   List<Widget> _buildSectionSlivers(double bottomPadding) {
     if (_state.loadingSources) {
       return [
@@ -425,6 +479,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       ];
     }
     if (cache.error != null) {
+      _maybePromptForLogin(cache.error!);
       return [
         _paddedSectionSliver(
           BookSourceMessageCard(

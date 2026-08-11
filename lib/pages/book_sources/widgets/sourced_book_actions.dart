@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_transitions.dart';
@@ -57,13 +58,21 @@ class SourcedBookActions {
 
   Future<void> _openReader(SourcedBook result) async {
     if (!context.mounted) return;
+    final reader = isOnlineComicSource(result.source, result.book)
+        ? OnlineComicReaderPage(
+            source: result.source,
+            book: result.book,
+            client: client,
+            shelfService: shelfService,
+          )
+        : BookSourceReaderPage(
+            source: result.source,
+            book: result.book,
+            client: client,
+            shelfService: shelfService,
+          );
     final route = BookOpenTransition.createRoute<void>(
-      BookSourceReaderPage(
-        source: result.source,
-        book: result.book,
-        client: client,
-        shelfService: shelfService,
-      ),
+      reader,
       origin: ReaderPageTransitionOrigin.discoverSheet,
       waitForReaderReady: true,
     );

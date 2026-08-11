@@ -46,8 +46,13 @@ class PagedImageReaderSettingsStore {
 
   Future<ImageReaderDirection> loadDirection(int? bookId) async {
     if (bookId == null) return ImageReaderDirection.ltr;
+    return loadDirectionForKey('$bookId');
+  }
+
+  Future<ImageReaderDirection> loadDirectionForKey(String? key) async {
+    if (key == null || key.isEmpty) return ImageReaderDirection.ltr;
     final overrides = await _loadOverrides();
-    return ImageReaderDirection.fromName(overrides['$bookId']);
+    return ImageReaderDirection.fromName(overrides[key]);
   }
 
   Future<void> saveDirection(
@@ -55,11 +60,19 @@ class PagedImageReaderSettingsStore {
     ImageReaderDirection direction,
   ) async {
     if (bookId == null) return;
+    await saveDirectionForKey('$bookId', direction);
+  }
+
+  Future<void> saveDirectionForKey(
+    String? key,
+    ImageReaderDirection direction,
+  ) async {
+    if (key == null || key.isEmpty) return;
     final overrides = await _loadOverrides();
     if (direction == ImageReaderDirection.ltr) {
-      overrides.remove('$bookId');
+      overrides.remove(key);
     } else {
-      overrides['$bookId'] = direction.name;
+      overrides[key] = direction.name;
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(directionOverridesKey, jsonEncode(overrides));

@@ -21,6 +21,7 @@ import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/book_sources/book_source_change_page.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
 import 'package:xxread/pages/settings/sync/book_file_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/ai/ai_preprocess_task_controller.dart';
@@ -184,13 +185,21 @@ class _LibraryPageState extends State<LibraryPage> {
         try {
           final source = _sourceShelfService.sourceFrom(fullBook);
           final sourceBook = _sourceShelfService.sourceBookFrom(fullBook);
+          final reader = isOnlineComicSource(source, sourceBook)
+              ? OnlineComicReaderPage(
+                  source: source,
+                  book: sourceBook,
+                  shelfService: _sourceShelfService,
+                  initialTheme: initialTheme,
+                )
+              : BookSourceReaderPage(
+                  source: source,
+                  book: sourceBook,
+                  shelfService: _sourceShelfService,
+                  initialTheme: initialTheme,
+                );
           final route = BookOpenTransition.createRoute<void>(
-            BookSourceReaderPage(
-              source: source,
-              book: sourceBook,
-              shelfService: _sourceShelfService,
-              initialTheme: initialTheme,
-            ),
+            reader,
             animation: animation,
             libraryAnimation: animation == null ? libraryAnimation : null,
             animationPace: animationPace,

@@ -24,6 +24,7 @@ import 'pages/home/home_shell_page.dart';
 import 'pages/library/import_book/import_book_page.dart';
 import 'pages/legal/user_agreement_page.dart';
 import 'pages/reader/book_source/book_source_reader_page.dart';
+import 'pages/reader/book_source/online_comic_reader_page.dart';
 import 'pages/book_sources/source_verification_page.dart';
 import 'services/books/book_services.dart';
 import 'services/books/book_format_support.dart';
@@ -707,13 +708,23 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
       if (book.isOnline) {
         final client = BookSourceClient();
         final shelfService = BookSourceShelfService(client: client);
+        final source = shelfService.sourceFrom(book);
+        final sourceBook = shelfService.sourceBookFrom(book);
+        final reader = isOnlineComicSource(source, sourceBook)
+            ? OnlineComicReaderPage(
+                source: source,
+                book: sourceBook,
+                client: client,
+                shelfService: shelfService,
+              )
+            : BookSourceReaderPage(
+                source: source,
+                book: sourceBook,
+                client: client,
+                shelfService: shelfService,
+              );
         final route = BookOpenTransition.createRoute<void>(
-          BookSourceReaderPage(
-            source: shelfService.sourceFrom(book),
-            book: shelfService.sourceBookFrom(book),
-            client: client,
-            shelfService: shelfService,
-          ),
+          reader,
           waitForReaderReady: true,
         );
         await BookOpenTransition.push<void>(context, route);

@@ -112,7 +112,8 @@ class OnlineFontService {
       await directory.create(recursive: true);
       _fontDirectory = directory;
       await _readManifest();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Online font storage initialization failed: $error');
       _isSupported = false;
       _records.clear();
     }
@@ -138,7 +139,8 @@ class OnlineFontService {
       try {
         final bytes = await file_.readAsBytes();
         await _registrar(family, bytes, file.style);
-      } catch (_) {
+      } catch (error) {
+        debugPrint('Online font could not be loaded ($fontId): $error');
         return false;
       }
     }
@@ -341,9 +343,7 @@ class OnlineFontService {
         onProgress: onProgress,
       );
       // 清理半成品。
-      try {
-        if (await fontDir.exists()) await fontDir.delete(recursive: true);
-      } catch (_) {}
+      await _deleteDirectoryBestEffort(fontDir, context: 'partial download');
       rethrow;
     } catch (error) {
       _emitProgress(
@@ -356,9 +356,7 @@ class OnlineFontService {
         error: error.toString(),
         onProgress: onProgress,
       );
-      try {
-        if (await fontDir.exists()) await fontDir.delete(recursive: true);
-      } catch (_) {}
+      await _deleteDirectoryBestEffort(fontDir, context: 'partial download');
       throw OnlineFontException(OnlineFontErrorCode.storageFailed, error);
     } finally {
       _activeDownloads.remove(fontId);
@@ -370,9 +368,7 @@ class OnlineFontService {
     final directory = _fontDirectory;
     if (directory == null) return;
     final fontDir = Directory(path.join(directory.path, fontId));
-    try {
-      if (await fontDir.exists()) await fontDir.delete(recursive: true);
-    } catch (_) {}
+    await _deleteDirectoryBestEffort(fontDir, context: 'download');
     _records.remove(fontId);
     _loadedFontIds.remove(fontId);
     _progress.remove(fontId);
@@ -412,7 +408,8 @@ class OnlineFontService {
                 },
               ),
         );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Online font manifest is unreadable: $error');
       _records.clear();
     }
   }
@@ -434,8 +431,30 @@ class OnlineFontService {
       if (await manifest.exists()) await manifest.delete();
       await temporary.rename(manifest.path);
     } catch (error) {
-      if (await temporary.exists()) await temporary.delete();
+      await _deleteFileBestEffort(temporary, context: 'temporary manifest');
       throw OnlineFontException(OnlineFontErrorCode.storageFailed, error);
+    }
+  }
+
+  Future<void> _deleteDirectoryBestEffort(
+    Directory directory, {
+    required String context,
+  }) async {
+    try {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    } catch (error) {
+      debugPrint('Failed to remove online font $context: $error');
+    }
+  }
+
+  Future<void> _deleteFileBestEffort(
+    File file, {
+    required String context,
+  }) async {
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (error) {
+      debugPrint('Failed to remove online font $context: $error');
     }
   }
 

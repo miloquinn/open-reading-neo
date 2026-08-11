@@ -22,6 +22,7 @@ void main() {
       final versions = catalogs.first.map((entry) => entry.version).toList();
 
       expect(versions, isNotEmpty);
+      expect(versions.first, '2.5.9');
       for (final catalog in catalogs) {
         expect(catalog.map((entry) => entry.version), versions);
         expect(catalog.every((entry) => entry.items.isNotEmpty), isTrue);

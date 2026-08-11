@@ -81,6 +81,24 @@ void main() {
     expect(await sourceFile.exists(), isTrue);
     expect(await _filesUnder(documentsDirectory), isEmpty);
   });
+
+  test('大文件复制时保持内容哈希一致', () async {
+    final bytes = List<int>.generate(
+      5 * 1024 * 1024 + 1,
+      (index) => index % 251,
+      growable: false,
+    );
+    final sourceFile = File('${sandbox.path}/large.txt');
+    await sourceFile.writeAsBytes(bytes, flush: true);
+    final store = _MemoryBookImportStore();
+    final importer = _testImporter(store, documentsDirectory);
+
+    final result = await importer.importFile(_externalSource(sourceFile));
+
+    expect(result.outcome, BookImportOutcome.imported);
+    expect(result.book.contentHash, md5.convert(bytes).toString());
+    expect(await File(result.book.filePath).readAsBytes(), bytes);
+  });
 }
 
 BookImportService _testImporter(

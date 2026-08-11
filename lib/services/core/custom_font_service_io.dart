@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -65,7 +66,8 @@ class CustomFontService {
       await directory.create(recursive: true);
       _fontDirectory = directory;
       await _readManifest();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Custom font storage initialization failed: $error');
       _isSupported = false;
       _fonts.clear();
     }
@@ -102,14 +104,21 @@ class CustomFontService {
             weightAxisInspected: true,
           );
           metadataChanged = true;
-        } catch (_) {}
+        } catch (error) {
+          debugPrint('Custom font metadata inspection failed: $error');
+        }
       }
       if (metadataChanged) {
         try {
           await _writeManifest();
-        } catch (_) {}
+        } catch (error) {
+          debugPrint(
+            'Custom font metadata migration could not persist: $error',
+          );
+        }
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Custom font manifest is unreadable: $error');
       _fonts.clear();
     }
   }
@@ -131,7 +140,7 @@ class CustomFontService {
       if (await manifest.exists()) await manifest.delete();
       await temporary.rename(manifest.path);
     } catch (error) {
-      if (await temporary.exists()) await temporary.delete();
+      await _deleteFileBestEffort(temporary, context: 'temporary manifest');
       throw CustomFontException(CustomFontErrorCode.storageFailed, error);
     }
   }
@@ -269,13 +278,27 @@ class CustomFontService {
       await _registrar(record.runtimeFamily, bytes);
       _loadedFontIds.add(id);
       return true;
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        'Custom font could not be loaded (${record.fileName}): $error',
+      );
       final index = _fonts.indexWhere((font) => font.id == id);
       if (index >= 0) {
         _fonts[index] = record.copyWith(available: false);
         await _writeManifest();
       }
       return false;
+    }
+  }
+
+  Future<void> _deleteFileBestEffort(
+    File file, {
+    required String context,
+  }) async {
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (error) {
+      debugPrint('Failed to remove custom font $context: $error');
     }
   }
 

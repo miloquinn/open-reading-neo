@@ -2,6 +2,39 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.5.9",
+            "notes": {
+                "en": [
+                    "Refined App and reader font selection with clearer system, online, and imported font states",
+                    "Kept online font download progress local to the font list to avoid repeated full-page rebuilds",
+                    "Reduced disk I/O for large book imports by calculating the copy hash during the file transfer",
+                    "Improved import and font-storage diagnostics without replacing the original error or blocking safe font fallback",
+                    "Split EPUB metadata parsing and font settings out of oversized core files"
+                ],
+                "zh": [
+                    "优化 App 与阅读字体选择，统一系统字体、在线字体和自定义字体的状态展示",
+                    "在线字体下载进度只刷新字体列表区域，减少设置页与应用根组件的重复重建",
+                    "复制大文件时同步计算内容哈希，减少书籍导入过程中的重复磁盘读取",
+                    "改善导入与字体存储错误诊断，同时保留原始错误和安全字体回退",
+                    "从超大核心文件中拆分 EPUB 元数据解析和字体设置模块"
+                ],
+                "zh-TW": [
+                    "優化 App 與閱讀字體選擇，統一系統字體、線上字體和自訂字體的狀態顯示",
+                    "線上字體下載進度只更新字體列表區域，減少設定頁與應用程式根元件的重複重建",
+                    "複製大型檔案時同步計算內容雜湊，減少書籍匯入過程中的重複磁碟讀取",
+                    "改善匯入與字體儲存錯誤診斷，同時保留原始錯誤和安全字體回退",
+                    "從超大型核心檔案中拆分 EPUB 中繼資料解析和字體設定模組"
+                ],
+                "ja": [
+                    "App と読書用フォントの選択画面を改善し、システム・オンライン・インポート済みフォントの状態表示を統一しました",
+                    "オンラインフォントの進捗更新をフォント一覧内に限定し、設定ページとアプリ全体の不要な再構築を削減しました",
+                    "大きな書籍ファイルのコピー中にハッシュを同時計算し、インポート時の重複したディスク読み込みを削減しました",
+                    "元のエラーと安全なフォントフォールバックを保ちながら、インポートとフォント保存の診断情報を改善しました",
+                    "肥大化したコアファイルから EPUB メタデータ解析とフォント設定を分離しました"
+                ]
+            }
+        },
+        {
             "version": "2.5.8",
             "notes": {
                 "en": [

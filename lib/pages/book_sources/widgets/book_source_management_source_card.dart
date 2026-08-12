@@ -79,6 +79,18 @@ class BookSourceManagementNoMatchesCard extends StatelessWidget {
   }
 }
 
+String sourceHealthCapabilityLabel(
+  BuildContext context,
+  SourceHealthCapability capability,
+) => switch (capability) {
+  SourceHealthCapability.search => context.l10n.sourceHealthCapabilitySearch,
+  SourceHealthCapability.discover =>
+    context.l10n.sourceHealthCapabilityDiscover,
+  SourceHealthCapability.info => context.l10n.sourceHealthCapabilityInfo,
+  SourceHealthCapability.catalog => context.l10n.sourceHealthCapabilityCatalog,
+  SourceHealthCapability.content => context.l10n.sourceHealthCapabilityContent,
+};
+
 BoxDecoration _cardDecoration(Color color, Color border, double radius) {
   return BoxDecoration(
     color: color,
@@ -179,6 +191,12 @@ class _SourceSummary extends StatelessWidget {
               : context.l10n.sourceHealthPartial,
           icon: Icons.warning_amber_rounded,
           color: scheme.error,
+        ),
+      if (health?.fullyAvailable == true)
+        _MetaPill(
+          label: context.l10n.bookSourcesFullyAvailable,
+          icon: Icons.verified_rounded,
+          color: scheme.tertiary,
         ),
       for (final group in groups.take(2))
         _MetaPill(

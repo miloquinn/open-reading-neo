@@ -129,6 +129,7 @@ class BookSourcesController extends ChangeNotifier {
       discoverySources: discoverySources,
       selectedSourceId: selectedSourceId,
       loadingSources: false,
+      listGroupsRevision: _state.listGroupsRevision + 1,
     );
     if (next.availableSections.isNotEmpty &&
         !next.availableSections.contains(next.section)) {
@@ -417,6 +418,7 @@ class BookSourcesController extends ChangeNotifier {
               loaded.values.expand((items) => items).toList(growable: false),
             ),
           },
+          listGroupsRevision: _state.listGroupsRevision + 1,
         ),
       );
     } catch (error) {

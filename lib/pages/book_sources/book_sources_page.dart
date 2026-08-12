@@ -154,6 +154,49 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   String? _bookRevealScope;
   double? _listDirectoryScrollOffset;
 
+  // Remapping every discoverable source into BookSourceListChannels (and
+  // then filtering by search query) is O(source count) — cheap once, but
+  // this page rebuilds on every controller notification (expanding one row,
+  // one source's channels finishing a fetch, a keystroke), and a library can
+  // run into the thousands of sources. Recomputing on every rebuild instead
+  // of only when the underlying data or query actually changed is what made
+  // list view feel like it never finished loading.
+  int? _cachedListGroupsRevision;
+  List<BookSourceListChannels>? _cachedListGroups;
+  int? _cachedFilteredGroupsRevision;
+  String? _cachedFilteredGroupsQuery;
+  List<BookSourceListChannels>? _cachedFilteredGroups;
+
+  List<BookSourceListChannels> _memoizedListGroups() {
+    if (_cachedListGroupsRevision == _state.listGroupsRevision) {
+      return _cachedListGroups!;
+    }
+    final groups = _state.listSourceGroups;
+    _cachedListGroupsRevision = _state.listGroupsRevision;
+    _cachedListGroups = groups;
+    return groups;
+  }
+
+  List<BookSourceListChannels> _memoizedFilteredListGroups(
+    List<BookSourceListChannels> groups,
+  ) {
+    final query = _state.listSourceQuery;
+    if (_cachedFilteredGroupsRevision == _state.listGroupsRevision &&
+        _cachedFilteredGroupsQuery == query) {
+      return _cachedFilteredGroups!;
+    }
+    final filtered = groups
+        .where(
+          (group) =>
+              BookSourcesPage.listSourceMatchesQuery(group.source, query),
+        )
+        .toList(growable: false);
+    _cachedFilteredGroupsRevision = _state.listGroupsRevision;
+    _cachedFilteredGroupsQuery = query;
+    _cachedFilteredGroups = filtered;
+    return filtered;
+  }
+
   BookSourcesState get _state => _controller.state;
 
   @override
@@ -691,15 +734,8 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     }
 
     if (_state.showListDirectory || _state.selectedCategory == null) {
-      final groups = _state.listSourceGroups;
-      final filteredGroups = groups
-          .where(
-            (group) => BookSourcesPage.listSourceMatchesQuery(
-              group.source,
-              _state.listSourceQuery,
-            ),
-          )
-          .toList(growable: false);
+      final groups = _memoizedListGroups();
+      final filteredGroups = _memoizedFilteredListGroups(groups);
       return [
         BookSourceListDirectory(
           searchController: _listSourceSearchController,

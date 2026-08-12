@@ -6,6 +6,7 @@ import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_client.dart';
 import '../../../book_sources/services/book_source_health_check_service.dart';
 import '../../../book_sources/services/book_source_registry.dart';
+import '../../../book_sources/source_engine/source_health_checker.dart';
 
 enum BookSourceManagementFilter {
   all,
@@ -16,7 +17,23 @@ enum BookSourceManagementFilter {
   requiresLogin,
 }
 
-enum BookSourceManagementMutation { enable, refresh, remove, health }
+enum BookSourceManagementMutation { enable, refresh, remove, health, cleanup }
+
+@immutable
+class BookSourceCleanupSweepResult {
+  const BookSourceCleanupSweepResult({
+    required this.fullyAvailable,
+    required this.needsAttention,
+  });
+
+  final List<RegisteredBookSource> fullyAvailable;
+  final List<RegisteredBookSource> needsAttention;
+
+  static const empty = BookSourceCleanupSweepResult(
+    fullyAvailable: [],
+    needsAttention: [],
+  );
+}
 
 @immutable
 class BookSourceHealthProgress {
@@ -43,10 +60,20 @@ class BookSourceManagementState {
     this.healthProgress,
     this.mutation,
     this.failure,
+    this.sourcesRevision = 0,
   }) : sources = List.unmodifiable(sources),
        selectedSourceIds = Set.unmodifiable(selectedSourceIds);
 
   final List<RegisteredBookSource> sources;
+
+  /// Bumped only when [sources] is actually replaced with a new list (a
+  /// load, a mutation, a health-check merge) — never on an unrelated change
+  /// like [query] or [healthProgress] ticking during a batch check.
+  /// [visibleSources]/[availableGroups] re-filter every source and parse
+  /// each one's group tags with a regex; a library running into the
+  /// thousands shouldn't pay for that on every rebuild, so callers memoize
+  /// those getters keyed on this revision instead of calling them directly.
+  final int sourcesRevision;
   final bool loading;
   final String query;
   final BookSourceManagementFilter filter;
@@ -139,6 +166,10 @@ class BookSourceManagementState {
           ? this.mutation
           : mutation as BookSourceManagementMutation?,
       failure: identical(failure, _unchanged) ? this.failure : failure,
+      // Every call site only ever passes `sources:` when it genuinely has a
+      // new list, so bumping whenever it's non-null (rather than hunting
+      // down each mutation method individually) can't miss a real change.
+      sourcesRevision: sources == null ? sourcesRevision : sourcesRevision + 1,
     );
   }
 }
@@ -201,6 +232,7 @@ class BookSourceManagementController extends ChangeNotifier {
   int _loadRevision = 0;
   int _mutationRevision = 0;
   int _healthRevision = 0;
+  bool _cleanupCancelRequested = false;
 
   BookSourceManagementState get state => _state;
 
@@ -284,10 +316,11 @@ class BookSourceManagementController extends ChangeNotifier {
 
   void toggleSelectAllVisible() {
     final visibleIds = _state.visibleSources.map((source) => source.id).toSet();
+    final allSelected =
+        visibleIds.isNotEmpty &&
+        _state.selectedSourceIds.containsAll(visibleIds);
     _emit(
-      _state.copyWith(
-        selectedSourceIds: _state.allVisibleSelected ? const {} : visibleIds,
-      ),
+      _state.copyWith(selectedSourceIds: allSelected ? const {} : visibleIds),
     );
   }
 
@@ -434,6 +467,98 @@ class BookSourceManagementController extends ChangeNotifier {
       _emit(_state.copyWith(mutation: null, failure: error));
       rethrow;
     }
+  }
+
+  /// Stops a running [runCleanupSweep] from starting any more checks. Sources
+  /// already in flight still finish (bounded by the cleanup sweep's own
+  /// timeout), and whatever was checked before this call is still persisted
+  /// and included in the result — a library of thousands of sources can take
+  /// a long time, so cancelling must never discard progress already made.
+  void cancelCleanupSweep() {
+    _cleanupCancelRequested = true;
+  }
+
+  /// Runs [BookSourceHealthCheckService.checkAllForCleanup] over every
+  /// `readingSource`-protocol source and buckets the results, so a caller can
+  /// offer to disable whatever didn't come back fully available.
+  Future<BookSourceCleanupSweepResult> runCleanupSweep() async {
+    final targets = _state.sources
+        .where(
+          (source) =>
+              source.sourceProtocol == BookSourceProtocolKind.readingSource,
+        )
+        .toList(growable: false);
+    if (targets.isEmpty || _state.healthProgress != null) {
+      return BookSourceCleanupSweepResult.empty;
+    }
+    _loadRevision++;
+    _mutationRevision++;
+    final revision = ++_healthRevision;
+    _cleanupCancelRequested = false;
+    _emit(
+      _state.copyWith(
+        mutation: BookSourceManagementMutation.cleanup,
+        healthProgress: BookSourceHealthProgress(
+          completed: 0,
+          total: targets.length,
+        ),
+        failure: null,
+      ),
+    );
+    try {
+      final updated = await _sourceHealthService.checkAllForCleanup(
+        targets,
+        onProgress: (completed, total) {
+          if (!_isCurrentHealth(revision)) return;
+          _emit(
+            _state.copyWith(
+              healthProgress: BookSourceHealthProgress(
+                completed: completed,
+                total: total,
+              ),
+            ),
+          );
+        },
+        isCancelled: () =>
+            _cleanupCancelRequested || !_isCurrentHealth(revision),
+      );
+      if (!_isCurrentHealth(revision)) {
+        return BookSourceCleanupSweepResult.empty;
+      }
+      _mergeSources(updated);
+      _emit(_state.copyWith(mutation: null, healthProgress: null));
+      final fullyAvailable = <RegisteredBookSource>[];
+      final needsAttention = <RegisteredBookSource>[];
+      for (final source in updated) {
+        final result = sourceHealthCheckResultOf(source);
+        (result?.fullyAvailable == true ? fullyAvailable : needsAttention).add(
+          source,
+        );
+      }
+      return BookSourceCleanupSweepResult(
+        fullyAvailable: List.unmodifiable(fullyAvailable),
+        needsAttention: List.unmodifiable(needsAttention),
+      );
+    } on Object catch (error) {
+      if (!_isCurrentHealth(revision)) {
+        return BookSourceCleanupSweepResult.empty;
+      }
+      _emit(
+        _state.copyWith(mutation: null, healthProgress: null, failure: error),
+      );
+      rethrow;
+    }
+  }
+
+  /// Disables every source in [ids] in one write — used to apply a cleanup
+  /// sweep's "needs attention" bucket after the user reviews it.
+  Future<void> disableSources(Iterable<String> ids) async {
+    final idSet = ids.toSet();
+    if (idSet.isEmpty) return;
+    await _runMutation(
+      BookSourceManagementMutation.enable,
+      () => _registry.setEnabledAll(idSet, false),
+    );
   }
 
   void replaceSources(List<RegisteredBookSource> sources) {

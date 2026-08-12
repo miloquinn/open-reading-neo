@@ -10,6 +10,8 @@ class BookSourceManagementList extends StatelessWidget {
   const BookSourceManagementList({
     super.key,
     required this.state,
+    required this.visibleSources,
+    required this.availableGroups,
     required this.searchController,
     required this.scrollController,
     required this.additionalProtocolsEnabled,
@@ -29,6 +31,8 @@ class BookSourceManagementList extends StatelessWidget {
   });
 
   final BookSourceManagementState state;
+  final List<RegisteredBookSource> visibleSources;
+  final List<String> availableGroups;
   final TextEditingController searchController;
   final ScrollController scrollController;
   final bool additionalProtocolsEnabled;
@@ -53,7 +57,7 @@ class BookSourceManagementList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = state.visibleSources;
+    final visible = visibleSources;
     final allOrsp = visible
         .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
         .toList(growable: false);
@@ -86,6 +90,8 @@ class BookSourceManagementList extends StatelessWidget {
             sliver: SliverToBoxAdapter(
               child: _HeaderAndFilters(
                 state: state,
+                visibleSources: visible,
+                availableGroups: availableGroups,
                 visibleCount: visible.length,
                 searchController: searchController,
                 onQueryChanged: onQueryChanged,
@@ -209,6 +215,8 @@ class BookSourceManagementList extends StatelessWidget {
 class _HeaderAndFilters extends StatelessWidget {
   const _HeaderAndFilters({
     required this.state,
+    required this.visibleSources,
+    required this.availableGroups,
     required this.visibleCount,
     required this.searchController,
     required this.onQueryChanged,
@@ -223,6 +231,8 @@ class _HeaderAndFilters extends StatelessWidget {
   });
 
   final BookSourceManagementState state;
+  final List<RegisteredBookSource> visibleSources;
+  final List<String> availableGroups;
   final int visibleCount;
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
@@ -282,7 +292,7 @@ class _HeaderAndFilters extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              if (state.availableGroups.isNotEmpty)
+              if (availableGroups.isNotEmpty)
                 ActionChip(
                   key: const Key('bookSourceGroupFilter'),
                   avatar: const Icon(Icons.folder_outlined, size: 18),
@@ -298,6 +308,7 @@ class _HeaderAndFilters extends StatelessWidget {
           const SizedBox(height: 12),
           _BulkActions(
             state: state,
+            allVisibleSelected: _allSelected(),
             onToggleSelectAll: onToggleSelectAll,
             onEnableSelected: onEnableSelected,
             onDisableSelected: onDisableSelected,
@@ -323,6 +334,11 @@ class _HeaderAndFilters extends StatelessWidget {
     );
   }
 
+  bool _allSelected() {
+    final ids = visibleSources.map((source) => source.id).toSet();
+    return ids.isNotEmpty && state.selectedSourceIds.containsAll(ids);
+  }
+
   String _filterLabel(
     BuildContext context,
     BookSourceManagementFilter filter,
@@ -341,6 +357,7 @@ class _HeaderAndFilters extends StatelessWidget {
 class _BulkActions extends StatelessWidget {
   const _BulkActions({
     required this.state,
+    required this.allVisibleSelected,
     required this.onToggleSelectAll,
     required this.onEnableSelected,
     required this.onDisableSelected,
@@ -349,6 +366,7 @@ class _BulkActions extends StatelessWidget {
   });
 
   final BookSourceManagementState state;
+  final bool allVisibleSelected;
   final VoidCallback onToggleSelectAll;
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
@@ -366,12 +384,12 @@ class _BulkActions extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onToggleSelectAll,
           icon: Icon(
-            state.allVisibleSelected
+            allVisibleSelected
                 ? Icons.deselect_rounded
                 : Icons.select_all_rounded,
           ),
           label: Text(
-            state.allVisibleSelected
+            allVisibleSelected
                 ? context.l10n.bookSourcesClearSelection
                 : context.l10n.bookSourcesSelectAll,
           ),

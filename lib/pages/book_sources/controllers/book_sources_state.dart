@@ -116,6 +116,14 @@ class BookSourcesState {
   final bool listLayout;
   final int largeSourceLibraryThreshold;
 
+  /// Bumped only when [sectionSources] or [listChannelsBySource] actually
+  /// change (a real source load, or one source's channels finishing a
+  /// fetch) — never on every unrelated state change. [listSourceGroups]
+  /// remaps every discoverable source into a wrapper object, which is cheap
+  /// once but not something a source library running into the thousands
+  /// should pay for on every rebuild; callers memoize it keyed on this.
+  final int listGroupsRevision;
+
   BookSourcesState({
     List<RegisteredBookSource> sources = const [],
     Map<BookSourcesSection, List<RegisteredBookSource>> sectionSources =
@@ -141,6 +149,7 @@ class BookSourcesState {
     Map<String, Object> listChannelErrors = const {},
     this.listLayout = false,
     this.largeSourceLibraryThreshold = 40,
+    this.listGroupsRevision = 0,
   }) : sources = List.unmodifiable(sources),
        sectionSources = _freezeListMap(sectionSources),
        discoverySources = List.unmodifiable(discoverySources),
@@ -199,6 +208,7 @@ class BookSourcesState {
     Set<String>? loadingListChannelSources,
     Map<String, Object>? listChannelErrors,
     bool? listLayout,
+    int? listGroupsRevision,
   }) => BookSourcesState(
     sources: List.unmodifiable(sources ?? this.sources),
     sectionSources: sectionSources ?? this.sectionSources,
@@ -236,6 +246,7 @@ class BookSourcesState {
     listChannelErrors: listChannelErrors ?? this.listChannelErrors,
     listLayout: listLayout ?? this.listLayout,
     largeSourceLibraryThreshold: largeSourceLibraryThreshold,
+    listGroupsRevision: listGroupsRevision ?? this.listGroupsRevision,
   );
 }
 

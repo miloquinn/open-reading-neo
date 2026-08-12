@@ -777,6 +777,63 @@ abstract class AppLocalizations {
   /// **'{healthy} of {total} source(s) are healthy'**
   String bookSourcesHealthCheckSummary(int healthy, int total);
 
+  /// No description provided for @bookSourcesCleanupMenuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check & clean up sources'**
+  String get bookSourcesCleanupMenuLabel;
+
+  /// No description provided for @bookSourcesCleanupNoCheckableSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No sources to check'**
+  String get bookSourcesCleanupNoCheckableSources;
+
+  /// No description provided for @bookSourcesCleanupAllFullyAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'All {count} checked source(s) are fully available'**
+  String bookSourcesCleanupAllFullyAvailable(int count);
+
+  /// No description provided for @bookSourcesCleanupReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup review'**
+  String get bookSourcesCleanupReviewTitle;
+
+  /// No description provided for @bookSourcesCleanupReviewSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{fullyAvailable} fully available, {needsAttention} need attention'**
+  String bookSourcesCleanupReviewSummary(
+    int fullyAvailable,
+    int needsAttention,
+  );
+
+  /// No description provided for @bookSourcesCleanupReviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These sources didn\'t pass every check. Selected ones will be disabled.'**
+  String get bookSourcesCleanupReviewHint;
+
+  /// No description provided for @bookSourcesCleanupDisableSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {count} selected'**
+  String bookSourcesCleanupDisableSelected(int count);
+
+  /// No description provided for @bookSourcesCleanupDisabledSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled {count} source(s)'**
+  String bookSourcesCleanupDisabledSummary(int count);
+
+  /// No description provided for @bookSourcesCleanupCancelledSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped — checked {count} source(s). Run it again later to pick up where you left off.'**
+  String bookSourcesCleanupCancelledSummary(int count);
+
   /// No description provided for @bookSourcesUrlLabel.
   ///
   /// In en, this message translates to:
@@ -1070,6 +1127,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Partially broken'**
   String get sourceHealthPartial;
+
+  /// No description provided for @bookSourcesFullyAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Fully available'**
+  String get bookSourcesFullyAvailable;
 
   /// No description provided for @sourceHealthTimedOut.
   ///

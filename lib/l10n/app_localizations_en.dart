@@ -405,6 +405,47 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesCleanupMenuLabel => 'Check & clean up sources';
+
+  @override
+  String get bookSourcesCleanupNoCheckableSources => 'No sources to check';
+
+  @override
+  String bookSourcesCleanupAllFullyAvailable(int count) {
+    return 'All $count checked source(s) are fully available';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewTitle => 'Cleanup review';
+
+  @override
+  String bookSourcesCleanupReviewSummary(
+    int fullyAvailable,
+    int needsAttention,
+  ) {
+    return '$fullyAvailable fully available, $needsAttention need attention';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewHint =>
+      'These sources didn\'t pass every check. Selected ones will be disabled.';
+
+  @override
+  String bookSourcesCleanupDisableSelected(int count) {
+    return 'Disable $count selected';
+  }
+
+  @override
+  String bookSourcesCleanupDisabledSummary(int count) {
+    return 'Disabled $count source(s)';
+  }
+
+  @override
+  String bookSourcesCleanupCancelledSummary(int count) {
+    return 'Stopped — checked $count source(s). Run it again later to pick up where you left off.';
+  }
+
+  @override
   String get bookSourcesUrlLabel => 'Source address';
 
   @override
@@ -566,6 +607,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sourceHealthPartial => 'Partially broken';
+
+  @override
+  String get bookSourcesFullyAvailable => 'Fully available';
 
   @override
   String get sourceHealthTimedOut => 'Check timed out';

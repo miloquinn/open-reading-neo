@@ -9,51 +9,54 @@ import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 
 void main() {
   group('SourceHealthChecker', () {
-    test('reports every capability healthy when the full chain succeeds', () async {
-      final transport = _FakeTransport({
-        'https://books.test/search?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1':
-            '''
+    test(
+      'reports every capability healthy when the full chain succeeds',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/search?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1':
+              '''
           <div class="book">
             <a href="/book/1"><span class="name">剑来</span></a>
             <span class="author">烽火</span>
           </div>
         ''',
-        'https://books.test/explore?page=1': '''
+          'https://books.test/explore?page=1': '''
           <div class="book">
             <a href="/book/2"><span class="name">另一本书</span></a>
             <span class="author">某人</span>
           </div>
         ''',
-        'https://books.test/book/1': '''
+          'https://books.test/book/1': '''
           <h1>剑来</h1><p class="author">烽火</p>
           <a class="toc" href="/book/1/toc">目录</a>
         ''',
-        'https://books.test/book/1/toc': '''
+          'https://books.test/book/1/toc': '''
           <ul id="chapters"><li><a href="/chapter/1">第一章</a></li></ul>
         ''',
-        'https://books.test/chapter/1':
-            '<article id="content"><p>正文</p></article>',
-      });
-      final source = _fixtureSource().toRegisteredSource(enabled: true);
-      final checker = const SourceHealthChecker();
+          'https://books.test/chapter/1':
+              '<article id="content"><p>正文</p></article>',
+        });
+        final source = _fixtureSource().toRegisteredSource(enabled: true);
+        final checker = const SourceHealthChecker();
 
-      final result = await checker.check(
-        source,
-        runtime: SourceRuntime(transport: transport),
-      );
+        final result = await checker.check(
+          source,
+          runtime: SourceRuntime(transport: transport),
+        );
 
-      expect(result.healthy, isTrue);
-      expect(result.timedOut, isFalse);
-      expect(result.failed, isEmpty);
-      expect(result.checked, {
-        SourceHealthCapability.search,
-        SourceHealthCapability.discover,
-        SourceHealthCapability.info,
-        SourceHealthCapability.catalog,
-        SourceHealthCapability.content,
-      });
-      expect(result.respondTimeMs, isNotNull);
-    });
+        expect(result.healthy, isTrue);
+        expect(result.timedOut, isFalse);
+        expect(result.failed, isEmpty);
+        expect(result.checked, {
+          SourceHealthCapability.search,
+          SourceHealthCapability.discover,
+          SourceHealthCapability.info,
+          SourceHealthCapability.catalog,
+          SourceHealthCapability.content,
+        });
+        expect(result.respondTimeMs, isNotNull);
+      },
+    );
 
     test(
       'isolates a broken content rule without failing search, info, or catalog',
@@ -134,6 +137,83 @@ void main() {
       expect(result.timedOut, isTrue);
       expect(result.healthy, isFalse);
       expect(result.respondTimeMs, isNull);
+    });
+  });
+
+  group('SourceHealthCheckResult.fullyAvailable', () {
+    test('true once search, discover, info, and content all pass', () {
+      final result = SourceHealthCheckResult(
+        checked: const {
+          SourceHealthCapability.search,
+          SourceHealthCapability.discover,
+          SourceHealthCapability.info,
+          SourceHealthCapability.catalog,
+          SourceHealthCapability.content,
+        },
+        failed: const {},
+        checkedAt: DateTime.utc(2026, 8, 12),
+      );
+
+      expect(result.fullyAvailable, isTrue);
+      expect(result.missingForFullAvailability, isEmpty);
+    });
+
+    test(
+      'false, and reported missing, when a required capability was never attempted',
+      () {
+        // A source with no declared search rule never adds `search` to
+        // `checked`, so `healthy` can be true while `fullyAvailable` is not.
+        final result = SourceHealthCheckResult(
+          checked: const {
+            SourceHealthCapability.discover,
+            SourceHealthCapability.info,
+            SourceHealthCapability.catalog,
+            SourceHealthCapability.content,
+          },
+          failed: const {},
+          checkedAt: DateTime.utc(2026, 8, 12),
+        );
+
+        expect(result.healthy, isTrue);
+        expect(result.fullyAvailable, isFalse);
+        expect(result.missingForFullAvailability, {
+          SourceHealthCapability.search,
+        });
+      },
+    );
+
+    test('false, and reported missing, when a required capability failed', () {
+      final result = SourceHealthCheckResult(
+        checked: const {
+          SourceHealthCapability.search,
+          SourceHealthCapability.discover,
+          SourceHealthCapability.info,
+          SourceHealthCapability.catalog,
+          SourceHealthCapability.content,
+        },
+        failed: const {SourceHealthCapability.content},
+        checkedAt: DateTime.utc(2026, 8, 12),
+      );
+
+      expect(result.fullyAvailable, isFalse);
+      expect(result.missingForFullAvailability, {
+        SourceHealthCapability.content,
+      });
+    });
+
+    test('a timed-out check is never fully available', () {
+      final result = SourceHealthCheckResult(
+        checked: const {},
+        failed: const {},
+        checkedAt: DateTime.utc(2026, 8, 12),
+        timedOut: true,
+      );
+
+      expect(result.fullyAvailable, isFalse);
+      expect(
+        result.missingForFullAvailability,
+        SourceHealthCheckResult.fullAvailabilityCapabilities,
+      );
     });
   });
 

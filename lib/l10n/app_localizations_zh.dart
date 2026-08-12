@@ -386,6 +386,46 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesCleanupMenuLabel => '检测并清理书源';
+
+  @override
+  String get bookSourcesCleanupNoCheckableSources => '没有可检测的书源';
+
+  @override
+  String bookSourcesCleanupAllFullyAvailable(int count) {
+    return '已检测的 $count 个书源均完全可用';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewTitle => '检测完成';
+
+  @override
+  String bookSourcesCleanupReviewSummary(
+    int fullyAvailable,
+    int needsAttention,
+  ) {
+    return '完全可用 $fullyAvailable 个，有问题 $needsAttention 个';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewHint => '以下书源未通过全部校验项，勾选的将被关闭。';
+
+  @override
+  String bookSourcesCleanupDisableSelected(int count) {
+    return '关闭选中的 $count 个';
+  }
+
+  @override
+  String bookSourcesCleanupDisabledSummary(int count) {
+    return '已关闭 $count 个书源';
+  }
+
+  @override
+  String bookSourcesCleanupCancelledSummary(int count) {
+    return '已停止，已检测 $count 个书源。之后再次运行会从上次的进度继续。';
+  }
+
+  @override
   String get bookSourcesUrlLabel => '书源地址';
 
   @override
@@ -540,6 +580,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sourceHealthPartial => '部分失效';
+
+  @override
+  String get bookSourcesFullyAvailable => '完全可用';
 
   @override
   String get sourceHealthTimedOut => '校验超时';
@@ -5672,6 +5715,46 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get bookSourcesCleanupMenuLabel => '檢測並清理書源';
+
+  @override
+  String get bookSourcesCleanupNoCheckableSources => '沒有可檢測的書源';
+
+  @override
+  String bookSourcesCleanupAllFullyAvailable(int count) {
+    return '已檢測的 $count 個書源均完全可用';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewTitle => '檢測完成';
+
+  @override
+  String bookSourcesCleanupReviewSummary(
+    int fullyAvailable,
+    int needsAttention,
+  ) {
+    return '完全可用 $fullyAvailable 個，有問題 $needsAttention 個';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewHint => '以下書源未通過全部檢查項，勾選的將被關閉。';
+
+  @override
+  String bookSourcesCleanupDisableSelected(int count) {
+    return '關閉選中的 $count 個';
+  }
+
+  @override
+  String bookSourcesCleanupDisabledSummary(int count) {
+    return '已關閉 $count 個書源';
+  }
+
+  @override
+  String bookSourcesCleanupCancelledSummary(int count) {
+    return '已停止，已檢測 $count 個書源。之後再次執行會從上次的進度繼續。';
+  }
+
+  @override
   String get bookSourcesUrlLabel => '書源位址';
 
   @override
@@ -5826,6 +5909,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get sourceHealthPartial => '部分失效';
+
+  @override
+  String get bookSourcesFullyAvailable => '完全可用';
 
   @override
   String get sourceHealthTimedOut => '檢查逾時';

@@ -6,6 +6,7 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_health_check_service.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
+import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
 import 'package:xxread/pages/book_sources/controllers/book_source_management_controller.dart';
 
 void main() {
@@ -155,6 +156,108 @@ void main() {
   );
 
   test(
+    'a cleanup sweep buckets sources by fullyAvailable and suppresses late progress after disposal',
+    () async {
+      final available = _source(
+        'fully-available',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final broken = _source(
+        'needs-attention',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final health = _HealthService();
+      final controller = BookSourceManagementController(healthService: health);
+      controller.replaceSources([available, broken]);
+
+      final sweep = controller.runCleanupSweep();
+      health.cleanupOnProgress?.call(1, 2);
+      expect(controller.state.healthProgress?.completed, 1);
+      final availableChecked = withSourceHealthCheckResult(
+        available,
+        SourceHealthCheckResult(
+          checked: SourceHealthCheckResult.fullAvailabilityCapabilities,
+          failed: const {},
+          checkedAt: DateTime.utc(2026, 8, 12),
+        ),
+      );
+      final brokenChecked = withSourceHealthCheckResult(
+        broken,
+        SourceHealthCheckResult(
+          checked: const {SourceHealthCapability.search},
+          failed: const {SourceHealthCapability.search},
+          checkedAt: DateTime.utc(2026, 8, 12),
+        ),
+      );
+      health.allForCleanup.complete([availableChecked, brokenChecked]);
+      final result = await sweep;
+
+      expect(result.fullyAvailable.single.id, available.id);
+      expect(result.needsAttention.single.id, broken.id);
+      expect(controller.state.healthProgress, isNull);
+      expect(
+        controller.state.sources.map((source) => source.enabled),
+        everyElement(isTrue),
+      );
+
+      final lateHealth = _HealthService();
+      final lateController = BookSourceManagementController(
+        healthService: lateHealth,
+      );
+      lateController.replaceSources([broken]);
+      final lateSweep = lateController.runCleanupSweep();
+      lateController.dispose();
+      lateHealth.cleanupOnProgress?.call(1, 1);
+      lateHealth.allForCleanup.complete([brokenChecked]);
+      final lateResult = await lateSweep;
+      expect(lateResult.fullyAvailable, isEmpty);
+      expect(lateResult.needsAttention, isEmpty);
+
+      controller.dispose();
+    },
+  );
+
+  test('disableSources turns off exactly the given ids', () async {
+    final registry = _Registry();
+    final controller = BookSourceManagementController(registry: registry);
+
+    await controller.disableSources(['a', 'b']);
+
+    expect(registry.lastEnabledIds, {'a', 'b'});
+  });
+
+  test('disableSources is a no-op for an empty id set', () async {
+    final registry = _Registry();
+    final controller = BookSourceManagementController(registry: registry);
+
+    await controller.disableSources(const []);
+
+    expect(registry.lastEnabledIds, isEmpty);
+  });
+
+  test(
+    'cancelCleanupSweep flags the in-flight sweep as cancelled for the service',
+    () async {
+      final source = _source(
+        'cleanup-cancel',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final health = _HealthService();
+      final controller = BookSourceManagementController(healthService: health);
+      controller.replaceSources([source]);
+
+      final sweep = controller.runCleanupSweep();
+      expect(health.cleanupIsCancelled?.call(), isFalse);
+      controller.cancelCleanupSweep();
+      expect(health.cleanupIsCancelled?.call(), isTrue);
+
+      health.allForCleanup.complete(const []);
+      await sweep;
+      controller.dispose();
+    },
+  );
+
+  test(
     'owns factory-created clients but leaves injected clients borrowed',
     () async {
       final registry = _Registry();
@@ -268,7 +371,9 @@ class _Registry extends BookSourceRegistry {
 
 class _HealthService extends BookSourceHealthCheckService {
   final Completer<List<RegisteredBookSource>> all = Completer();
+  final Completer<List<RegisteredBookSource>> allForCleanup = Completer();
   SourceHealthCheckProgress? onProgress;
+  SourceHealthCheckProgress? cleanupOnProgress;
 
   @override
   Future<List<RegisteredBookSource>> checkAll(
@@ -277,6 +382,19 @@ class _HealthService extends BookSourceHealthCheckService {
   }) {
     this.onProgress = onProgress;
     return all.future;
+  }
+
+  bool Function()? cleanupIsCancelled;
+
+  @override
+  Future<List<RegisteredBookSource>> checkAllForCleanup(
+    List<RegisteredBookSource> sources, {
+    SourceHealthCheckProgress? onProgress,
+    bool Function()? isCancelled,
+  }) {
+    cleanupOnProgress = onProgress;
+    cleanupIsCancelled = isCancelled;
+    return allForCleanup.future;
   }
 }
 

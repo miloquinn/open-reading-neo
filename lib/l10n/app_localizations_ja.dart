@@ -390,6 +390,47 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesCleanupMenuLabel => 'ソースを検査して整理';
+
+  @override
+  String get bookSourcesCleanupNoCheckableSources => '検査できるソースがありません';
+
+  @override
+  String bookSourcesCleanupAllFullyAvailable(int count) {
+    return '検査した $count 件のソースはすべて完全に利用可能です';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewTitle => '検査結果の確認';
+
+  @override
+  String bookSourcesCleanupReviewSummary(
+    int fullyAvailable,
+    int needsAttention,
+  ) {
+    return '完全に利用可能 $fullyAvailable 件、要確認 $needsAttention 件';
+  }
+
+  @override
+  String get bookSourcesCleanupReviewHint =>
+      '以下のソースはすべての検査項目を通過していません。選択したものを無効化します。';
+
+  @override
+  String bookSourcesCleanupDisableSelected(int count) {
+    return '選択した $count 件を無効化';
+  }
+
+  @override
+  String bookSourcesCleanupDisabledSummary(int count) {
+    return '$count 件のソースを無効化しました';
+  }
+
+  @override
+  String bookSourcesCleanupCancelledSummary(int count) {
+    return '停止しました。$count 件を検査済みです。後でもう一度実行すると続きから再開します。';
+  }
+
+  @override
   String get bookSourcesUrlLabel => 'ソースのアドレス';
 
   @override
@@ -546,6 +587,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get sourceHealthPartial => '一部失効';
+
+  @override
+  String get bookSourcesFullyAvailable => '完全に利用可能';
 
   @override
   String get sourceHealthTimedOut => 'チェックがタイムアウトしました';

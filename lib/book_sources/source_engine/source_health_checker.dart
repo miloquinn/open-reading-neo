@@ -28,6 +28,32 @@ class SourceHealthCheckResult {
 
   bool get healthy => !timedOut && checked.isNotEmpty && failed.isEmpty;
 
+  /// The capabilities required to browse into a source's list and read a
+  /// full chapter of a book — stricter than [healthy], which only requires
+  /// that whatever *was* attempted didn't fail (so a source lacking the
+  /// `search` capability could still read as healthy without ever proving it
+  /// can list books or return content).
+  static const Set<SourceHealthCapability> fullAvailabilityCapabilities = {
+    SourceHealthCapability.search,
+    SourceHealthCapability.discover,
+    SourceHealthCapability.info,
+    SourceHealthCapability.content,
+  };
+
+  bool get fullyAvailable =>
+      !timedOut &&
+      failed.isEmpty &&
+      checked.containsAll(fullAvailabilityCapabilities);
+
+  /// The capabilities keeping this result short of [fullyAvailable]: ones
+  /// that failed outright, plus ones a source never even attempted (for
+  /// example because it doesn't declare a `search` rule at all).
+  Set<SourceHealthCapability> get missingForFullAvailability => timedOut
+      ? fullAvailabilityCapabilities
+      : fullAvailabilityCapabilities
+            .difference(checked)
+            .union(failed.intersection(fullAvailabilityCapabilities));
+
   Map<String, dynamic> toJson() => {
     'checked': (checked.map((capability) => capability.name).toList()..sort()),
     'failed': (failed.map((capability) => capability.name).toList()..sort()),
@@ -99,6 +125,15 @@ class SourceHealthChecker {
   final String keyword;
   final Duration timeout;
   final SourceTransport? _transport;
+
+  /// A copy of this checker with a different [timeout], keeping the same
+  /// [keyword] and transport — used by cleanup-oriented batch sweeps that
+  /// want a tighter per-source budget than a user-initiated check.
+  SourceHealthChecker withTimeout(Duration timeout) => SourceHealthChecker(
+    keyword: keyword,
+    timeout: timeout,
+    transport: _transport,
+  );
 
   Future<SourceHealthCheckResult> check(
     RegisteredBookSource source, {

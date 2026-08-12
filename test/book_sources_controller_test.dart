@@ -66,6 +66,38 @@ void main() {
   );
 
   test(
+    'listGroupsRevision bumps only on a real load or channel fetch, not on unrelated updates',
+    () async {
+      final sources = [_source('a'), _source('b')];
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed(sources),
+      );
+
+      await controller.load();
+      final afterLoad = controller.state.listGroupsRevision;
+      expect(afterLoad, greaterThan(0));
+
+      // Memoized callers (the discover list view) key their cache on this
+      // revision, so an unrelated state change — like typing into the
+      // source search box — must leave it untouched, or the whole point of
+      // memoizing is defeated.
+      controller.setListSourceQuery('a');
+      expect(controller.state.listGroupsRevision, afterLoad);
+
+      final group = BookSourceListChannels(
+        source: sources.first,
+        channels: const [],
+      );
+      await controller.expandListSource(group);
+      expect(controller.state.listGroupsRevision, greaterThan(afterLoad));
+
+      await controller.close();
+    },
+  );
+
+  test(
     'bounds concurrent source requests and preserves partial results',
     () async {
       final sources = List.generate(

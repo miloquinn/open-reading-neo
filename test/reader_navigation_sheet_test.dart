@@ -8,6 +8,71 @@ import 'package:xxread/widgets/open_reading_icons.dart';
 import 'package:xxread/widgets/reader_navigation_sheet.dart';
 
 void main() {
+  test('navigation catalog precomputes tree and chapter lookups', () {
+    final catalog = ReaderNavigationCatalog(const [
+      ReaderNavigationChapter(title: '  第一部\n', index: 0, id: 'part-1'),
+      ReaderNavigationChapter(title: '第一章', index: 1, depth: 1),
+      ReaderNavigationChapter(title: '第一节', index: 1, depth: 2),
+      ReaderNavigationChapter(title: '第二章', index: 2, depth: 1),
+    ]);
+
+    expect(catalog.parentPositions, [-1, 0, 1, 0]);
+    expect(catalog.hasChildren, [true, true, false, false]);
+    expect(catalog.normalizedTitles.first, '第一部');
+    expect(catalog.positionsByChapter[1], [1, 2]);
+    expect(catalog.chapterIndexById['part-1'], 0);
+    expect(catalog.chapterIndexByTitle['第二章'], 2);
+    expect(catalog.initialPositionForChapter(1), 1);
+    expect(catalog.initialPositionForChapter(3), 3);
+    expect(catalog.lastPositionBeforeChapter(1), 0);
+    expect(catalog.lastPositionBeforeChapter(0), -1);
+  });
+
+  testWidgets('navigation resolver waits for the sheet entrance animation', (
+    tester,
+  ) async {
+    var resolveCalls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: SizedBox(
+            height: 720,
+            child: ReaderNavigationSheet(
+              palette: ReaderThemes.day,
+              chapters: const [
+                ReaderNavigationChapter(title: '第一章', index: 0),
+                ReaderNavigationChapter(title: '第一节', index: 0, depth: 1),
+              ],
+              currentChapterIndex: 0,
+              currentNavigationPosition: 0,
+              resolveCurrentNavigationPosition: () {
+                resolveCalls++;
+                return 1;
+              },
+              bookmarks: const [],
+              onChapterSelected: (_) {},
+              onBookmarkSelected: (_) {},
+              onBookmarkDeleted: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(resolveCalls, 0);
+    await tester.pump(const Duration(milliseconds: 299));
+    expect(resolveCalls, 0);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(resolveCalls, 1);
+    expect(
+      tester.widget<Text>(find.text('第一节')).style?.color,
+      ReaderThemes.day.accent,
+    );
+  });
+
   testWidgets('Open Reading current-position icon assets are bundled', (
     tester,
   ) async {

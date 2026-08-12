@@ -67,6 +67,8 @@ class MemberAccountController extends ChangeNotifier {
   StreamSubscription<Uri>? _authCallbackSubscription;
   Completer<void>? _authCallbackSignal;
   Future<void>? _callbackCompletion;
+  Future<bool>? _deviceAuthorizationPoll;
+  String? _deviceAuthorizationPollCode;
 
   bool get initialized => _initialized;
   bool get loading => _loading;
@@ -343,6 +345,30 @@ class MemberAccountController extends ChangeNotifier {
   }
 
   Future<bool> pollDeviceAuthorization(
+    DeviceAuthorization authorization,
+  ) async {
+    final activePoll = _deviceAuthorizationPoll;
+    if (activePoll != null) {
+      if (_deviceAuthorizationPollCode == authorization.deviceCode) {
+        return activePoll;
+      }
+      return _pollDeviceAuthorization(authorization);
+    }
+
+    final poll = _pollDeviceAuthorization(authorization);
+    _deviceAuthorizationPoll = poll;
+    _deviceAuthorizationPollCode = authorization.deviceCode;
+    try {
+      return await poll;
+    } finally {
+      if (identical(_deviceAuthorizationPoll, poll)) {
+        _deviceAuthorizationPoll = null;
+        _deviceAuthorizationPollCode = null;
+      }
+    }
+  }
+
+  Future<bool> _pollDeviceAuthorization(
     DeviceAuthorization authorization,
   ) async {
     var completed = false;

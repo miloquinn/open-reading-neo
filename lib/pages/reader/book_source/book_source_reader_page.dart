@@ -164,6 +164,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   List<BookSourceChapter> _rawChapters = const [];
   List<BookSourceChapter> _chapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
+  ReaderNavigationCatalog? _navigationCatalog;
   BookSourceChapterContent? _content;
   int _chapterIndex = 0;
   bool _loadingCatalog = true;

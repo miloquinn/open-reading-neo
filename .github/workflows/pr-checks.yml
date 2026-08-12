@@ -52,6 +52,11 @@ jobs:
       - name: Verify generated localizations are current
         run: git diff --exit-code -- lib/l10n
 
+      - name: Verify generated changelog is current
+        run: |
+          python3 -m unittest test/test_generate_changelog.py
+          python3 tool/generate_changelog.py --check
+
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed lib test tool
 

@@ -82,6 +82,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      find.text('这里是我的批注', skipOffstage: false),
+      findsNothing,
+      reason: 'inactive annotation tab must not build on the catalog frame',
+    );
     await tester.tap(find.text('笔记'));
     await tester.pumpAndSettle();
     expect(find.text('这里是我的批注'), findsOneWidget);

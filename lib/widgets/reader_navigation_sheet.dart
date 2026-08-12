@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/reader/reader_annotation.dart';
@@ -23,6 +25,107 @@ class ReaderNavigationChapter {
   final int depth;
 }
 
+class ReaderNavigationCatalog {
+  ReaderNavigationCatalog(List<ReaderNavigationChapter> chapters)
+    : chapters = List.unmodifiable(chapters) {
+    final count = chapters.length;
+    final positions = List<int>.generate(count, (position) => position);
+    final ancestors = <int>[];
+    final parentPositions = List<int>.filled(count, -1);
+    final hasChildren = List<bool>.filled(count, false);
+    final normalizedTitles = List<String>.filled(count, '');
+    final searchableTitles = List<String>.filled(count, '');
+    final positionsByChapter = <int, List<int>>{};
+    final chapterIndexById = <String, int>{};
+    final chapterIndexByTitle = <String, int>{};
+
+    for (var position = 0; position < count; position++) {
+      final chapter = chapters[position];
+      final depth = chapter.depth < 0 ? 0 : chapter.depth;
+      while (ancestors.isNotEmpty &&
+          (chapters[ancestors.last].depth < 0
+                  ? 0
+                  : chapters[ancestors.last].depth) >=
+              depth) {
+        ancestors.removeLast();
+      }
+      if (ancestors.isNotEmpty) parentPositions[position] = ancestors.last;
+      hasChildren[position] =
+          position + 1 < count && chapters[position + 1].depth > depth;
+      final title = chapter.title.replaceAll(_titleWhitespace, ' ').trim();
+      normalizedTitles[position] = title;
+      searchableTitles[position] = title.toLowerCase();
+      positionsByChapter
+          .putIfAbsent(chapter.index, () => <int>[])
+          .add(position);
+      final id = chapter.id;
+      if (id != null && id.isNotEmpty) {
+        chapterIndexById.putIfAbsent(id, () => chapter.index);
+      }
+      if (title.isNotEmpty) {
+        chapterIndexByTitle.putIfAbsent(title, () => chapter.index);
+      }
+      ancestors.add(position);
+    }
+
+    this.positions = List.unmodifiable(positions);
+    this.parentPositions = List.unmodifiable(parentPositions);
+    this.hasChildren = List.unmodifiable(hasChildren);
+    this.normalizedTitles = List.unmodifiable(normalizedTitles);
+    this.searchableTitles = List.unmodifiable(searchableTitles);
+    this.positionsByChapter = Map<int, List<int>>.unmodifiable(
+      positionsByChapter.map(
+        (index, positions) =>
+            MapEntry<int, List<int>>(index, List<int>.unmodifiable(positions)),
+      ),
+    );
+    sortedChapterIndexes = List<int>.unmodifiable(
+      positionsByChapter.keys.toList()..sort(),
+    );
+    this.chapterIndexById = Map.unmodifiable(chapterIndexById);
+    this.chapterIndexByTitle = Map.unmodifiable(chapterIndexByTitle);
+  }
+
+  static final _titleWhitespace = RegExp(r'\s+');
+
+  final List<ReaderNavigationChapter> chapters;
+  late final List<int> positions;
+  late final List<int> parentPositions;
+  late final List<bool> hasChildren;
+  late final List<String> normalizedTitles;
+  late final List<String> searchableTitles;
+  late final Map<int, List<int>> positionsByChapter;
+  late final List<int> sortedChapterIndexes;
+  late final Map<String, int> chapterIndexById;
+  late final Map<String, int> chapterIndexByTitle;
+
+  int initialPositionForChapter(int chapterIndex) {
+    final positions = positionsByChapter[chapterIndex];
+    return positions == null || positions.isEmpty
+        ? lastPositionBeforeChapter(chapterIndex)
+        : positions.first;
+  }
+
+  int lastPositionBeforeChapter(int chapterIndex) {
+    var low = 0;
+    var high = sortedChapterIndexes.length;
+    while (low < high) {
+      final middle = low + ((high - low) >> 1);
+      if (sortedChapterIndexes[middle] < chapterIndex) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    if (low == 0) return -1;
+    return positionsByChapter[sortedChapterIndexes[low - 1]]!.last;
+  }
+
+  int? chapterIndexForTitle(String title) {
+    return chapterIndexByTitle[title.replaceAll(_titleWhitespace, ' ').trim()];
+  }
+}
+
 class ReaderNavigationSheet extends StatefulWidget {
   const ReaderNavigationSheet({
     super.key,
@@ -42,6 +145,7 @@ class ReaderNavigationSheet extends StatefulWidget {
     this.currentChapterText,
     this.currentNavigationPosition,
     this.resolveCurrentNavigationPosition,
+    this.catalog,
   });
 
   final ReaderThemePalette palette;
@@ -57,6 +161,7 @@ class ReaderNavigationSheet extends StatefulWidget {
   // chapter's text, which must not run on the frame that opens this sheet.
   // When supplied, it is called once after the first frame instead.
   final int Function()? resolveCurrentNavigationPosition;
+  final ReaderNavigationCatalog? catalog;
   final ValueChanged<int> onChapterSelected;
   final ValueChanged<ReaderNavigationChapter>? onNavigationChapterSelected;
   final ValueChanged<Bookmark> onBookmarkSelected;
@@ -72,7 +177,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     with SingleTickerProviderStateMixin {
   static const _chapterExtent = 64.0;
   static const _treeIndent = 16.0;
-  static final _chapterTitleWhitespace = RegExp(r'\s+');
+  static const _navigationResolveDelay = Duration(milliseconds: 300);
 
   late final TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
@@ -80,23 +185,26 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   final Set<int> _collapsedChapterPositions = <int>{};
   String _query = '';
 
-  List<_ReaderNavigationTreeEntry> _treeEntries = const [];
-  List<_ReaderNavigationTreeEntry>? _visibleCache;
+  late ReaderNavigationCatalog _catalog;
+  List<int>? _visibleCache;
   int? _resolvedNavigationPosition;
   bool _navigationPositionResolved = false;
+  Timer? _navigationResolveTimer;
 
   @override
   void initState() {
     super.initState();
+    assert(
+      widget.catalog == null ||
+          widget.catalog!.chapters.length == widget.chapters.length,
+    );
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(_handleTabChanged);
-    _treeEntries = _computeTreeEntries();
+    _catalog = widget.catalog ?? ReaderNavigationCatalog(widget.chapters);
     _resolvedNavigationPosition = widget.currentNavigationPosition;
     _navigationPositionResolved =
         widget.resolveCurrentNavigationPosition == null;
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _resolveAndScrollToCurrent(animate: false),
-    );
+    _scheduleResolveAndScroll(animate: false);
   }
 
   @override
@@ -106,6 +214,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       ..dispose();
     _searchController.dispose();
     _chapterScrollController.dispose();
+    _navigationResolveTimer?.cancel();
     super.dispose();
   }
 
@@ -116,19 +225,30 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   @override
   void didUpdateWidget(covariant ReaderNavigationSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_sameChapterTree(oldWidget.chapters, widget.chapters)) {
+    if (!identical(oldWidget.catalog, widget.catalog) ||
+        !identical(oldWidget.chapters, widget.chapters)) {
       _collapsedChapterPositions.clear();
-      _treeEntries = _computeTreeEntries();
+      _catalog = widget.catalog ?? ReaderNavigationCatalog(widget.chapters);
       _visibleCache = null;
     }
     if (oldWidget.currentChapterIndex != widget.currentChapterIndex) {
       _resolvedNavigationPosition = widget.currentNavigationPosition;
       _navigationPositionResolved =
           widget.resolveCurrentNavigationPosition == null;
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _resolveAndScrollToCurrent(animate: true),
-      );
+      _scheduleResolveAndScroll(animate: true);
     }
+  }
+
+  void _scheduleResolveAndScroll({required bool animate}) {
+    _navigationResolveTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scrollToCurrent(animate: false);
+      if (widget.resolveCurrentNavigationPosition == null) return;
+      _navigationResolveTimer = Timer(_navigationResolveDelay, () {
+        if (mounted) _resolveAndScrollToCurrent(animate: animate);
+      });
+    });
   }
 
   void _resolveAndScrollToCurrent({required bool animate}) {
@@ -141,87 +261,41 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     _scrollToCurrent(animate: animate);
   }
 
-  bool _sameChapterTree(
-    List<ReaderNavigationChapter> previous,
-    List<ReaderNavigationChapter> next,
-  ) {
-    if (identical(previous, next)) return true;
-    if (previous.length != next.length) return false;
-    for (var index = 0; index < previous.length; index++) {
-      final before = previous[index];
-      final after = next[index];
-      if (before.index != after.index ||
-          before.depth != after.depth ||
-          before.fragment != after.fragment ||
-          before.title != after.title) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  List<_ReaderNavigationTreeEntry> _computeTreeEntries() {
-    final entries = <_ReaderNavigationTreeEntry>[];
-    final ancestorPositions = <int>[];
-    for (var position = 0; position < widget.chapters.length; position++) {
-      final chapter = widget.chapters[position];
-      final depth = chapter.depth < 0 ? 0 : chapter.depth;
-      while (ancestorPositions.isNotEmpty &&
-          entries[ancestorPositions.last].depth >= depth) {
-        ancestorPositions.removeLast();
-      }
-      final parentPosition = ancestorPositions.isEmpty
-          ? null
-          : ancestorPositions.last;
-      final hasChildren =
-          position + 1 < widget.chapters.length &&
-          widget.chapters[position + 1].depth > depth;
-      entries.add(
-        _ReaderNavigationTreeEntry(
-          chapter: chapter,
-          position: position,
-          depth: depth,
-          parentPosition: parentPosition,
-          hasChildren: hasChildren,
-        ),
-      );
-      ancestorPositions.add(position);
-    }
-    return entries;
-  }
-
-  List<_ReaderNavigationTreeEntry> get _visibleChapters {
+  List<int> get _visibleChapters {
     return _visibleCache ??= _computeVisibleChapters();
   }
 
-  List<_ReaderNavigationTreeEntry> _computeVisibleChapters() {
-    final entries = _treeEntries;
+  List<int> _computeVisibleChapters() {
+    final chapters = _catalog.chapters;
     final normalized = _query.trim().toLowerCase();
     if (normalized.isNotEmpty) {
       final includedPositions = <int>{};
-      for (final entry in entries) {
-        if (!entry.chapter.title.toLowerCase().contains(normalized)) continue;
-        int? position = entry.position;
-        while (position != null && includedPositions.add(position)) {
-          position = entries[position].parentPosition;
+      for (var position = 0; position < chapters.length; position++) {
+        if (!_catalog.searchableTitles[position].contains(normalized)) continue;
+        var ancestor = position;
+        while (ancestor >= 0 && includedPositions.add(ancestor)) {
+          ancestor = _catalog.parentPositions[ancestor];
         }
       }
-      return entries
-          .where((entry) => includedPositions.contains(entry.position))
-          .toList(growable: false);
+      return Iterable<int>.generate(
+        chapters.length,
+      ).where(includedPositions.contains).toList(growable: false);
     }
-    if (_collapsedChapterPositions.isEmpty) return entries;
+    if (_collapsedChapterPositions.isEmpty) {
+      return _catalog.positions;
+    }
 
-    final visible = <_ReaderNavigationTreeEntry>[];
+    final visible = <int>[];
     final collapsedAncestorDepths = <int>[];
-    for (final entry in entries) {
+    for (var position = 0; position < chapters.length; position++) {
+      final depth = chapters[position].depth < 0 ? 0 : chapters[position].depth;
       while (collapsedAncestorDepths.isNotEmpty &&
-          collapsedAncestorDepths.last >= entry.depth) {
+          collapsedAncestorDepths.last >= depth) {
         collapsedAncestorDepths.removeLast();
       }
-      if (collapsedAncestorDepths.isEmpty) visible.add(entry);
-      if (_collapsedChapterPositions.contains(entry.position)) {
-        collapsedAncestorDepths.add(entry.depth);
+      if (collapsedAncestorDepths.isEmpty) visible.add(position);
+      if (_collapsedChapterPositions.contains(position)) {
+        collapsedAncestorDepths.add(depth);
       }
     }
     return visible;
@@ -231,13 +305,12 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     final suppliedPosition = _resolvedNavigationPosition;
     if (suppliedPosition != null &&
         suppliedPosition >= 0 &&
-        suppliedPosition < _treeEntries.length) {
+        suppliedPosition < _catalog.chapters.length) {
       return suppliedPosition;
     }
-    final matchingPositions = <int>[
-      for (final entry in _treeEntries)
-        if (entry.chapter.index == widget.currentChapterIndex) entry.position,
-    ];
+    final matchingPositions =
+        _catalog.positionsByChapter[widget.currentChapterIndex] ??
+        const <int>[];
     if (matchingPositions.length <= 1) {
       return matchingPositions.isEmpty ? -1 : matchingPositions.single;
     }
@@ -258,9 +331,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     var selectedPosition = matchingPositions.first;
     var searchFrom = 0;
     for (final position in matchingPositions) {
-      final title = _treeEntries[position].chapter.title
-          .replaceAll(_chapterTitleWhitespace, ' ')
-          .trim();
+      final title = _catalog.normalizedTitles[position];
       if (title.isEmpty) continue;
       final titleOffset = text.indexOf(title, searchFrom);
       if (titleOffset < 0) continue;
@@ -271,17 +342,17 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     return selectedPosition;
   }
 
-  void _toggleChapter(_ReaderNavigationTreeEntry entry) {
+  void _toggleChapter(int position) {
     setState(() {
-      if (!_collapsedChapterPositions.remove(entry.position)) {
-        _collapsedChapterPositions.add(entry.position);
+      if (!_collapsedChapterPositions.remove(position)) {
+        _collapsedChapterPositions.add(position);
       }
       _visibleCache = null;
     });
   }
 
   void _scrollToCurrent({bool animate = true}) {
-    if (!_chapterScrollController.hasClients || widget.chapters.isEmpty) {
+    if (!_chapterScrollController.hasClients || _catalog.chapters.isEmpty) {
       return;
     }
     if (_query.isNotEmpty) {
@@ -295,16 +366,15 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       );
       return;
     }
-    final entries = _treeEntries;
     final currentPosition = _currentChapterPosition;
     if (currentPosition < 0) return;
     var expandedAncestor = false;
-    var ancestorPosition = entries[currentPosition].parentPosition;
-    while (ancestorPosition != null) {
+    var ancestorPosition = _catalog.parentPositions[currentPosition];
+    while (ancestorPosition >= 0) {
       expandedAncestor =
           _collapsedChapterPositions.remove(ancestorPosition) ||
           expandedAncestor;
-      ancestorPosition = entries[ancestorPosition].parentPosition;
+      ancestorPosition = _catalog.parentPositions[ancestorPosition];
     }
     if (expandedAncestor) {
       setState(() => _visibleCache = null);
@@ -316,7 +386,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     final visiblePosition = _collapsedChapterPositions.isEmpty
         ? currentPosition
         : _visibleChapters.indexWhere(
-            (entry) => entry.position == currentPosition,
+            (position) => position == currentPosition,
           );
     if (visiblePosition < 0) return;
     final position = _chapterScrollController.position;
@@ -365,8 +435,14 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     controller: _tabController,
                     children: [
                       _buildCatalog(themedContext),
-                      _buildBookmarks(themedContext),
-                      _buildAnnotations(themedContext),
+                      _DeferredTab(
+                        active: _tabController.index == 1,
+                        childBuilder: () => _buildBookmarks(themedContext),
+                      ),
+                      _DeferredTab(
+                        active: _tabController.index == 2,
+                        childBuilder: () => _buildAnnotations(themedContext),
+                      ),
                     ],
                   ),
                 ),
@@ -410,7 +486,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                 Text(
                   context.l10n.readerNavigationPosition(
                     widget.currentChapterIndex + 1,
-                    widget.chapters.length,
+                    _catalog.chapters.length,
                   ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: widget.palette.secondaryText,
@@ -559,9 +635,12 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     itemExtent: _chapterExtent,
                     itemCount: chapters.length,
                     itemBuilder: (context, visibleIndex) {
-                      final entry = chapters[visibleIndex];
-                      final selected = entry.position == currentPosition;
-                      return _buildChapterTile(context, entry, selected);
+                      final position = chapters[visibleIndex];
+                      return _buildChapterTile(
+                        context,
+                        position,
+                        position == currentPosition,
+                      );
                     },
                   ),
                 ),
@@ -570,19 +649,13 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     );
   }
 
-  Widget _buildChapterTile(
-    BuildContext context,
-    _ReaderNavigationTreeEntry entry,
-    bool selected,
-  ) {
-    final chapter = entry.chapter;
-    final normalizedTitle = chapter.title
-        .replaceAll(_chapterTitleWhitespace, ' ')
-        .trim();
+  Widget _buildChapterTile(BuildContext context, int position, bool selected) {
+    final chapter = _catalog.chapters[position];
+    final normalizedTitle = _catalog.normalizedTitles[position];
     final title = normalizedTitle.isEmpty
         ? context.l10n.readerChapterFallback(chapter.index + 1)
         : normalizedTitle;
-    final displayDepth = entry.depth.clamp(0, 8);
+    final displayDepth = chapter.depth.clamp(0, 8);
     final isSearching = _query.trim().isNotEmpty;
     return Semantics(
       container: true,
@@ -653,11 +726,11 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     ),
                   ),
                 ],
-                if (entry.hasChildren) ...[
+                if (_catalog.hasChildren[position]) ...[
                   const SizedBox(width: 4),
                   _buildTreeControl(
                     context,
-                    entry: entry,
+                    position: position,
                     selected: selected,
                     enabled: !isSearching,
                   ),
@@ -694,15 +767,15 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
 
   Widget _buildTreeControl(
     BuildContext context, {
-    required _ReaderNavigationTreeEntry entry,
+    required int position,
     required bool selected,
     required bool enabled,
   }) {
     final color = selected
         ? widget.palette.accent
         : widget.palette.secondaryText.withValues(alpha: 0.88);
-    assert(entry.hasChildren);
-    final expanded = !_collapsedChapterPositions.contains(entry.position);
+    assert(_catalog.hasChildren[position]);
+    final expanded = !_collapsedChapterPositions.contains(position);
     final localizations = MaterialLocalizations.of(context);
     return SizedBox(
       width: 34,
@@ -712,8 +785,10 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
             ? localizations.expandedIconTapHint
             : localizations.collapsedIconTapHint,
         child: IconButton(
-          key: ValueKey('reader-navigation-toggle-${entry.chapter.index}'),
-          onPressed: enabled ? () => _toggleChapter(entry) : null,
+          key: ValueKey(
+            'reader-navigation-toggle-${_catalog.chapters[position].index}',
+          ),
+          onPressed: enabled ? () => _toggleChapter(position) : null,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 34, height: 42),
           visualDensity: VisualDensity.compact,
@@ -784,17 +859,13 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   int _annotationChapterPosition(BookNote annotation) {
     final chapterId = readerAnnotationChapterId(annotation);
     if (chapterId != null) {
-      final match = widget.chapters.indexWhere(
-        (chapter) => chapter.id == chapterId,
-      );
-      if (match >= 0) return widget.chapters[match].index;
+      final chapterIndex = _catalog.chapterIndexById[chapterId];
+      if (chapterIndex != null) return chapterIndex;
     }
     final chapterTitle = annotation.chapter.trim();
     if (chapterTitle.isNotEmpty) {
-      final match = widget.chapters.indexWhere(
-        (chapter) => chapter.title.trim() == chapterTitle,
-      );
-      if (match >= 0) return widget.chapters[match].index;
+      final chapterIndex = _catalog.chapterIndexForTitle(chapterTitle);
+      if (chapterIndex != null) return chapterIndex;
     }
     return 0x3fffffff;
   }
@@ -1077,18 +1148,14 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   }
 }
 
-class _ReaderNavigationTreeEntry {
-  const _ReaderNavigationTreeEntry({
-    required this.chapter,
-    required this.position,
-    required this.depth,
-    required this.parentPosition,
-    required this.hasChildren,
-  });
+class _DeferredTab extends StatelessWidget {
+  const _DeferredTab({required this.active, required this.childBuilder});
 
-  final ReaderNavigationChapter chapter;
-  final int position;
-  final int depth;
-  final int? parentPosition;
-  final bool hasChildren;
+  final bool active;
+  final Widget Function() childBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return active ? childBuilder() : const SizedBox.shrink();
+  }
 }

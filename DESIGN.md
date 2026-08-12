@@ -3,10 +3,10 @@
 ## Source of truth
 
 - Status: Active
-- Last refreshed: 2026-07-22
-- Primary product surfaces: 首页、书库、阅读器、阅读统计、设置，以及“数据与同步 / WebDAV”页面。
-- Evidence reviewed: `README.md`、`structure.md`、`docs/webdav-sync-design.md`、`docs/webdav-sync-ux-design.md`、`lib/pages/settings/sync/`、`lib/pages/library/import_book/import_book_page.dart`、`lib/services/sync/`、现有导入与存储实现，以及 Git 历史中 2026-07-11 移除的旧 WebDAV 同步实现。
-- Feature specifications: `docs/webdav-sync-design.md`（同步协议与数据架构）、`docs/webdav-sync-ux-design.md`（页面、交互、文案与状态流）。
+- Last refreshed: 2026-08-11
+- Primary product surfaces: 首页、书库、阅读器、阅读统计、书源管理、设置，以及“数据与同步 / WebDAV”页面。
+- Evidence reviewed: `README.md`、`structure.md`、`docs/webdav-sync-design.md`、`docs/webdav-sync-ux-design.md`、`docs/book-source-group-design.md`、`lib/pages/settings/sync/`、`lib/pages/book_sources/`、`lib/book_sources/source_engine/source_health_checker.dart`、现有导入、存储与同步实现，以及 Git 历史中 2026-07-11 移除的旧 WebDAV 同步实现。
+- Feature specifications: `docs/webdav-sync-design.md`（同步协议与数据架构）、`docs/webdav-sync-ux-design.md`（页面、交互、文案与状态流）、`docs/book-source-group-design.md`（书源分组、校验状态与管理交互）。
 
 ## Brand
 
@@ -51,8 +51,8 @@
 ## Components
 
 - Existing components to reuse: 设置页分区卡片、操作项、开关项、侧边 Toast、确认对话框、响应式导航容器。
-- New/changed components: 同步状态卡、分步连接测试、同步范围列表、书籍文件三段筛选、云端书籍卡片状态、批量传输操作栏、待处理变更摘要、同步活动详情、远端空间信息卡。
-- Variants and states: 未配置、测试连接中、已连接、同步中、成功、部分成功、失败、离线、凭据失效、远端空间不兼容。
+- New/changed components: 同步状态卡、分步连接测试、同步范围列表、书籍文件三段筛选、云端书籍卡片状态、批量传输操作栏、待处理变更摘要、同步活动详情、远端空间信息卡；书源健康状态筛选、用户分组选择器、批量分组面板和校验结果摘要。
+- Variants and states: 同步包含未配置、测试连接中、已连接、同步中、成功、部分成功、失败、离线、凭据失效、远端空间不兼容；书源校验包含正常、异常、未校验和校验中，且与用户分组保持独立。
 - Token/component ownership: 样式继续由现有主题与设置页组件拥有；同步页面只组合，不创建第二套设计系统。
 
 ## Accessibility
@@ -72,7 +72,7 @@
 ## Interaction states
 
 - Loading: 明确当前阶段，例如“读取远端设备列表”“上传 3 项变更”，允许离开页面，单次同步不可重复启动。
-- Empty: 未配置时解释需要 WebDAV 地址、用户名和应用密码；无远端数据时说明首次同步将创建独立目录。
+- Empty: 未配置时解释需要 WebDAV 地址、用户名和应用密码；无远端数据时说明首次同步将创建独立目录；书源分组筛选无结果时保留筛选条件并提供重置，删除分组不删除书源。
 - Error: 给出可行动分类，如地址无效、认证失败、证书错误、目录无写权限、空间不足、服务端不支持必要方法、数据损坏。
 - Success: 显示最后成功时间、同步的数据域和本次上传/下载数量。
 - Disabled: 未通过连接测试前禁用“开启自动同步”；同步过程中禁用配置修改和再次同步。
@@ -81,7 +81,7 @@
 ## Content voice
 
 - Tone: 直接、可信、避免夸张。
-- Terminology: 使用“同步”表示双向合并；“备份”只用于单向快照；使用“远端数据”而不是含糊的“云端”。
+- Terminology: 使用“同步”表示双向合并；“备份”只用于单向快照；使用“远端数据”而不是含糊的“云端”。书源管理中使用“正常 / 异常 / 未校验”表示动态校验状态，使用“我的分组”表示用户维护的长期分类。
 - Microcopy rules: 清楚区分“清除本机配置”“重置本机同步状态”“删除远端同步数据”；涉及覆盖或删除时说明对象、范围和不可逆性。
 
 ## Implementation constraints
@@ -90,7 +90,7 @@
 - Design-token constraints: 不新增主题依赖和同步专属 token。
 - Performance constraints: 阅读进度写入需防抖；元数据批次上限 1 MiB；书籍文件流式传输，不整文件载入内存。
 - Compatibility constraints: WebDAV 服务端能力不一致；不得依赖 LOCK；Web 端受 CORS 与浏览器方法限制，首版不承诺可用。
-- Test/screenshot expectations: UI 与状态流按 `docs/webdav-sync-ux-design.md` 验收；协议和冲突策略按 `docs/webdav-sync-design.md` 的验收矩阵验证。
+- Test/screenshot expectations: UI 与状态流按 `docs/webdav-sync-ux-design.md` 验收；协议和冲突策略按 `docs/webdav-sync-design.md` 的验收矩阵验证；书源分组、迁移、组合筛选和校验反馈按 `docs/book-source-group-design.md` 验收。
 
 ## Open questions
 

@@ -235,7 +235,98 @@ extension _NativeReaderHorizontalPaging on _NativeReaderPageState {
           chapters[page.chapterIndex].blocks[imageIndex].imageProvider;
       if (image != null) images.add(image);
     }
-    await Future.wait(images.map((image) => precacheImage(image, context)));
+    await Future.wait(
+      images.map((image) {
+        final testPrecacher = widget.imagePrecacher;
+        return testPrecacher == null
+            ? precacheImage(image, context)
+            : testPrecacher(image);
+      }),
+    );
+  }
+
+  void _scheduleNearbyBookPageImages(
+    List<_NativeChapter> chapters,
+    List<_BookPageRef> bookPages, {
+    required bool usesTwoPageLayout,
+  }) {
+    if (bookPages.isEmpty) return;
+    final currentIndex = bookPages.indexWhere(
+      (page) =>
+          !page.isBlank &&
+          !page.isForwardBoundary &&
+          page.chapterIndex == _chapterIndex &&
+          page.pageIndex == _pageIndex,
+    );
+    if (currentIndex < 0) return;
+
+    final currentStart = usesTwoPageLayout
+        ? _spreadStartForPage(currentIndex)
+        : currentIndex;
+    final first = math.max(0, currentStart - (usesTwoPageLayout ? 2 : 1));
+    final last = math.min(
+      bookPages.length,
+      currentStart + (usesTwoPageLayout ? 4 : 3),
+    );
+    final imagePages = bookPages
+        .getRange(first, last)
+        .where((page) {
+          if (page.isBlank || page.isForwardBoundary) return false;
+          return page.content.imageBlockIndex != null;
+        })
+        .toList(growable: false);
+    _scheduleBookPageImageBatch(chapters, imagePages);
+  }
+
+  void _scheduleNearbyChapterPageImages(
+    List<_NativeChapter> chapters,
+    List<_ReaderPageData> pages, {
+    required String layoutFingerprint,
+  }) {
+    final first = math.max(0, _pageIndex - 1);
+    final last = math.min(pages.length, _pageIndex + 3);
+    final imagePages = <_BookPageRef>[
+      for (var pageIndex = first; pageIndex < last; pageIndex++)
+        if (pages[pageIndex].imageBlockIndex != null)
+          _BookPageRef(
+            chapterIndex: _chapterIndex,
+            pageIndex: pageIndex,
+            pageCount: pages.length,
+            layoutFingerprint: layoutFingerprint,
+            content: pages[pageIndex],
+          ),
+    ];
+    _scheduleBookPageImageBatch(chapters, imagePages);
+  }
+
+  void _scheduleBookPageImageBatch(
+    List<_NativeChapter> chapters,
+    List<_BookPageRef> imagePages,
+  ) {
+    if (imagePages.isEmpty) return;
+
+    final key = imagePages
+        .map(
+          (page) =>
+              '${page.layoutFingerprint}:${page.chapterIndex}:'
+              '${page.pageIndex}:${page.content.imageBlockIndex}',
+        )
+        .join('|');
+    if (_scheduledImagePrecacheKey == key) return;
+    _scheduledImagePrecacheKey = key;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _scheduledImagePrecacheKey != key) return;
+      unawaited(
+        _precacheBookPageImages(context, chapters, imagePages).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          debugPrint('precache native reader image failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }),
+      );
+    });
   }
 
   Widget _buildHorizontalSlideSurface(

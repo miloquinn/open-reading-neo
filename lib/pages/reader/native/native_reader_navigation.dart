@@ -270,6 +270,10 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     // Prepared once while the book is loading. Opening the sheet must not
     // allocate one navigation model per chapter on the interaction frame.
     final navigationChapters = _navigationChapters;
+    final navigationCatalog = _navigationCatalog;
+    if (navigationCatalog == null) return;
+    final initialNavigationPosition = navigationCatalog
+        .initialPositionForChapter(_chapterIndex);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -285,13 +289,13 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
           child: ReaderNavigationSheet(
             palette: _readerTheme,
             chapters: navigationChapters,
+            catalog: navigationCatalog,
             currentChapterIndex: _chapterIndex,
             currentChapterOffset: _anchorOffset,
             currentChapterText: chapters[_chapterIndex].plainText,
-            // Locating the exact EPUB subsection can scan the current
-            // chapter's text; deferred so it never runs on this tap frame.
+            currentNavigationPosition: initialNavigationPosition,
             resolveCurrentNavigationPosition: () =>
-                _currentNavigationPosition(navigationChapters, chapters),
+                _currentNavigationPosition(navigationCatalog, chapters),
             bookmarks: _bookmarks,
             annotations: _annotations,
             currentAnchorKey: currentAnchorKey,
@@ -332,7 +336,7 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
   }
 
   int _currentNavigationPosition(
-    List<ReaderNavigationChapter> navigation,
+    ReaderNavigationCatalog catalog,
     List<_NativeChapter> chapters,
   ) {
     if (_chapterIndex < 0 || _chapterIndex >= chapters.length) return -1;
@@ -340,10 +344,10 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     final lastJumpPosition = _lastNavigationJumpPosition;
     if (lastJumpPosition != null &&
         lastJumpPosition >= 0 &&
-        lastJumpPosition < navigation.length &&
+        lastJumpPosition < catalog.chapters.length &&
         _pageMode != NativePageMode.verticalScroll &&
         _visiblePages.isNotEmpty) {
-      final target = navigation[lastJumpPosition];
+      final target = catalog.chapters[lastJumpPosition];
       if (target.index == _chapterIndex) {
         final targetOffset = chapter.navigationOffsetFor(target) ?? 0;
         final firstPage = _pageIndex.clamp(0, _visiblePages.length - 1);
@@ -360,26 +364,17 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
       0,
       chapter.plainText.length,
     );
-    var selectedPosition = -1;
-    var selectedChapterIndex = -1;
+    final chapterPositions = catalog.positionsByChapter[_chapterIndex];
+    if (chapterPositions == null || chapterPositions.isEmpty) {
+      return catalog.lastPositionBeforeChapter(_chapterIndex);
+    }
+    var selectedPosition = catalog.lastPositionBeforeChapter(_chapterIndex);
     var selectedOffset = -1;
-    for (var position = 0; position < navigation.length; position++) {
-      final target = navigation[position];
-      if (target.index > _chapterIndex) continue;
-      if (target.index < _chapterIndex) {
-        if (target.index >= selectedChapterIndex) {
-          selectedPosition = position;
-          selectedChapterIndex = target.index;
-          selectedOffset = -1;
-        }
-        continue;
-      }
+    for (final position in chapterPositions) {
+      final target = catalog.chapters[position];
       final targetOffset = chapter.navigationOffsetFor(target) ?? 0;
-      if (targetOffset <= currentOffset &&
-          (selectedChapterIndex < _chapterIndex ||
-              targetOffset >= selectedOffset)) {
+      if (targetOffset <= currentOffset && targetOffset >= selectedOffset) {
         selectedPosition = position;
-        selectedChapterIndex = _chapterIndex;
         selectedOffset = targetOffset;
       }
     }

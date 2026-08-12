@@ -196,6 +196,7 @@ class NativeReaderPage extends StatefulWidget {
     @visibleForTesting this.onPaginationCacheMiss,
     @visibleForTesting this.paginationCacheDao,
     @visibleForTesting this.usePaginationMemoryCache = true,
+    @visibleForTesting this.imagePrecacher,
   });
 
   final Book book;
@@ -203,6 +204,7 @@ class NativeReaderPage extends StatefulWidget {
   final ValueChanged<int>? onPaginationCacheMiss;
   final PaginationCacheDao? paginationCacheDao;
   final bool usePaginationMemoryCache;
+  final Future<void> Function(ImageProvider image)? imagePrecacher;
 
   @override
   State<NativeReaderPage> createState() => _NativeReaderPageState();
@@ -248,6 +250,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   final ReaderLeafStatusController _leafStatusController =
       ReaderLeafStatusController();
   final Set<String> _queuedHorizontalPaginationWarms = {};
+  String? _scheduledImagePrecacheKey;
   final Map<String, GlobalKey> _continuousPartKeys = {};
   final Map<String, List<_ContinuousReaderPart>> _continuousPartCache = {};
   late Map<String, List<_ReaderPageData>> _pageCache;
@@ -258,6 +261,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Future<void> _paginationCacheWriteQueue = Future<void>.value();
   List<_NativeChapter> _loadedChapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
+  ReaderNavigationCatalog? _navigationCatalog;
   int? _lastNavigationJumpPosition;
   bool _readerDependenciesInitialized = false;
   int _chapterIndex = 0;

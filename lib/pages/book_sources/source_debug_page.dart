@@ -145,62 +145,67 @@ class _SourceDebugPageState extends State<SourceDebugPage> {
           onPressed: _events.isEmpty ? null : _clear,
         ),
       ],
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    textInputAction: TextInputAction.go,
-                    onSubmitted: (_) => _run(),
-                    decoration: InputDecoration(
-                      hintText: context.l10n.sourceDebugInputHint,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                if (_running)
-                  OutlinedButton.icon(
-                    onPressed: _stop,
-                    icon: const Icon(Icons.stop_rounded),
-                    label: Text(context.l10n.sourceDebugStop),
-                  )
-                else
-                  FilledButton.icon(
-                    onPressed: _run,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text(context.l10n.sourceDebugRun),
-                  ),
-              ],
-            ),
-          ),
-          if (_running) const LinearProgressIndicator(minHeight: 2),
-          Expanded(
-            child: _events.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Text(
-                        context.l10n.sourceDebugEmpty,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: scheme.onSurfaceVariant),
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: FloatingSubpageScaffold.headerExtentOf(context),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _inputController,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (_) => _run(),
+                      decoration: InputDecoration(
+                        hintText: context.l10n.sourceDebugInputHint,
+                        border: const OutlineInputBorder(),
+                        isDense: true,
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-                    itemCount: _events.length,
-                    itemBuilder: (context, index) =>
-                        _EventTile(event: _events[index], onTap: _showDetail),
                   ),
-          ),
-        ],
+                  const SizedBox(width: 10),
+                  if (_running)
+                    OutlinedButton.icon(
+                      onPressed: _stop,
+                      icon: const Icon(Icons.stop_rounded),
+                      label: Text(context.l10n.sourceDebugStop),
+                    )
+                  else
+                    FilledButton.icon(
+                      onPressed: _run,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: Text(context.l10n.sourceDebugRun),
+                    ),
+                ],
+              ),
+            ),
+            if (_running) const LinearProgressIndicator(minHeight: 2),
+            Expanded(
+              child: _events.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          context.l10n.sourceDebugEmpty,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+                      itemCount: _events.length,
+                      itemBuilder: (context, index) =>
+                          _EventTile(event: _events[index], onTap: _showDetail),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -216,10 +221,7 @@ class _EventTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (icon, color) = switch (event) {
-      SourceDebugEvent(isError: true) => (
-        Icons.error_rounded,
-        scheme.error,
-      ),
+      SourceDebugEvent(isError: true) => (Icons.error_rounded, scheme.error),
       SourceDebugEvent(kind: SourceDebugEventKind.stageStart) => (
         Icons.play_circle_outline_rounded,
         scheme.onSurfaceVariant,

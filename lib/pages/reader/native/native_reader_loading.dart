@@ -80,6 +80,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
           ),
           growable: false,
         );
+    _navigationCatalog = ReaderNavigationCatalog(_navigationChapters);
     return chapters;
   }
 

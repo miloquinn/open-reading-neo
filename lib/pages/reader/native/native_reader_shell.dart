@@ -82,6 +82,19 @@ extension _NativeReaderShell on _NativeReaderPageState {
         _buildVerticalPageList(chapter, pages, viewport),
       );
     }
+    if (_pageMode == NativePageMode.instantPage) {
+      _scheduleNearbyChapterPageImages(
+        chapters,
+        pages,
+        layoutFingerprint: layoutFingerprint,
+      );
+    } else {
+      _scheduleNearbyBookPageImages(
+        chapters,
+        bookPages,
+        usesTwoPageLayout: usesTwoPageLayout,
+      );
+    }
     if (_pageMode == NativePageMode.horizontalSlide) {
       return _buildHorizontalSlideSurface(
         chapters,

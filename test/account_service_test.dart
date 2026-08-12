@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -386,6 +387,71 @@ void main() {
     expect(await controller.pollDeviceAuthorization(authorization), isTrue);
     expect(controller.user?.username, 'reader');
     expect(storage.refreshToken, 'refresh-2');
+  });
+
+  test('concurrent device authorization polls share one completion', () async {
+    final storage = _MemoryTokenStore();
+    final responseGate = Completer<void>();
+    final requestStarted = Completer<void>();
+    var polls = 0;
+    final adapter = _AsyncRouteAdapter((options) async {
+      return switch (options.uri.path) {
+        '/api/v1/auth/device/github/begin' => _json({
+          'device_code': 'device-secret',
+          'user_code': 'ABCD-EFGH',
+          'verification_uri': '/activate',
+          'expires_in': 600,
+          'interval': 5,
+        }),
+        '/api/v1/auth/device/token' => () async {
+          polls++;
+          requestStarted.complete();
+          await responseGate.future;
+          return _json(_session(access: 'access-2', refresh: 'refresh-2'));
+        }(),
+        '/api/v1/membership' => _json({
+          'premium': false,
+          'features': <String, bool>{},
+          'entitlements': <Object>[],
+        }),
+        _ => throw StateError('Unexpected route ${options.uri.path}'),
+      };
+    });
+    final controller = MemberAccountController(api: _client(adapter, storage));
+    final authorization = await controller.beginExternalLogin(
+      MemberExternalAuthMethod.github,
+    );
+
+    final callbackPoll = controller.pollDeviceAuthorization(authorization);
+    final pagePoll = controller.pollDeviceAuthorization(authorization);
+    await requestStarted.future;
+
+    expect(polls, 1);
+    expect(controller.error, isNull);
+    await expectLater(
+      controller.pollDeviceAuthorization(
+        DeviceAuthorization(
+          method: MemberExternalAuthMethod.github,
+          deviceCode: 'other-device',
+          userCode: 'WXYZ-1234',
+          verificationUri: Uri.https('open.xxread.top', '/activate'),
+          expiresIn: 600,
+          interval: 5,
+        ),
+      ),
+      throwsA(
+        isA<MemberAccountException>().having(
+          (error) => error.message,
+          'message',
+          '账号操作正在进行，请稍候',
+        ),
+      ),
+    );
+
+    responseGate.complete();
+    expect(await Future.wait([callbackPoll, pagePoll]), [isTrue, isTrue]);
+    expect(controller.user?.username, 'reader');
+    expect(controller.error, isNull);
   });
 
   test('API detail becomes a user-facing controller error', () async {
@@ -802,6 +868,22 @@ class _RouteAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async => handler(options);
+}
+
+class _AsyncRouteAdapter implements HttpClientAdapter {
+  _AsyncRouteAdapter(this.handler);
+
+  final Future<ResponseBody> Function(RequestOptions options) handler;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) => handler(options);
 }
 
 class _MemoryTokenStore implements MemberTokenStore {

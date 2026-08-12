@@ -35,6 +35,72 @@ void main() {
   });
 
   testWidgets(
+    'EPUB precaches adjacent horizontal images before the first turn',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await tester.binding.setSurfaceSize(const Size(480, 800));
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: ReaderPageMode.horizontalSlide.name,
+        ReaderSettingsStore.txtChapterTitlePageKey: false,
+      });
+      final directory = Directory.systemTemp.createTempSync(
+        'open-reading-epub-image-precache-',
+      );
+      final epub = File('${directory.path}/image-precache.epub');
+      epub.writeAsBytesSync(
+        _epubFixture(
+          chapterCount: 3,
+          imageOnlyChapterCount: 3,
+          uniqueImagePerChapter: true,
+        ),
+      );
+      final precachedImages = <ImageProvider>[];
+
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NativeReaderPage(
+              book: Book(
+                title: 'EPUB image precache fixture',
+                filePath: epub.path,
+                format: 'epub',
+                fileModifiedTime: epub
+                    .lastModifiedSync()
+                    .millisecondsSinceEpoch,
+              ),
+              imagePrecacher: (image) async => precachedImages.add(image),
+            ),
+          ),
+        );
+        await tester.runAsync(() async {
+          for (var attempt = 0; attempt < 60; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            await tester.pump();
+            if (precachedImages.toSet().length >= 2) return;
+          }
+        });
+        await _pumpUntil(tester, () => precachedImages.toSet().length >= 2);
+
+        final controller = tester
+            .widget<PageView>(find.byType(PageView))
+            .controller!;
+        expect(controller.page, controller.initialPage.toDouble());
+        expect(precachedImages.toSet(), hasLength(greaterThanOrEqualTo(2)));
+        expect(precachedImages, everyElement(isA<FileImage>()));
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.binding.setSurfaceSize(null);
+        debugDefaultTargetPlatformOverride = null;
+        directory.deleteSync(recursive: true);
+      }
+    },
+  );
+
+  testWidgets(
     'EPUB horizontal turns warm the next pagination window before a chapter boundary',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -680,7 +746,11 @@ int _lastPublishedContentPageIndex(WidgetTester tester, Finder pageView) {
   fail('No published EPUB content page was available.');
 }
 
-List<int> _epubFixture({int chapterCount = 4, int imageOnlyChapterCount = 0}) {
+List<int> _epubFixture({
+  int chapterCount = 4,
+  int imageOnlyChapterCount = 0,
+  bool uniqueImagePerChapter = false,
+}) {
   final archive = Archive();
   void add(String name, String content) {
     final bytes = utf8.encode(content);
@@ -704,7 +774,7 @@ List<int> _epubFixture({int chapterCount = 4, int imageOnlyChapterCount = 0}) {
   </metadata>
   <manifest>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-    <item id="stripe" href="stripe.png" media-type="image/png"/>
+    ${uniqueImagePerChapter ? List.generate(chapterCount, (index) => '<item id="stripe${index + 1}" href="stripe${index + 1}.png" media-type="image/png"/>').join() : '<item id="stripe" href="stripe.png" media-type="image/png"/>'}
     ${List.generate(chapterCount, (index) => '<item id="c${index + 1}" href="chapter${index + 1}.xhtml" media-type="application/xhtml+xml"/>').join()}
   </manifest>
   <spine toc="ncx">${List.generate(chapterCount, (index) => '<itemref idref="c${index + 1}"/>').join()}</spine>
@@ -715,16 +785,20 @@ List<int> _epubFixture({int chapterCount = 4, int imageOnlyChapterCount = 0}) {
   <docTitle><text>Transition fixture</text></docTitle>
   <navMap>${List.generate(chapterCount, (index) => '<navPoint id="nav${index + 1}" playOrder="${index + 1}"><navLabel><text>Chapter ${index + 1}</text></navLabel><content src="chapter${index + 1}.xhtml"/></navPoint>').join()}</navMap>
 </ncx>''');
-  addBytes(
-    'OEBPS/stripe.png',
-    base64Decode(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-    ),
+  final imageBytes = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   );
+  if (uniqueImagePerChapter) {
+    for (var chapter = 1; chapter <= chapterCount; chapter++) {
+      addBytes('OEBPS/stripe$chapter.png', imageBytes);
+    }
+  } else {
+    addBytes('OEBPS/stripe.png', imageBytes);
+  }
   for (var chapter = 1; chapter <= chapterCount; chapter++) {
     add('OEBPS/chapter$chapter.xhtml', '''<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter $chapter</title></head><body>
-${chapter <= imageOnlyChapterCount ? '<img src="stripe.png" alt=""/>' : '<h1>Chapter $chapter</h1>${List.generate(40, (index) => '<p>Chapter $chapter paragraph $index contains enough text to create several deterministic reader pages for transition testing.</p>').join()}'}
+${chapter <= imageOnlyChapterCount ? '<img src="${uniqueImagePerChapter ? 'stripe$chapter.png' : 'stripe.png'}" alt=""/>' : '<h1>Chapter $chapter</h1>${List.generate(40, (index) => '<p>Chapter $chapter paragraph $index contains enough text to create several deterministic reader pages for transition testing.</p>').join()}'}
 </body></html>''');
   }
   return ZipEncoder().encode(archive)!;

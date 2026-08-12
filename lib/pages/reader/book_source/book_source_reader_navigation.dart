@@ -451,6 +451,8 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     // Prepared with the catalog so the interaction frame only mounts the
     // sheet instead of allocating one navigation model per chapter.
     final navigationChapters = _navigationChapters;
+    final navigationCatalog = _navigationCatalog;
+    if (navigationCatalog == null) return;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -466,6 +468,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
           child: ReaderNavigationSheet(
             palette: _readerTheme,
             chapters: navigationChapters,
+            catalog: navigationCatalog,
             currentChapterIndex: _chapterIndex,
             bookmarks: _bookmarks,
             annotations: _annotations,

@@ -28,6 +28,7 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
         ..sort((a, b) => a.order.compareTo(b.order));
       final chapters = _withReplacedChapterTitles(rawChapters);
       final navigationChapters = _navigationFor(chapters);
+      final navigationCatalog = ReaderNavigationCatalog(navigationChapters);
       final saved = results[1] as BookSourceReadingProgress?;
       final settings = results[2]! as ReaderSettings;
       final scrollByChapter = results[3]! as bool;
@@ -51,6 +52,7 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
         _rawChapters = rawChapters;
         _chapters = chapters;
         _navigationChapters = navigationChapters;
+        _navigationCatalog = navigationCatalog;
         _chapterIndex = initialIndex;
         _fontSize = settings.fontSize;
         _fontWeight = settings.fontWeight;

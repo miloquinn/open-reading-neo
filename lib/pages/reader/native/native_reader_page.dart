@@ -20,7 +20,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'package:xxread/core/reader/canonical_locator.dart';
 import 'package:xxread/core/reader/horizontal_page_turn_tracker.dart';
-import 'package:xxread/core/reader/android_reader_aloud_notification.dart';
+import 'package:xxread/core/reader/platform_reader_aloud_media_session.dart';
 import 'package:xxread/core/reader/indexed_text_reader.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
 import 'package:xxread/core/reader/reader_annotation.dart';
@@ -61,6 +61,7 @@ import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/services/tts_service.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
+import 'package:xxread/services/reader_aloud_session.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
@@ -324,6 +325,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
+  bool _readerAloudPositionRevealInProgress = false;
+  int _readerAloudPositionRevealGeneration = 0;
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
   final BookmarkDao _bookmarkDao = BookmarkDao();
   final BookNoteDao _bookNoteDao = BookNoteDao();
@@ -575,7 +578,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
     _openingFlightSettled?.removeListener(_onOpeningFlightSettledChanged);
     _openingCoverHoldReached?.removeListener(_onOpeningCoverHoldChanged);
-    _readerAloudController?.dispose();
+    _readerAloudController?.removeListener(_onReaderAloudChanged);
     unawaited(_flushReadingSession());
     unawaited(_flushPendingPositionSave());
     _pageController?.dispose();

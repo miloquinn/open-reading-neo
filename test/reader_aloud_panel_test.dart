@@ -92,7 +92,7 @@ void main() {
     final speedSlider = tester.widgetList<Slider>(find.byType(Slider)).first;
     speedSlider.onChanged?.call(0.8);
     await tester.pump();
-    expect(find.text('0.80×'), findsOneWidget);
+    expect(find.text('1.60×'), findsOneWidget);
     speedSlider.onChangeEnd?.call(0.8);
     await tester.pumpAndSettle();
     expect(tts.speechRate, 0.8);

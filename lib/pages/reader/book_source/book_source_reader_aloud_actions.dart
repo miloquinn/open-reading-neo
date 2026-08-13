@@ -5,6 +5,10 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
     final active = _readerAloudController?.isActive ?? false;
     final highlight = _readerAloudController?.highlight;
     if (!mounted) return;
+    final error = _readerAloudController?.lastError;
+    if (error != null) {
+      showSideToast(context, '朗读启动失败：$error', kind: SideToastKind.error);
+    }
     if (active == _readerAloudActive && highlight == _readerAloudHighlight) {
       return;
     }
@@ -16,34 +20,42 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
 
   Future<void> _revealReaderAloudPosition(ReaderAloudPosition position) async {
     if (!mounted || _chapters.isEmpty) return;
-    final chapterIndex = position.chapterIndex.clamp(0, _chapters.length - 1);
-    final content = await _continuousContentFor(chapterIndex);
-    if (!mounted) return;
-    final text =
-        _readableChapterText[chapterIndex] ??
-        await readableBookSourceChapterTextAsync(
-          content,
-          fallbackTitle: _chapters[chapterIndex].title,
-        );
-    final offset = position.offset.clamp(0, text.length);
-    final progress = text.isEmpty ? 0.0 : offset / text.length;
+    final revealGeneration = ++_readerAloudPositionRevealGeneration;
+    _readerAloudPositionRevealInProgress = true;
+    try {
+      final chapterIndex = position.chapterIndex.clamp(0, _chapters.length - 1);
+      final content = await _continuousContentFor(chapterIndex);
+      if (!mounted) return;
+      final text =
+          _readableChapterText[chapterIndex] ??
+          await readableBookSourceChapterTextAsync(
+            content,
+            fallbackTitle: _chapters[chapterIndex].title,
+          );
+      final offset = position.offset.clamp(0, text.length);
+      final progress = text.isEmpty ? 0.0 : offset / text.length;
 
-    if (_pageMode == BookSourcePageMode.verticalScroll) {
-      await _jumpToVerticalChapter(
-        chapterIndex,
-        textOffset: offset,
-        progress: progress,
-      );
-      return;
+      if (_pageMode == BookSourcePageMode.verticalScroll) {
+        await _jumpToVerticalChapter(
+          chapterIndex,
+          textOffset: offset,
+          progress: progress,
+        );
+        return;
+      }
+      if (chapterIndex != _chapterIndex || _pagedViewportSize.isEmpty) {
+        await _loadChapter(chapterIndex, restoreProgress: progress);
+        return;
+      }
+      final layout = _pagedLayoutFor(chapterIndex, content, _pagedViewportSize);
+      final pageIndex = bookSourcePageIndexForOffset(layout.pages, offset);
+      _paginatedPages = layout.pages;
+      _setPagedIndex(pageIndex, jumpPageView: true);
+    } finally {
+      if (revealGeneration == _readerAloudPositionRevealGeneration) {
+        _readerAloudPositionRevealInProgress = false;
+      }
     }
-    if (chapterIndex != _chapterIndex || _pagedViewportSize.isEmpty) {
-      await _loadChapter(chapterIndex, restoreProgress: progress);
-      return;
-    }
-    final layout = _pagedLayoutFor(chapterIndex, content, _pagedViewportSize);
-    final pageIndex = bookSourcePageIndexForOffset(layout.pages, offset);
-    _paginatedPages = layout.pages;
-    _setPagedIndex(pageIndex, jumpPageView: true);
   }
 
   Future<void> _persistReaderAloudPosition(ReaderAloudPosition position) async {
@@ -102,6 +114,37 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
       palette: _readerTheme,
       themeData: _readerThemeData,
     );
+  }
+
+  /// Starts immediately from the reader toolbar; settings stay in the panel.
+  Future<void> _toggleReaderAloudPlayback() async {
+    final controller = _ensureReaderAloudController();
+    if (controller == null) return;
+    if (controller.isActive) {
+      await _showReaderAloudPanel();
+      return;
+    }
+    switch (controller.state) {
+      case ReaderAloudPlaybackState.playing:
+      case ReaderAloudPlaybackState.loading:
+        await controller.pause();
+      case ReaderAloudPlaybackState.paused:
+        await controller.resume();
+      case ReaderAloudPlaybackState.stopped:
+      case ReaderAloudPlaybackState.error:
+        showSideToast(context, '正在开始朗读…');
+        await controller.start();
+    }
+  }
+
+  Future<void> _restartReaderAloudAtVisiblePage() async {
+    final controller = _readerAloudController;
+    if (_readerAloudPositionRevealInProgress ||
+        controller == null ||
+        !controller.isActive) {
+      return;
+    }
+    await controller.start();
   }
 
   Future<void> _showAskAiPanel() async {

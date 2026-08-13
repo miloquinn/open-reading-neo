@@ -146,16 +146,36 @@ class TtsVoiceOption {
 }
 
 /// 只使用系统 TTS（flutter_tts 封装平台系统引擎）。
-class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
+class _QueuedTtsOperation {
+  _QueuedTtsOperation({required this.texts, required this.onTextStarted});
+
+  final List<String> texts;
+  final ValueChanged<int> onTextStarted;
+  final Completer<void> completion = Completer<void>();
+  int nativeStartCount = 0;
+  int completedCount = 0;
+  int lastReportedIndex = -1;
+  Object? error;
+}
+
+class TtsService extends ChangeNotifier
+    implements
+        ReaderAloudAdjustableEngine,
+        ReaderAloudContinuousEngine,
+        ReaderAloudQueuedEngine {
   static const String _voiceIdPrefKey = 'tts_voice_id';
   static const String _voiceIdentifierPrefKey = 'tts_voice_identifier';
   static const String _voiceNamePrefKey = 'tts_voice_name';
   static const String _voiceLocalePrefKey = 'tts_voice_locale';
+  static const String _xiaomiTtsEngine = 'com.xiaomi.mibrain.speech';
 
   FlutterTts? _flutterTts;
   Future<void>? _initializationFuture;
   Future<void>? _voiceLoadingFuture;
   Completer<void>? _activeSpeakSignal;
+  _QueuedTtsOperation? _activeQueuedOperation;
+  Timer? _webStartTimer;
+  Future<void> _speakModeTransition = Future<void>.value();
   int _speakCancellationVersion = 0;
   bool _isDisposed = false;
 
@@ -177,11 +197,20 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
   String? _voiceLoadError;
   List<TtsVoiceOption> _availableVoices = const <TtsVoiceOption>[];
   TtsVoiceOption? _currentVoice;
+  String? _androidTtsEngine;
+  final FlutterTts Function() _ttsFactory;
 
   @override
   bool get isPlaying => _isPlaying;
   @override
   bool get isPaused => _isPaused;
+  @override
+  bool get supportsContinuousText => false;
+  @override
+  bool get supportsQueuedText =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
   bool get isInitialized => _isInitialized;
   bool get isInitializing => _isInitializing;
   bool get isAvailable => _isInitialized;
@@ -203,7 +232,8 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
   TtsVoiceOption? get currentVoice => _currentVoice;
   String get currentVoiceLabel => _currentVoice?.title ?? 'system_default';
 
-  TtsService() {
+  TtsService({FlutterTts Function()? ttsFactory})
+    : _ttsFactory = ttsFactory ?? FlutterTts.new {
     unawaited(initialize());
   }
 
@@ -235,15 +265,17 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     try {
       await _loadSettings();
 
-      final tts = FlutterTts();
+      final tts = _ttsFactory();
       _wireHandlers(tts);
       await _configureSystemTts(tts);
-      await _safeSetSpeechRate(tts, _speechRate);
-      await _safeSetVolume(tts, _speechVolume);
-      await _safeSetPitch(tts, _speechPitch);
+      await _detectAndroidTtsEngine(tts);
       await _refreshAvailableLanguages(tts);
       await _applyBestLanguage(tts);
       await _restoreSavedVoice(tts);
+      // Several Android vendor engines reset their playback parameters when
+      // setLanguage/setVoice is called. Voice selection therefore has to
+      // happen before restoring rate, volume, and pitch.
+      await _applyPlaybackParameters(tts);
 
       _flutterTts = tts;
       _isInitialized = true;
@@ -282,21 +314,32 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      await tts.setSharedInstance(true);
-      await tts.autoStopSharedSession(true);
+      // Configure the category before activating the shared session. Playback
+      // with spokenAudio is valid with no category options and keeps speech
+      // eligible for background playback. The session remains active between
+      // queued utterances so iOS does not introduce a gap for every sentence.
       await tts.setIosAudioCategory(
         IosTextToSpeechAudioCategory.playback,
-        const [
-          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-          IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
-        ],
-        IosTextToSpeechAudioMode.voicePrompt,
+        const <IosTextToSpeechAudioCategoryOptions>[],
+        IosTextToSpeechAudioMode.spokenAudio,
       );
+      await tts.autoStopSharedSession(false);
+      await tts.setSharedInstance(true);
     }
   }
 
   void _wireHandlers(FlutterTts tts) {
     tts.setStartHandler(() {
+      _webStartTimer?.cancel();
+      _webStartTimer = null;
+      final queued = _activeQueuedOperation;
+      if (queued != null) {
+        final index = queued.nativeStartCount;
+        if (index < queued.texts.length) {
+          queued.nativeStartCount++;
+          _reportQueuedTextStarted(queued, index);
+        }
+      }
       _isPlaying = true;
       _isPaused = false;
       _lastError = null;
@@ -304,6 +347,32 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     });
 
     tts.setCompletionHandler(() {
+      final queued = _activeQueuedOperation;
+      if (queued != null) {
+        // stop() can deliver one late completion after a replacement queue
+        // is installed. Ignore only callbacks that cannot belong to an item
+        // which has already started.
+        if (queued.completedCount >= queued.nativeStartCount) {
+          return;
+        }
+        queued.completedCount++;
+        if (queued.completedCount < queued.texts.length) {
+          _isPlaying = true;
+          _isPaused = false;
+          _notifySafe();
+          return;
+        }
+        if (identical(_activeQueuedOperation, queued)) {
+          _activeQueuedOperation = null;
+        }
+        _isPlaying = false;
+        _isPaused = false;
+        _currentPosition = queued.texts.last.length;
+        _utteranceBasePosition = 0;
+        if (!queued.completion.isCompleted) queued.completion.complete();
+        _notifySafe();
+        return;
+      }
       _isPlaying = false;
       _isPaused = false;
       _currentPosition = 0;
@@ -324,6 +393,7 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     });
 
     tts.setCancelHandler(() {
+      _completeQueuedOperation();
       _isPlaying = false;
       _isPaused = false;
       _utteranceBasePosition = 0;
@@ -336,6 +406,27 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
       int endOffset,
       String word,
     ) {
+      final queued = _activeQueuedOperation;
+      if (queued != null) {
+        // onStart is the primary sentence boundary signal. Some engines send
+        // progress first, so use the progress text as a safe fallback.
+        if (queued.lastReportedIndex < 0 || _currentText != text) {
+          final startIndex = (queued.lastReportedIndex + 1).clamp(
+            0,
+            queued.texts.length,
+          );
+          var matchingIndex = -1;
+          for (var index = startIndex; index < queued.texts.length; index++) {
+            if (queued.texts[index] == text) {
+              matchingIndex = index;
+              break;
+            }
+          }
+          if (matchingIndex >= 0) {
+            _reportQueuedTextStarted(queued, matchingIndex);
+          }
+        }
+      }
       _currentPosition = (_utteranceBasePosition + startOffset).clamp(
         0,
         _currentText.length,
@@ -344,11 +435,14 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     });
 
     tts.setErrorHandler((message) {
+      _webStartTimer?.cancel();
+      _webStartTimer = null;
       _isPlaying = false;
       _isPaused = false;
       _lastError = message?.toString().trim().isNotEmpty == true
           ? message.toString()
           : 'tts_call_failed';
+      _completeQueuedOperation(error: StateError('tts_call_failed'));
       final activeSignal = _activeSpeakSignal;
       if (activeSignal != null && !activeSignal.isCompleted) {
         activeSignal.completeError(StateError('tts_call_failed'));
@@ -356,6 +450,24 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
       _notifySafe();
       debugPrint('TTS 运行错误: $message');
     });
+  }
+
+  void _reportQueuedTextStarted(_QueuedTtsOperation queued, int index) {
+    if (!identical(_activeQueuedOperation, queued) ||
+        index < 0 ||
+        index >= queued.texts.length ||
+        index <= queued.lastReportedIndex) {
+      return;
+    }
+    queued.lastReportedIndex = index;
+    _currentText = queued.texts[index];
+    _currentPosition = 0;
+    _utteranceBasePosition = 0;
+    try {
+      queued.onTextStarted(index);
+    } catch (error) {
+      debugPrint('TTS queue start callback failed: $error');
+    }
   }
 
   Future<void> _refreshAvailableLanguages(FlutterTts tts) async {
@@ -535,10 +647,34 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
 
   Future<void> _safeSetSpeechRate(FlutterTts tts, double rate) async {
     try {
-      await tts.setSpeechRate(rate.clamp(0.1, 1.0));
+      await tts.setSpeechRate(_effectivePlatformSpeechRate(rate));
     } catch (e) {
       debugPrint('设置 TTS 语速失败: $e');
     }
+  }
+
+  Future<void> _detectAndroidTtsEngine(FlutterTts tts) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      _androidTtsEngine = (await tts.getDefaultEngine)?.toString().trim();
+      debugPrint('Android TTS engine: $_androidTtsEngine');
+    } catch (error) {
+      _androidTtsEngine = null;
+      debugPrint('Unable to detect Android TTS engine: $error');
+    }
+  }
+
+  double _effectivePlatformSpeechRate(double storedRate) {
+    final normalized = storedRate.clamp(0.1, 1.0).toDouble();
+    if (_androidTtsEngine != _xiaomiTtsEngine) return normalized;
+
+    // Xiaomi's cloud TTS compresses Android's standard speech rate to a very
+    // small integer range. With the normal flutter_tts mapping, 1.0x and 2.0x
+    // become adjacent Xiaomi values and sound almost identical. Keep normal
+    // speed unchanged, but expand the faster half only for this engine.
+    final multiplier = normalized * 2;
+    if (multiplier <= 1) return normalized;
+    return (0.5 + (multiplier - 1) * 2.5).clamp(0.1, 3.0).toDouble();
   }
 
   Future<void> _safeSetVolume(FlutterTts tts, double volume) async {
@@ -557,6 +693,26 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     }
   }
 
+  Future<void> _applyPlaybackParameters(
+    FlutterTts tts, {
+    bool logEffectiveRate = false,
+  }) async {
+    await _safeSetSpeechRate(tts, _speechRate);
+    await _safeSetVolume(tts, _speechVolume);
+    await _safeSetPitch(tts, _speechPitch);
+    if (logEffectiveRate &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android) {
+      // flutter_tts maps its 0.5 value to Android TextToSpeech's native 1.0.
+      debugPrint(
+        'Android TTS queue rate: '
+        '${(_speechRate * 2).toStringAsFixed(2)}x '
+        '(flutter_tts=${_effectivePlatformSpeechRate(_speechRate)}, '
+        'engine=${_androidTtsEngine ?? 'unknown'})',
+      );
+    }
+  }
+
   @override
   Future<void> speak(String text) async {
     final content = text.trim();
@@ -572,18 +728,29 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
       throw StateError('tts_unavailable');
     }
 
-    var cancellationVersion = _speakCancellationVersion;
+    final needsNativeStop =
+        _isPlaying ||
+        _isPaused ||
+        _activeSpeakSignal != null ||
+        _activeQueuedOperation != null;
+    _speakCancellationVersion++;
+    final cancellationVersion = _speakCancellationVersion;
+    _completeActiveSpeakWait();
+    _completeQueuedOperation();
     Completer<void>? activeSignal;
     try {
-      if (_isPlaying || _isPaused) {
-        _speakCancellationVersion++;
-        _completeActiveSpeakWait();
+      if (needsNativeStop) {
         await tts.stop();
       }
+      // A queued operation can still be switching awaitSpeakCompletion(false)
+      // before it installs its native callback counters. Serializing this
+      // restore prevents a replacement single utterance from returning early.
+      await _restoreDefaultSpeakMode(tts);
+      if (cancellationVersion != _speakCancellationVersion) return;
 
-      cancellationVersion = _speakCancellationVersion;
-      activeSignal = Completer<void>();
-      _activeSpeakSignal = activeSignal;
+      final speakSignal = Completer<void>();
+      activeSignal = speakSignal;
+      _activeSpeakSignal = speakSignal;
       _currentText = content;
       _currentPosition = 0;
       _utteranceBasePosition = 0;
@@ -591,12 +758,29 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
       _notifySafe();
 
       await _applyCurrentVoiceIfNeeded(tts);
+      await _applyPlaybackParameters(tts);
+      if (kIsWeb) {
+        _webStartTimer?.cancel();
+        _webStartTimer = Timer(const Duration(seconds: 6), () {
+          if (identical(_activeSpeakSignal, speakSignal) &&
+              !_isPlaying &&
+              !speakSignal.isCompleted) {
+            speakSignal.completeError(
+              StateError('浏览器系统语音没有开始播放；请检查标签页是否静音和系统语音是否可用。'),
+            );
+          }
+        });
+      }
+      // The web implementation of flutter_tts returns 0 after a cancelled
+      // utterance even though SpeechSynthesis has accepted the replacement.
+      // Its start/error callbacks are the authoritative playback signal.
+      // On native platforms preserve the plugin return-value check.
       final result = await Future.any<dynamic>([
         _speakWithAudioFocus(tts, content),
         activeSignal.future,
       ]);
       if (cancellationVersion != _speakCancellationVersion) return;
-      if (result == 0 || result == false) {
+      if (!kIsWeb && (result == 0 || result == false)) {
         throw StateError('tts_call_failed');
       }
     } catch (e, stackTrace) {
@@ -615,8 +799,96 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
       debugPrint('TTS 播放失败: $e');
       Error.throwWithStackTrace(e, stackTrace);
     } finally {
+      _webStartTimer?.cancel();
+      _webStartTimer = null;
       if (identical(_activeSpeakSignal, activeSignal)) {
         _activeSpeakSignal = null;
+      }
+    }
+  }
+
+  @override
+  Future<void> speakQueued(
+    List<String> texts, {
+    required ValueChanged<int> onTextStarted,
+  }) async {
+    final contents = texts
+        .map((text) => text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList(growable: false);
+    if (contents.isEmpty) return;
+
+    await initialize();
+    final tts = _flutterTts;
+    if (!_isInitialized || tts == null || !supportsQueuedText) {
+      throw StateError('tts_unavailable');
+    }
+
+    final needsNativeStop =
+        _isPlaying ||
+        _isPaused ||
+        _activeSpeakSignal != null ||
+        _activeQueuedOperation != null;
+    _speakCancellationVersion++;
+    final operationVersion = _speakCancellationVersion;
+    _completeActiveSpeakWait();
+    _completeQueuedOperation();
+    try {
+      if (needsNativeStop) {
+        await tts.stop();
+        // Let a delayed cancel/completion from the old native queue cross the
+        // method channel before installing the new FIFO counters.
+        await Future<void>.delayed(Duration.zero);
+      }
+      await _applyCurrentVoiceIfNeeded(tts);
+      await _applyPlaybackParameters(tts, logEffectiveRate: true);
+      final enteredQueueMode = await _enterQueuedSpeakMode(
+        tts,
+        operationVersion,
+      );
+      if (!enteredQueueMode) return;
+
+      final queued = _QueuedTtsOperation(
+        texts: contents,
+        onTextStarted: onTextStarted,
+      );
+      _activeQueuedOperation = queued;
+      _currentText = contents.first;
+      _currentPosition = 0;
+      _utteranceBasePosition = 0;
+      _isPlaying = true;
+      _isPaused = false;
+      _lastError = null;
+      _notifySafe();
+
+      for (var index = 0; index < contents.length; index++) {
+        if (!identical(_activeQueuedOperation, queued) ||
+            operationVersion != _speakCancellationVersion) {
+          return;
+        }
+        final result = await _speakQueuedText(
+          tts,
+          contents[index],
+          requestAudioFocus: index == 0,
+        );
+        if (result == 0 || result == false) {
+          throw StateError('tts_call_failed');
+        }
+      }
+      await queued.completion.future;
+      final queuedError = queued.error;
+      if (queuedError != null) throw queuedError;
+    } catch (error, stackTrace) {
+      if (operationVersion != _speakCancellationVersion) return;
+      _completeQueuedOperation();
+      _isPlaying = false;
+      _isPaused = false;
+      _lastError = error is StateError ? error.message : _toErrorText(error);
+      _notifySafe();
+      Error.throwWithStackTrace(error, stackTrace);
+    } finally {
+      if (operationVersion == _speakCancellationVersion) {
+        await _restoreDefaultSpeakMode(tts);
       }
     }
   }
@@ -631,7 +903,17 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     try {
       _speakCancellationVersion++;
       _completeActiveSpeakWait();
-      await tts.pause();
+      final wasQueued = _activeQueuedOperation != null;
+      _completeQueuedOperation();
+      if (wasQueued) {
+        // flutter_tts pause only remembers one utterance and cannot preserve
+        // the remaining native queue. The controller has already saved the
+        // current sentence offset, so stop and rebuild the queue on resume.
+        await tts.stop();
+        await _restoreDefaultSpeakMode(tts);
+      } else {
+        await tts.pause();
+      }
       _isPlaying = false;
       _isPaused = true;
       _notifySafe();
@@ -657,6 +939,7 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
           : '';
       _utteranceBasePosition = startIndex;
       await _applyCurrentVoiceIfNeeded(tts);
+      await _applyPlaybackParameters(tts);
       await _speakWithAudioFocus(
         tts,
         remainingText.isEmpty ? fallbackText : remainingText,
@@ -670,6 +953,8 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
 
   @override
   Future<void> stop() async {
+    _webStartTimer?.cancel();
+    _webStartTimer = null;
     final tts = _flutterTts;
     if (tts == null) {
       return;
@@ -678,7 +963,9 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     try {
       _speakCancellationVersion++;
       _completeActiveSpeakWait();
+      _completeQueuedOperation();
       await tts.stop();
+      await _restoreDefaultSpeakMode(tts);
     } catch (e) {
       _lastError = _toErrorText(e);
       debugPrint('TTS 停止失败: $e');
@@ -728,9 +1015,89 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
     return tts.speak(text);
   }
 
+  Future<dynamic> _speakQueuedText(
+    FlutterTts tts,
+    String text, {
+    required bool requestAudioFocus,
+  }) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return tts.speak(text, focus: requestAudioFocus);
+    }
+    return tts.speak(text);
+  }
+
   void _completeActiveSpeakWait() {
     final active = _activeSpeakSignal;
     if (active != null && !active.isCompleted) active.complete();
+  }
+
+  void _completeQueuedOperation({Object? error}) {
+    final queued = _activeQueuedOperation;
+    _activeQueuedOperation = null;
+    if (queued == null || queued.completion.isCompleted) return;
+    queued.error = error;
+    queued.completion.complete();
+  }
+
+  Future<T> _withSpeakModeTransition<T>(Future<T> Function() operation) async {
+    final previous = _speakModeTransition;
+    final release = Completer<void>();
+    _speakModeTransition = release.future;
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release.complete();
+    }
+  }
+
+  Future<bool> _enterQueuedSpeakMode(FlutterTts tts, int operationVersion) {
+    return _withSpeakModeTransition(() async {
+      if (operationVersion != _speakCancellationVersion) return false;
+
+      await tts.awaitSpeakCompletion(false);
+      if (operationVersion != _speakCancellationVersion) {
+        await _restoreDefaultSpeakModeUnlocked(tts);
+        return false;
+      }
+
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        // QUEUE_ADD is Android-only. AVSpeechSynthesizer already preserves
+        // FIFO order when several speak calls are submitted without awaiting
+        // each utterance's completion.
+        await tts.setQueueMode(1);
+        if (operationVersion != _speakCancellationVersion) {
+          await _restoreDefaultSpeakModeUnlocked(tts);
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  Future<void> _restoreDefaultSpeakMode(FlutterTts tts) {
+    return _withSpeakModeTransition(
+      () => _restoreDefaultSpeakModeUnlocked(tts),
+    );
+  }
+
+  Future<void> _restoreDefaultSpeakModeUnlocked(FlutterTts tts) async {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await tts.setQueueMode(0);
+    } else if (defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
+    await tts.awaitSpeakCompletion(true);
+  }
+
+  Future<void> _disposeNativeTts(FlutterTts tts) async {
+    try {
+      await tts.stop();
+      await _restoreDefaultSpeakMode(tts);
+    } catch (error) {
+      debugPrint('TTS dispose failed: $error');
+    }
   }
 
   Future<void> setLanguage(String language) async {
@@ -1034,12 +1401,14 @@ class TtsService extends ChangeNotifier implements ReaderAloudAdjustableEngine {
   void dispose() {
     _isDisposed = true;
     _speakCancellationVersion++;
+    _webStartTimer?.cancel();
     _completeActiveSpeakWait();
+    _completeQueuedOperation();
     final tts = _flutterTts;
     _flutterTts = null;
     _initializationFuture = null;
     if (tts != null) {
-      unawaited(tts.stop());
+      unawaited(_disposeNativeTts(tts));
     }
     super.dispose();
   }

@@ -15,7 +15,6 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'l10n/app_localizations.dart';
 import 'book_sources/services/book_source_client.dart';
-import 'book_sources/services/book_source_maintenance_coordinator.dart';
 import 'book_sources/services/book_source_registry.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
 import 'book_sources/source_engine/source_interaction_coordinator.dart';
@@ -40,6 +39,7 @@ import 'utils/app_themes.dart';
 import 'utils/book_open_transition.dart';
 import 'services/tts_service.dart';
 import 'services/reader_aloud_service.dart';
+import 'services/reader_aloud_session.dart';
 import 'services/account/account.dart';
 import 'package:path_provider/path_provider.dart';
 import 'utils/glass_config.dart';
@@ -110,11 +110,9 @@ void main(List<String> arguments) async {
             update: (context, tts, service) =>
                 service ?? ReaderAloudService(systemEngine: tts),
           ),
+          provider.ChangeNotifierProvider(create: (_) => ReaderAloudSession()),
           provider.ChangeNotifierProvider(
             create: (_) => DownloadTaskController(),
-          ),
-          provider.ChangeNotifierProvider(
-            create: (_) => BookSourceMaintenanceCoordinator(),
           ),
           provider.ChangeNotifierProvider(
             create: (_) => WebDavSyncController(),

@@ -37,49 +37,53 @@ extension _NativeReaderControls on _NativeReaderPageState {
     } on ProviderNotFoundException {
       return null;
     }
-    final controller = ReaderAloudController(
-      engine: aloudService,
-      notificationSink: AndroidReaderAloudNotification.instance,
-      source: CallbackReaderAloudSource(
-        bookTitle: widget.book.title,
-        chapterCount: () => _loadedChapters.length,
-        currentPosition: () async {
-          final chapterIndex = _chapterIndex
-              .clamp(0, math.max(0, _loadedChapters.length - 1))
-              .toInt();
-          var offset = _anchorOffset ?? 0;
-          if (_pageMode == NativePageMode.verticalScroll &&
-              _visibleContinuousParts.isNotEmpty) {
-            offset =
-                _visibleContinuousParts[_pageIndex.clamp(
-                      0,
-                      _visibleContinuousParts.length - 1,
-                    )]
-                    .content
-                    .startOffset;
-          } else if (_visiblePages.isNotEmpty) {
-            offset =
-                _visiblePages[_pageIndex.clamp(0, _visiblePages.length - 1)]
-                    .startOffset;
-          }
-          return ReaderAloudPosition(
-            chapterIndex: chapterIndex,
-            offset: offset,
-          );
-        },
-        loadChapter: (index) async {
-          if (index < 0 || index >= _loadedChapters.length) return null;
-          final chapter = _loadedChapters[index];
-          await chapter.loadTextAsync();
-          return ReaderAloudChapter(
-            index: index,
-            id: chapter.id,
-            title: chapter.title,
-            text: chapter.plainText,
-          );
-        },
-        revealPosition: _revealReaderAloudPosition,
-        persistPosition: _persistReaderAloudPosition,
+    final session = context.read<ReaderAloudSession>();
+    final controller = session.acquire(
+      sourceId: 'local:${widget.book.id}',
+      create: () => ReaderAloudController(
+        engine: aloudService,
+        notificationSink: PlatformReaderAloudMediaSession.instance,
+        source: CallbackReaderAloudSource(
+          bookTitle: widget.book.title,
+          chapterCount: () => _loadedChapters.length,
+          currentPosition: () async {
+            final chapterIndex = _chapterIndex
+                .clamp(0, math.max(0, _loadedChapters.length - 1))
+                .toInt();
+            var offset = _anchorOffset ?? 0;
+            if (_pageMode == NativePageMode.verticalScroll &&
+                _visibleContinuousParts.isNotEmpty) {
+              offset =
+                  _visibleContinuousParts[_pageIndex.clamp(
+                        0,
+                        _visibleContinuousParts.length - 1,
+                      )]
+                      .content
+                      .startOffset;
+            } else if (_visiblePages.isNotEmpty) {
+              offset =
+                  _visiblePages[_pageIndex.clamp(0, _visiblePages.length - 1)]
+                      .startOffset;
+            }
+            return ReaderAloudPosition(
+              chapterIndex: chapterIndex,
+              offset: offset,
+            );
+          },
+          loadChapter: (index) async {
+            if (index < 0 || index >= _loadedChapters.length) return null;
+            final chapter = _loadedChapters[index];
+            await chapter.loadTextAsync();
+            return ReaderAloudChapter(
+              index: index,
+              id: chapter.id,
+              title: chapter.title,
+              text: chapter.plainText,
+            );
+          },
+          revealPosition: _revealReaderAloudPosition,
+          persistPosition: _persistReaderAloudPosition,
+        ),
       ),
     )..addListener(_onReaderAloudChanged);
     _readerAloudController = controller;
@@ -90,6 +94,10 @@ extension _NativeReaderControls on _NativeReaderPageState {
     final active = _readerAloudController?.isActive ?? false;
     final highlight = _readerAloudController?.highlight;
     if (!mounted) return;
+    final error = _readerAloudController?.lastError;
+    if (error != null) {
+      showSideToast(context, '朗读启动失败：$error', kind: SideToastKind.error);
+    }
     if (active == _readerAloudActive && highlight == _readerAloudHighlight) {
       return;
     }
@@ -101,38 +109,46 @@ extension _NativeReaderControls on _NativeReaderPageState {
 
   Future<void> _revealReaderAloudPosition(ReaderAloudPosition position) async {
     if (!mounted || _loadedChapters.isEmpty) return;
-    final chapterIndex = position.chapterIndex.clamp(
-      0,
-      _loadedChapters.length - 1,
-    );
-    final chapter = _loadedChapters[chapterIndex];
-    await chapter.loadTextAsync();
-    final offset = position.offset.clamp(0, chapter.plainText.length);
-    final excerptEnd = (offset + 72).clamp(offset, chapter.plainText.length);
-    final locator = CanonicalLocator.fromComponents(
-      format: BookFormat.fromFileExtension(widget.book.format),
-      chapterId: chapter.id,
-      offset: offset,
-      excerpt: chapter.plainText.substring(offset, excerptEnd),
-      progression: chapter.plainText.isEmpty
-          ? 0
-          : offset / chapter.plainText.length,
-    );
-    final revealsWithinCurrentChapter = chapterIndex == _chapterIndex;
-    await _jumpToBookmark(
-      Bookmark(
-        bookId: widget.book.id ?? 0,
-        pageNumber: chapterIndex,
-        chapterIndex: chapterIndex,
-        chapterTitle: chapter.title,
-        canonicalLocator: LocatorCodec.encodeCanonicalLocator(locator),
-      ),
-      _loadedChapters,
-    );
-    if (revealsWithinCurrentChapter &&
-        mounted &&
-        _pageMode != NativePageMode.verticalScroll) {
-      _setReaderState(() {});
+    final revealGeneration = ++_readerAloudPositionRevealGeneration;
+    _readerAloudPositionRevealInProgress = true;
+    try {
+      final chapterIndex = position.chapterIndex.clamp(
+        0,
+        _loadedChapters.length - 1,
+      );
+      final chapter = _loadedChapters[chapterIndex];
+      await chapter.loadTextAsync();
+      final offset = position.offset.clamp(0, chapter.plainText.length);
+      final excerptEnd = (offset + 72).clamp(offset, chapter.plainText.length);
+      final locator = CanonicalLocator.fromComponents(
+        format: BookFormat.fromFileExtension(widget.book.format),
+        chapterId: chapter.id,
+        offset: offset,
+        excerpt: chapter.plainText.substring(offset, excerptEnd),
+        progression: chapter.plainText.isEmpty
+            ? 0
+            : offset / chapter.plainText.length,
+      );
+      final revealsWithinCurrentChapter = chapterIndex == _chapterIndex;
+      await _jumpToBookmark(
+        Bookmark(
+          bookId: widget.book.id ?? 0,
+          pageNumber: chapterIndex,
+          chapterIndex: chapterIndex,
+          chapterTitle: chapter.title,
+          canonicalLocator: LocatorCodec.encodeCanonicalLocator(locator),
+        ),
+        _loadedChapters,
+      );
+      if (revealsWithinCurrentChapter &&
+          mounted &&
+          _pageMode != NativePageMode.verticalScroll) {
+        _setReaderState(() {});
+      }
+    } finally {
+      if (revealGeneration == _readerAloudPositionRevealGeneration) {
+        _readerAloudPositionRevealInProgress = false;
+      }
     }
   }
 
@@ -195,6 +211,38 @@ extension _NativeReaderControls on _NativeReaderPageState {
       palette: _readerTheme,
       themeData: _readerThemeData,
     );
+  }
+
+  /// The toolbar button is intentionally a playback control. Detailed voice,
+  /// speed and sleep settings remain available from the reader controls sheet.
+  Future<void> _toggleReaderAloudPlayback() async {
+    final controller = _ensureReaderAloudController();
+    if (controller == null) return;
+    if (controller.isActive) {
+      await _showReaderAloudPanel();
+      return;
+    }
+    switch (controller.state) {
+      case ReaderAloudPlaybackState.playing:
+      case ReaderAloudPlaybackState.loading:
+        await controller.pause();
+      case ReaderAloudPlaybackState.paused:
+        await controller.resume();
+      case ReaderAloudPlaybackState.stopped:
+      case ReaderAloudPlaybackState.error:
+        showSideToast(context, '正在开始朗读…');
+        await controller.start();
+    }
+  }
+
+  Future<void> _restartReaderAloudAtVisiblePage() async {
+    final controller = _readerAloudController;
+    if (_readerAloudPositionRevealInProgress ||
+        controller == null ||
+        !controller.isActive) {
+      return;
+    }
+    await controller.start();
   }
 
   Future<void> _showAskAiPanel(

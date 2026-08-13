@@ -354,8 +354,12 @@ class MemberAccountController extends ChangeNotifier {
       }
       return _pollDeviceAuthorization(authorization);
     }
+    if ((isAuthenticated || mfaRequired) &&
+        _pendingDeviceAuthorization == null) {
+      return true;
+    }
 
-    final poll = _pollDeviceAuthorization(authorization);
+    final poll = _pollDeviceAuthorizationRecovering(authorization);
     _deviceAuthorizationPoll = poll;
     _deviceAuthorizationPollCode = authorization.deviceCode;
     try {
@@ -365,6 +369,21 @@ class MemberAccountController extends ChangeNotifier {
         _deviceAuthorizationPoll = null;
         _deviceAuthorizationPollCode = null;
       }
+    }
+  }
+
+  Future<bool> _pollDeviceAuthorizationRecovering(
+    DeviceAuthorization authorization,
+  ) async {
+    try {
+      return await _pollDeviceAuthorization(authorization);
+    } on MemberAccountException catch (error) {
+      if (error.code != 'network_timeout' &&
+          error.code != 'network_unavailable') {
+        rethrow;
+      }
+      clearError();
+      return false;
     }
   }
 
@@ -422,11 +441,10 @@ class MemberAccountController extends ChangeNotifier {
     final payload = await _pendingAuthorizationStore.read();
     if (payload == null || payload.isEmpty) return;
     try {
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
       _pendingDeviceAuthorization = DeviceAuthorization.fromJson(
-        MemberExternalAuthMethod.values.byName(
-          (jsonDecode(payload) as Map<String, dynamic>)['method'] as String,
-        ),
-        jsonDecode(payload) as Map<String, dynamic>,
+        MemberExternalAuthMethod.values.byName(decoded['method'] as String),
+        decoded,
         baseUri: _api.baseUri,
       );
       _authCallbackSignal = Completer<void>();
@@ -607,7 +625,12 @@ class MemberAccountController extends ChangeNotifier {
   }
 
   Future<void> _loadAccountValues() async {
-    await _loadMembershipValue();
+    try {
+      await _loadMembershipValue();
+    } on MemberAccountException {
+      // The session and user returned by authentication are authoritative.
+      // Membership is supplementary and can recover on a later account load.
+    }
     if (!kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.macOS)) {

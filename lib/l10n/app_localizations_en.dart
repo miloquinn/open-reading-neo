@@ -446,6 +446,147 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesMaintenanceTitle => 'Source maintenance';
+
+  @override
+  String get bookSourcesMaintenanceSubtitle =>
+      'Check source health and disable broken or duplicate entries';
+
+  @override
+  String get bookSourcesMaintenanceHealthTitle => 'Source health check';
+
+  @override
+  String get bookSourcesMaintenanceHealthSubtitle =>
+      'Checks search, details, catalogs, and content online; this may take a while';
+
+  @override
+  String get bookSourcesMaintenanceHealthRunning =>
+      'Source health check running';
+
+  @override
+  String get bookSourcesMaintenanceDedupeTitle => 'Duplicate cleanup';
+
+  @override
+  String get bookSourcesMaintenanceDedupeSubtitle =>
+      'Finds identical or possible duplicates locally without visiting source sites';
+
+  @override
+  String get bookSourcesMaintenanceReviewTitle => 'Last health-check result';
+
+  @override
+  String bookSourcesMaintenanceReviewSubtitle(int count) {
+    return '$count source(s) need attention';
+  }
+
+  @override
+  String get bookSourcesMaintenanceSafetyHint =>
+      'Maintenance disables sources by default and never deletes source configurations.';
+
+  @override
+  String get bookSourcesMaintenanceProgressTitle => 'Checking sources';
+
+  @override
+  String get bookSourcesMaintenanceProgressHint =>
+      'Checking search, details, catalogs, and content';
+
+  @override
+  String get bookSourcesMaintenanceFinishedTitle =>
+      'Source health check complete';
+
+  @override
+  String bookSourcesMaintenanceFinishedSummary(int checked, int attention) {
+    return 'Checked $checked source(s); $attention need attention';
+  }
+
+  @override
+  String bookSourcesMaintenanceProgress(int completed, int total) {
+    return '$completed / $total';
+  }
+
+  @override
+  String get bookSourcesMaintenanceStop => 'Stop checking';
+
+  @override
+  String get bookSourcesMaintenanceBackground => 'Continue in background';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundHint =>
+      'Close this progress view and the check will continue quietly while the app is running.';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundToast =>
+      'Source health check is continuing quietly in the background';
+
+  @override
+  String get bookSourcesMaintenanceReviewResults => 'Review results';
+
+  @override
+  String bookSourcesMaintenanceRunningMenuLabel(int completed, int total) {
+    return 'Source maintenance $completed/$total';
+  }
+
+  @override
+  String get bookSourcesDedupeMenuLabel => 'Find duplicate sources';
+
+  @override
+  String get bookSourcesDedupeNone => 'No duplicate sources found';
+
+  @override
+  String get bookSourcesDedupeReviewTitle => 'Review duplicate sources';
+
+  @override
+  String bookSourcesDedupeReviewSummary(int groups, int duplicates) {
+    return '$groups group(s), $duplicates duplicate source(s)';
+  }
+
+  @override
+  String get bookSourcesDedupeReviewHint =>
+      'The recommended source is kept. Selected duplicates will be disabled, not deleted.';
+
+  @override
+  String bookSourcesDedupeDisableSelected(int count) {
+    return 'Disable $count selected';
+  }
+
+  @override
+  String bookSourcesDedupeDisabledSummary(int count) {
+    return 'Disabled $count duplicate source(s)';
+  }
+
+  @override
+  String get bookSourcesDedupeModeExact => 'Exact';
+
+  @override
+  String get bookSourcesDedupeModeStandard => 'Standard';
+
+  @override
+  String get bookSourcesDedupeModeSite => 'Same site';
+
+  @override
+  String get bookSourcesDedupeExactReason => 'Same source identity';
+
+  @override
+  String get bookSourcesDedupeCanonicalReason =>
+      'Same normalized source address';
+
+  @override
+  String get bookSourcesDedupeSiteReason => 'Same site; review required';
+
+  @override
+  String get bookSourcesDedupeRecommended => 'Recommended';
+
+  @override
+  String get bookSourcesDedupeReviewAction => 'Review deduplication';
+
+  @override
+  String bookSourcesDedupeImportSummary(int ready, int duplicates, int errors) {
+    return '$ready ready, $duplicates duplicate, $errors invalid';
+  }
+
+  @override
+  String get bookSourcesDedupeRestoreDefaults => 'Restore recommendations';
+
+  @override
   String get bookSourcesUrlLabel => 'Source address';
 
   @override
@@ -480,6 +621,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookSourcesProtocolTitle => 'Open Reading Source Protocol';
+
+  @override
+  String get bookSourcesInformationTitle => 'Protocol & information';
+
+  @override
+  String get bookSourcesInformationSubtitle =>
+      'View the protocol, project links, and content-rights information';
+
+  @override
+  String get bookSourcesInformationProtocolSubtitle =>
+      'Learn about supported source capabilities and the open protocol';
+
+  @override
+  String get bookSourcesInformationRepositorySubtitle =>
+      'View the protocol repository on GitHub';
+
+  @override
+  String get bookSourcesInformationRightsSubtitle =>
+      'Understand third-party content and rights boundaries';
 
   @override
   String get bookSourcesProtocolDescription =>

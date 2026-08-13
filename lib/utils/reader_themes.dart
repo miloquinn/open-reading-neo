@@ -239,7 +239,11 @@ class ReaderThemes {
         return fromCustomTheme(customThemes.first);
       }
       return all.firstWhere((theme) => theme.id == themeId, orElse: () => day);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Failed to restore the saved reader theme (${error.runtimeType}).',
+      );
+      debugPrintStack(stackTrace: stackTrace);
       return day;
     }
   }

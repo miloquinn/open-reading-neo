@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'account_models.dart';
@@ -54,14 +55,40 @@ class MemberAccountSummaryCache {
   static const storageKey = 'member_account_summary_v1';
 
   Future<MemberAccountSummary?> load() async {
+    late final SharedPreferences prefs;
+    String? encoded;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final encoded = prefs.getString(storageKey);
-      if (encoded == null || encoded.isEmpty) return null;
+      prefs = await SharedPreferences.getInstance();
+      encoded = prefs.getString(storageKey);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Failed to read account summary cache (${error.runtimeType}).',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      return null;
+    }
+    if (encoded == null || encoded.isEmpty) return null;
+
+    try {
       final decoded = jsonDecode(encoded);
-      if (decoded is! Map) return null;
+      if (decoded is! Map) {
+        throw const FormatException('Account summary root must be an object.');
+      }
       return MemberAccountSummary.fromJson(decoded.cast<String, dynamic>());
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Discarding invalid account summary cache (${error.runtimeType}).',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      try {
+        await prefs.remove(storageKey);
+      } catch (cleanupError, cleanupStackTrace) {
+        debugPrint(
+          'Failed to clear invalid account summary cache '
+          '(${cleanupError.runtimeType}).',
+        );
+        debugPrintStack(stackTrace: cleanupStackTrace);
+      }
       return null;
     }
   }

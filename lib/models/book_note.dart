@@ -85,11 +85,6 @@ class BookNote {
            : annotationId,
        updateTime = updateTime ?? DateTime.now();
 
-  /// 设置ID（用于数据库插入后）
-  void setId(int newId) {
-    // Note: 由于Dart的不可变性，这里通过copyWith实现
-  }
-
   /// 转换为数据库Map
   Map<String, dynamic> toMap() {
     return {

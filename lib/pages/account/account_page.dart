@@ -61,9 +61,6 @@ class _AccountPageState extends State<AccountPage> {
       await account.initialize();
       if (!mounted) return;
       _syncProfile(account.user);
-      if (account.isAuthenticated && account.mfaStatus == null) {
-        await account.loadMfaStatus();
-      }
     } catch (error) {
       _showError(error);
     }
@@ -182,8 +179,6 @@ class _AccountPageState extends State<AccountPage> {
       if (!mounted) return;
       _syncProfile(account.user);
       if (account.mfaRequired) return;
-      await account.loadMfaStatus();
-      if (!mounted) return;
       showSideToast(context, context.l10n.settingsAccountVerified);
     } catch (error) {
       _showError(error);
@@ -197,7 +192,6 @@ class _AccountPageState extends State<AccountPage> {
         await account.loginPasskey();
         if (!mounted) return;
         _syncProfile(account.user);
-        await account.loadMfaStatus();
         if (mounted) {
           showSideToast(context, context.l10n.settingsAccountVerified);
         }
@@ -226,18 +220,16 @@ class _AccountPageState extends State<AccountPage> {
           ),
         ]);
         if (!mounted || !_polling) return;
-        var complete = account.isAuthenticated || account.mfaRequired;
-        if (!complete) {
-          try {
-            complete = await account.pollDeviceAuthorization(authorization);
-          } on MemberAccountException catch (error) {
-            if (error.code != 'slow_down') rethrow;
-            account.clearError();
-            await Future<void>.delayed(
-              Duration(seconds: error.retryAfter ?? authorization.interval),
-            );
-            continue;
-          }
+        var complete = false;
+        try {
+          complete = await account.pollDeviceAuthorization(authorization);
+        } on MemberAccountException catch (error) {
+          if (error.code != 'slow_down') rethrow;
+          account.clearError();
+          await Future<void>.delayed(
+            Duration(seconds: error.retryAfter ?? authorization.interval),
+          );
+          continue;
         }
         if (!complete) continue;
         if (!mounted) return;
@@ -247,8 +239,6 @@ class _AccountPageState extends State<AccountPage> {
           _deviceAuthorization = null;
         });
         if (account.mfaRequired) return;
-        await account.loadMfaStatus();
-        if (!mounted) return;
         showSideToast(context, context.l10n.settingsAccountVerified);
         return;
       }
@@ -276,8 +266,6 @@ class _AccountPageState extends State<AccountPage> {
       if (!mounted) return;
       _syncProfile(account.user);
       if (account.mfaRequired) return;
-      await account.loadMfaStatus();
-      if (!mounted) return;
       showSideToast(context, context.l10n.settingsAccountVerified);
     } catch (error) {
       _showError(error);
@@ -302,7 +290,6 @@ class _AccountPageState extends State<AccountPage> {
       await account.verifyMfa(_mfaLoginCode.text);
       if (!mounted) return;
       _syncProfile(account.user);
-      await account.loadMfaStatus();
       if (mounted) {
         showSideToast(context, context.l10n.settingsAccountVerified);
       }
@@ -444,6 +431,16 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Future<void> _openAccountSecurity() async {
+    final account = context.read<MemberAccountController>();
+    if (account.mfaStatus == null) {
+      try {
+        await account.loadMfaStatus();
+      } catch (error) {
+        _showError(error);
+        return;
+      }
+    }
+    if (!mounted) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (_) => const _AccountSecurityPage()),
     );

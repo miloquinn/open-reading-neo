@@ -834,6 +834,234 @@ abstract class AppLocalizations {
   /// **'Stopped — checked {count} source(s). Run it again later to pick up where you left off.'**
   String bookSourcesCleanupCancelledSummary(int count);
 
+  /// No description provided for @bookSourcesMaintenanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source maintenance'**
+  String get bookSourcesMaintenanceTitle;
+
+  /// No description provided for @bookSourcesMaintenanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check source health and disable broken or duplicate entries'**
+  String get bookSourcesMaintenanceSubtitle;
+
+  /// No description provided for @bookSourcesMaintenanceHealthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source health check'**
+  String get bookSourcesMaintenanceHealthTitle;
+
+  /// No description provided for @bookSourcesMaintenanceHealthSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks search, details, catalogs, and content online; this may take a while'**
+  String get bookSourcesMaintenanceHealthSubtitle;
+
+  /// No description provided for @bookSourcesMaintenanceHealthRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Source health check running'**
+  String get bookSourcesMaintenanceHealthRunning;
+
+  /// No description provided for @bookSourcesMaintenanceDedupeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate cleanup'**
+  String get bookSourcesMaintenanceDedupeTitle;
+
+  /// No description provided for @bookSourcesMaintenanceDedupeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Finds identical or possible duplicates locally without visiting source sites'**
+  String get bookSourcesMaintenanceDedupeSubtitle;
+
+  /// No description provided for @bookSourcesMaintenanceReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Last health-check result'**
+  String get bookSourcesMaintenanceReviewTitle;
+
+  /// No description provided for @bookSourcesMaintenanceReviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} source(s) need attention'**
+  String bookSourcesMaintenanceReviewSubtitle(int count);
+
+  /// No description provided for @bookSourcesMaintenanceSafetyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance disables sources by default and never deletes source configurations.'**
+  String get bookSourcesMaintenanceSafetyHint;
+
+  /// No description provided for @bookSourcesMaintenanceProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking sources'**
+  String get bookSourcesMaintenanceProgressTitle;
+
+  /// No description provided for @bookSourcesMaintenanceProgressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking search, details, catalogs, and content'**
+  String get bookSourcesMaintenanceProgressHint;
+
+  /// No description provided for @bookSourcesMaintenanceFinishedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source health check complete'**
+  String get bookSourcesMaintenanceFinishedTitle;
+
+  /// No description provided for @bookSourcesMaintenanceFinishedSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {checked} source(s); {attention} need attention'**
+  String bookSourcesMaintenanceFinishedSummary(int checked, int attention);
+
+  /// No description provided for @bookSourcesMaintenanceProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{completed} / {total}'**
+  String bookSourcesMaintenanceProgress(int completed, int total);
+
+  /// No description provided for @bookSourcesMaintenanceStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop checking'**
+  String get bookSourcesMaintenanceStop;
+
+  /// No description provided for @bookSourcesMaintenanceBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in background'**
+  String get bookSourcesMaintenanceBackground;
+
+  /// No description provided for @bookSourcesMaintenanceBackgroundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Close this progress view and the check will continue quietly while the app is running.'**
+  String get bookSourcesMaintenanceBackgroundHint;
+
+  /// No description provided for @bookSourcesMaintenanceBackgroundToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Source health check is continuing quietly in the background'**
+  String get bookSourcesMaintenanceBackgroundToast;
+
+  /// No description provided for @bookSourcesMaintenanceReviewResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Review results'**
+  String get bookSourcesMaintenanceReviewResults;
+
+  /// No description provided for @bookSourcesMaintenanceRunningMenuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Source maintenance {completed}/{total}'**
+  String bookSourcesMaintenanceRunningMenuLabel(int completed, int total);
+
+  /// No description provided for @bookSourcesDedupeMenuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Find duplicate sources'**
+  String get bookSourcesDedupeMenuLabel;
+
+  /// No description provided for @bookSourcesDedupeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No duplicate sources found'**
+  String get bookSourcesDedupeNone;
+
+  /// No description provided for @bookSourcesDedupeReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review duplicate sources'**
+  String get bookSourcesDedupeReviewTitle;
+
+  /// No description provided for @bookSourcesDedupeReviewSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{groups} group(s), {duplicates} duplicate source(s)'**
+  String bookSourcesDedupeReviewSummary(int groups, int duplicates);
+
+  /// No description provided for @bookSourcesDedupeReviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The recommended source is kept. Selected duplicates will be disabled, not deleted.'**
+  String get bookSourcesDedupeReviewHint;
+
+  /// No description provided for @bookSourcesDedupeDisableSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {count} selected'**
+  String bookSourcesDedupeDisableSelected(int count);
+
+  /// No description provided for @bookSourcesDedupeDisabledSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled {count} duplicate source(s)'**
+  String bookSourcesDedupeDisabledSummary(int count);
+
+  /// No description provided for @bookSourcesDedupeModeExact.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact'**
+  String get bookSourcesDedupeModeExact;
+
+  /// No description provided for @bookSourcesDedupeModeStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get bookSourcesDedupeModeStandard;
+
+  /// No description provided for @bookSourcesDedupeModeSite.
+  ///
+  /// In en, this message translates to:
+  /// **'Same site'**
+  String get bookSourcesDedupeModeSite;
+
+  /// No description provided for @bookSourcesDedupeExactReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Same source identity'**
+  String get bookSourcesDedupeExactReason;
+
+  /// No description provided for @bookSourcesDedupeCanonicalReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Same normalized source address'**
+  String get bookSourcesDedupeCanonicalReason;
+
+  /// No description provided for @bookSourcesDedupeSiteReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Same site; review required'**
+  String get bookSourcesDedupeSiteReason;
+
+  /// No description provided for @bookSourcesDedupeRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get bookSourcesDedupeRecommended;
+
+  /// No description provided for @bookSourcesDedupeReviewAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review deduplication'**
+  String get bookSourcesDedupeReviewAction;
+
+  /// No description provided for @bookSourcesDedupeImportSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{ready} ready, {duplicates} duplicate, {errors} invalid'**
+  String bookSourcesDedupeImportSummary(int ready, int duplicates, int errors);
+
+  /// No description provided for @bookSourcesDedupeRestoreDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore recommendations'**
+  String get bookSourcesDedupeRestoreDefaults;
+
   /// No description provided for @bookSourcesUrlLabel.
   ///
   /// In en, this message translates to:
@@ -899,6 +1127,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Reading Source Protocol'**
   String get bookSourcesProtocolTitle;
+
+  /// No description provided for @bookSourcesInformationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Protocol & information'**
+  String get bookSourcesInformationTitle;
+
+  /// No description provided for @bookSourcesInformationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View the protocol, project links, and content-rights information'**
+  String get bookSourcesInformationSubtitle;
+
+  /// No description provided for @bookSourcesInformationProtocolSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn about supported source capabilities and the open protocol'**
+  String get bookSourcesInformationProtocolSubtitle;
+
+  /// No description provided for @bookSourcesInformationRepositorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View the protocol repository on GitHub'**
+  String get bookSourcesInformationRepositorySubtitle;
+
+  /// No description provided for @bookSourcesInformationRightsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Understand third-party content and rights boundaries'**
+  String get bookSourcesInformationRightsSubtitle;
 
   /// No description provided for @bookSourcesProtocolDescription.
   ///

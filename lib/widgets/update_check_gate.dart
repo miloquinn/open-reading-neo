@@ -49,6 +49,7 @@ class UpdatePromptController {
     bool manual = false,
     UpdateCheckService? service,
     AppUpdateDownloadService? downloadService,
+    void Function(Object error, StackTrace stackTrace)? onError,
   }) async {
     try {
       final result = await (service ?? UpdateCheckService()).check();
@@ -100,7 +101,13 @@ class UpdatePromptController {
           }
       }
       return true;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      if (onError != null) {
+        onError(error, stackTrace);
+      } else {
+        debugPrint('Update check failed (${error.runtimeType}).');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       if (manual && context.mounted) {
         _showMessage(
           context,

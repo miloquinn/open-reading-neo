@@ -221,13 +221,37 @@ void main() {
     expect(find.text('Download from website'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('failed checks report diagnostics without changing fallback UX', (
+    tester,
+  ) async {
+    final errors = <Object>[];
+    await tester.pumpWidget(
+      _UpdateCheckTestApp(
+        service: _ThrowingUpdateCheckService(),
+        onError: (error, _) => errors.add(error),
+      ),
+    );
+
+    await tester.tap(find.text('Check updates'));
+    await tester.pumpAndSettle();
+
+    expect(errors, hasLength(1));
+    expect(errors.single, isA<StateError>());
+    expect(find.text('Update check failed'), findsNothing);
+  });
 }
 
 class _UpdateCheckTestApp extends StatelessWidget {
-  const _UpdateCheckTestApp({required this.service, this.manual = false});
+  const _UpdateCheckTestApp({
+    required this.service,
+    this.manual = false,
+    this.onError,
+  });
 
   final UpdateCheckService service;
   final bool manual;
+  final void Function(Object error, StackTrace stackTrace)? onError;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -246,6 +270,7 @@ class _UpdateCheckTestApp extends StatelessWidget {
             context,
             manual: manual,
             service: service,
+            onError: onError,
           ),
           child: const Text('Check updates'),
         ),
@@ -261,4 +286,11 @@ class _FakeUpdateCheckService extends UpdateCheckService {
 
   @override
   Future<UpdateCheckResult> check({String? currentVersion}) async => result;
+}
+
+class _ThrowingUpdateCheckService extends UpdateCheckService {
+  @override
+  Future<UpdateCheckResult> check({String? currentVersion}) async {
+    throw StateError('update endpoint unavailable');
+  }
 }

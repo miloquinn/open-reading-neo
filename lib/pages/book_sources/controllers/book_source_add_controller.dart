@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../book_sources/dedupe/book_source_dedupe_models.dart';
 import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_import_analyzer.dart';
 import '../../../book_sources/services/book_source_registry.dart';
@@ -105,6 +106,32 @@ class BookSourceAddController extends ChangeNotifier {
   void setError(Object error) {
     final generation = ++_generation;
     _emit(BookSourceAddState(error: error, generation: generation));
+  }
+
+  void setDedupeMode(BookSourceDedupeMode mode) {
+    final analysis = _state.analysis;
+    final preview = analysis?.additionalPreview;
+    if (analysis == null || preview == null || _state.loading) return;
+    _emit(
+      BookSourceAddState(
+        analysis: BookSourceImportAnalysis.additional(preview.withMode(mode)),
+        generation: ++_generation,
+      ),
+    );
+  }
+
+  void setSelectedSourceIndices(Set<int> indices) {
+    final analysis = _state.analysis;
+    final preview = analysis?.additionalPreview;
+    if (analysis == null || preview == null || _state.loading) return;
+    _emit(
+      BookSourceAddState(
+        analysis: BookSourceImportAnalysis.additional(
+          preview.withSelectedIndices(indices),
+        ),
+        generation: ++_generation,
+      ),
+    );
   }
 
   Future<BookSourceAddCommitResult?> commit() async {

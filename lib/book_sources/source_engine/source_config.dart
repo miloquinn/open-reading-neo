@@ -248,12 +248,14 @@ class SourceCompatibilityScanner {
 class SourceImportResult {
   const SourceImportResult({
     required this.sources,
+    required this.candidates,
     required this.sourceUrls,
     required this.errors,
     required this.duplicates,
   });
 
   final List<ReadingSourceConfig> sources;
+  final List<ReadingSourceConfig> candidates;
   final List<Uri> sourceUrls;
   final List<String> errors;
   final int duplicates;
@@ -317,6 +319,7 @@ SourceImportResult parseReadingSourcePayload(
     throw FormatException('Too many sources (max $maxSources).');
   }
   final byUrl = <String, ReadingSourceConfig>{};
+  final parsedCandidates = <ReadingSourceConfig>[];
   final errors = <String>[];
   var duplicates = 0;
   for (var index = 0; index < candidates.length; index++) {
@@ -329,6 +332,7 @@ SourceImportResult parseReadingSourcePayload(
       final source = ReadingSourceConfig.fromJson(
         candidate.map((key, value) => MapEntry('$key', value)),
       );
+      parsedCandidates.add(source);
       if (byUrl.containsKey(source.url)) duplicates++;
       byUrl[source.url] = source;
     } on FormatException catch (error) {
@@ -337,6 +341,7 @@ SourceImportResult parseReadingSourcePayload(
   }
   return SourceImportResult(
     sources: List.unmodifiable(byUrl.values),
+    candidates: List.unmodifiable(parsedCandidates),
     sourceUrls: List.unmodifiable(sourceUrls),
     errors: List.unmodifiable(errors),
     duplicates: duplicates,

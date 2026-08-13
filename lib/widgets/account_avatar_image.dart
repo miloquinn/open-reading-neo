@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../services/account/account_avatar_cache.dart';
+import 'image_decode_retry_controller.dart';
 
 class AccountAvatarImage extends StatefulWidget {
   const AccountAvatarImage({
@@ -28,8 +29,7 @@ class AccountAvatarImage extends StatefulWidget {
 
 class _AccountAvatarImageState extends State<AccountAvatarImage> {
   late Future<Uint8List> _bytes;
-  bool _retriedDecode = false;
-  bool _retryScheduled = false;
+  final _decodeRetry = ImageDecodeRetryController();
 
   AccountAvatarCache get _cache => widget.cache ?? AccountAvatarCache.instance;
 
@@ -43,29 +43,19 @@ class _AccountAvatarImageState extends State<AccountAvatarImage> {
   void didUpdateWidget(covariant AccountAvatarImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url || oldWidget.cache != widget.cache) {
-      _retriedDecode = false;
-      _retryScheduled = false;
+      _decodeRetry.reset();
       _bytes = _cache.load(widget.url);
     }
   }
 
   void _retryAfterDecodeFailure() {
-    if (_retriedDecode || _retryScheduled) return;
-    _retryScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      _retriedDecode = true;
-      try {
-        await _cache.evict(widget.url);
-        if (!mounted) return;
-        setState(() {
-          _retryScheduled = false;
-          _bytes = _cache.load(widget.url);
-        });
-      } catch (_) {
-        _retryScheduled = false;
-      }
-    });
+    _decodeRetry.schedule(
+      isMounted: () => mounted,
+      evict: () => _cache.evict(widget.url),
+      reload: () => setState(() {
+        _bytes = _cache.load(widget.url);
+      }),
+    );
   }
 
   @override

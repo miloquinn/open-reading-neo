@@ -537,6 +537,14 @@ MemberAccountException _friendlyError(DioException error) {
     _ => json['message'] as String?,
   };
   final validationMessage = _validationErrorMessage(detail);
+  final clientCode = switch (error.type) {
+    DioExceptionType.connectionTimeout ||
+    DioExceptionType.receiveTimeout ||
+    DioExceptionType.sendTimeout => 'network_timeout',
+    DioExceptionType.connectionError ||
+    DioExceptionType.unknown when statusCode == null => 'network_unavailable',
+    _ => null,
+  };
   final message =
       serverMessage ??
       validationMessage ??
@@ -568,7 +576,7 @@ MemberAccountException _friendlyError(DioException error) {
   return MemberAccountException(
     message,
     statusCode: statusCode,
-    code: code,
+    code: code ?? clientCode,
     retryAfter: retryAfter,
   );
 }

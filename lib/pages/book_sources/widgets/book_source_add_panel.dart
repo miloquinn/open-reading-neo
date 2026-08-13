@@ -21,6 +21,7 @@ class BookSourceAddPanel extends StatelessWidget {
     required this.onAnalyzeLink,
     required this.onChooseFile,
     required this.onAdd,
+    required this.onReviewDedupe,
   });
 
   final TextEditingController controller;
@@ -36,6 +37,7 @@ class BookSourceAddPanel extends StatelessWidget {
   final VoidCallback onAnalyzeLink;
   final VoidCallback onChooseFile;
   final VoidCallback onAdd;
+  final VoidCallback onReviewDedupe;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +102,10 @@ class BookSourceAddPanel extends StatelessWidget {
               ),
             if (analysis case final detected?) ...[
               const SizedBox(height: 14),
-              _DetectedSourceSummary(analysis: detected),
+              _DetectedSourceSummary(
+                analysis: detected,
+                onReviewDedupe: onReviewDedupe,
+              ),
             ],
             if (errorText != null) ...[
               const SizedBox(height: 10),
@@ -198,9 +203,13 @@ class BookSourceAddPanel extends StatelessWidget {
 }
 
 class _DetectedSourceSummary extends StatelessWidget {
-  const _DetectedSourceSummary({required this.analysis});
+  const _DetectedSourceSummary({
+    required this.analysis,
+    required this.onReviewDedupe,
+  });
 
   final BookSourceImportAnalysis analysis;
+  final VoidCallback onReviewDedupe;
 
   @override
   Widget build(BuildContext context) {
@@ -226,11 +235,21 @@ class _DetectedSourceSummary extends StatelessWidget {
             Text(analysis.sources.single.name)
           else if (preview != null)
             Text(
-              context.l10n.additionalSourcesQuickPreview(
+              context.l10n.bookSourcesDedupeImportSummary(
                 preview.sources.length,
-                preview.skipped,
+                preview.duplicates,
+                preview.errors.length,
               ),
             ),
+          if (preview != null && preview.dedupeResult.groups.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              key: const Key('bookSourceReviewDedupeButton'),
+              onPressed: onReviewDedupe,
+              icon: const Icon(Icons.difference_outlined),
+              label: Text(context.l10n.bookSourcesDedupeReviewAction),
+            ),
+          ],
         ],
       ),
     );

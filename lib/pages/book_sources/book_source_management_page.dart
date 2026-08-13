@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../book_sources/models/registered_book_source.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
 import '../../book_sources/services/book_source_import_analyzer.dart';
+import '../../book_sources/services/book_source_maintenance_coordinator.dart';
 import '../../book_sources/source_engine/source_health_checker.dart';
 import '../../book_sources/source_engine/source_import_service.dart';
 import '../../services/core/app_settings_service.dart';
@@ -21,16 +22,21 @@ import 'source_debug_page.dart';
 import 'source_login_page.dart';
 import 'widgets/book_source_add_panel.dart';
 import 'widgets/book_source_cleanup_review_sheet.dart';
+import 'widgets/book_source_dedupe_review_sheet.dart';
 import 'widgets/book_source_group_picker.dart';
+import 'widgets/book_source_information_sheet.dart';
 import 'widgets/book_source_management_list.dart';
 import 'widgets/book_source_management_source_card.dart';
+import 'widgets/book_source_maintenance_sheet.dart';
 
 /// Low-frequency configuration for online content providers.
 ///
 /// Discovery remains user-facing; adding, enabling and removing providers lives
 /// here so technical configuration does not interrupt the book-browsing flow.
 class BookSourceManagementPage extends StatefulWidget {
-  const BookSourceManagementPage({super.key});
+  const BookSourceManagementPage({super.key, this.maintenance});
+
+  final BookSourceMaintenanceCoordinator? maintenance;
 
   @override
   State<BookSourceManagementPage> createState() =>
@@ -43,6 +49,10 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final BookSourceManagementController _controller;
+  late final BookSourceMaintenanceCoordinator _maintenance;
+  late final bool _ownsMaintenance;
+  int _handledMaintenanceRunId = 0;
+  bool _maintenanceProgressOpen = false;
 
   // `visibleSources`/`availableGroups` re-filter every source and regex-parse
   // each one's group tags; this page rebuilds on every controller
@@ -88,6 +98,23 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   @override
   void initState() {
     super.initState();
+    final injected = widget.maintenance;
+    if (injected != null) {
+      _maintenance = injected;
+      _ownsMaintenance = false;
+    } else {
+      try {
+        _maintenance = context.read<BookSourceMaintenanceCoordinator>();
+        _ownsMaintenance = false;
+      } on ProviderNotFoundException {
+        _maintenance = BookSourceMaintenanceCoordinator();
+        _ownsMaintenance = true;
+      }
+    }
+    _handledMaintenanceRunId = _maintenance.state.isRunning
+        ? _maintenance.state.runId - 1
+        : _maintenance.state.runId;
+    _maintenance.addListener(_onMaintenanceChanged);
     _controller = BookSourceManagementController()..addListener(_onChanged);
     _scrollController.addListener(_loadMoreSourcesIfNeeded);
     unawaited(_controller.load());
@@ -95,6 +122,40 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
 
   void _onChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onMaintenanceChanged() {
+    if (!mounted) return;
+    final state = _maintenance.state;
+    if (!state.isRunning && state.runId > _handledMaintenanceRunId) {
+      _handledMaintenanceRunId = state.runId;
+      final result = state.result;
+      if (result != null) {
+        _controller.mergeExternalSources([
+          ...result.fullyAvailable,
+          ...result.needsAttention,
+        ]);
+        if (!_maintenanceProgressOpen) {
+          showSideToast(
+            context,
+            state.status == BookSourceMaintenanceStatus.cancelled
+                ? context.l10n.bookSourcesCleanupCancelledSummary(result.total)
+                : context.l10n.bookSourcesMaintenanceFinishedSummary(
+                    result.total,
+                    result.needsAttention.length,
+                  ),
+            kind: state.status == BookSourceMaintenanceStatus.cancelled
+                ? SideToastKind.info
+                : result.needsAttention.isEmpty
+                ? SideToastKind.success
+                : SideToastKind.warning,
+          );
+        }
+      } else if (state.failure != null) {
+        showSideToast(context, '${state.failure}', kind: SideToastKind.error);
+      }
+    }
+    setState(() {});
   }
 
   void _loadMoreSourcesIfNeeded() {
@@ -116,6 +177,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       ..removeListener(_loadMoreSourcesIfNeeded)
       ..dispose();
     _searchController.dispose();
+    _maintenance.removeListener(_onMaintenanceChanged);
+    if (_ownsMaintenance) _maintenance.dispose();
     _controller
       ..removeListener(_onChanged)
       ..dispose();
@@ -163,33 +226,33 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
               ),
             ),
             FloatingSubpageMenuItem(
-              value: _BookSourceHeaderAction.cleanup,
-              itemKey: const Key('bookSourcesCleanupButton'),
+              value: _BookSourceHeaderAction.maintenance,
+              itemKey: const Key('bookSourcesMaintenanceButton'),
+              startsSection: true,
+              iconColor: Theme.of(context).colorScheme.tertiary,
               child: ListTile(
-                leading: const Icon(Icons.cleaning_services_outlined),
-                title: Text(context.l10n.bookSourcesCleanupMenuLabel),
+                leading: Icon(
+                  _maintenance.state.isRunning
+                      ? Icons.monitor_heart_rounded
+                      : Icons.home_repair_service_outlined,
+                ),
+                title: Text(
+                  _maintenance.state.isRunning
+                      ? context.l10n.bookSourcesMaintenanceRunningMenuLabel(
+                          _maintenance.state.progress?.completed ?? 0,
+                          _maintenance.state.progress?.total ?? 0,
+                        )
+                      : context.l10n.bookSourcesMaintenanceTitle,
+                ),
               ),
             ),
             FloatingSubpageMenuItem(
-              value: _BookSourceHeaderAction.protocolDetails,
+              value: _BookSourceHeaderAction.information,
               itemKey: const Key('bookSourcesProtocolButton'),
+              startsSection: true,
               child: ListTile(
-                leading: const Icon(Icons.api_rounded),
-                title: Text(context.l10n.bookSourcesProtocolTitle),
-              ),
-            ),
-            FloatingSubpageMenuItem(
-              value: _BookSourceHeaderAction.protocolRepository,
-              child: ListTile(
-                leading: const Icon(Icons.open_in_new_rounded),
-                title: Text(context.l10n.bookSourcesProtocolRepository),
-              ),
-            ),
-            FloatingSubpageMenuItem(
-              value: _BookSourceHeaderAction.rightsReport,
-              child: ListTile(
-                leading: const Icon(Icons.report_outlined),
-                title: Text(context.l10n.bookSourcesRightsReport),
+                leading: const Icon(Icons.info_outline_rounded),
+                title: Text(context.l10n.bookSourcesInformationTitle),
               ),
             ),
           ],
@@ -199,14 +262,10 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 unawaited(_showAddSourceDialog());
               case _BookSourceHeaderAction.select:
                 _controller.toggleSelectionMode();
-              case _BookSourceHeaderAction.cleanup:
-                unawaited(_runCleanupSweep());
-              case _BookSourceHeaderAction.protocolDetails:
-                _showProtocolDialog();
-              case _BookSourceHeaderAction.protocolRepository:
-                unawaited(_openProtocolRepository());
-              case _BookSourceHeaderAction.rightsReport:
-                unawaited(_openRightsReport());
+              case _BookSourceHeaderAction.maintenance:
+                unawaited(_showMaintenanceMenu());
+              case _BookSourceHeaderAction.information:
+                unawaited(_showInformationMenu());
             }
           },
         ),
@@ -363,82 +422,87 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     }
   }
 
-  Future<void> _runCleanupSweep() async {
-    // Closing the dialog by any means — the Cancel button, tapping the
-    // barrier, or the system back gesture — counts as a cancel request: a
-    // library can run into the thousands of sources, so this must never be
-    // a dead end the user can't back out of.
-    var sweepFinished = false;
-    var cancelledByUser = false;
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (dialogContext) => AlertDialog(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-              const SizedBox(width: 16),
-              Flexible(
-                child: ListenableBuilder(
-                  listenable: _controller,
-                  builder: (context, _) {
-                    final progress = _controller.state.healthProgress;
-                    return Text(
-                      progress == null
-                          ? context.l10n.bookSourcesCleanupMenuLabel
-                          : '${progress.completed}/${progress.total}',
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(context.l10n.bookSourcesCancel),
-            ),
-          ],
-        ),
-      ).whenComplete(() {
-        if (!sweepFinished) {
-          cancelledByUser = true;
-          _controller.cancelCleanupSweep();
-        }
-      }),
+  Future<void> _showMaintenanceMenu() async {
+    final action = await showModalBottomSheet<BookSourceMaintenanceAction>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) =>
+          BookSourceMaintenanceSheet(maintenance: _maintenance),
     );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case BookSourceMaintenanceAction.healthCheck:
+        await _openHealthMaintenance();
+      case BookSourceMaintenanceAction.dedupe:
+        await _reviewInstalledDuplicates();
+      case BookSourceMaintenanceAction.reviewHealthResult:
+        await _reviewHealthResult();
+    }
+  }
 
-    final BookSourceCleanupSweepResult result;
-    try {
-      result = await _controller.runCleanupSweep();
-    } on Object catch (error) {
-      sweepFinished = true;
-      if (!cancelledByUser && mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-      if (mounted) showSideToast(context, '$error', kind: SideToastKind.error);
+  Future<void> _showInformationMenu() async {
+    final action = await showModalBottomSheet<BookSourceInformationAction>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => const BookSourceInformationSheet(),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case BookSourceInformationAction.protocol:
+        _showProtocolDialog();
+      case BookSourceInformationAction.repository:
+        await _openProtocolRepository();
+      case BookSourceInformationAction.rightsReport:
+        await _openRightsReport();
+    }
+  }
+
+  Future<void> _openHealthMaintenance() async {
+    if (!_maintenance.state.isRunning) {
+      unawaited(_maintenance.start(_controller.state.sources));
+    }
+    await _showMaintenanceProgress();
+  }
+
+  Future<void> _showMaintenanceProgress() async {
+    if (_maintenanceProgressOpen || !mounted) return;
+    _maintenanceProgressOpen = true;
+    var reviewAfterClose = false;
+    final continuedInBackground = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => BookSourceMaintenanceProgressSheet(
+        maintenance: _maintenance,
+        onReview: () {
+          reviewAfterClose = true;
+          Navigator.pop(sheetContext, false);
+        },
+      ),
+    );
+    _maintenanceProgressOpen = false;
+    if (!mounted) return;
+    if (reviewAfterClose) {
+      await _reviewHealthResult();
       return;
     }
-    sweepFinished = true;
-    if (!cancelledByUser && mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-    }
-    if (!mounted) return;
-    final total = result.fullyAvailable.length + result.needsAttention.length;
-    if (cancelledByUser) {
+    if (continuedInBackground != false && _maintenance.state.isRunning) {
       showSideToast(
         context,
-        context.l10n.bookSourcesCleanupCancelledSummary(total),
+        context.l10n.bookSourcesMaintenanceBackgroundToast,
         kind: SideToastKind.info,
       );
-      return;
     }
-    if (total == 0) {
+  }
+
+  Future<void> _reviewHealthResult() async {
+    final result = _maintenance.state.result;
+    if (result == null) return;
+    if (result.total == 0) {
       showSideToast(
         context,
         context.l10n.bookSourcesCleanupNoCheckableSources,
@@ -469,9 +533,40 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     if (toDisable == null || toDisable.isEmpty || !mounted) return;
     await _controller.disableSources(toDisable);
     if (!mounted) return;
+    _maintenance.clearResult();
     showSideToast(
       context,
       context.l10n.bookSourcesCleanupDisabledSummary(toDisable.length),
+      kind: SideToastKind.success,
+    );
+  }
+
+  Future<void> _reviewInstalledDuplicates() async {
+    final analysis = _controller.findDuplicateSources();
+    if (analysis.result.groups.isEmpty) {
+      showSideToast(
+        context,
+        context.l10n.bookSourcesDedupeNone,
+        kind: SideToastKind.info,
+      );
+      return;
+    }
+    final toDisable = await showModalBottomSheet<Set<String>>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => BookSourceInstalledDedupeReviewSheet(
+        result: analysis.result,
+        sourcesByIndex: analysis.sourcesByIndex,
+      ),
+    );
+    if (toDisable == null || toDisable.isEmpty || !mounted) return;
+    await _controller.disableSources(toDisable);
+    if (!mounted) return;
+    showSideToast(
+      context,
+      context.l10n.bookSourcesDedupeDisabledSummary(toDisable.length),
       kind: SideToastKind.success,
     );
   }
@@ -688,6 +783,24 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       }, kind: SideToastKind.success);
     }
 
+    Future<void> reviewDedupe(StateSetter setRouteState) async {
+      final preview = addController.state.analysis?.additionalPreview;
+      if (preview == null || preview.dedupeResult.groups.isEmpty) return;
+      final selection =
+          await showModalBottomSheet<BookSourceImportDedupeSelection>(
+            context: context,
+            useSafeArea: true,
+            showDragHandle: true,
+            isScrollControlled: true,
+            builder: (context) =>
+                BookSourceImportDedupeReviewSheet(preview: preview),
+          );
+      if (selection == null) return;
+      addController.setDedupeMode(selection.mode);
+      addController.setSelectedSourceIndices(selection.selectedIndices);
+      setRouteState(() {});
+    }
+
     Widget buildPanel(
       BuildContext routeContext,
       StateSetter setRouteState, {
@@ -712,6 +825,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         onAnalyzeLink: () => unawaited(analyzeLink(setRouteState)),
         onChooseFile: () => unawaited(chooseFile(setRouteState)),
         onAdd: () => unawaited(addDetected(routeContext, setRouteState)),
+        onReviewDedupe: () => unawaited(reviewDedupe(setRouteState)),
       );
     }
 
@@ -841,11 +955,4 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 }
 
-enum _BookSourceHeaderAction {
-  add,
-  select,
-  cleanup,
-  protocolDetails,
-  protocolRepository,
-  rightsReport,
-}
+enum _BookSourceHeaderAction { add, select, maintenance, information }

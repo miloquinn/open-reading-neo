@@ -5,25 +5,67 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 
+import '../dedupe/book_source_dedupe_engine.dart';
+import '../dedupe/book_source_dedupe_models.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import '../services/book_source_network_policy.dart';
 import 'source_config.dart';
 
 class SourceImportPreview {
-  SourceImportPreview({
-    required this.sources,
-    required this.errors,
-    this.duplicates = 0,
-  }) : _reports = Map.unmodifiable({
-         for (final source in sources)
-           source.stableId: const SourceCompatibilityScanner().scan(source),
-       });
+  factory SourceImportPreview({
+    required List<ReadingSourceConfig> sources,
+    required List<String> errors,
+    BookSourceDedupeMode mode = BookSourceDedupeMode.standard,
+    Set<int>? selectedIndices,
+  }) {
+    final analysis = _analyzeSources(sources, mode);
+    return SourceImportPreview._(
+      analysis.reports,
+      candidates: List.unmodifiable(sources),
+      errors: errors,
+      mode: mode,
+      dedupeResult: analysis.result,
+      selectedIndices: Set.unmodifiable(
+        selectedIndices ?? analysis.result.defaultSelectedIndices,
+      ),
+    );
+  }
 
-  final List<ReadingSourceConfig> sources;
+  SourceImportPreview._(
+    this._reports, {
+    required this.candidates,
+    required this.errors,
+    required this.mode,
+    required this.dedupeResult,
+    required this.selectedIndices,
+  });
+
+  final List<ReadingSourceConfig> candidates;
   final List<String> errors;
-  final int duplicates;
-  final Map<String, SourceCompatibilityReport> _reports;
+  final BookSourceDedupeMode mode;
+  final BookSourceDedupeResult dedupeResult;
+  final Set<int> selectedIndices;
+  final Map<int, SourceCompatibilityReport> _reports;
+
+  Iterable<(int, ReadingSourceConfig)> get _selectedEntries =>
+      candidates.indexed.where((entry) => selectedIndices.contains(entry.$1));
+
+  List<ReadingSourceConfig> get sources =>
+      List.unmodifiable(_selectedEntries.map((entry) => entry.$2));
+  int get duplicates => candidates.length - sources.length;
+  int get duplicateGroups => dedupeResult.groups.length;
+
+  SourceImportPreview withMode(BookSourceDedupeMode value) =>
+      SourceImportPreview(sources: candidates, errors: errors, mode: value);
+
+  SourceImportPreview withSelectedIndices(Set<int> value) =>
+      SourceImportPreview(
+        sources: candidates,
+        errors: errors,
+        mode: mode,
+        selectedIndices: value,
+      );
 
   int get supported => _count(SourceCompatibilityLevel.supported);
   int get partial => _count(SourceCompatibilityLevel.partial);
@@ -31,15 +73,21 @@ class SourceImportPreview {
   int get skipped => errors.length + duplicates;
 
   int _count(SourceCompatibilityLevel level) =>
-      _reports.values.where((report) => report.level == level).length;
+      selectedIndices.where((index) => _reports[index]?.level == level).length;
 
   SourceCompatibilityReport reportFor(ReadingSourceConfig source) =>
-      _reports[source.stableId]!;
+      _reports[_candidateIndices[source]]!;
 
-  List<RegisteredBookSource> toRegisteredSources() => sources
+  late final Map<ReadingSourceConfig, int> _candidateIndices = Map.identity()
+    ..addEntries(
+      candidates.indexed.map((entry) => MapEntry(entry.$2, entry.$1)),
+    );
+
+  List<RegisteredBookSource> toRegisteredSources() => _selectedEntries
       .map(
-        (source) =>
-            source.toRegisteredSource(compatibilityReport: reportFor(source)),
+        (entry) => entry.$2.toRegisteredSource(
+          compatibilityReport: _reports[entry.$1],
+        ),
       )
       .toList(growable: false);
 
@@ -48,14 +96,16 @@ class SourceImportPreview {
   /// instead of scanning every source again during the commit tap.
   Future<List<RegisteredBookSource>> toRegisteredSourcesAsync() {
     final request = <String, Object?>{
-      'sources': sources.map((source) => source.raw).toList(growable: false),
+      'sources': _selectedEntries
+          .map((entry) => entry.$2.raw)
+          .toList(growable: false),
       'reports': <String, Map<String, Object?>>{
-        for (final source in sources)
-          source.stableId: {
-            'level': reportFor(source).level.name,
-            'issues': reportFor(
-              source,
-            ).issues.map((issue) => issue.name).toList(growable: false),
+        for (final entry in _selectedEntries)
+          entry.$2.stableId: {
+            'level': _reports[entry.$1]!.level.name,
+            'issues': _reports[entry.$1]!.issues
+                .map((issue) => issue.name)
+                .toList(growable: false),
           },
       },
     };
@@ -63,6 +113,32 @@ class SourceImportPreview {
       (maps) => maps.map(RegisteredBookSource.fromJson).toList(growable: false),
     );
   }
+}
+
+({BookSourceDedupeResult result, Map<int, SourceCompatibilityReport> reports})
+_analyzeSources(List<ReadingSourceConfig> sources, BookSourceDedupeMode mode) {
+  final reports = <int, SourceCompatibilityReport>{};
+  final candidates = sources.indexed.map((entry) {
+    final report = const SourceCompatibilityScanner().scan(entry.$2);
+    reports[entry.$1] = report;
+    return BookSourceDedupeCandidate(
+      index: entry.$1,
+      rawConfig: entry.$2.raw,
+      compatibilityRank: switch (report.level) {
+        SourceCompatibilityLevel.supported => 2,
+        SourceCompatibilityLevel.partial => 1,
+        SourceCompatibilityLevel.unsupported => 0,
+      },
+      runnableCapabilities: entry.$2
+          .toRegisteredSource(compatibilityReport: report)
+          .capabilities
+          .length,
+    );
+  });
+  return (
+    result: const BookSourceDedupeEngine().analyze(candidates, mode: mode),
+    reports: Map.unmodifiable(reports),
+  );
 }
 
 class SourceImportService {
@@ -186,7 +262,7 @@ class SourceImportService {
       initialBytes: initialBytes,
     );
     return SourceImportPreview(
-      sources: List.unmodifiable(tree.sources.values),
+      sources: List.unmodifiable(tree.sources),
       errors: List.unmodifiable(tree.errors),
     );
   }
@@ -208,25 +284,21 @@ class SourceImportService {
     }
     final bytes = initialBytes ?? await _download(uri);
     final parsed = await _parseBytesAsync(bytes);
-    final byUrl = <String, ReadingSourceConfig>{
-      for (final source in parsed.sources) source.url: source,
-    };
+    final sources = <ReadingSourceConfig>[...parsed.candidates];
     final errors = <String>[...parsed.errors.map((error) => '$uri: $error')];
     final nestedResults = await _mapWithConcurrency(
       parsed.sourceUrls,
       _maxNestedConcurrent,
       (nested) => _loadRecursive(nested, depth: depth + 1, visited: visited),
     );
-    // Merge in declaration order to preserve the historical last-write-wins
-    // behavior for duplicate URLs in nested source lists.
     for (final nested in nestedResults) {
-      byUrl.addAll(nested.sources);
+      sources.addAll(nested.sources);
       errors.addAll(nested.errors);
     }
-    if (byUrl.length > maxSources) {
+    if (sources.length > maxSources) {
       throw const FormatException('Too many sources in import.');
     }
-    return _SourceImportTree(sources: byUrl, errors: errors);
+    return _SourceImportTree(sources: sources, errors: errors);
   }
 
   Future<List<T>> _mapWithConcurrency<T>(
@@ -311,9 +383,8 @@ class SourceImportService {
 
   SourceImportPreview _collect(SourceImportResult result) {
     return SourceImportPreview(
-      sources: result.sources,
+      sources: result.candidates,
       errors: result.errors,
-      duplicates: result.duplicates,
     );
   }
 }
@@ -321,9 +392,9 @@ class SourceImportService {
 const int _maxNestedConcurrent = 4;
 
 class _SourceImportTree {
-  const _SourceImportTree({this.sources = const {}, this.errors = const []});
+  const _SourceImportTree({this.sources = const [], this.errors = const []});
 
-  final Map<String, ReadingSourceConfig> sources;
+  final List<ReadingSourceConfig> sources;
   final List<String> errors;
 }
 

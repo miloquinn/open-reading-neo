@@ -293,12 +293,16 @@ class FloatingSubpageMenuItem<T> {
     required this.child,
     this.enabled = true,
     this.itemKey,
+    this.startsSection = false,
+    this.iconColor,
   });
 
   final T value;
   final Widget child;
   final bool enabled;
   final Key? itemKey;
+  final bool startsSection;
+  final Color? iconColor;
 }
 
 class FloatingSubpageMenuButton<T> extends StatelessWidget {
@@ -321,7 +325,7 @@ class FloatingSubpageMenuButton<T> extends StatelessWidget {
         Overlay.of(context).context.findRenderObject()! as RenderBox;
     final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
     final mediaQuery = MediaQuery.of(context);
-    final menuWidth = (overlay.size.width - 40).clamp(220.0, 248.0);
+    final menuWidth = (overlay.size.width - 40).clamp(232.0, 272.0);
     final menuLeft = (topLeft.dx + box.size.width - menuWidth).clamp(
       20.0,
       overlay.size.width - menuWidth - 20,
@@ -458,6 +462,18 @@ class _FloatingSubpageMenuSurface<T> extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       for (var index = 0; index < items.length; index++) ...[
+                        if (items[index].startsSection) ...[
+                          const SizedBox(height: 5),
+                          Divider(
+                            height: 1,
+                            indent: 12,
+                            endIndent: 12,
+                            color: scheme.outlineVariant.withValues(
+                              alpha: 0.55,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                        ],
                         _FloatingSubpageMenuTile(
                           key: items[index].itemKey,
                           item: items[index],
@@ -465,14 +481,6 @@ class _FloatingSubpageMenuSurface<T> extends StatelessWidget {
                               ? () => onSelected(items[index].value)
                               : null,
                         ),
-                        if (index != items.length - 1)
-                          Divider(
-                            height: 1,
-                            indent: 54,
-                            color: scheme.outlineVariant.withValues(
-                              alpha: 0.45,
-                            ),
-                          ),
                       ],
                     ],
                   ),
@@ -497,37 +505,51 @@ class _FloatingSubpageMenuTile<T> extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
-    child: Opacity(
-      opacity: onTap == null ? 0.42 : 1,
-      child: SizedBox(
-        height: 54,
-        child: Row(
-          children: [
-            const SizedBox(width: 4),
-            SizedBox.square(
-              dimension: 42,
-              child: Center(
-                child: item.child is ListTile
-                    ? (item.child as ListTile).leading
-                    : null,
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final iconColor = item.iconColor ?? scheme.primary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Opacity(
+        opacity: onTap == null ? 0.42 : 1,
+        child: SizedBox(
+          height: 54,
+          child: Row(
+            children: [
+              const SizedBox(width: 4),
+              SizedBox.square(
+                dimension: 42,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconTheme.merge(
+                    data: IconThemeData(color: iconColor, size: 21),
+                    child: Center(
+                      child: item.child is ListTile
+                          ? (item.child as ListTile).leading
+                          : null,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(fontWeight: FontWeight.w600),
-                child: item.child is ListTile
-                    ? (item.child as ListTile).title ?? const SizedBox.shrink()
-                    : item.child,
+              const SizedBox(width: 10),
+              Expanded(
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  child: item.child is ListTile
+                      ? (item.child as ListTile).title ??
+                            const SizedBox.shrink()
+                      : item.child,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-          ],
+              const SizedBox(width: 8),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

@@ -361,44 +361,65 @@ void main() {
   );
 
   test(
-    'bulk import skips only the sources whose id conflicts with a '
-    'different origin, instead of aborting the whole batch',
+    'registry reuses canonical reading-source identity on reimport',
     () async {
       final registry = BookSourceRegistry();
-      // Two "app" sources that share a non-URL bookSourceUrl (common for
-      // aggregator sources whose real host lives inside their script), but
-      // whose embedded scripts point at different hosts — a genuine identity
-      // conflict, not a re-import of the same source.
-      final original = ReadingSourceConfig.fromJson({
-        ..._source(name: 'App Source'),
-        'bookSourceUrl': 'App Source',
-        'jsLib': 'let hosts = ["https://a.example"];',
-      }).toRegisteredSource(enabled: true);
-      await registry.upsertAll([original]);
-
-      final impostor = ReadingSourceConfig.fromJson({
-        ..._source(name: 'App Source (impostor)'),
-        'bookSourceUrl': 'App Source',
-        'jsLib': 'let hosts = ["https://b.example"];',
-      }).toRegisteredSource(enabled: true);
-      final freshSource = ReadingSourceConfig.fromJson(
-        _source(name: 'Brand New', url: 'https://new.example'),
+      final old = ReadingSourceConfig.fromJson(
+        _source(
+          name: 'Canonical old',
+          url: 'https://EXAMPLE.com:443/?utm_source=list',
+        ),
+      ).toRegisteredSource(enabled: true);
+      final updated = ReadingSourceConfig.fromJson(
+        _source(name: 'Canonical updated', url: 'https://example.com'),
       ).toRegisteredSource(enabled: true);
 
-      final result = await registry.upsertAll([impostor, freshSource]);
+      await registry.upsertAll([old]);
+      final result = await registry.upsertAll([updated]);
 
-      expect(result.conflicted, hasLength(1));
-      expect(result.conflicted.single.name, 'App Source (impostor)');
-      expect(
-        result.sources.map((source) => source.name),
-        containsAll(['App Source', 'Brand New']),
-      );
-      expect(
-        result.sources.map((source) => source.name),
-        isNot(contains('App Source (impostor)')),
-      );
+      expect(result.conflicted, isEmpty);
+      expect(result.sources, hasLength(1));
+      expect(result.sources.single.id, old.id);
+      expect(result.sources.single.name, 'Canonical updated');
     },
   );
+
+  test('bulk import skips only the sources whose id conflicts with a '
+      'different origin, instead of aborting the whole batch', () async {
+    final registry = BookSourceRegistry();
+    // Two "app" sources that share a non-URL bookSourceUrl (common for
+    // aggregator sources whose real host lives inside their script), but
+    // whose embedded scripts point at different hosts — a genuine identity
+    // conflict, not a re-import of the same source.
+    final original = ReadingSourceConfig.fromJson({
+      ..._source(name: 'App Source'),
+      'bookSourceUrl': 'App Source',
+      'jsLib': 'let hosts = ["https://a.example"];',
+    }).toRegisteredSource(enabled: true);
+    await registry.upsertAll([original]);
+
+    final impostor = ReadingSourceConfig.fromJson({
+      ..._source(name: 'App Source (impostor)'),
+      'bookSourceUrl': 'App Source',
+      'jsLib': 'let hosts = ["https://b.example"];',
+    }).toRegisteredSource(enabled: true);
+    final freshSource = ReadingSourceConfig.fromJson(
+      _source(name: 'Brand New', url: 'https://new.example'),
+    ).toRegisteredSource(enabled: true);
+
+    final result = await registry.upsertAll([impostor, freshSource]);
+
+    expect(result.conflicted, hasLength(1));
+    expect(result.conflicted.single.name, 'App Source (impostor)');
+    expect(
+      result.sources.map((source) => source.name),
+      containsAll(['App Source', 'Brand New']),
+    );
+    expect(
+      result.sources.map((source) => source.name),
+      isNot(contains('App Source (impostor)')),
+    );
+  });
 }
 
 class _MemoryBookSourceRegistryStorage implements BookSourceRegistryStorage {

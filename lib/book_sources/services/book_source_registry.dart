@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../source_engine/source_config.dart';
+import '../dedupe/book_source_identity.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
@@ -379,7 +380,7 @@ String _sourceIdentity(RegisteredBookSource source) {
   if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
     final configuredUrl = source.sourceConfig?['bookSourceUrl'];
     if (configuredUrl is String && configuredUrl.trim().isNotEmpty) {
-      return 'reading-source:${configuredUrl.trim()}';
+      return 'reading-source:${BookSourceIdentity.parse(configuredUrl).canonicalKey}';
     }
   }
   return 'protocol:${source.sourceProtocol.name}:id:${source.id}';

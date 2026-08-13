@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
+import 'package:xxread/book_sources/dedupe/book_source_dedupe_models.dart';
 import 'package:xxread/book_sources/services/book_source_import_analyzer.dart';
 import 'package:xxread/book_sources/services/book_source_network_policy.dart';
 import 'package:xxread/book_sources/source_engine/source_import_service.dart';
@@ -96,6 +97,29 @@ void main() {
     expect(preview.duplicates, 1);
     expect(preview.errors, hasLength(1));
     expect(preview.skipped, 2);
+  });
+
+  test('standard dedupe normalizes URLs and preserves explicit selection', () {
+    final result = BookSourceImportAnalyzer().analyzeBytes(
+      _bytes([
+        {
+          'bookSourceName': 'Canonical old',
+          'bookSourceUrl': 'https://EXAMPLE.com:443/?b=2&utm_source=list&a=1',
+        },
+        {
+          'bookSourceName': 'Canonical new',
+          'bookSourceUrl': 'https://example.com?a=1&b=2',
+        },
+      ]),
+    );
+
+    final preview = result.additionalPreview!;
+    expect(preview.dedupeResult.groups, hasLength(1));
+    expect(preview.sources.single.name, 'Canonical new');
+    final exact = preview.withMode(BookSourceDedupeMode.exact);
+    expect(exact.sources, hasLength(2));
+    final manuallySelected = preview.withSelectedIndices({0});
+    expect(manuallySelected.sources.single.name, 'Canonical old');
   });
 
   test('accepts realistic aggregate files larger than the old 4 MiB limit', () {

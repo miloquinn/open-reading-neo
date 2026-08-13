@@ -34,6 +34,8 @@ void main() {
     });
 
     expect(await const MemberAccountSummaryCache().load(), isNull);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(MemberAccountSummaryCache.storageKey), isNull);
   });
 
   test(
@@ -389,10 +391,91 @@ void main() {
     expect(storage.refreshToken, 'refresh-2');
   });
 
+  test(
+    'device authorization stays signed in when account enrichment is offline',
+    () async {
+      final storage = _MemoryTokenStore();
+      final adapter = _RouteAdapter((options) {
+        return switch (options.uri.path) {
+          '/api/v1/auth/device/github/begin' => _json({
+            'device_code': 'device-secret',
+            'user_code': 'ABCD-EFGH',
+            'verification_uri': '/activate',
+            'expires_in': 600,
+            'interval': 5,
+          }),
+          '/api/v1/auth/device/token' => _json(
+            _session(access: 'access-2', refresh: 'refresh-2'),
+          ),
+          '/api/v1/membership' => throw const SocketException('offline'),
+          _ => throw StateError('Unexpected route ${options.uri.path}'),
+        };
+      });
+      final controller = MemberAccountController(
+        api: _client(adapter, storage),
+      );
+      final authorization = await controller.beginExternalLogin(
+        MemberExternalAuthMethod.github,
+      );
+
+      expect(await controller.pollDeviceAuthorization(authorization), isTrue);
+
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.user?.username, 'reader');
+      expect(controller.error, isNull);
+      expect(storage.accessToken, 'access-2');
+      expect(storage.refreshToken, 'refresh-2');
+    },
+  );
+
+  test(
+    'device authorization silently retries a transient connection failure',
+    () async {
+      final storage = _MemoryTokenStore();
+      var polls = 0;
+      final adapter = _RouteAdapter((options) {
+        return switch (options.uri.path) {
+          '/api/v1/auth/device/github/begin' => _json({
+            'device_code': 'device-secret',
+            'user_code': 'ABCD-EFGH',
+            'verification_uri': '/activate',
+            'expires_in': 600,
+            'interval': 5,
+          }),
+          '/api/v1/auth/device/token' when polls++ == 0 =>
+            throw const SocketException('connection changed after app resume'),
+          '/api/v1/auth/device/token' => _json(
+            _session(access: 'access-2', refresh: 'refresh-2'),
+          ),
+          '/api/v1/membership' => _json({
+            'premium': false,
+            'features': <String, bool>{},
+            'entitlements': <Object>[],
+          }),
+          _ => throw StateError('Unexpected route ${options.uri.path}'),
+        };
+      });
+      final controller = MemberAccountController(
+        api: _client(adapter, storage),
+      );
+      final authorization = await controller.beginExternalLogin(
+        MemberExternalAuthMethod.github,
+      );
+
+      expect(await controller.pollDeviceAuthorization(authorization), isFalse);
+      expect(controller.error, isNull);
+      expect(controller.isAuthenticated, isFalse);
+
+      expect(await controller.pollDeviceAuthorization(authorization), isTrue);
+      expect(controller.error, isNull);
+      expect(controller.user?.username, 'reader');
+    },
+  );
+
   test('concurrent device authorization polls share one completion', () async {
     final storage = _MemoryTokenStore();
     final responseGate = Completer<void>();
-    final requestStarted = Completer<void>();
+    final enrichmentStarted = Completer<void>();
     var polls = 0;
     final adapter = _AsyncRouteAdapter((options) async {
       return switch (options.uri.path) {
@@ -403,17 +486,19 @@ void main() {
           'expires_in': 600,
           'interval': 5,
         }),
-        '/api/v1/auth/device/token' => () async {
+        '/api/v1/auth/device/token' => () {
           polls++;
-          requestStarted.complete();
-          await responseGate.future;
           return _json(_session(access: 'access-2', refresh: 'refresh-2'));
         }(),
-        '/api/v1/membership' => _json({
-          'premium': false,
-          'features': <String, bool>{},
-          'entitlements': <Object>[],
-        }),
+        '/api/v1/membership' => () async {
+          enrichmentStarted.complete();
+          await responseGate.future;
+          return _json({
+            'premium': false,
+            'features': <String, bool>{},
+            'entitlements': <Object>[],
+          });
+        }(),
         _ => throw StateError('Unexpected route ${options.uri.path}'),
       };
     });
@@ -423,8 +508,9 @@ void main() {
     );
 
     final callbackPoll = controller.pollDeviceAuthorization(authorization);
+    await enrichmentStarted.future;
+    expect(controller.isAuthenticated, isTrue);
     final pagePoll = controller.pollDeviceAuthorization(authorization);
-    await requestStarted.future;
 
     expect(polls, 1);
     expect(controller.error, isNull);

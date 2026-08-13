@@ -12,7 +12,10 @@
                     "Kept online font download progress local to the font list to avoid repeated full-page rebuilds",
                     "Reduced disk I/O for large book imports by calculating the copy hash during the file transfer",
                     "Improved import and font-storage diagnostics without replacing the original error or blocking safe font fallback",
-                    "Split EPUB metadata parsing and font settings out of oversized core files"
+                    "Split EPUB metadata parsing and font settings out of oversized core files",
+                    "Added source health checks and duplicate-source review for imports and installed source libraries",
+                    "Fixed browser-based account login briefly showing a network failure after returning to the app before authorization completed",
+                    "Added indexed annotation lookup and one-shot recovery for cached avatar and source-cover decode failures"
                 ],
                 "zh": [
                     "发现页列表布局新增书源、分页书籍入场动画和分类平滑展开效果",
@@ -22,7 +25,10 @@
                     "在线字体下载进度只刷新字体列表区域，减少设置页与应用根组件的重复重建",
                     "复制大文件时同步计算内容哈希，减少书籍导入过程中的重复磁盘读取",
                     "改善导入与字体存储错误诊断，同时保留原始错误和安全字体回退",
-                    "从超大核心文件中拆分 EPUB 元数据解析和字体设置模块"
+                    "从超大核心文件中拆分 EPUB 元数据解析和字体设置模块",
+                    "新增书源体检与重复项审查，支持检查导入内容和已安装书源，默认只关闭重复项而不删除配置",
+                    "修复浏览器账号授权返回 App 后短暂误报无法连接账号服务、随后又登录成功的问题",
+                    "优化批注索引查询，并为头像和书源封面缓存解码失败增加一次自动恢复"
                 ],
                 "zh-TW": [
                     "發現頁列表版面新增書源、分頁書籍進場動畫與分類平滑展開效果",
@@ -32,7 +38,10 @@
                     "線上字體下載進度只更新字體列表區域，減少設定頁與應用程式根元件的重複重建",
                     "複製大型檔案時同步計算內容雜湊，減少書籍匯入過程中的重複磁碟讀取",
                     "改善匯入與字體儲存錯誤診斷，同時保留原始錯誤和安全字體回退",
-                    "從超大型核心檔案中拆分 EPUB 中繼資料解析和字體設定模組"
+                    "從超大型核心檔案中拆分 EPUB 中繼資料解析和字體設定模組",
+                    "新增書源健康檢查與重複項目審查，支援檢查匯入內容和已安裝書源，預設只停用重複項目而不刪除設定",
+                    "修復瀏覽器帳號授權返回 App 後短暫誤報無法連線帳號服務、隨後又登入成功的問題",
+                    "優化批註索引查詢，並為頭像和書源封面快取解碼失敗增加一次自動恢復"
                 ],
                 "ja": [
                     "発見ページのリスト表示に、書源・追加読み込みされた書籍の表示アニメーションとカテゴリの滑らかな展開を追加しました",
@@ -42,7 +51,10 @@
                     "オンラインフォントの進捗更新をフォント一覧内に限定し、設定ページとアプリ全体の不要な再構築を削減しました",
                     "大きな書籍ファイルのコピー中にハッシュを同時計算し、インポート時の重複したディスク読み込みを削減しました",
                     "元のエラーと安全なフォントフォールバックを保ちながら、インポートとフォント保存の診断情報を改善しました",
-                    "肥大化したコアファイルから EPUB メタデータ解析とフォント設定を分離しました"
+                    "肥大化したコアファイルから EPUB メタデータ解析とフォント設定を分離しました",
+                    "インポート時とインストール済み書源向けに、書源の健全性チェックと重複項目の確認を追加しました",
+                    "ブラウザ認証から App に戻った直後、一時的な接続エラーが表示されてからログイン成功となる問題を修正しました",
+                    "注釈検索のインデックスを改善し、アバターと書源カバーのキャッシュ画像がデコードできない場合に一度だけ自動復旧するようにしました"
                 ]
             }
         },

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:xxread/book_sources/models/registered_book_source.dart';
+import 'package:xxread/book_sources/dedupe/book_source_dedupe_models.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_health_check_service.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
@@ -89,6 +90,53 @@ void main() {
     expect(controller.state.visibleSources, [needsLogin]);
     controller.dispose();
   });
+
+  test(
+    'duplicate scan ignores ORSP and keeps same-site variants for review',
+    () {
+      final controller = BookSourceManagementController();
+      final canonicalOld = _source(
+        'canonical-old',
+        protocol: BookSourceProtocolKind.readingSource,
+        sourceUrl: 'https://EXAMPLE.com:443/?utm_source=list',
+      );
+      final canonicalNew = _source(
+        'canonical-new',
+        protocol: BookSourceProtocolKind.readingSource,
+        sourceUrl: 'https://example.com',
+      );
+      final otherPath = _source(
+        'other-path',
+        protocol: BookSourceProtocolKind.readingSource,
+        sourceUrl: 'https://example.com/catalog',
+      );
+      controller.replaceSources([
+        canonicalOld,
+        canonicalNew,
+        otherPath,
+        _source('orsp'),
+      ]);
+
+      final standard = controller.findDuplicateSources();
+      expect(standard.result.groups, hasLength(1));
+      expect(
+        standard.result.groups.single.confidence,
+        BookSourceDedupeConfidence.canonical,
+      );
+      expect(standard.sourcesByIndex.values, hasLength(3));
+
+      final site = controller.findDuplicateSources(
+        mode: BookSourceDedupeMode.siteReview,
+      );
+      expect(site.result.groups, hasLength(1));
+      expect(
+        site.result.groups.single.confidence,
+        BookSourceDedupeConfidence.sameSite,
+      );
+      expect(site.result.groups.single.defaultSelectedIndices, hasLength(3));
+      controller.dispose();
+    },
+  );
 
   test(
     'selection and bulk enable enforce additional-protocol restrictions',
@@ -306,6 +354,7 @@ RegisteredBookSource _source(
   bool enabled = true,
   String? group,
   String? loginUrl,
+  String? sourceUrl,
   BookSourceProtocolKind protocol = BookSourceProtocolKind.orsp,
 }) {
   return RegisteredBookSource(
@@ -322,7 +371,7 @@ RegisteredBookSource _source(
     enabled: enabled,
     addedAt: DateTime.utc(2026),
     sourceProtocol: protocol,
-    sourceConfig: _sourceConfig(protocol, group, loginUrl),
+    sourceConfig: _sourceConfig(protocol, group, loginUrl, sourceUrl),
   );
 }
 
@@ -330,6 +379,7 @@ Map<String, dynamic>? _sourceConfig(
   BookSourceProtocolKind protocol,
   String? group,
   String? loginUrl,
+  String? sourceUrl,
 ) {
   if (protocol != BookSourceProtocolKind.readingSource &&
       group == null &&
@@ -339,6 +389,7 @@ Map<String, dynamic>? _sourceConfig(
   final config = <String, dynamic>{};
   if (group != null) config['bookSourceGroup'] = group;
   if (loginUrl != null) config['loginUrl'] = loginUrl;
+  if (sourceUrl != null) config['bookSourceUrl'] = sourceUrl;
   return config;
 }
 

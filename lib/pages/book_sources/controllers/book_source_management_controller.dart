@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../book_sources/dedupe/book_source_dedupe_engine.dart';
+import '../../../book_sources/dedupe/book_source_dedupe_models.dart';
 import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_client.dart';
 import '../../../book_sources/services/book_source_health_check_service.dart';
@@ -18,6 +20,17 @@ enum BookSourceManagementFilter {
 }
 
 enum BookSourceManagementMutation { enable, refresh, remove, health, cleanup }
+
+@immutable
+class BookSourceInstalledDedupeResult {
+  const BookSourceInstalledDedupeResult({
+    required this.result,
+    required this.sourcesByIndex,
+  });
+
+  final BookSourceDedupeResult result;
+  final Map<int, RegisteredBookSource> sourcesByIndex;
+}
 
 @immutable
 class BookSourceCleanupSweepResult {
@@ -561,6 +574,37 @@ class BookSourceManagementController extends ChangeNotifier {
     );
   }
 
+  BookSourceInstalledDedupeResult findDuplicateSources({
+    BookSourceDedupeMode mode = BookSourceDedupeMode.standard,
+  }) {
+    final candidates = <BookSourceDedupeCandidate>[];
+    final sourcesByIndex = <int, RegisteredBookSource>{};
+    for (final source in _state.sources) {
+      if (source.sourceProtocol != BookSourceProtocolKind.readingSource) {
+        continue;
+      }
+      final raw = source.sourceConfig;
+      if (raw == null) continue;
+      if ('${raw['bookSourceUrl'] ?? ''}'.trim().isEmpty) continue;
+      final index = candidates.length;
+      sourcesByIndex[index] = source;
+      candidates.add(
+        BookSourceDedupeCandidate(
+          index: index,
+          rawConfig: {...raw, 'enabled': source.enabled},
+          installedSourceId: source.id,
+          isHealthy: sourceHealthCheckResultOf(source)?.fullyAvailable == true,
+          runnableCapabilities: source.capabilities.length,
+          compatibilityRank: source.capabilities.isEmpty ? 0 : 1,
+        ),
+      );
+    }
+    return BookSourceInstalledDedupeResult(
+      result: const BookSourceDedupeEngine().analyze(candidates, mode: mode),
+      sourcesByIndex: Map.unmodifiable(sourcesByIndex),
+    );
+  }
+
   void replaceSources(List<RegisteredBookSource> sources) {
     _loadRevision++;
     _mutationRevision++;
@@ -574,6 +618,10 @@ class BookSourceManagementController extends ChangeNotifier {
         failure: null,
       ),
     );
+  }
+
+  void mergeExternalSources(List<RegisteredBookSource> sources) {
+    _mergeSources(sources);
   }
 
   bool _canEnable(RegisteredBookSource source) {

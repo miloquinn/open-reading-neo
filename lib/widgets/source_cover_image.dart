@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../book_sources/services/source_cover_cache.dart';
+import 'image_decode_retry_controller.dart';
 
 class SourceCoverImage extends StatefulWidget {
   const SourceCoverImage({
@@ -35,8 +36,7 @@ class SourceCoverImage extends StatefulWidget {
 
 class _SourceCoverImageState extends State<SourceCoverImage> {
   late Future<Uint8List> _bytes;
-  int _decodeRetryCount = 0;
-  bool _decodeRetryScheduled = false;
+  final _decodeRetry = ImageDecodeRetryController();
 
   SourceCoverCache get _cache => widget.cache ?? SourceCoverCache.instance;
 
@@ -52,29 +52,19 @@ class _SourceCoverImageState extends State<SourceCoverImage> {
     if (oldWidget.url != widget.url ||
         oldWidget.cache != widget.cache ||
         !mapEquals(oldWidget.headers, widget.headers)) {
-      _decodeRetryCount = 0;
-      _decodeRetryScheduled = false;
+      _decodeRetry.reset();
       _bytes = _cache.load(widget.url, headers: widget.headers);
     }
   }
 
   void _retryAfterDecodeFailure() {
-    if (_decodeRetryCount > 0 || _decodeRetryScheduled) return;
-    _decodeRetryScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      _decodeRetryCount++;
-      try {
-        await _cache.evict(widget.url, headers: widget.headers);
-        if (!mounted) return;
-        setState(() {
-          _decodeRetryScheduled = false;
-          _bytes = _cache.load(widget.url, headers: widget.headers);
-        });
-      } catch (_) {
-        _decodeRetryScheduled = false;
-      }
-    });
+    _decodeRetry.schedule(
+      isMounted: () => mounted,
+      evict: () => _cache.evict(widget.url, headers: widget.headers),
+      reload: () => setState(() {
+        _bytes = _cache.load(widget.url, headers: widget.headers);
+      }),
+    );
   }
 
   @override

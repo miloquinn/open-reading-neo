@@ -44,7 +44,26 @@ void main() {
     expect(find.text('Open Reading Source Protocol'), findsNothing);
     await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
     await tester.pumpAndSettle();
+    expect(find.text('Protocol & information'), findsOneWidget);
+    expect(
+      find.byKey(const Key('bookSourcesMaintenanceButton')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('bookSourcesDedupeButton')), findsNothing);
+    await tester.tap(find.byKey(const Key('bookSourcesProtocolButton')));
+    await tester.pumpAndSettle();
     expect(find.text('Open Reading Source Protocol'), findsOneWidget);
+    expect(find.text('Protocol repository'), findsOneWidget);
+    Navigator.of(
+      tester.element(find.text('Protocol & information').first),
+    ).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourcesMaintenanceButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Source health check'), findsOneWidget);
+    expect(find.text('Duplicate cleanup'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

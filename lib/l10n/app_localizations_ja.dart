@@ -431,6 +431,141 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesMaintenanceTitle => '書籍ソースの整理';
+
+  @override
+  String get bookSourcesMaintenanceSubtitle => 'ソースの状態を確認し、無効または重複した項目を停止します';
+
+  @override
+  String get bookSourcesMaintenanceHealthTitle => 'ソースのヘルスチェック';
+
+  @override
+  String get bookSourcesMaintenanceHealthSubtitle =>
+      '検索、詳細、目次、本文をオンラインで確認します。時間がかかる場合があります';
+
+  @override
+  String get bookSourcesMaintenanceHealthRunning => 'ヘルスチェック実行中';
+
+  @override
+  String get bookSourcesMaintenanceDedupeTitle => '重複項目の整理';
+
+  @override
+  String get bookSourcesMaintenanceDedupeSubtitle =>
+      'ソースサイトへ接続せず、同一または重複の可能性がある項目を端末内で検索します';
+
+  @override
+  String get bookSourcesMaintenanceReviewTitle => '前回のチェック結果';
+
+  @override
+  String bookSourcesMaintenanceReviewSubtitle(int count) {
+    return '$count 件のソースに対応が必要です';
+  }
+
+  @override
+  String get bookSourcesMaintenanceSafetyHint =>
+      '整理では既定でソースを停止するだけで、設定は削除しません。';
+
+  @override
+  String get bookSourcesMaintenanceProgressTitle => 'ソースを確認中';
+
+  @override
+  String get bookSourcesMaintenanceProgressHint => '検索、詳細、目次、本文の機能を確認しています';
+
+  @override
+  String get bookSourcesMaintenanceFinishedTitle => 'ヘルスチェック完了';
+
+  @override
+  String bookSourcesMaintenanceFinishedSummary(int checked, int attention) {
+    return '$checked 件を確認し、$attention 件に対応が必要です';
+  }
+
+  @override
+  String bookSourcesMaintenanceProgress(int completed, int total) {
+    return '$completed / $total';
+  }
+
+  @override
+  String get bookSourcesMaintenanceStop => 'チェックを停止';
+
+  @override
+  String get bookSourcesMaintenanceBackground => 'バックグラウンドで続行';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundHint =>
+      '進捗画面を閉じても、アプリの実行中は静かにチェックを続行します。';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundToast =>
+      'ヘルスチェックをバックグラウンドで続行しています';
+
+  @override
+  String get bookSourcesMaintenanceReviewResults => '結果を確認';
+
+  @override
+  String bookSourcesMaintenanceRunningMenuLabel(int completed, int total) {
+    return 'ソース整理 $completed/$total';
+  }
+
+  @override
+  String get bookSourcesDedupeMenuLabel => '重複ソースを検索';
+
+  @override
+  String get bookSourcesDedupeNone => '重複ソースは見つかりませんでした';
+
+  @override
+  String get bookSourcesDedupeReviewTitle => '重複ソースを確認';
+
+  @override
+  String bookSourcesDedupeReviewSummary(int groups, int duplicates) {
+    return '$groups グループ、重複 $duplicates 件';
+  }
+
+  @override
+  String get bookSourcesDedupeReviewHint => '推奨ソースを残し、選択した重複項目は削除せず無効化します。';
+
+  @override
+  String bookSourcesDedupeDisableSelected(int count) {
+    return '選択した $count 件を無効化';
+  }
+
+  @override
+  String bookSourcesDedupeDisabledSummary(int count) {
+    return '重複ソース $count 件を無効化しました';
+  }
+
+  @override
+  String get bookSourcesDedupeModeExact => '完全一致';
+
+  @override
+  String get bookSourcesDedupeModeStandard => '標準';
+
+  @override
+  String get bookSourcesDedupeModeSite => '同一サイト';
+
+  @override
+  String get bookSourcesDedupeExactReason => 'ソース識別子が同一';
+
+  @override
+  String get bookSourcesDedupeCanonicalReason => '正規化したソースアドレスが同一';
+
+  @override
+  String get bookSourcesDedupeSiteReason => '同一サイトのため確認が必要';
+
+  @override
+  String get bookSourcesDedupeRecommended => '推奨';
+
+  @override
+  String get bookSourcesDedupeReviewAction => '重複排除を確認';
+
+  @override
+  String bookSourcesDedupeImportSummary(int ready, int duplicates, int errors) {
+    return 'インポート可能 $ready 件、重複 $duplicates 件、無効 $errors 件';
+  }
+
+  @override
+  String get bookSourcesDedupeRestoreDefaults => '推奨選択に戻す';
+
+  @override
   String get bookSourcesUrlLabel => 'ソースのアドレス';
 
   @override
@@ -464,6 +599,24 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get bookSourcesProtocolTitle => 'Open Reading Source Protocol';
+
+  @override
+  String get bookSourcesInformationTitle => 'プロトコルと説明';
+
+  @override
+  String get bookSourcesInformationSubtitle =>
+      'プロトコル、プロジェクトリンク、コンテンツ権利の説明を確認します';
+
+  @override
+  String get bookSourcesInformationProtocolSubtitle =>
+      '対応するソース機能とオープンプロトコルについて確認します';
+
+  @override
+  String get bookSourcesInformationRepositorySubtitle =>
+      'GitHub でプロトコルのリポジトリを表示します';
+
+  @override
+  String get bookSourcesInformationRightsSubtitle => '第三者コンテンツと権利の範囲を確認します';
 
   @override
   String get bookSourcesProtocolDescription =>

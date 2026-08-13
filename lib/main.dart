@@ -15,6 +15,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'l10n/app_localizations.dart';
 import 'book_sources/services/book_source_client.dart';
+import 'book_sources/services/book_source_maintenance_coordinator.dart';
 import 'book_sources/services/book_source_registry.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
 import 'book_sources/source_engine/source_interaction_coordinator.dart';
@@ -111,6 +112,9 @@ void main(List<String> arguments) async {
           ),
           provider.ChangeNotifierProvider(
             create: (_) => DownloadTaskController(),
+          ),
+          provider.ChangeNotifierProvider(
+            create: (_) => BookSourceMaintenanceCoordinator(),
           ),
           provider.ChangeNotifierProvider(
             create: (_) => WebDavSyncController(),

@@ -426,6 +426,136 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get bookSourcesMaintenanceTitle => '书源整理';
+
+  @override
+  String get bookSourcesMaintenanceSubtitle => '检查书源状态，关闭无效或重复项目';
+
+  @override
+  String get bookSourcesMaintenanceHealthTitle => '书源体检';
+
+  @override
+  String get bookSourcesMaintenanceHealthSubtitle => '联网检查搜索、详情、目录和正文，可能需要一些时间';
+
+  @override
+  String get bookSourcesMaintenanceHealthRunning => '书源体检进行中';
+
+  @override
+  String get bookSourcesMaintenanceDedupeTitle => '重复项整理';
+
+  @override
+  String get bookSourcesMaintenanceDedupeSubtitle => '本地查找相同或疑似重复的书源，不会访问书源网站';
+
+  @override
+  String get bookSourcesMaintenanceReviewTitle => '上次体检结果';
+
+  @override
+  String bookSourcesMaintenanceReviewSubtitle(int count) {
+    return '有 $count 个书源需要处理';
+  }
+
+  @override
+  String get bookSourcesMaintenanceSafetyHint => '整理操作默认只关闭书源，不会删除书源配置。';
+
+  @override
+  String get bookSourcesMaintenanceProgressTitle => '正在体检书源';
+
+  @override
+  String get bookSourcesMaintenanceProgressHint => '正在检查搜索、详情、目录和正文能力';
+
+  @override
+  String get bookSourcesMaintenanceFinishedTitle => '书源体检完成';
+
+  @override
+  String bookSourcesMaintenanceFinishedSummary(int checked, int attention) {
+    return '已检查 $checked 个书源，$attention 个需要处理';
+  }
+
+  @override
+  String bookSourcesMaintenanceProgress(int completed, int total) {
+    return '$completed / $total';
+  }
+
+  @override
+  String get bookSourcesMaintenanceStop => '停止检测';
+
+  @override
+  String get bookSourcesMaintenanceBackground => '后台继续';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundHint => '关闭进度页后，检查将在应用运行期间静默继续。';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundToast => '书源体检已在后台静默继续';
+
+  @override
+  String get bookSourcesMaintenanceReviewResults => '查看体检结果';
+
+  @override
+  String bookSourcesMaintenanceRunningMenuLabel(int completed, int total) {
+    return '书源整理 $completed/$total';
+  }
+
+  @override
+  String get bookSourcesDedupeMenuLabel => '查找重复书源';
+
+  @override
+  String get bookSourcesDedupeNone => '没有发现重复书源';
+
+  @override
+  String get bookSourcesDedupeReviewTitle => '检查重复书源';
+
+  @override
+  String bookSourcesDedupeReviewSummary(int groups, int duplicates) {
+    return '共 $groups 组，$duplicates 个重复书源';
+  }
+
+  @override
+  String get bookSourcesDedupeReviewHint => '将保留推荐书源，选中的重复项只会被关闭，不会删除。';
+
+  @override
+  String bookSourcesDedupeDisableSelected(int count) {
+    return '关闭选中的 $count 个';
+  }
+
+  @override
+  String bookSourcesDedupeDisabledSummary(int count) {
+    return '已关闭 $count 个重复书源';
+  }
+
+  @override
+  String get bookSourcesDedupeModeExact => '精确';
+
+  @override
+  String get bookSourcesDedupeModeStandard => '标准';
+
+  @override
+  String get bookSourcesDedupeModeSite => '同站审查';
+
+  @override
+  String get bookSourcesDedupeExactReason => '书源身份完全相同';
+
+  @override
+  String get bookSourcesDedupeCanonicalReason => '规范化书源地址相同';
+
+  @override
+  String get bookSourcesDedupeSiteReason => '来自同一站点，需要人工确认';
+
+  @override
+  String get bookSourcesDedupeRecommended => '推荐保留';
+
+  @override
+  String get bookSourcesDedupeReviewAction => '查看去重结果';
+
+  @override
+  String bookSourcesDedupeImportSummary(int ready, int duplicates, int errors) {
+    return '可导入 $ready 个，重复 $duplicates 个，无效 $errors 个';
+  }
+
+  @override
+  String get bookSourcesDedupeRestoreDefaults => '恢复推荐选择';
+
+  @override
   String get bookSourcesUrlLabel => '书源地址';
 
   @override
@@ -459,6 +589,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookSourcesProtocolTitle => 'Open Reading Source Protocol';
+
+  @override
+  String get bookSourcesInformationTitle => '协议与说明';
+
+  @override
+  String get bookSourcesInformationSubtitle => '查看协议、项目地址和内容权利说明';
+
+  @override
+  String get bookSourcesInformationProtocolSubtitle => '了解书源支持的能力和开放协议';
+
+  @override
+  String get bookSourcesInformationRepositorySubtitle => '在 GitHub 查看协议仓库';
+
+  @override
+  String get bookSourcesInformationRightsSubtitle => '了解第三方内容和权利边界';
 
   @override
   String get bookSourcesProtocolDescription =>
@@ -5755,6 +5900,136 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get bookSourcesMaintenanceTitle => '書源整理';
+
+  @override
+  String get bookSourcesMaintenanceSubtitle => '檢查書源狀態，停用無效或重複項目';
+
+  @override
+  String get bookSourcesMaintenanceHealthTitle => '書源體檢';
+
+  @override
+  String get bookSourcesMaintenanceHealthSubtitle => '連線檢查搜尋、詳情、目錄和正文，可能需要一些時間';
+
+  @override
+  String get bookSourcesMaintenanceHealthRunning => '書源體檢進行中';
+
+  @override
+  String get bookSourcesMaintenanceDedupeTitle => '重複項整理';
+
+  @override
+  String get bookSourcesMaintenanceDedupeSubtitle => '在本機尋找相同或疑似重複的書源，不會存取書源網站';
+
+  @override
+  String get bookSourcesMaintenanceReviewTitle => '上次體檢結果';
+
+  @override
+  String bookSourcesMaintenanceReviewSubtitle(int count) {
+    return '有 $count 個書源需要處理';
+  }
+
+  @override
+  String get bookSourcesMaintenanceSafetyHint => '整理操作預設只停用書源，不會刪除書源設定。';
+
+  @override
+  String get bookSourcesMaintenanceProgressTitle => '正在體檢書源';
+
+  @override
+  String get bookSourcesMaintenanceProgressHint => '正在檢查搜尋、詳情、目錄和正文能力';
+
+  @override
+  String get bookSourcesMaintenanceFinishedTitle => '書源體檢完成';
+
+  @override
+  String bookSourcesMaintenanceFinishedSummary(int checked, int attention) {
+    return '已檢查 $checked 個書源，$attention 個需要處理';
+  }
+
+  @override
+  String bookSourcesMaintenanceProgress(int completed, int total) {
+    return '$completed / $total';
+  }
+
+  @override
+  String get bookSourcesMaintenanceStop => '停止檢測';
+
+  @override
+  String get bookSourcesMaintenanceBackground => '背景繼續';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundHint => '關閉進度頁後，檢查將在應用程式執行期間靜默繼續。';
+
+  @override
+  String get bookSourcesMaintenanceBackgroundToast => '書源體檢已在背景靜默繼續';
+
+  @override
+  String get bookSourcesMaintenanceReviewResults => '查看體檢結果';
+
+  @override
+  String bookSourcesMaintenanceRunningMenuLabel(int completed, int total) {
+    return '書源整理 $completed/$total';
+  }
+
+  @override
+  String get bookSourcesDedupeMenuLabel => '尋找重複書源';
+
+  @override
+  String get bookSourcesDedupeNone => '沒有發現重複書源';
+
+  @override
+  String get bookSourcesDedupeReviewTitle => '檢查重複書源';
+
+  @override
+  String bookSourcesDedupeReviewSummary(int groups, int duplicates) {
+    return '共 $groups 組，$duplicates 個重複書源';
+  }
+
+  @override
+  String get bookSourcesDedupeReviewHint => '將保留建議書源，選取的重複項只會被停用，不會刪除。';
+
+  @override
+  String bookSourcesDedupeDisableSelected(int count) {
+    return '停用選取的 $count 個';
+  }
+
+  @override
+  String bookSourcesDedupeDisabledSummary(int count) {
+    return '已停用 $count 個重複書源';
+  }
+
+  @override
+  String get bookSourcesDedupeModeExact => '精確';
+
+  @override
+  String get bookSourcesDedupeModeStandard => '標準';
+
+  @override
+  String get bookSourcesDedupeModeSite => '同站審查';
+
+  @override
+  String get bookSourcesDedupeExactReason => '書源身分完全相同';
+
+  @override
+  String get bookSourcesDedupeCanonicalReason => '正規化書源位址相同';
+
+  @override
+  String get bookSourcesDedupeSiteReason => '來自同一站點，需要人工確認';
+
+  @override
+  String get bookSourcesDedupeRecommended => '建議保留';
+
+  @override
+  String get bookSourcesDedupeReviewAction => '檢視去重結果';
+
+  @override
+  String bookSourcesDedupeImportSummary(int ready, int duplicates, int errors) {
+    return '可匯入 $ready 個，重複 $duplicates 個，無效 $errors 個';
+  }
+
+  @override
+  String get bookSourcesDedupeRestoreDefaults => '恢復建議選取';
+
+  @override
   String get bookSourcesUrlLabel => '書源位址';
 
   @override
@@ -5788,6 +6063,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get bookSourcesProtocolTitle => 'Open Reading Source Protocol';
+
+  @override
+  String get bookSourcesInformationTitle => '協定與說明';
+
+  @override
+  String get bookSourcesInformationSubtitle => '查看協定、專案位址和內容權利說明';
+
+  @override
+  String get bookSourcesInformationProtocolSubtitle => '瞭解書源支援的能力和開放協定';
+
+  @override
+  String get bookSourcesInformationRepositorySubtitle => '在 GitHub 查看協定儲存庫';
+
+  @override
+  String get bookSourcesInformationRightsSubtitle => '瞭解第三方內容和權利邊界';
 
   @override
   String get bookSourcesProtocolDescription =>

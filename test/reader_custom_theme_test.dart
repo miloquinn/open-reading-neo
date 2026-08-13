@@ -36,7 +36,32 @@ void main() {
     });
 
     expect(await const ReaderCustomThemeStore().load(), isNull);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(ReaderCustomThemeStore.storageKey), isNull);
   });
+
+  test(
+    'unsupported custom theme entries do not discard valid siblings',
+    () async {
+      const valid = ReaderCustomTheme(
+        id: 'custom:valid',
+        name: 'Valid',
+        background: Color(0xFF102030),
+        text: Color(0xFFF0E0D0),
+        controlBar: Color(0xFF203040),
+      );
+      SharedPreferences.setMockInitialValues({
+        ReaderCustomThemeStore.storageKey: jsonEncode([
+          valid.toMap(),
+          'not-a-theme',
+        ]),
+      });
+
+      final restored = await const ReaderCustomThemeStore().loadAll();
+
+      expect(restored.map((theme) => theme.id), ['custom:valid']);
+    },
+  );
 
   test(
     'custom reader themes persist order, names, and image metadata',

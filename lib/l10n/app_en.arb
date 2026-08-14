@@ -348,6 +348,23 @@
   "@ttsReading": {
     "description": "TTS reading feature label"
   },
+  "readerAloudStartFailed": "Reader aloud failed to start: {error}",
+  "@readerAloudStartFailed": {
+    "description": "Reader-aloud failure toast",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "readerAloudNoReadableText": "No readable text to read aloud in this chapter.",
+  "@readerAloudNoReadableText": {
+    "description": "Reader-aloud error when the chapter has no readable text"
+  },
+  "ttsWebSpeechNotStarted": "The browser speech service did not start. Check that the tab is not muted and that a system voice is available.",
+  "@ttsWebSpeechNotStarted": {
+    "description": "Web TTS error when speech synthesis never starts"
+  },
   "share": "Share",
   "@share": {
     "description": "Share button label"

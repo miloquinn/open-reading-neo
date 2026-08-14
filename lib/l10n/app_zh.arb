@@ -348,6 +348,23 @@
   "@ttsReading": {
     "description": "TTS朗读功能"
   },
+  "readerAloudStartFailed": "朗读启动失败：{error}",
+  "@readerAloudStartFailed": {
+    "description": "朗读启动失败提示",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "readerAloudNoReadableText": "本章没有可朗读的正文。",
+  "@readerAloudNoReadableText": {
+    "description": "章节没有可朗读正文时的朗读错误"
+  },
+  "ttsWebSpeechNotStarted": "浏览器系统语音没有开始播放；请检查标签页是否静音和系统语音是否可用。",
+  "@ttsWebSpeechNotStarted": {
+    "description": "网页端系统语音未开始播放的错误"
+  },
   "share": "分享",
   "@share": {
     "description": "分享按钮"

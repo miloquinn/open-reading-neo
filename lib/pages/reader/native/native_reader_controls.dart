@@ -95,8 +95,13 @@ extension _NativeReaderControls on _NativeReaderPageState {
     final highlight = _readerAloudController?.highlight;
     if (!mounted) return;
     final error = _readerAloudController?.lastError;
-    if (error != null) {
-      showSideToast(context, '朗读启动失败：$error', kind: SideToastKind.error);
+    if (error != null && !identical(error, _lastShownReaderAloudError)) {
+      _lastShownReaderAloudError = error;
+      showSideToast(
+        context,
+        context.l10n.readerAloudStartFailed(_localizedReaderAloudError(error)),
+        kind: SideToastKind.error,
+      );
     }
     if (active == _readerAloudActive && highlight == _readerAloudHighlight) {
       return;
@@ -105,6 +110,15 @@ extension _NativeReaderControls on _NativeReaderPageState {
       _readerAloudActive = active;
       _readerAloudHighlight = highlight;
     });
+  }
+
+  String _localizedReaderAloudError(Object error) {
+    final message = error is StateError ? error.message : null;
+    return switch (message) {
+      'reader_aloud_no_readable_text' => context.l10n.readerAloudNoReadableText,
+      'tts_web_speech_not_started' => context.l10n.ttsWebSpeechNotStarted,
+      _ => error.toString(),
+    };
   }
 
   Future<void> _revealReaderAloudPosition(ReaderAloudPosition position) async {

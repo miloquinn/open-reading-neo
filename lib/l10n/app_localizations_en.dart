@@ -862,6 +862,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsReading => 'Text-to-Speech';
 
   @override
+  String readerAloudStartFailed(String error) {
+    return 'Reader aloud failed to start: $error';
+  }
+
+  @override
+  String get readerAloudNoReadableText =>
+      'No readable text to read aloud in this chapter.';
+
+  @override
+  String get ttsWebSpeechNotStarted =>
+      'The browser speech service did not start. Check that the tab is not muted and that a system voice is available.';
+
+  @override
   String get share => 'Share';
 
   @override

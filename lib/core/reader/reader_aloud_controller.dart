@@ -451,7 +451,7 @@ class ReaderAloudController extends ChangeNotifier {
       );
       if (!loaded || !_isCurrent(generation)) {
         if (_isCurrent(generation)) {
-          throw StateError('没有可朗读的正文');
+          throw StateError('reader_aloud_no_readable_text');
         }
         return;
       }

@@ -1560,6 +1560,24 @@ abstract class AppLocalizations {
   /// **'Text-to-Speech'**
   String get ttsReading;
 
+  /// Reader-aloud failure toast
+  ///
+  /// In en, this message translates to:
+  /// **'Reader aloud failed to start: {error}'**
+  String readerAloudStartFailed(String error);
+
+  /// Reader-aloud error when the chapter has no readable text
+  ///
+  /// In en, this message translates to:
+  /// **'No readable text to read aloud in this chapter.'**
+  String get readerAloudNoReadableText;
+
+  /// Web TTS error when speech synthesis never starts
+  ///
+  /// In en, this message translates to:
+  /// **'The browser speech service did not start. Check that the tab is not muted and that a system voice is available.'**
+  String get ttsWebSpeechNotStarted;
+
   /// Share button label
   ///
   /// In en, this message translates to:

@@ -819,6 +819,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsReading => '语音朗读';
 
   @override
+  String readerAloudStartFailed(String error) {
+    return '朗读启动失败：$error';
+  }
+
+  @override
+  String get readerAloudNoReadableText => '本章没有可朗读的正文。';
+
+  @override
+  String get ttsWebSpeechNotStarted => '浏览器系统语音没有开始播放；请检查标签页是否静音和系统语音是否可用。';
+
+  @override
   String get share => '分享';
 
   @override
@@ -6291,6 +6302,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get ttsReading => '語音朗讀';
+
+  @override
+  String readerAloudStartFailed(String error) {
+    return '朗讀啟動失敗：$error';
+  }
+
+  @override
+  String get readerAloudNoReadableText => '本章沒有可朗讀的正文。';
+
+  @override
+  String get ttsWebSpeechNotStarted => '瀏覽器系統語音沒有開始播放；請檢查分頁是否靜音以及系統語音是否可用。';
 
   @override
   String get share => '分享';

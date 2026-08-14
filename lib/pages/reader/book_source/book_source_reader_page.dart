@@ -251,6 +251,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
+  Object? _lastShownReaderAloudError;
 
   ReaderThemePalette get _readerTheme =>
       _loadingCatalog && widget.initialTheme != null

@@ -835,6 +835,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get ttsReading => '読み上げ';
 
   @override
+  String readerAloudStartFailed(String error) {
+    return '読み上げの開始に失敗しました：$error';
+  }
+
+  @override
+  String get readerAloudNoReadableText => 'この章には読み上げられる本文がありません。';
+
+  @override
+  String get ttsWebSpeechNotStarted =>
+      'ブラウザの音声読み上げが開始されませんでした。タブがミュートされていないか、システム音声が利用可能か確認してください。';
+
+  @override
   String get share => '共有';
 
   @override

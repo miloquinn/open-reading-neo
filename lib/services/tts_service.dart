@@ -765,9 +765,7 @@ class TtsService extends ChangeNotifier
           if (identical(_activeSpeakSignal, speakSignal) &&
               !_isPlaying &&
               !speakSignal.isCompleted) {
-            speakSignal.completeError(
-              StateError('浏览器系统语音没有开始播放；请检查标签页是否静音和系统语音是否可用。'),
-            );
+            speakSignal.completeError(StateError('tts_web_speech_not_started'));
           }
         });
       }

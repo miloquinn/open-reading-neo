@@ -175,6 +175,7 @@ class TtsService extends ChangeNotifier
   Completer<void>? _activeSpeakSignal;
   _QueuedTtsOperation? _activeQueuedOperation;
   Timer? _webStartTimer;
+  Timer? _progressNotifyTimer;
   Future<void> _speakModeTransition = Future<void>.value();
   int _speakCancellationVersion = 0;
   bool _isDisposed = false;
@@ -199,6 +200,7 @@ class TtsService extends ChangeNotifier
   TtsVoiceOption? _currentVoice;
   String? _androidTtsEngine;
   final FlutterTts Function() _ttsFactory;
+  final Duration _progressNotifyInterval;
 
   @override
   bool get isPlaying => _isPlaying;
@@ -232,8 +234,14 @@ class TtsService extends ChangeNotifier
   TtsVoiceOption? get currentVoice => _currentVoice;
   String get currentVoiceLabel => _currentVoice?.title ?? 'system_default';
 
-  TtsService({FlutterTts Function()? ttsFactory})
-    : _ttsFactory = ttsFactory ?? FlutterTts.new {
+  TtsService({
+    FlutterTts Function()? ttsFactory,
+    @visibleForTesting
+    Duration progressNotifyInterval = const Duration(milliseconds: 150),
+  }) : _ttsFactory = ttsFactory ?? FlutterTts.new,
+       // A public named parameter cannot initialize this private test seam.
+       // ignore: prefer_initializing_formals
+       _progressNotifyInterval = progressNotifyInterval {
     unawaited(initialize());
   }
 
@@ -431,7 +439,7 @@ class TtsService extends ChangeNotifier
         0,
         _currentText.length,
       );
-      _notifySafe();
+      _scheduleProgressNotify();
     });
 
     tts.setErrorHandler((message) {
@@ -1390,8 +1398,18 @@ class TtsService extends ChangeNotifier
     return raw.length > 220 ? raw.substring(0, 220) : raw;
   }
 
+  void _scheduleProgressNotify() {
+    if (_isDisposed || _progressNotifyTimer != null) return;
+    _progressNotifyTimer = Timer(_progressNotifyInterval, () {
+      _progressNotifyTimer = null;
+      _notifySafe();
+    });
+  }
+
   void _notifySafe() {
     if (_isDisposed) return;
+    _progressNotifyTimer?.cancel();
+    _progressNotifyTimer = null;
     notifyListeners();
   }
 
@@ -1400,6 +1418,8 @@ class TtsService extends ChangeNotifier
     _isDisposed = true;
     _speakCancellationVersion++;
     _webStartTimer?.cancel();
+    _progressNotifyTimer?.cancel();
+    _progressNotifyTimer = null;
     _completeActiveSpeakWait();
     _completeQueuedOperation();
     final tts = _flutterTts;

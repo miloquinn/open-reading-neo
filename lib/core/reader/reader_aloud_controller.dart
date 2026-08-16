@@ -246,8 +246,6 @@ typedef ReaderAloudSegmentBuilder =
 class ReaderAloudSegmenter {
   const ReaderAloudSegmenter._();
 
-  static const String _boundaries = '。！？!?；;：:\n';
-
   static List<ReaderAloudSegment> split({
     required int chapterIndex,
     required String chapterId,
@@ -272,8 +270,7 @@ class ReaderAloudSegmenter {
       final hardEnd = math.min(text.length, start + safeMax);
       var end = -1;
       for (var index = start; index < hardEnd; index++) {
-        final character = text[index];
-        if (_boundaries.contains(character) &&
+        if (_isBoundary(text.codeUnitAt(index)) &&
             index + 1 - start >= safeMinimum) {
           end = index + 1;
           break;
@@ -320,6 +317,18 @@ class ReaderAloudSegmenter {
     return segments;
   }
 
+  static bool _isBoundary(int codeUnit) =>
+      codeUnit == 0x3002 || // 。
+      codeUnit == 0xFF01 || // ！
+      codeUnit == 0xFF1F || // ？
+      codeUnit == 0x21 || // !
+      codeUnit == 0x3F || // ?
+      codeUnit == 0xFF1B || // ；
+      codeUnit == 0x3B || // ;
+      codeUnit == 0xFF1A || // ：
+      codeUnit == 0x3A || // :
+      codeUnit == 0x0A;
+
   static bool _isWhitespace(int codeUnit) =>
       codeUnit == 0x20 ||
       codeUnit == 0x09 ||
@@ -362,6 +371,8 @@ class ReaderAloudController extends ChangeNotifier {
   Timer? _sleepTimer;
   ReaderAloudPlaybackState _state = ReaderAloudPlaybackState.stopped;
   ReaderAloudChapter? _currentChapter;
+  ReaderAloudChapter? _lastSegmentedChapter;
+  List<ReaderAloudSegment>? _lastSegmentedSegments;
   List<ReaderAloudSegment> _segments = const [];
   int _segmentIndex = 0;
   int _utteranceBaseOffset = 0;
@@ -537,6 +548,7 @@ class ReaderAloudController extends ChangeNotifier {
   }
 
   void setSleepTimer(Duration? duration) {
+    if (_disposed) return;
     _sleepTimer?.cancel();
     final normalized = duration != null && duration > Duration.zero
         ? duration
@@ -614,7 +626,7 @@ class ReaderAloudController extends ChangeNotifier {
     while (index >= 0 && index < source.chapterCount) {
       final chapter = await source.loadChapter(index);
       if (chapter == null) return false;
-      final segments = _segmenter(chapter);
+      final segments = _segmentsFor(chapter);
       if (segments.isNotEmpty) {
         _clearContinuousUtterance();
         _currentChapter = chapter;
@@ -638,6 +650,23 @@ class ReaderAloudController extends ChangeNotifier {
       startOffset = 0;
     }
     return false;
+  }
+
+  List<ReaderAloudSegment> _segmentsFor(ReaderAloudChapter chapter) {
+    final cachedChapter = _lastSegmentedChapter;
+    final cachedSegments = _lastSegmentedSegments;
+    if (cachedChapter != null &&
+        cachedSegments != null &&
+        cachedChapter.index == chapter.index &&
+        cachedChapter.id == chapter.id &&
+        cachedChapter.title == chapter.title &&
+        identical(cachedChapter.text, chapter.text)) {
+      return cachedSegments;
+    }
+    final segments = _segmenter(chapter);
+    _lastSegmentedChapter = chapter;
+    _lastSegmentedSegments = segments;
+    return segments;
   }
 
   Future<void> _playCurrent(int generation) async {
@@ -665,23 +694,41 @@ class ReaderAloudController extends ChangeNotifier {
         }
       }
       final chapter = _currentChapter;
-      final queuedTexts = queued
-          ? <String>[
-              segment.text.substring(startAt),
-              for (
-                var index = firstSegmentIndex + 1;
-                index <= utteranceEndSegmentIndex;
-                index++
-              )
-                _segments[index].text,
-            ]
-          : const <String>[];
+      final queuedEntries =
+          <({int segmentIndex, int startOffset, String text})>[];
+      if (queued) {
+        final firstText = segment.text.substring(startAt);
+        if (firstText.trim().isNotEmpty) {
+          queuedEntries.add((
+            segmentIndex: firstSegmentIndex,
+            startOffset: startAt,
+            text: firstText,
+          ));
+        }
+        for (
+          var index = firstSegmentIndex + 1;
+          index <= utteranceEndSegmentIndex;
+          index++
+        ) {
+          final text = _segments[index].text;
+          if (text.trim().isNotEmpty) {
+            queuedEntries.add((
+              segmentIndex: index,
+              startOffset: 0,
+              text: text,
+            ));
+          }
+        }
+      }
+      final queuedTexts = <String>[
+        for (final entry in queuedEntries) entry.text,
+      ];
       final spokenText = queued
-          ? queuedTexts.join()
+          ? null
           : continuous && chapter != null
           ? chapter.text.substring(utteranceStartOffset, utteranceEndOffset)
           : segment.text.substring(startAt);
-      if (spokenText.trim().isEmpty) {
+      if (queued ? queuedEntries.isEmpty : spokenText!.trim().isEmpty) {
         bool moved;
         try {
           moved = await _moveNext();
@@ -728,16 +775,19 @@ class ReaderAloudController extends ChangeNotifier {
                   _state != ReaderAloudPlaybackState.playing) {
                 return;
               }
-              final nextIndex = firstSegmentIndex + relativeIndex;
-              if (relativeIndex < 0 ||
-                  nextIndex < firstSegmentIndex ||
+              if (relativeIndex < 0 || relativeIndex >= queuedEntries.length) {
+                return;
+              }
+              final entry = queuedEntries[relativeIndex];
+              final nextIndex = entry.segmentIndex;
+              if (nextIndex < firstSegmentIndex ||
                   nextIndex > utteranceEndSegmentIndex ||
                   nextIndex >= _segments.length) {
                 return;
               }
               _segmentIndex = nextIndex;
-              _utteranceBaseOffset = relativeIndex == 0 ? startAt : 0;
-              _resumeOffset = _utteranceBaseOffset;
+              _utteranceBaseOffset = entry.startOffset;
+              _resumeOffset = entry.startOffset;
               final startedSegment = _segments[nextIndex];
               notifyListeners();
               unawaited(
@@ -756,7 +806,7 @@ class ReaderAloudController extends ChangeNotifier {
             },
           );
         } else {
-          await engine.speak(spokenText);
+          await engine.speak(spokenText!);
         }
       } catch (error) {
         _fail(error, generation);

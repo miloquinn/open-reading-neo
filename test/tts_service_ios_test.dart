@@ -16,7 +16,10 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     SharedPreferences.setMockInitialValues(<String, Object>{});
     tts = _FakeFlutterTts();
-    service = TtsService(ttsFactory: () => tts);
+    service = TtsService(
+      ttsFactory: () => tts,
+      progressNotifyInterval: Duration.zero,
+    );
     await _waitForInitialization(service);
     expect(service.isInitialized, isTrue, reason: service.lastError);
   });
@@ -24,7 +27,6 @@ void main() {
   tearDown(() async {
     await service.stop();
     service.dispose();
-    await Future<void>.delayed(Duration.zero);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -157,6 +159,27 @@ void main() {
     expect(service.lastError, 'tts_call_failed');
   });
 
+  test(
+    'coalesces burst progress notifications while keeping latest position',
+    () async {
+      await service.speak('abcdef');
+      var notifications = 0;
+      void listener() => notifications++;
+      service.addListener(listener);
+      addTearDown(() => service.removeListener(listener));
+
+      for (var index = 0; index < 20; index++) {
+        final start = index.clamp(0, 5);
+        tts.emitProgress('abcdef', start, start + 1, 'x');
+      }
+
+      expect(notifications, 0);
+      expect(service.currentPosition, 5);
+      await Future<void>.delayed(Duration.zero);
+      expect(notifications, 1);
+    },
+  );
+
   test('single speech replaces an in-flight queued-mode transition', () async {
     tts.calls.clear();
     final queueModeGate = Completer<void>();
@@ -191,6 +214,7 @@ class _FakeFlutterTts extends FlutterTts {
 
   VoidCallback? _start;
   VoidCallback? _complete;
+  ProgressHandler? _progress;
 
   @override
   Future<dynamic> awaitSpeakCompletion(bool awaitCompletion) async {
@@ -280,6 +304,15 @@ class _FakeFlutterTts extends FlutterTts {
   @override
   void setCompletionHandler(VoidCallback callback) {
     _complete = callback;
+  }
+
+  @override
+  void setProgressHandler(ProgressHandler callback) {
+    _progress = callback;
+  }
+
+  void emitProgress(String text, int start, int end, String word) {
+    _progress?.call(text, start, end, word);
   }
 
   void emitStart() => _start?.call();

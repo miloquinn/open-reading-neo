@@ -19,6 +19,30 @@ void main() {
       expect(segments.map((segment) => segment.text), ['甲句。', '乙句很短！', '丙句？']);
     });
 
+    test('keeps all supported sentence boundaries', () {
+      const text = '甲。乙！丙？丁!戊?己；庚;辛：壬:\n癸';
+
+      final segments = ReaderAloudSegmenter.split(
+        chapterIndex: 0,
+        chapterId: 'chapter-1',
+        chapterTitle: '第一章',
+        text: text,
+      );
+
+      expect(segments.map((segment) => segment.text), const [
+        '甲。',
+        '乙！',
+        '丙？',
+        '丁!',
+        '戊?',
+        '己；',
+        '庚;',
+        '辛：',
+        '壬:',
+        '癸',
+      ]);
+    });
+
     test('keeps UTF-16 offsets while splitting readable sentences', () {
       const text = '  第一句。第二句很短！\n\n第三段继续。';
 
@@ -81,6 +105,52 @@ void main() {
       await controller.stop();
       controller.dispose();
       await notifications.dispose();
+    });
+
+    test('reuses segmentation for the same chapter text instance', () async {
+      await controller.stop();
+      controller.dispose();
+      var segmentationCount = 0;
+      source.initialPosition = const ReaderAloudPosition(
+        chapterIndex: 0,
+        offset: 0,
+      );
+      controller = ReaderAloudController(
+        engine: engine,
+        source: source,
+        notificationSink: notifications,
+        segmenter: (chapter) {
+          segmentationCount++;
+          return ReaderAloudSegmenter.split(
+            chapterIndex: chapter.index,
+            chapterId: chapter.id,
+            chapterTitle: chapter.title,
+            text: chapter.text,
+            maxCharacters: 3,
+          );
+        },
+      );
+
+      unawaited(controller.start());
+      await _flush();
+      await controller.stop();
+      unawaited(controller.start());
+      await _flush();
+      expect(segmentationCount, 1);
+
+      await controller.stop();
+      final previous = source.chapters.first;
+      source.chapters[0] = ReaderAloudChapter(
+        index: previous.index,
+        id: previous.id,
+        title: previous.title,
+        text: String.fromCharCodes(previous.text.codeUnits),
+      );
+      expect(identical(previous.text, source.chapters.first.text), isFalse);
+      unawaited(controller.start());
+      await _flush();
+
+      expect(segmentationCount, 2);
     });
 
     test('starts from the segment containing the current offset', () async {
@@ -219,6 +289,74 @@ void main() {
         await _flush();
         expect(engine.queuedTexts, const ['丙句。', '丁句。']);
         expect(controller.currentChapter?.id, 'c2');
+      },
+    );
+
+    test(
+      'keeps queued highlights aligned when blank segments are filtered',
+      () async {
+        await controller.stop();
+        controller.dispose();
+        source = _FakeReaderAloudSource(
+          chapters: const [
+            ReaderAloudChapter(
+              index: 0,
+              id: 'c1',
+              title: '第一章',
+              text: '甲句。\u00A0\u00A0乙句。',
+            ),
+          ],
+          initialPosition: const ReaderAloudPosition(
+            chapterIndex: 0,
+            offset: 0,
+          ),
+        );
+        controller = ReaderAloudController(
+          engine: engine,
+          source: source,
+          notificationSink: notifications,
+          segmenter: (_) => const [
+            ReaderAloudSegment(
+              chapterIndex: 0,
+              chapterId: 'c1',
+              chapterTitle: '第一章',
+              startOffset: 0,
+              endOffset: 3,
+              text: '甲句。',
+            ),
+            ReaderAloudSegment(
+              chapterIndex: 0,
+              chapterId: 'c1',
+              chapterTitle: '第一章',
+              startOffset: 3,
+              endOffset: 5,
+              text: '\u00A0\u00A0',
+            ),
+            ReaderAloudSegment(
+              chapterIndex: 0,
+              chapterId: 'c1',
+              chapterTitle: '第一章',
+              startOffset: 5,
+              endOffset: 8,
+              text: '乙句。',
+            ),
+          ],
+        );
+        engine.supportsQueuedText = true;
+
+        unawaited(controller.start());
+        await _flush();
+
+        expect(engine.queuedTexts, const ['甲句。', '乙句。']);
+        engine.startQueuedText(1);
+        await _flush();
+
+        expect(controller.currentSegment?.startOffset, 5);
+        expect(controller.highlight?.startOffset, 5);
+        expect(
+          source.revealed,
+          contains(const ReaderAloudPosition(chapterIndex: 0, offset: 5)),
+        );
       },
     );
 
@@ -484,9 +622,9 @@ class _FakeReaderAloudEngine extends ChangeNotifier
 
 class _FakeReaderAloudSource implements ReaderAloudSource {
   _FakeReaderAloudSource({
-    required this.chapters,
+    required List<ReaderAloudChapter> chapters,
     required this.initialPosition,
-  });
+  }) : chapters = List<ReaderAloudChapter>.of(chapters);
 
   final List<ReaderAloudChapter> chapters;
   ReaderAloudPosition initialPosition;

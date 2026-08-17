@@ -1214,16 +1214,30 @@ void main() {
     );
     await tester.pump();
 
-    Key? topLayerKey() => tester
+    final leftCurlRect = tester.getRect(
+      find.byKey(const ValueKey('spread-left-curl')),
+    );
+    final rightCurlRect = tester.getRect(
+      find.byKey(const ValueKey('spread-right-curl')),
+    );
+    expect(leftCurlRect.right, closeTo(rightCurlRect.left, 0.001));
+    final spreadBindingX = leftCurlRect.right;
+
+    Key? topLeafLayerKey() => tester
         .widget<Stack>(
           find.byKey(const ValueKey('reader-page-curl-spread-layer-stack')),
         )
         .children
+        .where(
+          (child) =>
+              child.key !=
+              const ValueKey('reader-page-curl-spread-gutter-layer'),
+        )
         .last
         .key;
 
     expect(
-      topLayerKey(),
+      topLeafLayerKey(),
       const ValueKey('reader-page-curl-spread-right-layer'),
     );
 
@@ -1238,13 +1252,14 @@ void main() {
     expect(coordinator.activeBindingEdge, ReaderPageBindingEdge.left);
     expect(forwardController.debugActiveBackPageIdentity, 'right-back');
     expect(
-      topLayerKey(),
+      topLeafLayerKey(),
       const ValueKey('reader-page-curl-spread-right-layer'),
     );
     final firstForwardTouch = forwardController.debugTouchPosition;
     await forwardGesture.moveBy(const Offset(-40, 20));
     await tester.pump();
     expect(forwardController.debugTouchPosition, isNot(firstForwardTouch));
+    expect(rightCurlRect.left, closeTo(spreadBindingX, 0.001));
     await forwardGesture.cancel();
     await tester.pumpAndSettle();
 
@@ -1258,23 +1273,27 @@ void main() {
     await tester.pump();
     expect(coordinator.activeBindingEdge, ReaderPageBindingEdge.right);
     expect(backwardController.debugActiveBackPageIdentity, 'left-back');
-    expect(topLayerKey(), const ValueKey('reader-page-curl-spread-left-layer'));
+    expect(
+      topLeafLayerKey(),
+      const ValueKey('reader-page-curl-spread-left-layer'),
+    );
     final firstBackwardTouch = backwardController.debugTouchPosition;
     await backwardGesture.moveBy(const Offset(40, 20));
     await tester.pump();
     expect(backwardController.debugTouchPosition, isNot(firstBackwardTouch));
+    expect(leftCurlRect.right, closeTo(spreadBindingX, 0.001));
     await backwardGesture.cancel();
     await tester.pumpAndSettle();
   });
 
-  testWidgets('tablet folded back texture stays readable on both bindings', (
+  testWidgets('tablet folded back preserves page colors on both bindings', (
     tester,
   ) async {
-    await _expectReadableFoldedBack(
+    await _expectUnmutedFoldedBack(
       tester,
       bindingEdge: ReaderPageBindingEdge.left,
     );
-    await _expectReadableFoldedBack(
+    await _expectUnmutedFoldedBack(
       tester,
       bindingEdge: ReaderPageBindingEdge.right,
     );
@@ -1510,7 +1529,7 @@ ReaderPageSnapshot _revisionSnapshot(String id, int revision) =>
       child: Text('$id-$revision'),
     );
 
-Future<void> _expectReadableFoldedBack(
+Future<void> _expectUnmutedFoldedBack(
   WidgetTester tester, {
   required ReaderPageBindingEdge bindingEdge,
 }) async {
@@ -1627,10 +1646,14 @@ Future<void> _expectReadableFoldedBack(
   final second = _pixelColor(rawBytes, image.width, sampleXs[1], y);
   image.dispose();
 
-  expect(first.g, greaterThan(first.r + 0.18));
-  expect(first.g, greaterThan(first.b + 0.18));
-  expect(second.r, greaterThan(second.g + 0.35));
-  expect(second.b, greaterThan(second.g + 0.35));
+  expect(first.r, closeTo(Colors.green.r, 0.02));
+  expect(first.g, closeTo(Colors.green.g, 0.02));
+  expect(first.b, closeTo(Colors.green.b, 0.02));
+  expect(first.a, closeTo(1, 0.01));
+  expect(second.r, closeTo(1, 0.02));
+  expect(second.g, closeTo(0, 0.02));
+  expect(second.b, closeTo(1, 0.02));
+  expect(second.a, closeTo(1, 0.01));
 
   await gesture.cancel();
   await tester.pumpAndSettle();

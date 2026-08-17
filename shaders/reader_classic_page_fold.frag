@@ -327,6 +327,11 @@ void main() {
             polygon4
         )) {
         fragColor = sampleFoldedBack(transformedPos);
-        fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.10);
+        // Only the phone's simulated paper reverse receives the soft surface
+        // highlight. A tablet spread provides a real adjacent-page texture,
+        // which must retain the same colors and opacity as a flat reader page.
+        if (uHasBackPage <= 0.5) {
+            fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.10);
+        }
     }
 }

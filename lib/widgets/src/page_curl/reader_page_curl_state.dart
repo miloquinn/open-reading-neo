@@ -1258,9 +1258,24 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     ReaderPageSnapshot page, {
     required bool hidden,
   }) {
+    final halfGutter = (widget.coordinator?.gutterWidth ?? 0) / 2;
+    final pageBindingEdge = identical(key, _outgoingBackKey)
+        ? switch (widget.bindingEdge) {
+            ReaderPageBindingEdge.left => ReaderPageBindingEdge.right,
+            ReaderPageBindingEdge.right => ReaderPageBindingEdge.left,
+          }
+        : widget.bindingEdge;
+    final pageChild = halfGutter <= 0
+        ? page.child
+        : Padding(
+            padding: pageBindingEdge == ReaderPageBindingEdge.left
+                ? EdgeInsets.only(left: halfGutter)
+                : EdgeInsets.only(right: halfGutter),
+            child: page.child,
+          );
     final paper = RepaintBoundary(
       key: key,
-      child: ColoredBox(color: widget.paperColor, child: page.child),
+      child: ColoredBox(color: widget.paperColor, child: pageChild),
     );
     if (!hidden) return paper;
     return ExcludeSemantics(child: IgnorePointer(child: paper));
@@ -1329,8 +1344,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
                       backImage: backImage,
                       bindingOverflow: widget.coordinator == null
                           ? 0
-                          : geometry.size.width +
-                                widget.coordinator!.gutterWidth,
+                          : geometry.size.width,
                     ),
                   ),
                 ),

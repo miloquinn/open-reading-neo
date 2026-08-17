@@ -734,8 +734,13 @@ void main() {
                 .map((element) => tester.getRect(find.byWidget(element.widget)))
                 .toList()
               ..sort((left, right) => left.left.compareTo(right.left));
-        expect(rects[0].right, closeTo(588, 0.1));
-        expect(rects[1].left, closeTo(612, 0.1));
+        expect(rects[0].right, closeTo(600, 0.1));
+        expect(rects[1].left, closeTo(600, 0.1));
+        final gutterRect = tester.getRect(
+          find.byKey(const ValueKey('reader-page-curl-spread-gutter-layer')),
+        );
+        expect(gutterRect.left, closeTo(588, 0.1));
+        expect(gutterRect.right, closeTo(612, 0.1));
 
         final rightController = rightCurl.controller!;
         final gesture = await tester.startGesture(

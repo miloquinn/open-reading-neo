@@ -105,10 +105,11 @@ class ReaderPageCurlCoordinator extends ChangeNotifier {
   ReaderPageCurlCoordinator({this.gutterWidth = 0})
     : assert(gutterWidth >= 0 && gutterWidth.isFinite);
 
-  /// The fixed visual gap between the two leaves in a tablet spread.
+  /// Width of the visual gutter centered on a tablet spread's binding.
   ///
-  /// A coordinated leaf uses this together with its own width when painting
-  /// the folded sheet across the binding and onto the opposite leaf.
+  /// Half of this width is reserved inside each full-width paper leaf. The two
+  /// page-curl surfaces still meet at the exact center binding, so the animated
+  /// hinge never shifts to either outside edge of the visual gutter.
   final double gutterWidth;
 
   Object? _owner;
@@ -189,10 +190,8 @@ class ReaderPageCurlSpread extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final leafWidth = math.max(
-          0.0,
-          (constraints.maxWidth - coordinator.gutterWidth) / 2,
-        );
+        final leafWidth = math.max(0.0, constraints.maxWidth / 2);
+        final halfGutter = math.min(leafWidth, coordinator.gutterWidth / 2);
         return AnimatedBuilder(
           animation: coordinator.activeBindingEdgeListenable,
           builder: (context, _) {
@@ -206,30 +205,34 @@ class ReaderPageCurlSpread extends StatelessWidget {
             );
             final rightLayer = Positioned(
               key: const ValueKey('reader-page-curl-spread-right-layer'),
-              left: leafWidth + coordinator.gutterWidth,
+              left: leafWidth,
               top: 0,
               bottom: 0,
               width: leafWidth,
               child: right ?? const SizedBox.expand(),
             );
+            final activeBindingEdge = coordinator.activeBindingEdge;
             final leftIsActive =
-                coordinator.activeBindingEdge == ReaderPageBindingEdge.right;
+                activeBindingEdge == ReaderPageBindingEdge.right;
+            final gutterLayer = Positioned(
+              key: const ValueKey('reader-page-curl-spread-gutter-layer'),
+              left: leafWidth - halfGutter,
+              top: 0,
+              bottom: 0,
+              width: coordinator.gutterWidth,
+              child: IgnorePointer(child: gutter),
+            );
             return Stack(
               key: const ValueKey('reader-page-curl-spread-layer-stack'),
               fit: StackFit.expand,
               clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  key: const ValueKey('reader-page-curl-spread-gutter-layer'),
-                  left: leafWidth,
-                  top: 0,
-                  bottom: 0,
-                  width: coordinator.gutterWidth,
-                  child: IgnorePointer(child: gutter),
-                ),
-                if (leftIsActive) rightLayer else leftLayer,
-                if (leftIsActive) leftLayer else rightLayer,
-              ],
+              children: activeBindingEdge == null
+                  ? [leftLayer, rightLayer, gutterLayer]
+                  : [
+                      if (leftIsActive) rightLayer else leftLayer,
+                      gutterLayer,
+                      if (leftIsActive) leftLayer else rightLayer,
+                    ],
             );
           },
         );

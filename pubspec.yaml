@@ -32,8 +32,6 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  cupertino_icons: ^1.0.9
-
   # 文件处理和存储
   file_picker: ^11.0.2
   shared_preferences: ^2.5.5

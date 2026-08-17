@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xxread/main.dart';
+import 'package:xxread/services/core/theme_notifier.dart';
 import 'package:xxread/utils/app_themes.dart';
 
 Future<ThemeNotifier> _loadNotifier() async {

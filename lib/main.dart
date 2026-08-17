@@ -10,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart' as provider;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'l10n/app_localizations.dart';
@@ -42,12 +41,12 @@ import 'services/tts_service.dart';
 import 'services/reader_aloud_service.dart';
 import 'services/account/account.dart';
 import 'package:path_provider/path_provider.dart';
-import 'utils/glass_config.dart';
 import 'utils/localization_extension.dart';
 import 'utils/font_catalog_helper.dart';
 import 'utils/reader_themes.dart';
 import 'utils/ui_style.dart';
 import 'widgets/app_brand_icon.dart';
+import 'widgets/restartable_app.dart';
 import 'widgets/side_toast.dart';
 import 'widgets/update_check_gate.dart';
 
@@ -154,192 +153,6 @@ List<String> _supportedDesktopFileArguments(List<String> arguments) {
     }
   }
   return List<String>.unmodifiable(paths.toSet());
-}
-
-class RestartableApp extends StatefulWidget {
-  const RestartableApp({super.key, required this.child});
-
-  final Widget child;
-
-  static void restart(BuildContext context) {
-    final state = context.findAncestorStateOfType<_RestartableAppState>();
-    state?.restartApp();
-  }
-
-  @override
-  State<RestartableApp> createState() => _RestartableAppState();
-}
-
-class _RestartableAppState extends State<RestartableApp> {
-  Key _subtreeKey = UniqueKey();
-
-  void restartApp() {
-    setState(() => _subtreeKey = UniqueKey());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return KeyedSubtree(key: _subtreeKey, child: widget.child);
-  }
-}
-
-class ThemeNotifier extends ChangeNotifier {
-  static const String _themeModePrefKey = 'isDarkMode';
-  static const String _uiStylePrefKey = 'ui_style_mode';
-  static const String _accentColorPrefKey = 'appAccentColorV2';
-
-  // 仅用于从旧版“双层主题 + 强调色”设置迁移。
-  static const String _appThemePrefKey = 'appTheme';
-  static const String _customAccentPrefKey = 'customAccentColor';
-  static const String _globalAccentPrefKey = 'globalAccentColor';
-  static const String _lastPresetThemePrefKey = 'last_preset_app_theme';
-
-  ThemeMode _themeMode = ThemeMode.system;
-  bool _isInitialized = false;
-  Color _accentColor = AppThemes.defaultAccentColor;
-  AppTheme _currentAppTheme = AppThemes.fromAccentColor(
-    AppThemes.defaultAccentColor,
-  );
-  AppUiStyle _uiStyle = AppUiStyle.glass;
-
-  ThemeMode get themeMode => _themeMode;
-  bool get isInitialized => _isInitialized;
-  Color get accentColor => _accentColor;
-  AppTheme get currentAppTheme => _currentAppTheme;
-  AppUiStyle get uiStyle => _uiStyle;
-  bool get isGlassEffectsEnabled => _uiStyle == AppUiStyle.glass;
-  bool get shouldDisableGlassEffects => _uiStyle == AppUiStyle.material3;
-
-  ThemeNotifier() {
-    _loadTheme();
-  }
-
-  void _loadTheme() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final isDarkMode = prefs.getBool(_themeModePrefKey);
-    _uiStyle = appUiStyleFromStorage(prefs.getString(_uiStylePrefKey));
-    await prefs.remove('disable_glass_effects');
-    final storedAccentColor = prefs.getInt(_accentColorPrefKey);
-
-    _syncGlassEffectState();
-    if (prefs.getBool('enableAnimations') != true) {
-      await prefs.setBool('enableAnimations', true);
-    }
-
-    if (isDarkMode == null) {
-      // 首次启动，使用系统主题
-      _themeMode = ThemeMode.system;
-    } else {
-      _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
-    }
-
-    if (storedAccentColor != null) {
-      _accentColor = Color(storedAccentColor);
-    } else {
-      _accentColor = _migrateLegacyAccentColor(prefs);
-      await prefs.setInt(_accentColorPrefKey, _accentColor.toARGB32());
-    }
-    await _removeLegacyThemePreferences(prefs);
-    _currentAppTheme = AppThemes.fromAccentColor(_accentColor);
-
-    _isInitialized = true;
-    notifyListeners();
-
-    // 不在这里更新系统UI，让各页面自行控制
-    // 避免与阅读页面的全屏模式冲突
-  }
-
-  void toggleTheme(bool isDarkMode) async {
-    final newThemeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
-    if (_themeMode == newThemeMode) return; // 避免重复设置
-
-    _themeMode = newThemeMode;
-
-    // 立即通知监听器更新UI
-    notifyListeners();
-
-    // 不在这里更新系统栏样式，让各页面自行控制
-    // 避免与阅读页面的全屏模式冲突
-
-    // 异步保存设置
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_themeModePrefKey, isDarkMode);
-  }
-
-  /// 强调色是应用配色的唯一来源，Material 3 会由它生成完整浅色/深色色板。
-  Future<void> setAccentColor(Color color) async {
-    if (_accentColor.toARGB32() == color.toARGB32()) return;
-
-    _accentColor = color;
-    _currentAppTheme = AppThemes.fromAccentColor(color);
-    notifyListeners();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_accentColorPrefKey, color.toARGB32());
-    await _removeLegacyThemePreferences(prefs);
-  }
-
-  Color _migrateLegacyAccentColor(SharedPreferences prefs) {
-    final globalAccent = prefs.getInt(_globalAccentPrefKey);
-    if (globalAccent != null) return Color(globalAccent);
-
-    final appThemeName = prefs.getString(_appThemePrefKey);
-    final customAccent = prefs.getInt(_customAccentPrefKey);
-    if (appThemeName == 'custom' && customAccent != null) {
-      return Color(customAccent);
-    }
-    return AppThemes.accentColorForLegacyTheme(appThemeName);
-  }
-
-  Future<void> _removeLegacyThemePreferences(SharedPreferences prefs) async {
-    await prefs.remove(_appThemePrefKey);
-    await prefs.remove(_customAccentPrefKey);
-    await prefs.remove(_globalAccentPrefKey);
-    await prefs.remove(_lastPresetThemePrefKey);
-  }
-
-  void setThemeMode(ThemeMode mode) {
-    if (_themeMode == mode) return;
-
-    _themeMode = mode;
-    notifyListeners();
-
-    // 不在这里更新系统UI，让各页面自行控制
-    // 避免与阅读页面的全屏模式冲突
-
-    // 保存设置
-    _saveThemeMode(mode);
-  }
-
-  void _saveThemeMode(ThemeMode mode) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (mode == ThemeMode.system) {
-      await prefs.remove(_themeModePrefKey);
-    } else {
-      await prefs.setBool(_themeModePrefKey, mode == ThemeMode.dark);
-    }
-  }
-
-  Future<void> setUiStyle(AppUiStyle style) async {
-    if (_uiStyle == style) return;
-    _uiStyle = style;
-    _syncGlassEffectState();
-    notifyListeners();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_uiStylePrefKey, style.storageValue);
-  }
-
-  Future<void> setGlassEffectsEnabled(bool enabled) {
-    return setUiStyle(enabled ? AppUiStyle.glass : AppUiStyle.material3);
-  }
-
-  void _syncGlassEffectState() {
-    GlassEffectConfig.setDisableAllGlassEffects(shouldDisableGlassEffects);
-    GlassEffectConfig.applyPerformanceMode(
-      reduceEffects: shouldDisableGlassEffects,
-    );
-  }
 }
 
 class XxReadApp extends StatefulWidget {

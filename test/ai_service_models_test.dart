@@ -2,8 +2,24 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
+
+class _MemoryAISettingsStore implements AISettingsStore {
+  AIProviderSettings _settings = AIProviderSettings.defaults(
+    AIProviderType.minimax,
+  );
+
+  @override
+  Future<AIProviderSettings> load([AIProviderType? provider]) async {
+    if (provider == null || provider == _settings.provider) return _settings;
+    return AIProviderSettings.defaults(provider);
+  }
+
+  @override
+  Future<void> save(AIProviderSettings settings) async {
+    _settings = settings.normalized();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +45,10 @@ void main() {
             },
           ),
         );
-      final service = ReaderHttpAIService(dio: dio);
+      final service = ReaderHttpAIService(
+        dio: dio,
+        settingsStore: _MemoryAISettingsStore(),
+      );
 
       final models = await service.fetchAvailableModels(
         const AIProviderSettings(
@@ -161,7 +180,6 @@ void main() {
     );
 
     test('custom Anthropic chat uses messages endpoint and payload', () async {
-      SharedPreferences.setMockInitialValues({});
       late RequestOptions captured;
       final dio = Dio()
         ..interceptors.add(
@@ -182,7 +200,10 @@ void main() {
             },
           ),
         );
-      final service = ReaderHttpAIService(dio: dio);
+      final service = ReaderHttpAIService(
+        dio: dio,
+        settingsStore: _MemoryAISettingsStore(),
+      );
       await service.saveSettings(
         const AIProviderSettings(
           provider: AIProviderType.custom,

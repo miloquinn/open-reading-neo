@@ -325,8 +325,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
-  bool _readerAloudPositionRevealInProgress = false;
-  int _readerAloudPositionRevealGeneration = 0;
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
   final BookmarkDao _bookmarkDao = BookmarkDao();
   final BookNoteDao _bookNoteDao = BookNoteDao();

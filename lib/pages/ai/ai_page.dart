@@ -149,10 +149,9 @@ class _AiPageState extends State<AiPage> {
         book = await BookDao().getBookById(numericId);
       }
       if (book == null && session.bookTitle.trim().isNotEmpty) {
-        final books = await BookDao().getAllBooks();
-        book = books
-            .where((candidate) => candidate.title == session.bookTitle.trim())
-            .firstOrNull;
+        book = await BookDao().getMostRecentlyImportedBookByExactTitle(
+          session.bookTitle,
+        );
       }
     } catch (_) {}
     if (!mounted || book == null) return;
@@ -243,31 +242,34 @@ class _AiPageState extends State<AiPage> {
       ),
       builder: (sheetContext) {
         final l10n = sheetContext.l10n;
-        return ListView(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.block_outlined),
-              title: Text(l10n.aiChatNoBook),
-              onTap: () => Navigator.of(sheetContext).pop('none'),
-            ),
-            for (final book in books)
-              ListTile(
-                leading: const Icon(Icons.menu_book_outlined),
-                title: Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: book.author.trim().isEmpty
-                    ? null
-                    : Text(
-                        book.author,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                onTap: () => Navigator.of(sheetContext).pop(book),
+        return ListView.builder(
+          itemCount: books.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return ListTile(
+                leading: const Icon(Icons.block_outlined),
+                title: Text(l10n.aiChatNoBook),
+                onTap: () => Navigator.of(sheetContext).pop('none'),
+              );
+            }
+            final book = books[index - 1];
+            return ListTile(
+              leading: const Icon(Icons.menu_book_outlined),
+              title: Text(
+                book.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-          ],
+              subtitle: book.author.trim().isEmpty
+                  ? null
+                  : Text(
+                      book.author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+              onTap: () => Navigator.of(sheetContext).pop(book),
+            );
+          },
         );
       },
     );
@@ -315,7 +317,7 @@ class _AiPageState extends State<AiPage> {
     try {
       final notes = book.id == null
           ? const <BookNote>[]
-          : await BookNoteDao().selectBookNotesByBookId(book.id!);
+          : await BookNoteDao().selectBookNotesByBookId(book.id!, limit: 128);
       if (notes.isNotEmpty) {
         buffer.writeln('【用户在《${book.title}》中的笔记与高亮】');
         var used = 0;

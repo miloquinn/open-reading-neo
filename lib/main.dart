@@ -373,18 +373,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     });
     _syncIncomingBookReadiness();
 
-    // 初始化缓存与应用状态服务
-    try {
-      await DataCacheService().initialize();
-      await AppStateService().initialize();
-    } catch (e) {
-      debugPrint('数据服务初始化失败: $e');
-      if (mounted) {
-        setState(() => _bootstrapError = _BootstrapError.dataService);
-      }
-      return;
-    }
-
     // 浏览器没有 path_provider 的文件系统目录。Web 端的图片与书籍
     // 持久化需要单独的浏览器存储实现，不应让本地文件系统的初始化
     // 阻塞整个 Web 应用启动。
@@ -554,12 +542,11 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     }
   }
 
-  /// 处理用户拒绝协议
+  /// 用户明确拒绝协议后，原生端结束应用；Web 无法可靠关闭标签页，
+  /// 保持协议页以阻止用户进入主应用。
   void _onAgreementRejected() {
-    // 退出应用
-    debugPrint('❌ 用户拒绝协议，退出应用');
-    // 这里可以调用 SystemNavigator.pop() 或其他退出逻辑
-    // SystemNavigator.pop();
+    if (kIsWeb) return;
+    unawaited(SystemNavigator.pop());
   }
 
   @override
@@ -577,7 +564,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
                 navigatorKey: _navigatorKey,
                 onGenerateTitle: (context) => context.l10n.appTitle,
                 debugShowCheckedModeBanner: false,
-                // 🚀 启用高性能渲染，支持120Hz高刷新率
                 scrollBehavior: const MaterialScrollBehavior().copyWith(
                   physics: const BouncingScrollPhysics(),
                 ),
@@ -608,8 +594,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
           ),
     );
   }
-
-  // 已移除未使用的 _getEffectiveThemeMode 方法
 
   /// 根据协议状态决定显示哪个页面
   Widget _buildHome(BuildContext context) {
@@ -666,8 +650,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               Text(
                 switch (_bootstrapError) {
-                  _BootstrapError.dataService =>
-                    context.l10n.bootstrapDataServiceFailed,
                   _BootstrapError.imageManager =>
                     context.l10n.bootstrapImageManagerFailed,
                   null => context.l10n.unknownError,
@@ -826,4 +808,4 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
 }
 
 /// 启动初始化失败的类型，文案在 build 时按当前语言解析。
-enum _BootstrapError { dataService, imageManager }
+enum _BootstrapError { imageManager }

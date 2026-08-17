@@ -687,7 +687,7 @@ void main() {
         final curls = tester
             .widgetList<ReaderShaderPageCurl>(curlFinder)
             .toList();
-        expect(curls.every((curl) => curl.edgeDragOnly), isTrue);
+        expect(curls.every((curl) => !curl.edgeDragOnly), isTrue);
         expect(curls[0].bindingEdge, ReaderPageBindingEdge.right);
         expect(curls[1].bindingEdge, ReaderPageBindingEdge.left);
         expect(
@@ -744,7 +744,7 @@ void main() {
 
         final rightController = rightCurl.controller!;
         final gesture = await tester.startGesture(
-          Offset(rects[1].right - 2, rects[1].center.dy),
+          Offset(rects[1].left + rects[1].width * 0.25, rects[1].center.dy),
         );
         await gesture.moveBy(const Offset(-90, -45));
         await tester.pump();

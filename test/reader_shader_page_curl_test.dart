@@ -1164,7 +1164,7 @@ void main() {
     },
   );
 
-  testWidgets('tablet spread paints the active leaf above its sibling', (
+  testWidgets('tablet spread turns from inner leaf halves above its sibling', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(900, 800));
@@ -1186,7 +1186,6 @@ void main() {
                 key: const ValueKey('spread-left-curl'),
                 coordinator: coordinator,
                 controller: backwardController,
-                edgeDragOnly: true,
                 bindingEdge: ReaderPageBindingEdge.right,
                 currentPage: _snapshot('left-current'),
                 backwardPage: _snapshot('left-previous'),
@@ -1199,7 +1198,6 @@ void main() {
                 key: const ValueKey('spread-right-curl'),
                 coordinator: coordinator,
                 controller: forwardController,
-                edgeDragOnly: true,
                 currentPage: _snapshot('right-current'),
                 forwardPage: _snapshot('right-next'),
                 outgoingBackPage: _snapshot('right-back'),
@@ -1245,7 +1243,7 @@ void main() {
       find.byKey(const ValueKey('spread-right-curl')),
     );
     final forwardGesture = await tester.startGesture(
-      Offset(rightRect.right - 2, rightRect.center.dy),
+      Offset(rightRect.left + rightRect.width * 0.25, rightRect.center.dy),
     );
     await forwardGesture.moveBy(const Offset(-90, -30));
     await tester.pump();
@@ -1257,7 +1255,7 @@ void main() {
     );
     final firstForwardTouch = forwardController.debugTouchPosition;
     await forwardGesture.moveBy(const Offset(-40, 20));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
     expect(forwardController.debugTouchPosition, isNot(firstForwardTouch));
     expect(rightCurlRect.left, closeTo(spreadBindingX, 0.001));
     await forwardGesture.cancel();
@@ -1267,7 +1265,7 @@ void main() {
       find.byKey(const ValueKey('spread-left-curl')),
     );
     final backwardGesture = await tester.startGesture(
-      Offset(leftRect.left + 2, leftRect.center.dy),
+      Offset(leftRect.right - leftRect.width * 0.25, leftRect.center.dy),
     );
     await backwardGesture.moveBy(const Offset(90, -30));
     await tester.pump();
@@ -1279,11 +1277,147 @@ void main() {
     );
     final firstBackwardTouch = backwardController.debugTouchPosition;
     await backwardGesture.moveBy(const Offset(40, 20));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
     expect(backwardController.debugTouchPosition, isNot(firstBackwardTouch));
     expect(leftCurlRect.right, closeTo(spreadBindingX, 0.001));
     await backwardGesture.cancel();
     await tester.pumpAndSettle();
+
+    final crossForwardGesture = await tester.startGesture(
+      Offset(leftRect.right - leftRect.width * 0.25, leftRect.center.dy),
+    );
+    await crossForwardGesture.moveBy(const Offset(-90, -20));
+    await tester.pump();
+    expect(coordinator.activeBindingEdge, ReaderPageBindingEdge.left);
+    expect(forwardController.debugMotion, ReaderPageTurnMotion.outgoing);
+    expect(forwardController.debugActiveBackPageIdentity, 'right-back');
+    await crossForwardGesture.cancel();
+    await tester.pumpAndSettle();
+
+    final crossBackwardGesture = await tester.startGesture(
+      Offset(rightRect.left + rightRect.width * 0.25, rightRect.center.dy),
+    );
+    await crossBackwardGesture.moveBy(const Offset(90, -20));
+    await tester.pump();
+    expect(coordinator.activeBindingEdge, ReaderPageBindingEdge.right);
+    expect(backwardController.debugMotion, ReaderPageTurnMotion.outgoing);
+    expect(backwardController.debugActiveBackPageIdentity, 'left-back');
+    await crossBackwardGesture.cancel();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('tablet flat catch-up frame does not flash over sibling leaf', (
+    tester,
+  ) async {
+    const spreadWidth = 800.0;
+    const spreadHeight = 400.0;
+    final rootKey = GlobalKey();
+    final rightController = ReaderPageCurlController();
+    final coordinator = ReaderPageCurlCoordinator(gutterWidth: 24);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: RepaintBoundary(
+            key: rootKey,
+            child: SizedBox(
+              width: spreadWidth,
+              height: spreadHeight,
+              child: ReaderPageCurlSpread(
+                coordinator: coordinator,
+                gutter: const ColoredBox(color: Colors.black12),
+                left: ReaderShaderPageCurl(
+                  coordinator: coordinator,
+                  bindingEdge: ReaderPageBindingEdge.right,
+                  currentPage: _visualSnapshot(
+                    'flash-left-current',
+                    const ColoredBox(color: Colors.red),
+                  ),
+                  backwardPage: _visualSnapshot(
+                    'flash-left-previous',
+                    const ColoredBox(color: Colors.yellow),
+                  ),
+                  outgoingBackPage: _visualSnapshot(
+                    'flash-left-back',
+                    const ColoredBox(color: Colors.orange),
+                  ),
+                  onTurnForward: () {},
+                  onTurnBackward: () {},
+                  paperColor: Colors.white,
+                ),
+                right: ReaderShaderPageCurl(
+                  key: const ValueKey('flash-right-curl'),
+                  coordinator: coordinator,
+                  controller: rightController,
+                  currentPage: _visualSnapshot(
+                    'flash-right-current',
+                    const ColoredBox(color: Colors.blue),
+                  ),
+                  forwardPage: _visualSnapshot(
+                    'flash-right-next',
+                    const ColoredBox(color: Colors.green),
+                  ),
+                  outgoingBackPage: _visualSnapshot(
+                    'flash-right-back',
+                    const ColoredBox(color: Colors.purple),
+                  ),
+                  onTurnForward: () {},
+                  onTurnBackward: () {},
+                  paperColor: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (
+      var frame = 0;
+      frame < 20 && !rightController.debugUsesClassicFoldShader;
+      frame++
+    ) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(rightController.debugUsesClassicFoldShader, isTrue);
+
+    final boundary =
+        rootKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final baselineLeftPixel = await _capturePixel(
+      tester,
+      boundary,
+      x: (spreadWidth / 4).round(),
+      y: (spreadHeight / 2).round(),
+    );
+
+    final rightRect = tester.getRect(
+      find.byKey(const ValueKey('flash-right-curl')),
+    );
+    final gesture = await tester.startGesture(
+      Offset(rightRect.left + rightRect.width * 0.25, rightRect.center.dy),
+    );
+    await gesture.moveBy(const Offset(-30, 0));
+    for (
+      var frame = 0;
+      frame < 20 && !rightController.debugAnimationReady;
+      frame++
+    ) {
+      await tester.pump();
+    }
+    expect(rightController.debugAnimationReady, isTrue);
+    expect(rightController.debugIsCatchingUp, isTrue);
+
+    final catchUpLeftPixel = await _capturePixel(
+      tester,
+      boundary,
+      x: (spreadWidth / 4).round(),
+      y: (spreadHeight / 2).round(),
+    );
+
+    expect(catchUpLeftPixel, baselineLeftPixel);
+
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    coordinator.dispose();
   });
 
   testWidgets('tablet folded back preserves page colors on both bindings', (
@@ -1672,6 +1806,23 @@ ReaderPageSnapshot _visualSnapshot(String id, Widget child) =>
       contentRevision: 0,
       child: child,
     );
+
+Future<Color> _capturePixel(
+  WidgetTester tester,
+  RenderRepaintBoundary boundary, {
+  required int x,
+  required int y,
+}) async {
+  Color? pixel;
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    expect(bytes, isNotNull);
+    pixel = _pixelColor(bytes!, image.width, x, y);
+    image.dispose();
+  });
+  return pixel!;
+}
 
 Color _pixelColor(ByteData bytes, int width, int x, int y) {
   final offset = (y * width + x) * 4;

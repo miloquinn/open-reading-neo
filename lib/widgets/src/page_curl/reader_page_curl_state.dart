@@ -47,6 +47,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
   bool _longPressExpired = false;
   Offset? _pointerDown;
   Offset? _dragOrigin;
+  _ReaderShaderPageCurlState? _delegatedGestureLeaf;
   Offset? _catchUpStartPointer;
   Offset? _latestDragPointer;
   ReaderPageTurnDirection? _direction;
@@ -84,7 +85,9 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     );
     _catchUpTicker = createTicker(_onCatchUpTick);
     widget.controller?._attach(this);
-    widget.coordinator?.addListener(_onCoordinatorAvailable);
+    widget.coordinator
+      ?..addListener(_onCoordinatorAvailable)
+      .._attachLeaf(widget.bindingEdge, this);
     unawaited(_loadClassicFoldShader());
   }
 
@@ -107,13 +110,18 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
       oldWidget.controller?._detach(this);
       widget.controller?._attach(this);
     }
-    if (!identical(oldWidget.coordinator, widget.coordinator)) {
-      oldWidget.coordinator?.removeListener(_onCoordinatorAvailable);
+    if (!identical(oldWidget.coordinator, widget.coordinator) ||
+        oldWidget.bindingEdge != widget.bindingEdge) {
+      oldWidget.coordinator
+        ?..removeListener(_onCoordinatorAvailable)
+        .._detachLeaf(oldWidget.bindingEdge, this);
       if (identical(_ownedCoordinator, oldWidget.coordinator)) {
         oldWidget.coordinator?._release(this);
         _ownedCoordinator = null;
       }
-      widget.coordinator?.addListener(_onCoordinatorAvailable);
+      widget.coordinator
+        ?..addListener(_onCoordinatorAvailable)
+        .._attachLeaf(widget.bindingEdge, this);
     }
     final pagesChanged =
         !_sameSnapshot(oldWidget.currentPage, widget.currentPage) ||
@@ -143,7 +151,9 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller?._detach(this);
-    widget.coordinator?.removeListener(_onCoordinatorAvailable);
+    widget.coordinator
+      ?..removeListener(_onCoordinatorAvailable)
+      .._detachLeaf(widget.bindingEdge, this);
     _ownedCoordinator?._release(this);
     _ownedCoordinator = null;
     final completer = _turnCompleter;
@@ -382,6 +392,11 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     if (event.pointer != _activePointer) return;
     _velocityTracker?.addPosition(event.timeStamp, event.position);
     if (_longPressExpired) return;
+    final delegatedLeaf = _delegatedGestureLeaf;
+    if (delegatedLeaf != null) {
+      delegatedLeaf._onDelegatedPanUpdate(globalPosition: event.position);
+      return;
+    }
     if (!_pointerMoveStarted) {
       _pointerMoveStarted = true;
       _onPanStart(
@@ -408,14 +423,24 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     final tracker = _velocityTracker
       ?..addPosition(event.timeStamp, event.position);
     final velocity = tracker?.getVelocity() ?? Velocity.zero;
+    final delegatedLeaf = _delegatedGestureLeaf;
     _clearPointerTracking();
-    _onPanEnd(DragEndDetails(velocity: velocity));
+    if (delegatedLeaf != null) {
+      delegatedLeaf._onPanEnd(DragEndDetails(velocity: velocity));
+    } else {
+      _onPanEnd(DragEndDetails(velocity: velocity));
+    }
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
     if (event.pointer != _activePointer) return;
+    final delegatedLeaf = _delegatedGestureLeaf;
     _clearPointerTracking();
-    _onPanCancel();
+    if (delegatedLeaf != null) {
+      delegatedLeaf._onPanCancel();
+    } else {
+      _onPanCancel();
+    }
   }
 
   void _clearPointerTracking() {
@@ -425,6 +450,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
     _selectionHoldTimer = null;
     _pointerMoveStarted = false;
     _longPressExpired = false;
+    _delegatedGestureLeaf = null;
   }
 
   void _onPanStart(DragStartDetails details) {
@@ -485,6 +511,7 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
         if (delta.dx.abs() < delta.dy.abs() * intentRatio) return;
       }
       if (!_hasPage(direction)) {
+        if (_beginDelegatedGesture(direction, details.globalPosition)) return;
         _resetToIdle();
         return;
       }
@@ -509,6 +536,57 @@ class _ReaderShaderPageCurlState extends State<ReaderShaderPageCurl>
       _geometry = _geometryFromPointer(
         direction: _direction!,
         pointer: details.localPosition,
+        origin: _dragOrigin!,
+      );
+    });
+  }
+
+  bool _beginDelegatedGesture(
+    ReaderPageTurnDirection direction,
+    Offset globalPosition,
+  ) {
+    final coordinator = widget.coordinator;
+    final targetLeaf = coordinator?._leafFor(direction);
+    if (targetLeaf == null || identical(targetLeaf, this)) return false;
+    final started = targetLeaf._beginDelegatedDrag(direction, globalPosition);
+    if (!started) return false;
+    _delegatedGestureLeaf = targetLeaf;
+    _selectionHoldTimer?.cancel();
+    _selectionHoldTimer = null;
+    _pointerDown = null;
+    _dragOrigin = null;
+    _pendingDirection = null;
+    setState(() => _phase = _PageTurnPhase.idle);
+    return true;
+  }
+
+  bool _beginDelegatedDrag(
+    ReaderPageTurnDirection direction,
+    Offset globalPosition,
+  ) {
+    if (_phase != _PageTurnPhase.idle || _viewportSize.isEmpty) return false;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return false;
+    final localPosition = renderBox.globalToLocal(globalPosition);
+    return _beginDrag(
+      direction,
+      pointer: localPosition,
+      origin: localPosition,
+      catchUpFromEdge: _motionFor(direction) == ReaderPageTurnMotion.outgoing,
+    );
+  }
+
+  void _onDelegatedPanUpdate({required Offset globalPosition}) {
+    if (_phase != _PageTurnPhase.dragging || _direction == null) return;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return;
+    final localPosition = renderBox.globalToLocal(globalPosition);
+    _latestDragPointer = localPosition;
+    if (_catchUpStartPointer != null) return;
+    setState(() {
+      _geometry = _geometryFromPointer(
+        direction: _direction!,
+        pointer: localPosition,
         origin: _dragOrigin!,
       );
     });

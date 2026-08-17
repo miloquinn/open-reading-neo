@@ -29,16 +29,22 @@ class MemberUser {
 
   factory MemberUser.fromJson(Map<String, dynamic> json, {Uri? baseUri}) {
     final rawAvatar = json['avatar_url'] as String?;
+    final email = json['email'] as String;
+    final username = json['username'] as String?;
+    final effectiveName =
+        json['effective_name'] as String? ??
+        json['display_name'] as String? ??
+        username ??
+        email.split('@').first;
     return MemberUser(
       id: json['id'] as String,
-      email: json['email'] as String,
+      email: email,
       emailVerified: json['email_verified'] as bool? ?? true,
-      username: json['username'] as String,
+      // Email-code login can create an account before a username is chosen.
+      // Keep the client model non-null by using the server's display fallback.
+      username: username ?? effectiveName,
       displayName: json['display_name'] as String?,
-      effectiveName:
-          json['effective_name'] as String? ??
-          json['display_name'] as String? ??
-          json['username'] as String,
+      effectiveName: effectiveName,
       avatarUrl: _absoluteUrl(rawAvatar, baseUri),
       authMethods: List<String>.unmodifiable(
         (json['auth_methods'] as List? ?? const []).whereType<String>(),

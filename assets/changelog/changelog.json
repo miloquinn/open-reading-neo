@@ -2,6 +2,63 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.6.0",
+            "notes": {
+                "en": [
+                    "Kept read-aloud sessions active across reader routes and other apps while preserving the current book, chapter, sentence, and saved position",
+                    "Reduced system TTS sentence gaps and kept highlighting, pause and resume, and progress aligned with the spoken segment",
+                    "Added iOS spoken-audio, Now Playing, lock-screen and Control Center commands, and interruption handling",
+                    "Anchored tablet two-page curls to the true center binding while preserving the visual gutter",
+                    "Kept real reverse-page content at full color and enabled direction-based page turns from anywhere across the tablet spread",
+                    "Fixed an occasional one-frame flash on the sibling leaf when a tablet curl starts from the inner half",
+                    "Reused source catalogs and chapter content across book opens with background refresh and cache isolation for source configuration and login state",
+                    "Made Discover source-registry failures retryable instead of leaving the page loading indefinitely",
+                    "Allowed email-code accounts without a chosen username to use a safe display fallback instead of failing client-side parsing",
+                    "Disabled ordinary Android application backup for private databases, account state, and reading data while leaving explicit in-app synchronization unchanged",
+                    "Removed obsolete read-aloud and duplicate legacy state while splitting AI, settings, theme, import, and source modules to reduce repeated work on critical paths"
+                ],
+                "zh": [
+                    "听书会话可在离开阅读页或切换到其他应用后继续保持当前书籍、章节、句子和保存位置",
+                    "减少系统 TTS 句间停顿，并让正文高亮、暂停恢复和进度保存跟随真实朗读句子",
+                    "iOS 新增 spoken-audio、Now Playing、锁屏与控制中心操作和系统中断处理",
+                    "平板双页仿真翻页对齐屏幕中央的真实装订线，同时保留视觉中缝",
+                    "真实背页保持正常颜色与不透明度，整个双页区域都可按滑动方向前后翻页",
+                    "修复从平板页面内侧起手时，相邻页面偶尔出现单帧闪烁的问题",
+                    "在线书源目录与正文可跨打开复用并后台刷新，缓存按书源配置和登录状态隔离",
+                    "发现页遇到书源注册表加载失败时可重试，不再永久停留在加载中",
+                    "邮箱验证码账号尚未设置用户名时会使用安全显示名兜底，不再触发客户端解析错误",
+                    "Android 关闭普通应用备份，避免私有数据库、账号状态和阅读数据进入系统常规备份通道",
+                    "清理旧朗读控制和重复历史状态，拆分 AI、设置、主题、导入与书源模块，减少重复请求、等待和关键页面重建"
+                ],
+                "zh-TW": [
+                    "聽書工作階段可在離開閱讀頁或切換到其他應用程式後繼續保留目前書籍、章節、句子與儲存位置",
+                    "減少系統 TTS 句間停頓，並讓正文醒目提示、暫停恢復與進度儲存跟隨實際朗讀句子",
+                    "iOS 新增 spoken-audio、Now Playing、鎖定畫面與控制中心操作及系統中斷處理",
+                    "平板雙頁仿真翻頁對齊螢幕中央的真實裝訂線，同時保留視覺中縫",
+                    "真實背頁保持正常顏色與不透明度，整個雙頁區域都可依滑動方向前後翻頁",
+                    "修復從平板頁面內側起手時，相鄰頁面偶爾出現單幀閃爍的問題",
+                    "線上書源目錄與正文可跨開啟重複使用並在背景更新，快取依書源設定與登入狀態隔離",
+                    "發現頁遇到書源註冊表載入失敗時可重試，不再永久停留在載入中",
+                    "電子郵件驗證碼帳號尚未設定使用者名稱時會使用安全顯示名稱，不再觸發客戶端解析錯誤",
+                    "Android 關閉一般應用程式備份，避免私人資料庫、帳號狀態與閱讀資料進入系統常規備份通道",
+                    "清理舊朗讀控制與重複歷史狀態，拆分 AI、設定、主題、匯入與書源模組，減少關鍵路徑的重複請求與重建"
+                ],
+                "ja": [
+                    "読書ページを閉じたり他のアプリへ切り替えたりしても、読み上げ中の書籍・章・文・保存位置を維持できるようにしました",
+                    "システム TTS の文間の間隔を減らし、本文のハイライト、一時停止と再開、進捗保存を実際の読み上げ文に合わせました",
+                    "iOS に spoken-audio、Now Playing、ロック画面とコントロールセンターの操作、割り込み処理を追加しました",
+                    "タブレットの見開きページめくりを画面中央の実際の綴じ位置に揃え、視覚的な中央余白は維持しました",
+                    "実際の裏面ページを通常の色と不透明度で表示し、見開き全体のどこからでもスワイプ方向に前後へめくれるようにしました",
+                    "タブレットのページ内側からめくり始めたとき、反対側のページが一瞬点滅することがある問題を修正しました",
+                    "オンライン書源の目次と本文を再オープン時に再利用してバックグラウンド更新し、書源設定とログイン状態ごとにキャッシュを分離しました",
+                    "書源レジストリの読み込みに失敗した場合、発見ページが読み込み中のままにならず再試行できるようにしました",
+                    "メールコードで作成されユーザー名が未設定のアカウントでも、安全な表示名を使ってクライアント解析に失敗しないようにしました",
+                    "Android の通常アプリバックアップを無効にし、非公開データベース・アカウント状態・読書データが一般バックアップ経路へ入らないようにしました",
+                    "旧い読み上げ制御と重複した状態を整理し、AI・設定・テーマ・インポート・書源モジュールを分割して重要経路の重複処理を削減しました"
+                ]
+            }
+        },
+        {
             "version": "2.5.9",
             "notes": {
                 "en": [

@@ -449,7 +449,7 @@ void main() {
       final curls = tester
           .widgetList<ReaderShaderPageCurl>(curlFinder)
           .toList();
-      expect(curls.every((curl) => curl.edgeDragOnly), isTrue);
+      expect(curls.every((curl) => !curl.edgeDragOnly), isTrue);
       expect(curls[0].bindingEdge, ReaderPageBindingEdge.right);
       expect(curls[1].bindingEdge, ReaderPageBindingEdge.left);
       expect(
@@ -505,25 +505,17 @@ void main() {
       expect(gutterRect.right, closeTo(612, 0.1));
 
       final rightController = rightCurl.controller!;
-      final centerGesture = await tester.startGesture(
-        Offset(rects[1].left + 2, rects[1].center.dy),
+      final innerHalfGesture = await tester.startGesture(
+        Offset(rects[1].left + rects[1].width * 0.25, rects[1].center.dy),
       );
-      await centerGesture.moveBy(const Offset(-90, 0));
+      await innerHalfGesture.moveBy(const Offset(-90, -45));
       await tester.pump();
-      expect(rightController.debugMotion, isNull);
-      await centerGesture.cancel();
-
-      final rightGesture = await tester.startGesture(
-        Offset(rects[1].right - 2, rects[1].center.dy),
-      );
-      await rightGesture.moveBy(const Offset(-90, -45));
-      await tester.pump();
-      await rightGesture.moveBy(const Offset(-20, 0));
+      await innerHalfGesture.moveBy(const Offset(-20, 0));
       await tester.pump();
       expect(rightController.debugMotion, ReaderPageTurnMotion.outgoing);
       expect(rightController.debugActiveSourceIsCurrent, isTrue);
       expect(spread.coordinator.activeBindingEdge, ReaderPageBindingEdge.left);
-      await rightGesture.cancel();
+      await innerHalfGesture.cancel();
       for (var frame = 0; frame < 24; frame++) {
         await tester.pump(const Duration(milliseconds: 50));
       }

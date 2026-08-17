@@ -135,7 +135,6 @@ extension _NativeReaderRendering on _NativeReaderPageState {
       ),
       controller: _spreadBackwardPageCurlController,
       coordinator: _spreadPageCurlCoordinator,
-      edgeDragOnly: true,
       bindingEdge: ReaderPageBindingEdge.right,
       currentPage: _buildBookPageSnapshot(
         chapters,
@@ -175,7 +174,6 @@ extension _NativeReaderRendering on _NativeReaderPageState {
             ),
             controller: _spreadForwardPageCurlController,
             coordinator: _spreadPageCurlCoordinator,
-            edgeDragOnly: true,
             currentPage: _buildBookPageSnapshot(
               chapters,
               currentRight,

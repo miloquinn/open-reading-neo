@@ -113,11 +113,35 @@ class ReaderPageCurlCoordinator extends ChangeNotifier {
   final double gutterWidth;
 
   Object? _owner;
+  final Map<ReaderPageBindingEdge, _ReaderShaderPageCurlState> _leaves = {};
   final ValueNotifier<ReaderPageBindingEdge?> _activeBindingEdge =
       ValueNotifier(null);
   bool _availableAfterFrame = true;
   bool _notificationScheduled = false;
   bool _disposed = false;
+
+  void _attachLeaf(
+    ReaderPageBindingEdge bindingEdge,
+    _ReaderShaderPageCurlState leaf,
+  ) {
+    if (_disposed) return;
+    _leaves[bindingEdge] = leaf;
+  }
+
+  void _detachLeaf(
+    ReaderPageBindingEdge bindingEdge,
+    _ReaderShaderPageCurlState leaf,
+  ) {
+    if (identical(_leaves[bindingEdge], leaf)) {
+      _leaves.remove(bindingEdge);
+    }
+  }
+
+  _ReaderShaderPageCurlState? _leafFor(ReaderPageTurnDirection direction) =>
+      _leaves[switch (direction) {
+        ReaderPageTurnDirection.forward => ReaderPageBindingEdge.left,
+        ReaderPageTurnDirection.backward => ReaderPageBindingEdge.right,
+      }];
 
   bool _tryAcquire(Object owner, ReaderPageBindingEdge bindingEdge) {
     if (_disposed) return false;
@@ -161,6 +185,7 @@ class ReaderPageCurlCoordinator extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _owner = null;
+    _leaves.clear();
     _activeBindingEdge.dispose();
     super.dispose();
   }
@@ -291,8 +316,9 @@ class ReaderShaderPageCurl extends StatefulWidget {
 
   /// Restricts interactive turns to the free outer edge.
   ///
-  /// A two-page spread enables this on each half so the center spine cannot
-  /// start a page turn. Programmatic turns remain available for taps and keys.
+  /// Tablet reader spreads leave this disabled so either half of a leaf can
+  /// start its one available turn direction. Programmatic turns remain
+  /// available for taps and keys.
   final bool edgeDragOnly;
 
   @override

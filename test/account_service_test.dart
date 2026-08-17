@@ -64,6 +64,32 @@ void main() {
     },
   );
 
+  test('email-code login accepts accounts without a username', () async {
+    final storage = _MemoryTokenStore();
+    final adapter = _RouteAdapter((options) {
+      expect(options.uri.path, '/api/v1/auth/email/verify');
+      final session = _session(access: 'access-1', refresh: 'refresh-1');
+      final user = Map<String, dynamic>.from(session['user'] as Map)
+        ..['username'] = null
+        ..['display_name'] = null
+        ..['effective_name'] = 'reader';
+      session['user'] = user;
+      return _json(session);
+    });
+    final client = _client(adapter, storage);
+
+    final session = await client.verifyEmailCode(
+      email: 'reader@example.com',
+      challengeId: 'challenge-1',
+      code: '123456',
+    );
+
+    expect(session.user.username, 'reader');
+    expect(session.user.effectiveName, 'reader');
+    expect(storage.accessToken, 'access-1');
+    expect(storage.refreshToken, 'refresh-1');
+  });
+
   test('registration validation errors explain the invalid field', () async {
     final storage = _MemoryTokenStore();
     final adapter = _RouteAdapter((options) {

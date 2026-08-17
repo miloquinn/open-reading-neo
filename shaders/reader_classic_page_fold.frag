@@ -171,7 +171,8 @@ float sdSegment(vec2 p, vec2 a, vec2 b) {
 }
 
 void main() {
-    vec2 p = canonicalPoint(FlutterFragCoord().xy);
+    vec2 fragmentPoint = FlutterFragCoord().xy;
+    vec2 p = canonicalPoint(fragmentPoint);
     fragColor = vec4(0.0);
 
     if (all(equal(uPosA, vec2(0.0)))
@@ -187,13 +188,20 @@ void main() {
         uPosB
     );
     if (topDen == 0.0 || bottomDen == 0.0) {
-        fragColor = sampleSource(p);
+        if (fragmentPoint.x >= 0.0 && fragmentPoint.x <= uSize.x) {
+            fragColor = sampleSource(p);
+        }
         return;
     }
 
     if (uPosA.x == uSize.x && uPosA.y == 0.0
             && uPosB.x == uSize.x && uPosB.y == uSize.y) {
-        fragColor = sampleSource(p);
+        // A tablet leaf paints beyond its own bounds while curling across the
+        // binding. At the exact flat pose, keep that overflow transparent;
+        // otherwise the edge texels stretch across and flash on the sibling.
+        if (fragmentPoint.x >= 0.0 && fragmentPoint.x <= uSize.x) {
+            fragColor = sampleSource(p);
+        }
         return;
     }
 

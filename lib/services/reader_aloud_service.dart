@@ -441,6 +441,14 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
     implements ReaderAloudBytesPlayer {
   AudioplayersReaderAloudBytesPlayer({AudioPlayer? player})
     : _player = player ?? AudioPlayer() {
+    _audioContextReady = _player.setAudioContext(
+      AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const <AVAudioSessionOptions>{},
+        ),
+      ),
+    );
     _subscriptions.addAll([
       _player.onPositionChanged.listen((value) {
         _position = value;
@@ -461,6 +469,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
   }
 
   final AudioPlayer _player;
+  late final Future<void> _audioContextReady;
   final List<StreamSubscription<Object?>> _subscriptions = [];
   Completer<void>? _activePlayback;
   bool _isPlaying = false;
@@ -484,6 +493,8 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
     required String mimeType,
     required double volume,
   }) async {
+    if (_disposed) return;
+    await _audioContextReady;
     if (_disposed) return;
     await stop();
     final completer = Completer<void>();
@@ -554,7 +565,11 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
   }
 }
 
-class ReaderAloudService extends ChangeNotifier implements ReaderAloudEngine {
+class ReaderAloudService extends ChangeNotifier
+    implements
+        ReaderAloudEngine,
+        ReaderAloudContinuousEngine,
+        ReaderAloudQueuedEngine {
   ReaderAloudService({
     required this.systemEngine,
     ReaderAloudCloudSettingsStore? settingsStore,
@@ -594,6 +609,16 @@ class ReaderAloudService extends ChangeNotifier implements ReaderAloudEngine {
   bool get hasCloudApiKey => _hasCloudApiKey;
   String? get cloudError => _cloudError;
   bool get usesCloud => _engineType == ReaderAloudEngineType.cloud;
+  @override
+  bool get supportsContinuousText =>
+      _engineType == ReaderAloudEngineType.system &&
+      systemEngine is ReaderAloudContinuousEngine &&
+      (systemEngine as ReaderAloudContinuousEngine).supportsContinuousText;
+  @override
+  bool get supportsQueuedText =>
+      _engineType == ReaderAloudEngineType.system &&
+      systemEngine is ReaderAloudQueuedEngine &&
+      (systemEngine as ReaderAloudQueuedEngine).supportsQueuedText;
 
   @override
   int get currentPosition {
@@ -739,6 +764,25 @@ class ReaderAloudService extends ChangeNotifier implements ReaderAloudEngine {
       }
       Error.throwWithStackTrace(error, stackTrace);
     }
+  }
+
+  @override
+  Future<void> speakQueued(
+    List<String> texts, {
+    required ValueChanged<int> onTextStarted,
+  }) async {
+    await initialize();
+    if (_engineType != ReaderAloudEngineType.system ||
+        systemEngine is! ReaderAloudQueuedEngine ||
+        !(systemEngine as ReaderAloudQueuedEngine).supportsQueuedText) {
+      throw UnsupportedError('queued_tts_unavailable');
+    }
+    ++_operationGeneration;
+    _activeEngineType = ReaderAloudEngineType.system;
+    await (systemEngine as ReaderAloudQueuedEngine).speakQueued(
+      texts,
+      onTextStarted: onTextStarted,
+    );
   }
 
   @override

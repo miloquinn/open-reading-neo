@@ -163,6 +163,66 @@ void main() {
     });
 
     test(
+      'batches adjacent sentences for continuous engines and keeps highlighting',
+      () async {
+        engine.supportsContinuousText = true;
+        source.initialPosition = const ReaderAloudPosition(
+          chapterIndex: 0,
+          offset: 0,
+        );
+
+        unawaited(controller.start());
+        await _flush();
+
+        expect(engine.spokenTexts, [source.chapters[0].text]);
+        expect(controller.currentSegment?.startOffset, 0);
+
+        engine.reportProgress(3);
+        await _flush();
+        expect(controller.currentSegment?.startOffset, 3);
+        expect(controller.highlight?.startOffset, 3);
+
+        engine.completeUtterance();
+        await _flush();
+        expect(engine.spokenTexts, [
+          source.chapters[0].text,
+          source.chapters[1].text,
+        ]);
+      },
+    );
+
+    test(
+      'uses queued sentence start events to advance the spoken highlight',
+      () async {
+        engine.supportsQueuedText = true;
+        source.initialPosition = const ReaderAloudPosition(
+          chapterIndex: 0,
+          offset: 0,
+        );
+
+        unawaited(controller.start());
+        await _flush();
+
+        expect(engine.queuedTexts, const ['甲句。', '乙句。']);
+        expect(controller.highlight?.startOffset, 0);
+
+        engine.startQueuedText(1);
+        await _flush();
+        expect(controller.currentSegment?.startOffset, 3);
+        expect(controller.highlight?.startOffset, 3);
+        expect(
+          source.revealed,
+          contains(const ReaderAloudPosition(chapterIndex: 0, offset: 3)),
+        );
+
+        engine.completeUtterance();
+        await _flush();
+        expect(engine.queuedTexts, const ['丙句。', '丁句。']);
+        expect(controller.currentChapter?.id, 'c2');
+      },
+    );
+
+    test(
       'resumes from the engine progress without replaying earlier text',
       () async {
         source.initialPosition = const ReaderAloudPosition(
@@ -204,8 +264,23 @@ void main() {
       },
     );
 
+    test('routes platform media controls to the active session', () async {
+      source.initialPosition = const ReaderAloudPosition(
+        chapterIndex: 0,
+        offset: 0,
+      );
+      unawaited(controller.start());
+      await _flush();
+
+      notifications.sendControl(ReaderAloudControl.next);
+      await _flush();
+
+      expect(engine.spokenTexts.last, '乙句。');
+      expect(controller.currentSegment?.startOffset, 3);
+    });
+
     test(
-      'routes Android notification controls to the active session',
+      'handles explicit media play and pause commands idempotently',
       () async {
         source.initialPosition = const ReaderAloudPosition(
           chapterIndex: 0,
@@ -213,12 +288,45 @@ void main() {
         );
         unawaited(controller.start());
         await _flush();
+        final spokenBeforePlay = engine.spokenTexts.length;
 
-        notifications.sendControl(ReaderAloudControl.next);
+        notifications.sendControl(ReaderAloudControl.play);
+        await _flush();
+        expect(controller.state, ReaderAloudPlaybackState.playing);
+        expect(engine.spokenTexts.length, spokenBeforePlay);
+
+        notifications.sendControl(ReaderAloudControl.pause);
+        await _flush();
+        expect(controller.state, ReaderAloudPlaybackState.paused);
+
+        notifications.sendControl(ReaderAloudControl.pause);
+        await _flush();
+        expect(controller.state, ReaderAloudPlaybackState.paused);
+
+        notifications.sendControl(ReaderAloudControl.play);
+        await _flush();
+        expect(controller.state, ReaderAloudPlaybackState.playing);
+        expect(engine.spokenTexts.length, spokenBeforePlay + 1);
+      },
+    );
+
+    test(
+      'refreshes the active utterance after iOS media services reset',
+      () async {
+        source.initialPosition = const ReaderAloudPosition(
+          chapterIndex: 0,
+          offset: 0,
+        );
+        unawaited(controller.start());
+        await _flush();
+        engine.reportProgress(2);
+
+        notifications.sendControl(ReaderAloudControl.refresh);
         await _flush();
 
-        expect(engine.spokenTexts.last, '乙句。');
-        expect(controller.currentSegment?.startOffset, 3);
+        expect(engine.spokenTexts.length, 2);
+        expect(controller.currentOffset, 2);
+        expect(controller.state, ReaderAloudPlaybackState.playing);
       },
     );
 
@@ -267,13 +375,22 @@ Future<void> _flush() async {
 }
 
 class _FakeReaderAloudEngine extends ChangeNotifier
-    implements ReaderAloudEngine {
+    implements
+        ReaderAloudEngine,
+        ReaderAloudContinuousEngine,
+        ReaderAloudQueuedEngine {
   final List<String> spokenTexts = [];
+  List<String> queuedTexts = const [];
+  ValueChanged<int>? _onQueuedTextStarted;
   Completer<void>? _utterance;
   int _position = 0;
   bool _playing = false;
   bool _paused = false;
   bool failNextSpeak = false;
+  @override
+  bool supportsContinuousText = false;
+  @override
+  bool supportsQueuedText = false;
 
   @override
   int get currentPosition => _position;
@@ -315,6 +432,28 @@ class _FakeReaderAloudEngine extends ChangeNotifier
   }
 
   @override
+  Future<void> speakQueued(
+    List<String> texts, {
+    required ValueChanged<int> onTextStarted,
+  }) async {
+    queuedTexts = List<String>.of(texts);
+    _onQueuedTextStarted = onTextStarted;
+    _position = 0;
+    _playing = true;
+    _paused = false;
+    notifyListeners();
+    onTextStarted(0);
+    final utterance = Completer<void>();
+    _utterance = utterance;
+    await utterance.future;
+    if (identical(_utterance, utterance)) {
+      _utterance = null;
+    }
+    _playing = false;
+    notifyListeners();
+  }
+
+  @override
   Future<void> stop() async {
     _playing = false;
     _paused = false;
@@ -333,6 +472,12 @@ class _FakeReaderAloudEngine extends ChangeNotifier
 
   void reportProgress(int position) {
     _position = position;
+    notifyListeners();
+  }
+
+  void startQueuedText(int index) {
+    _position = 0;
+    _onQueuedTextStarted?.call(index);
     notifyListeners();
   }
 }

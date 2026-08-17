@@ -63,9 +63,12 @@ class ReaderAloudPanel extends StatefulWidget {
 
 class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
   Timer? _sleepTimerTicker;
+  Timer? _speechRateCommitTimer;
   double? _pendingSpeechRate;
   double? _pendingVolume;
   double? _pendingPitch;
+  int _speechRateCommitGeneration = 0;
+  Future<void> _speechRateCommitChain = Future<void>.value();
 
   @override
   void initState() {
@@ -82,6 +85,8 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
   @override
   void dispose() {
     _sleepTimerTicker?.cancel();
+    _speechRateCommitTimer?.cancel();
+    _speechRateCommitGeneration++;
     super.dispose();
   }
 
@@ -207,11 +212,19 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
                   value: speechRate,
                   min: 0.1,
                   max: 1,
-                  valueLabel: '${speechRate.toStringAsFixed(2)}×',
-                  onChanged: (value) =>
-                      setState(() => _pendingSpeechRate = value),
-                  onChangeEnd: (value) =>
-                      unawaited(_commitSpeechRate(value, controller, tts)),
+                  // flutter_tts maps 0.5 to Android's native 1.0 (normal
+                  // speed), so show the effective multiplier to the user.
+                  valueLabel: '${(speechRate * 2).toStringAsFixed(2)}×',
+                  onChanged: (value) {
+                    setState(() => _pendingSpeechRate = value);
+                    _scheduleSpeechRateCommit(value, controller, tts);
+                  },
+                  onChangeEnd: (value) => _scheduleSpeechRateCommit(
+                    value,
+                    controller,
+                    tts,
+                    delay: Duration.zero,
+                  ),
                 ),
                 _slider(
                   context,
@@ -310,17 +323,34 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     );
   }
 
-  Future<void> _commitSpeechRate(
+  void _scheduleSpeechRateCommit(
     double value,
     ReaderAloudController controller,
-    TtsService tts,
-  ) async {
-    try {
-      await tts.setSpeechRate(value);
-      await controller.refreshPlayback();
-    } finally {
-      if (mounted) setState(() => _pendingSpeechRate = null);
-    }
+    TtsService tts, {
+    Duration delay = const Duration(milliseconds: 180),
+  }) {
+    final generation = ++_speechRateCommitGeneration;
+    _speechRateCommitTimer?.cancel();
+    _speechRateCommitTimer = Timer(delay, () {
+      // Keep platform-channel calls ordered. If another slider value arrives,
+      // the older operation can save its value but must not restart playback.
+      _speechRateCommitChain = _speechRateCommitChain
+          .then((_) async {
+            if (!mounted || generation != _speechRateCommitGeneration) return;
+            await tts.setSpeechRate(value);
+            if (!mounted || generation != _speechRateCommitGeneration) return;
+            await controller.refreshPlayback();
+            if (mounted && generation == _speechRateCommitGeneration) {
+              setState(() => _pendingSpeechRate = null);
+            }
+          })
+          .catchError((Object error, StackTrace stackTrace) {
+            debugPrint('Failed to apply reader speech rate: $error');
+            if (mounted && generation == _speechRateCommitGeneration) {
+              setState(() => _pendingSpeechRate = null);
+            }
+          });
+    });
   }
 
   Future<void> _commitVolume(

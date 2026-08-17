@@ -12,7 +12,15 @@ bool get isReaderAloudPlatformSupported =>
 
 enum ReaderAloudPlaybackState { stopped, loading, playing, paused, error }
 
-enum ReaderAloudControl { previous, playPause, next, stop }
+enum ReaderAloudControl {
+  previous,
+  play,
+  pause,
+  playPause,
+  next,
+  refresh,
+  stop,
+}
 
 class ReaderAloudPosition {
   const ReaderAloudPosition({required this.chapterIndex, required this.offset});
@@ -106,6 +114,29 @@ abstract interface class ReaderAloudAdjustableEngine
     implements ReaderAloudEngine {
   double get speechRate;
   double get speechVolume;
+}
+
+/// Marks an engine that can reliably report progress through a longer
+/// utterance. The controller uses this to send adjacent sentences in one TTS
+/// request, avoiding the audible gap caused by starting a new request after
+/// every sentence.
+abstract interface class ReaderAloudContinuousEngine
+    implements ReaderAloudEngine {
+  bool get supportsContinuousText;
+}
+
+/// An engine that can enqueue several short utterances without an audible
+/// pause while still reporting exactly which utterance has started.
+///
+/// Android system TTS engines are much more reliable at reporting sentence
+/// boundaries this way than at reporting ranges inside one long utterance.
+abstract interface class ReaderAloudQueuedEngine implements ReaderAloudEngine {
+  bool get supportsQueuedText;
+
+  Future<void> speakQueued(
+    List<String> texts, {
+    required ValueChanged<int> onTextStarted,
+  });
 }
 
 abstract interface class ReaderAloudSource {
@@ -301,6 +332,8 @@ class ReaderAloudSegmenter {
 }
 
 class ReaderAloudController extends ChangeNotifier {
+  static const int _continuousBatchMaxCharacters = 1800;
+
   ReaderAloudController({
     required this.engine,
     required this.source,
@@ -332,6 +365,8 @@ class ReaderAloudController extends ChangeNotifier {
   List<ReaderAloudSegment> _segments = const [];
   int _segmentIndex = 0;
   int _utteranceBaseOffset = 0;
+  int? _continuousUtteranceStartOffset;
+  int? _continuousUtteranceEndSegmentIndex;
   int _resumeOffset = 0;
   int _generation = 0;
   bool _disposed = false;
@@ -351,6 +386,9 @@ class ReaderAloudController extends ChangeNotifier {
       chapterIndex: segment.chapterIndex,
       chapterId: segment.chapterId,
       startOffset: segment.startOffset,
+      // A sentence is the smallest stable unit across system and cloud TTS.
+      // It remains visible for the full utterance even when a platform does
+      // not expose word-boundary callbacks.
       endOffset: segment.endOffset,
     );
   }
@@ -372,6 +410,13 @@ class ReaderAloudController extends ChangeNotifier {
   int get currentOffset {
     final segment = currentSegment;
     if (segment == null) return 0;
+    final continuousStart = _continuousUtteranceStartOffset;
+    if (_state == ReaderAloudPlaybackState.playing && continuousStart != null) {
+      return (continuousStart + engine.currentPosition).clamp(
+        segment.startOffset,
+        segment.endOffset,
+      );
+    }
     final relative = _state == ReaderAloudPlaybackState.playing
         ? _utteranceBaseOffset + engine.currentPosition
         : _resumeOffset;
@@ -405,7 +450,9 @@ class ReaderAloudController extends ChangeNotifier {
         startOffset: position.offset,
       );
       if (!loaded || !_isCurrent(generation)) {
-        await stop();
+        if (_isCurrent(generation)) {
+          throw StateError('没有可朗读的正文');
+        }
         return;
       }
       _setState(ReaderAloudPlaybackState.playing);
@@ -417,10 +464,7 @@ class ReaderAloudController extends ChangeNotifier {
 
   Future<void> pause() async {
     if (_state != ReaderAloudPlaybackState.playing) return;
-    _resumeOffset = (_utteranceBaseOffset + engine.currentPosition).clamp(
-      0,
-      currentSegment?.text.length ?? 0,
-    );
+    _captureResumeOffset();
     final generation = ++_generation;
     _setState(ReaderAloudPlaybackState.paused);
     try {
@@ -453,10 +497,7 @@ class ReaderAloudController extends ChangeNotifier {
         currentSegment == null) {
       return;
     }
-    _resumeOffset = (_utteranceBaseOffset + engine.currentPosition).clamp(
-      0,
-      currentSegment!.text.length,
-    );
+    _captureResumeOffset();
     final generation = ++_generation;
     try {
       await engine.stop();
@@ -477,14 +518,9 @@ class ReaderAloudController extends ChangeNotifier {
 
   Future<void> stop() async {
     if (_state == ReaderAloudPlaybackState.playing) {
-      _resumeOffset = math.max(
-        _resumeOffset,
-        (_utteranceBaseOffset + engine.currentPosition).clamp(
-          0,
-          currentSegment?.text.length ?? 0,
-        ),
-      );
+      _captureResumeOffset(keepFurthest: true);
     }
+    _clearContinuousUtterance();
     ++_generation;
     _notificationTimer?.cancel();
     _progressSaveTimer?.cancel();
@@ -520,6 +556,7 @@ class ReaderAloudController extends ChangeNotifier {
       return;
     }
     final generation = ++_generation;
+    _clearContinuousUtterance();
     await engine.stop();
     if (!_isCurrent(generation)) return;
     bool moved;
@@ -579,6 +616,7 @@ class ReaderAloudController extends ChangeNotifier {
       if (chapter == null) return false;
       final segments = _segmenter(chapter);
       if (segments.isNotEmpty) {
+        _clearContinuousUtterance();
         _currentChapter = chapter;
         _segments = segments;
         if (startFromEnd) {
@@ -608,7 +646,41 @@ class ReaderAloudController extends ChangeNotifier {
       final segment = currentSegment;
       if (segment == null) return;
       final startAt = _resumeOffset.clamp(0, segment.text.length);
-      final spokenText = segment.text.substring(startAt);
+      final queued = _supportsQueuedText;
+      final continuous = !queued && _supportsContinuousText;
+      final firstSegmentIndex = _segmentIndex;
+      var utteranceEndSegmentIndex = _segmentIndex;
+      var utteranceStartOffset = segment.startOffset + startAt;
+      var utteranceEndOffset = segment.endOffset;
+      if (queued || continuous) {
+        while (utteranceEndSegmentIndex + 1 < _segments.length) {
+          final next = _segments[utteranceEndSegmentIndex + 1];
+          if (next.chapterId != segment.chapterId ||
+              next.endOffset - utteranceStartOffset >
+                  _continuousBatchMaxCharacters) {
+            break;
+          }
+          utteranceEndSegmentIndex++;
+          utteranceEndOffset = next.endOffset;
+        }
+      }
+      final chapter = _currentChapter;
+      final queuedTexts = queued
+          ? <String>[
+              segment.text.substring(startAt),
+              for (
+                var index = firstSegmentIndex + 1;
+                index <= utteranceEndSegmentIndex;
+                index++
+              )
+                _segments[index].text,
+            ]
+          : const <String>[];
+      final spokenText = queued
+          ? queuedTexts.join()
+          : continuous && chapter != null
+          ? chapter.text.substring(utteranceStartOffset, utteranceEndOffset)
+          : segment.text.substring(startAt);
       if (spokenText.trim().isEmpty) {
         bool moved;
         try {
@@ -627,6 +699,12 @@ class ReaderAloudController extends ChangeNotifier {
       }
 
       _utteranceBaseOffset = startAt;
+      if (continuous) {
+        _continuousUtteranceStartOffset = utteranceStartOffset;
+        _continuousUtteranceEndSegmentIndex = utteranceEndSegmentIndex;
+      } else {
+        _clearContinuousUtterance();
+      }
       try {
         await source.revealPosition(
           ReaderAloudPosition(
@@ -642,7 +720,44 @@ class ReaderAloudController extends ChangeNotifier {
       await _showNotification();
 
       try {
-        await engine.speak(spokenText);
+        if (queued) {
+          await (engine as ReaderAloudQueuedEngine).speakQueued(
+            queuedTexts,
+            onTextStarted: (relativeIndex) {
+              if (!_isCurrent(generation) ||
+                  _state != ReaderAloudPlaybackState.playing) {
+                return;
+              }
+              final nextIndex = firstSegmentIndex + relativeIndex;
+              if (relativeIndex < 0 ||
+                  nextIndex < firstSegmentIndex ||
+                  nextIndex > utteranceEndSegmentIndex ||
+                  nextIndex >= _segments.length) {
+                return;
+              }
+              _segmentIndex = nextIndex;
+              _utteranceBaseOffset = relativeIndex == 0 ? startAt : 0;
+              _resumeOffset = _utteranceBaseOffset;
+              final startedSegment = _segments[nextIndex];
+              notifyListeners();
+              unawaited(
+                source
+                    .revealPosition(
+                      ReaderAloudPosition(
+                        chapterIndex: startedSegment.chapterIndex,
+                        offset:
+                            startedSegment.startOffset + _utteranceBaseOffset,
+                      ),
+                    )
+                    .catchError((Object error) {
+                      debugPrint('reveal reader aloud position failed: $error');
+                    }),
+              );
+            },
+          );
+        } else {
+          await engine.speak(spokenText);
+        }
       } catch (error) {
         _fail(error, generation);
         return;
@@ -652,11 +767,17 @@ class ReaderAloudController extends ChangeNotifier {
         return;
       }
 
-      _resumeOffset = segment.text.length;
+      final completedSegmentIndex = queued
+          ? utteranceEndSegmentIndex
+          : _continuousUtteranceEndSegmentIndex ?? _segmentIndex;
+      _segmentIndex = completedSegmentIndex;
+      final completedSegment = currentSegment!;
+      _clearContinuousUtterance();
+      _resumeOffset = completedSegment.text.length;
       await _persistPosition(
         ReaderAloudPosition(
-          chapterIndex: segment.chapterIndex,
-          offset: segment.endOffset,
+          chapterIndex: completedSegment.chapterIndex,
+          offset: completedSegment.endOffset,
         ),
       );
       bool moved;
@@ -676,6 +797,9 @@ class ReaderAloudController extends ChangeNotifier {
 
   void _handleEngineChanged() {
     if (_disposed || _state != ReaderAloudPlaybackState.playing) return;
+    if (engine.isPlaying) {
+      _syncContinuousSegmentFromEngine();
+    }
     notifyListeners();
     _notificationTimer ??= Timer(const Duration(milliseconds: 450), () {
       _notificationTimer = null;
@@ -685,6 +809,81 @@ class ReaderAloudController extends ChangeNotifier {
       _progressSaveTimer = null;
       unawaited(_persistCurrentPosition());
     });
+  }
+
+  bool get _supportsContinuousText =>
+      engine is ReaderAloudContinuousEngine &&
+      (engine as ReaderAloudContinuousEngine).supportsContinuousText;
+
+  bool get _supportsQueuedText =>
+      engine is ReaderAloudQueuedEngine &&
+      (engine as ReaderAloudQueuedEngine).supportsQueuedText;
+
+  void _captureResumeOffset({bool keepFurthest = false}) {
+    var segment = currentSegment;
+    if (segment == null) return;
+
+    final continuousStart = _continuousUtteranceStartOffset;
+    if (continuousStart != null) {
+      final absoluteOffset = continuousStart + engine.currentPosition;
+      _syncContinuousSegmentAt(absoluteOffset);
+      segment = currentSegment;
+      if (segment == null) return;
+      final relative = (absoluteOffset - segment.startOffset).clamp(
+        0,
+        segment.text.length,
+      );
+      _resumeOffset = keepFurthest
+          ? math.max(_resumeOffset, relative)
+          : relative;
+      _clearContinuousUtterance();
+      return;
+    }
+
+    final relative = (_utteranceBaseOffset + engine.currentPosition).clamp(
+      0,
+      segment.text.length,
+    );
+    _resumeOffset = keepFurthest ? math.max(_resumeOffset, relative) : relative;
+  }
+
+  void _syncContinuousSegmentFromEngine() {
+    final start = _continuousUtteranceStartOffset;
+    if (start == null) return;
+    _syncContinuousSegmentAt(start + engine.currentPosition);
+  }
+
+  void _syncContinuousSegmentAt(int absoluteOffset) {
+    final endIndex = _continuousUtteranceEndSegmentIndex;
+    if (endIndex == null || _segments.isEmpty) return;
+    final firstIndex = _segmentIndex.clamp(0, endIndex);
+    var matchingIndex = endIndex;
+    for (var index = firstIndex; index <= endIndex; index++) {
+      if (absoluteOffset < _segments[index].endOffset) {
+        matchingIndex = index;
+        break;
+      }
+    }
+    if (matchingIndex == _segmentIndex) return;
+    _segmentIndex = matchingIndex;
+    final segment = _segments[matchingIndex];
+    unawaited(
+      source
+          .revealPosition(
+            ReaderAloudPosition(
+              chapterIndex: segment.chapterIndex,
+              offset: segment.startOffset,
+            ),
+          )
+          .catchError((Object error) {
+            debugPrint('reveal reader aloud position failed: $error');
+          }),
+    );
+  }
+
+  void _clearContinuousUtterance() {
+    _continuousUtteranceStartOffset = null;
+    _continuousUtteranceEndSegmentIndex = null;
   }
 
   Future<void> _persistCurrentPosition() async {
@@ -737,6 +936,17 @@ class ReaderAloudController extends ChangeNotifier {
     switch (control) {
       case ReaderAloudControl.previous:
         unawaited(previous());
+      case ReaderAloudControl.play:
+        if (_state == ReaderAloudPlaybackState.paused) {
+          unawaited(resume());
+        } else if (_state == ReaderAloudPlaybackState.stopped ||
+            _state == ReaderAloudPlaybackState.error) {
+          unawaited(start());
+        }
+      case ReaderAloudControl.pause:
+        if (_state == ReaderAloudPlaybackState.playing) {
+          unawaited(pause());
+        }
       case ReaderAloudControl.playPause:
         if (_state == ReaderAloudPlaybackState.playing) {
           unawaited(pause());
@@ -747,6 +957,10 @@ class ReaderAloudController extends ChangeNotifier {
         }
       case ReaderAloudControl.next:
         unawaited(next());
+      case ReaderAloudControl.refresh:
+        if (_state == ReaderAloudPlaybackState.playing) {
+          unawaited(refreshPlayback());
+        }
       case ReaderAloudControl.stop:
         unawaited(stop());
     }

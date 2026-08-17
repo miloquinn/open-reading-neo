@@ -17,7 +17,7 @@ import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/book_sources/services/book_source_text_paginator.dart';
 import 'package:xxread/core/reader/canonical_locator.dart';
-import 'package:xxread/core/reader/android_reader_aloud_notification.dart';
+import 'package:xxread/core/reader/platform_reader_aloud_media_session.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
 import 'package:xxread/core/reader/reader_annotation.dart';
 import 'package:xxread/core/reader/reader_custom_theme.dart';
@@ -47,6 +47,7 @@ import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/services/tts_service.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
+import 'package:xxread/services/reader_aloud_session.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
@@ -250,6 +251,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
+  bool _readerAloudPositionRevealInProgress = false;
+  int _readerAloudPositionRevealGeneration = 0;
 
   ReaderThemePalette get _readerTheme =>
       _loadingCatalog && widget.initialTheme != null
@@ -459,7 +462,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     _progressSaveTimer?.cancel();
     _controlsTimer?.cancel();
     _pagedLayoutWarmTimer?.cancel();
-    _readerAloudController?.dispose();
+    _readerAloudController?.removeListener(_onReaderAloudChanged);
     _chapterLoadSerial++;
     unawaited(_saveProgress());
     unawaited(_flushReadingSession());

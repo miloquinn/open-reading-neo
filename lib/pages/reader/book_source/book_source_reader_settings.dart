@@ -189,50 +189,54 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
     } on ProviderNotFoundException {
       return null;
     }
-    final controller = ReaderAloudController(
-      engine: aloudService,
-      notificationSink: AndroidReaderAloudNotification.instance,
-      source: CallbackReaderAloudSource(
-        bookTitle: widget.book.title,
-        chapterCount: () => _chapters.length,
-        currentPosition: () async {
-          if (_chapters.isEmpty) {
-            return const ReaderAloudPosition(chapterIndex: 0, offset: 0);
-          }
-          final chapterIndex = _chapterIndex.clamp(0, _chapters.length - 1);
-          final content = await _continuousContentFor(chapterIndex);
-          final text =
-              _readableChapterText[chapterIndex] ??
-              await readableBookSourceChapterTextAsync(
-                content,
-                fallbackTitle: _chapters[chapterIndex].title,
-              );
-          final offset =
-              _currentTextOffset ??
-              (text.length * _currentReadingProgress).round();
-          return ReaderAloudPosition(
-            chapterIndex: chapterIndex,
-            offset: offset.clamp(0, text.length),
-          );
-        },
-        loadChapter: (index) async {
-          if (index < 0 || index >= _chapters.length) return null;
-          final content = await _continuousContentFor(index);
-          final text =
-              _readableChapterText[index] ??
-              await readableBookSourceChapterTextAsync(
-                content,
-                fallbackTitle: _chapters[index].title,
-              );
-          return ReaderAloudChapter(
-            index: index,
-            id: _chapters[index].id,
-            title: _chapters[index].title,
-            text: text,
-          );
-        },
-        revealPosition: _revealReaderAloudPosition,
-        persistPosition: _persistReaderAloudPosition,
+    final session = context.read<ReaderAloudSession>();
+    final controller = session.acquire(
+      sourceId: 'source:${widget.source.id}:${widget.book.id}',
+      create: () => ReaderAloudController(
+        engine: aloudService,
+        notificationSink: PlatformReaderAloudMediaSession.instance,
+        source: CallbackReaderAloudSource(
+          bookTitle: widget.book.title,
+          chapterCount: () => _chapters.length,
+          currentPosition: () async {
+            if (_chapters.isEmpty) {
+              return const ReaderAloudPosition(chapterIndex: 0, offset: 0);
+            }
+            final chapterIndex = _chapterIndex.clamp(0, _chapters.length - 1);
+            final content = await _continuousContentFor(chapterIndex);
+            final text =
+                _readableChapterText[chapterIndex] ??
+                await readableBookSourceChapterTextAsync(
+                  content,
+                  fallbackTitle: _chapters[chapterIndex].title,
+                );
+            final offset =
+                _currentTextOffset ??
+                (text.length * _currentReadingProgress).round();
+            return ReaderAloudPosition(
+              chapterIndex: chapterIndex,
+              offset: offset.clamp(0, text.length),
+            );
+          },
+          loadChapter: (index) async {
+            if (index < 0 || index >= _chapters.length) return null;
+            final content = await _continuousContentFor(index);
+            final text =
+                _readableChapterText[index] ??
+                await readableBookSourceChapterTextAsync(
+                  content,
+                  fallbackTitle: _chapters[index].title,
+                );
+            return ReaderAloudChapter(
+              index: index,
+              id: _chapters[index].id,
+              title: _chapters[index].title,
+              text: text,
+            );
+          },
+          revealPosition: _revealReaderAloudPosition,
+          persistPosition: _persistReaderAloudPosition,
+        ),
       ),
     )..addListener(_onReaderAloudChanged);
     _readerAloudController = controller;

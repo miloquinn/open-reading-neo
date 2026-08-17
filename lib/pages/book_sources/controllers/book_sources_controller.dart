@@ -106,7 +106,22 @@ class BookSourcesController extends ChangeNotifier {
 
   Future<void> _loadSources() async {
     final revision = ++_sourceRevision;
-    final sources = await _registry.loadRunnableInBackground();
+    List<RegisteredBookSource> sources;
+    try {
+      sources = await _registry.loadRunnableInBackground();
+    } catch (error) {
+      if (_closed || revision != _sourceRevision) return;
+      _emit(
+        _state.copyWith(
+          loadingSources: false,
+          caches: {
+            ..._state.caches,
+            _state.section: BookSourcesSectionCache.error(error),
+          },
+        ),
+      );
+      return;
+    }
     if (_closed || revision != _sourceRevision) return;
     final sectionSources = _buildSectionSourceIndex(sources);
     final discoveryIds = sectionSources.values

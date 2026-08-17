@@ -122,6 +122,25 @@ void main() {
     },
   );
 
+  test(
+    'registry load failure leaves discovery in a retryable error state',
+    () async {
+      final controller = BookSourcesController(
+        gateway: _ControllerGateway(),
+        registry: _FakeRegistry([Future.error(StateError('invalid registry'))]),
+      );
+
+      await controller.load();
+
+      expect(controller.state.loadingSources, isFalse);
+      expect(
+        controller.state.caches[BookSourcesSection.recommended]!.error,
+        isA<StateError>(),
+      );
+      await controller.close();
+    },
+  );
+
   test('stale registry loads cannot replace a newer reload', () async {
     final first = Completer<List<RegisteredBookSource>>();
     final second = Completer<List<RegisteredBookSource>>();

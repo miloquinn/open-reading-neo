@@ -52,6 +52,7 @@ class BookSourceClientResources {
       factory: runtimeFactory ?? SourceRuntime.new,
       ownsCreated: runtime == null,
     );
+    final resolvedChapterCache = chapterCache ?? const BookSourceChapterCache();
     final resolvedOrsp =
         orspBackend ??
         OrspBookSourceBackend(
@@ -61,12 +62,13 @@ class BookSourceClientResources {
             responseCache ?? BookSourceResponseCache.instance,
             systemDio: resolvedSystemDio,
           ),
-          chapterCache ?? const BookSourceChapterCache(),
+          resolvedChapterCache,
         );
     final resolvedReading =
         readingBackend ??
         ReadingSourceBackend(
           lazyRuntime.get,
+          chapterCache: resolvedChapterCache,
           additionalProtocolsEnabled: additionalProtocolsEnabled,
         );
     return BookSourceClientResources._(

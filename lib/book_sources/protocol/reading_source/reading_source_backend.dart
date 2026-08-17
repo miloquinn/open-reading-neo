@@ -1,8 +1,12 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/core/app_settings_service.dart';
 import '../../models/registered_book_source.dart';
 import '../../services/book_download_cancellation.dart';
+import '../../services/book_source_chapter_cache.dart';
 import '../../source_engine/source_login_ui.dart';
 import '../../source_engine/source_runtime.dart';
 import '../book_source_protocol.dart';
@@ -62,12 +66,18 @@ abstract interface class ReadingSourceBackendPort {
 class ReadingSourceBackend implements ReadingSourceBackendPort {
   ReadingSourceBackend(
     this._runtime, {
+    this._chapterCache = const BookSourceChapterCache(),
     Future<bool> Function()? additionalProtocolsEnabled,
   }) : _additionalProtocolsEnabled =
            additionalProtocolsEnabled ?? _loadAdditionalProtocolsEnabled;
 
+  static const _cacheAuthRevisionPrefix =
+      'reading_source_chapter_cache_auth_revision_v1:';
+
   final SourceRuntime Function() _runtime;
+  final BookSourceChapterCache _chapterCache;
   final Future<bool> Function() _additionalProtocolsEnabled;
+  final Map<String, int> _cacheAuthRevisions = {};
 
   @override
   Future<List<SourceLoginField>> loadLoginFields(
@@ -84,12 +94,14 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   ) async {
     await _ensureEnabled();
     await _runtime().login(source, values);
+    await _bumpCacheAuthRevision(source.id);
   }
 
   @override
   Future<void> clearSourceLogin(RegisteredBookSource source) async {
     await _ensureEnabled();
     await _runtime().clearLoginSession(source);
+    await _bumpCacheAuthRevision(source.id);
   }
 
   @override
@@ -151,10 +163,15 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
     Map<String, String> sourceVariables = const {},
   }) async {
     await _ensureEnabled();
-    return _runtime().getChapters(
-      source,
-      bookId,
-      sourceVariables: sourceVariables,
+    return _chapterCache.getChapterCatalogOrLoad(
+      sourceId: source.id,
+      sourceRevision: await _cacheRevision(source, sourceVariables),
+      bookId: bookId,
+      loader: () => _runtime().getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      ),
     );
   }
 
@@ -184,11 +201,17 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
     Map<String, String> sourceVariables = const {},
   }) async {
     await _ensureEnabled();
-    return _runtime().getChapterContent(
-      source,
+    return _chapterCache.getOrLoad(
+      sourceId: source.id,
+      sourceRevision: await _cacheRevision(source, sourceVariables),
       bookId: bookId,
       chapterId: chapterId,
-      sourceVariables: sourceVariables,
+      loader: () => _runtime().getChapterContent(
+        source,
+        bookId: bookId,
+        chapterId: chapterId,
+        sourceVariables: sourceVariables,
+      ),
     );
   }
 
@@ -212,6 +235,44 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
     return content;
   }
 
+  Future<String> _cacheRevision(
+    RegisteredBookSource source,
+    Map<String, String> sourceVariables,
+  ) async {
+    final authRevision = await _cacheAuthRevision(source.id);
+    final stable = _stableCacheJson({
+      'manifestUrl': source.manifestUrl.toString(),
+      'apiBaseUrl': source.apiBaseUrl.toString(),
+      'protocolVersion': source.protocolVersion,
+      'sourceConfig': source.sourceConfig,
+      'sourceVariables': sourceVariables,
+      'authRevision': authRevision,
+    });
+    return sha256.convert(utf8.encode(jsonEncode(stable))).toString();
+  }
+
+  Future<int> _cacheAuthRevision(String sourceId) async {
+    final remembered = _cacheAuthRevisions[sourceId];
+    if (remembered != null) return remembered;
+    final preferences = await SharedPreferences.getInstance();
+    final revision =
+        preferences.getInt('$_cacheAuthRevisionPrefix$sourceId') ?? 0;
+    _cacheAuthRevisions[sourceId] = revision;
+    return revision;
+  }
+
+  Future<void> _bumpCacheAuthRevision(String sourceId) async {
+    final revision = DateTime.now().microsecondsSinceEpoch;
+    _cacheAuthRevisions[sourceId] = revision;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt('$_cacheAuthRevisionPrefix$sourceId', revision);
+    } catch (_) {
+      // A cache invalidation failure must not turn a successful login into an
+      // apparent authentication failure. This runtime still uses the new key.
+    }
+  }
+
   Future<void> _ensureEnabled() async {
     if (!await _additionalProtocolsEnabled()) {
       throw const BookSourceProtocolException(
@@ -224,4 +285,19 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
     final preferences = await SharedPreferences.getInstance();
     return preferences.getBool(additionalSourceProtocolsPreferenceKey) == true;
   }
+}
+
+Object? _stableCacheJson(Object? value) {
+  if (value is Map) {
+    final entries = value.entries.toList()
+      ..sort((left, right) => '${left.key}'.compareTo('${right.key}'));
+    return <String, Object?>{
+      for (final entry in entries)
+        '${entry.key}': _stableCacheJson(entry.value),
+    };
+  }
+  if (value is Iterable) {
+    return value.map(_stableCacheJson).toList(growable: false);
+  }
+  return value;
 }

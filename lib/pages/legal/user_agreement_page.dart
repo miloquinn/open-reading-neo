@@ -1093,7 +1093,6 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
       children: [
         if (_step == _AgreementStep.introduction)
           TextButton(
-            key: const Key('agreementExitButton'),
             onPressed: _saving ? null : _onDisagreePressed,
             child: Text(context.l10n.agreementV2ExitLabel),
           )
@@ -1243,7 +1242,6 @@ class _UserAgreementPageState extends State<UserAgreementPage> {
             child: Text(context.l10n.agreementV2CancelLabel),
           ),
           FilledButton.tonal(
-            key: const Key('agreementConfirmExitButton'),
             onPressed: () {
               Navigator.pop(dialogContext);
               widget.onDisagreed?.call();

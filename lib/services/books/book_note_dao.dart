@@ -94,22 +94,14 @@ class BookNoteDao {
     return maps.isEmpty ? null : BookNote.fromMap(maps.first);
   }
 
-  /// 根据书籍ID获取注释。
-  ///
-  /// [limit] 用于上下文预览等只消费有限内容的调用方，避免把整本书的
-  /// 高亮与批注一次性物化到内存。
-  Future<List<BookNote>> selectBookNotesByBookId(
-    int bookId, {
-    int? limit,
-  }) async {
+  /// 根据书籍ID获取所有注释
+  Future<List<BookNote>> selectBookNotesByBookId(int bookId) async {
     final db = await _database;
-    final safeLimit = limit?.clamp(1, 1000).toInt();
     final List<Map<String, dynamic>> maps = await db.query(
       'book_notes',
       where: 'book_id = ?',
       whereArgs: [bookId],
       orderBy: 'page_number ASC, create_time DESC',
-      limit: safeLimit,
     );
     return List.generate(maps.length, (i) => BookNote.fromMap(maps[i]));
   }

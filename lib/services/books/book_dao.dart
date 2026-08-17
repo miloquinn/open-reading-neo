@@ -62,30 +62,6 @@ class BookDao implements BookImportStore {
     }
   }
 
-  /// 按标题精确查找最近导入的书籍，供旧版外部记录回填稳定 ID。
-  ///
-  /// 标题并非全局唯一；调用方应把结果当作兼容性回退，成功后持久化
-  /// 书籍 ID，避免之后再次扫描整个书库。
-  Future<Book?> getMostRecentlyImportedBookByExactTitle(String title) async {
-    final normalizedTitle = title.trim();
-    if (normalizedTitle.isEmpty) return null;
-
-    try {
-      final db = await _dbService.database;
-      final maps = await db.query(
-        'books',
-        columns: _bookSummaryColumns,
-        where: 'title = ?',
-        whereArgs: [normalizedTitle],
-        orderBy: 'importDate DESC, id DESC',
-        limit: 1,
-      );
-      return maps.isEmpty ? null : Book.fromMap(maps.first);
-    } catch (e) {
-      throw Exception('按标题查找书籍失败: $e');
-    }
-  }
-
   /// 批量读取书籍摘要，并保持调用方给出的 ID 顺序。
   ///
   /// 首页最近阅读等列表不需要正文、目录和分页缓存字段；一次批量查询可避免

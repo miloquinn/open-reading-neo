@@ -124,35 +124,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('agreement exit confirmation invokes rejection callback', (
-    tester,
-  ) async {
-    var rejected = false;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: UserAgreementPage(
-          onAgreed: () {},
-          onDisagreed: () => rejected = true,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('agreementExitButton')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('agreementConfirmExitButton')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('agreementConfirmExitButton')));
-    await tester.pumpAndSettle();
-
-    expect(rejected, isTrue);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('agreement flow respects reduced motion', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(430, 844);

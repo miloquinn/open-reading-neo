@@ -90,20 +90,6 @@ void main() {
     });
   });
 
-  test('book note lookup honors a bounded limit', () async {
-    for (var index = 0; index < 3; index++) {
-      await dao.insertBookNote(
-        _note(
-          annotationId: 'a2d5b6c0-8a08-4ba8-8c15-0a2f9db9c5d$index',
-        ).copyWith(cfi: 'limited-cfi-$index'),
-      );
-    }
-
-    final notes = await dao.selectBookNotesByBookId(1, limit: 2);
-
-    expect(notes, hasLength(2));
-  });
-
   test('text annotations merge without loading ink at the same CFI', () async {
     final text = _note(
       annotationId: '4c521a0b-59eb-4bec-8742-85eb693fca7b',

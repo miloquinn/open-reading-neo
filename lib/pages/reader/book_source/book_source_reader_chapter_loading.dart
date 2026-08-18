@@ -81,6 +81,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
       _pendingSlideChapterIndex = null;
       _pendingSlideBoundaryViewIndex = null;
     });
+    _restartReaderAloudFromCurrentPageAfterManualTurn();
     if (_pageMode == BookSourcePageMode.horizontalSlide) {
       _replaceSlidePageController(
         initialPage: preparedPageIndex + slideLeading,

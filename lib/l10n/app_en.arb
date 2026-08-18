@@ -2072,6 +2072,18 @@
   "@readerModePageCurlHint": {
     "description": "Subtitle explaining the simulated page curl mode"
   },
+  "readerTextBrightnessLabel": "Text Brightness",
+  "@readerTextBrightnessLabel": {
+    "description": "Reader text brightness label"
+  },
+  "readerDimTextInDarkModeTitle": "Dim text in dark mode",
+  "@readerDimTextInDarkModeTitle": {
+    "description": "Toggle for dimming reader text in dark mode"
+  },
+  "readerDimTextInDarkModeHint": "Use 30% brightness in dark mode",
+  "@readerDimTextInDarkModeHint": {
+    "description": "Reader dark mode text brightness hint"
+  },
   "readerFontSizeValue": "Font size  {size}",
   "@readerFontSizeValue": {
     "description": "Slider label showing the current reader font size",

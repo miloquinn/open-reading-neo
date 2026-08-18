@@ -20,6 +20,8 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
 
   Future<void> _updateReadingSettings({
     double? fontSize,
+    int? textBrightness,
+    bool? dimTextInDarkMode,
     int? fontWeight,
     double? lineHeight,
     double? letterSpacing,
@@ -53,6 +55,11 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
     final currentTextOffset = _currentTextOffset;
     _updateReaderState(() {
       _fontSize = fontSize ?? _fontSize;
+      _textBrightness = (textBrightness ?? _textBrightness).clamp(
+        ReaderSettings.minTextBrightness,
+        ReaderSettings.maxTextBrightness,
+      );
+      _dimTextInDarkMode = dimTextInDarkMode ?? _dimTextInDarkMode;
       _fontWeight = normalizeReaderFontWeight(fontWeight ?? _fontWeight);
       _lineHeight = (lineHeight ?? _lineHeight).clamp(1.4, 2.1);
       _letterSpacing = (letterSpacing ?? _letterSpacing).clamp(

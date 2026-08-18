@@ -291,9 +291,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       );
   bool _openPreviousChapterAtLastPage = false;
   bool _controlsVisible = false;
+  Timer? _controlsTimer;
   NativePageMode _pageMode = ReaderSettings.defaultPageMode;
   bool _scrollByChapter = false;
   double _fontSize = 19;
+  int _textBrightness = ReaderSettings.defaultTextBrightness;
+  bool _dimTextInDarkMode = ReaderSettings.defaultDimTextInDarkMode;
   int _fontWeight = ReaderSettings.defaultFontWeight;
   double _lineHeight = 1.75;
   double _letterSpacing = ReaderSettings.defaultLetterSpacing;
@@ -325,6 +328,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
+  bool _restartReaderAloudAfterManualPageTurn = false;
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
   final BookmarkDao _bookmarkDao = BookmarkDao();
   final BookNoteDao _bookNoteDao = BookNoteDao();
@@ -573,6 +577,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _openingLoaderTimer?.cancel();
+    _controlsTimer?.cancel();
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
     _openingFlightSettled?.removeListener(_onOpeningFlightSettledChanged);
     _openingCoverHoldReached?.removeListener(_onOpeningCoverHoldChanged);

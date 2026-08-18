@@ -1003,6 +1003,9 @@
   "readerModeCoverSlideHint": "現在のページが左へスライドし、下にある次のページが現れます",
   "readerModePageCurl": "ページカール",
   "readerModePageCurlHint": "左右にドラッグしてページをめくり、離すと完了または戻ります",
+  "readerTextBrightnessLabel": "文字の明るさ",
+  "readerDimTextInDarkModeTitle": "ダークモードで文字を暗くする",
+  "readerDimTextInDarkModeHint": "ダークモードでは明るさを30%に固定します",
   "readerFontSizeValue": "文字サイズ  {size}",
   "@readerFontSizeValue": {
     "placeholders": {

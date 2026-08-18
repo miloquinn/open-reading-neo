@@ -2264,6 +2264,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerModePageCurlHint => '左右拖动卷起页面，松手后完成翻页或回弹';
 
   @override
+  String get readerTextBrightnessLabel => '文字亮度';
+
+  @override
+  String get readerDimTextInDarkModeTitle => '夜间模式降低文字亮度';
+
+  @override
+  String get readerDimTextInDarkModeHint => '夜间模式下固定使用 30% 亮度';
+
+  @override
   String readerFontSizeValue(int size) {
     return '字体大小  $size';
   }
@@ -7696,6 +7705,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readerModePageCurlHint => '左右拖動捲起頁面，放開後完成翻頁或回彈';
+
+  @override
+  String get readerTextBrightnessLabel => '文字亮度';
+
+  @override
+  String get readerDimTextInDarkModeTitle => '夜間模式降低文字亮度';
+
+  @override
+  String get readerDimTextInDarkModeHint => '夜間模式下固定使用 30% 亮度';
 
   @override
   String readerFontSizeValue(int size) {

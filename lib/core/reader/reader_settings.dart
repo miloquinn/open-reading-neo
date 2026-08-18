@@ -8,6 +8,27 @@ import 'reader_tap_zones.dart';
 
 enum ReaderTextAlignment { natural, justified }
 
+/// Converts the reader's 0–100 brightness setting into an opaque gray.
+///
+/// The scale is deliberately absolute: 0 is #000000 and 100 is #FFFFFF.
+Color readerTextColorForBrightness(int brightness) {
+  final channel =
+      (brightness.clamp(
+                ReaderSettings.minTextBrightness,
+                ReaderSettings.maxTextBrightness,
+              ) *
+              255 /
+              ReaderSettings.maxTextBrightness)
+          .round();
+  return Color.fromARGB(255, channel, channel, channel);
+}
+
+int effectiveReaderTextBrightness({
+  required int brightness,
+  required bool dimInDarkMode,
+  required bool isDarkMode,
+}) => isDarkMode && dimInDarkMode ? 30 : brightness;
+
 int normalizeReaderFontWeight(num value) => ((value / 100).round() * 100).clamp(
   ReaderSettings.minFontWeight,
   ReaderSettings.maxFontWeight,
@@ -40,6 +61,12 @@ List<FontVariation> readerFontVariationsFromValue(
 @immutable
 class ReaderSettings {
   static const double defaultFontSize = 19;
+
+  /// 0 is black (#000000) and 100 is white (#FFFFFF).
+  static const int minTextBrightness = 0;
+  static const int maxTextBrightness = 100;
+  static const int defaultTextBrightness = 0;
+  static const bool defaultDimTextInDarkMode = true;
   static const int minFontWeight = 300;
   static const int maxFontWeight = 700;
   static const int defaultFontWeight = 400;
@@ -58,6 +85,8 @@ class ReaderSettings {
 
   const ReaderSettings({
     required this.fontSize,
+    this.textBrightness = defaultTextBrightness,
+    this.dimTextInDarkMode = defaultDimTextInDarkMode,
     this.fontWeight = defaultFontWeight,
     required this.lineHeight,
     this.letterSpacing = defaultLetterSpacing,
@@ -75,6 +104,8 @@ class ReaderSettings {
   });
 
   final double fontSize;
+  final int textBrightness;
+  final bool dimTextInDarkMode;
   final int fontWeight;
   final double lineHeight;
   final double letterSpacing;
@@ -92,6 +123,8 @@ class ReaderSettings {
 
   ReaderSettings copyWith({
     double? fontSize,
+    int? textBrightness,
+    bool? dimTextInDarkMode,
     int? fontWeight,
     double? lineHeight,
     double? letterSpacing,
@@ -109,6 +142,11 @@ class ReaderSettings {
   }) {
     return ReaderSettings(
       fontSize: (fontSize ?? this.fontSize).clamp(14, 32),
+      textBrightness: (textBrightness ?? this.textBrightness).clamp(
+        minTextBrightness,
+        maxTextBrightness,
+      ),
+      dimTextInDarkMode: dimTextInDarkMode ?? this.dimTextInDarkMode,
       fontWeight: normalizeReaderFontWeight(fontWeight ?? this.fontWeight),
       lineHeight: (lineHeight ?? this.lineHeight).clamp(1.4, 2.1),
       letterSpacing: (letterSpacing ?? this.letterSpacing).clamp(
@@ -142,6 +180,8 @@ class ReaderSettings {
 
 class ReaderSettingsStore {
   static const fontSizeKey = 'native_reader_font_size';
+  static const textBrightnessKey = 'native_reader_text_brightness';
+  static const dimTextInDarkModeKey = 'native_reader_dim_text_in_dark_mode';
   static const fontWeightKey = 'native_reader_font_weight';
   static const lineHeightKey = 'native_reader_line_height';
   static const letterSpacingKey = 'native_reader_letter_spacing';
@@ -195,6 +235,16 @@ class ReaderSettingsStore {
     return ReaderSettings(
       fontSize: (prefs.getDouble(fontSizeKey) ?? ReaderSettings.defaultFontSize)
           .clamp(14, 32),
+      textBrightness:
+          (prefs.getInt(textBrightnessKey) ??
+                  ReaderSettings.defaultTextBrightness)
+              .clamp(
+                ReaderSettings.minTextBrightness,
+                ReaderSettings.maxTextBrightness,
+              ),
+      dimTextInDarkMode:
+          prefs.getBool(dimTextInDarkModeKey) ??
+          ReaderSettings.defaultDimTextInDarkMode,
       fontWeight: normalizeReaderFontWeight(
         prefs.getInt(fontWeightKey) ?? ReaderSettings.defaultFontWeight,
       ),
@@ -248,6 +298,8 @@ class ReaderSettingsStore {
     final prefs = await SharedPreferences.getInstance();
     await Future.wait([
       prefs.setDouble(fontSizeKey, settings.fontSize),
+      prefs.setInt(textBrightnessKey, settings.textBrightness),
+      prefs.setBool(dimTextInDarkModeKey, settings.dimTextInDarkMode),
       prefs.setInt(fontWeightKey, settings.fontWeight),
       prefs.setDouble(lineHeightKey, settings.lineHeight),
       prefs.setDouble(letterSpacingKey, settings.letterSpacing),

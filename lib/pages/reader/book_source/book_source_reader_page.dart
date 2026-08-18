@@ -173,6 +173,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   bool _controlsVisible = false;
   Object? _error;
   double _fontSize = 19;
+  int _textBrightness = ReaderSettings.defaultTextBrightness;
+  bool _dimTextInDarkMode = ReaderSettings.defaultDimTextInDarkMode;
   int _fontWeight = ReaderSettings.defaultFontWeight;
   double _lineHeight = 1.75;
   double _letterSpacing = ReaderSettings.defaultLetterSpacing;
@@ -251,6 +253,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
+  bool _restartReaderAloudAfterManualPageTurn = false;
 
   ReaderThemePalette get _readerTheme =>
       _loadingCatalog && widget.initialTheme != null
@@ -264,6 +267,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
 
   ReaderSettings get _readerSettings => ReaderSettings(
     fontSize: _fontSize,
+    textBrightness: _textBrightness,
+    dimTextInDarkMode: _dimTextInDarkMode,
     fontWeight: _fontWeight,
     lineHeight: _lineHeight,
     letterSpacing: _letterSpacing,

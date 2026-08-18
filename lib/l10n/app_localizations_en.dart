@@ -2368,6 +2368,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Drag sideways to curl the page, then release to turn or rebound';
 
   @override
+  String get readerTextBrightnessLabel => 'Text Brightness';
+
+  @override
+  String get readerDimTextInDarkModeTitle => 'Dim text in dark mode';
+
+  @override
+  String get readerDimTextInDarkModeHint => 'Use 30% brightness in dark mode';
+
+  @override
   String readerFontSizeValue(int size) {
     return 'Font size  $size';
   }

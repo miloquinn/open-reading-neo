@@ -10,7 +10,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   void _showControlsTemporarily() {
     _controlsTimer?.cancel();
     if (mounted) _updateReaderState(() => _controlsVisible = true);
-    _controlsTimer = Timer(const Duration(milliseconds: 2200), () {
+    _controlsTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) _updateReaderState(() => _controlsVisible = false);
     });
   }
@@ -18,7 +18,21 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   void _toggleControls() {
     if (_annotationInteractionActive) return;
     _controlsTimer?.cancel();
-    _updateReaderState(() => _controlsVisible = !_controlsVisible);
+    if (_controlsVisible) {
+      _updateReaderState(() => _controlsVisible = false);
+      return;
+    }
+    _updateReaderState(() => _controlsVisible = true);
+    _controlsTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) _updateReaderState(() => _controlsVisible = false);
+    });
+  }
+
+  void _hideControlsForPageTurn() {
+    _controlsTimer?.cancel();
+    if (mounted && _controlsVisible) {
+      _updateReaderState(() => _controlsVisible = false);
+    }
   }
 
   Future<void> _requestExit() async {
@@ -85,8 +99,10 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     if (_annotationInteractionActive) return;
     final velocity = details.primaryVelocity ?? 0;
     if (velocity < -350 && _chapterIndex < _chapters.length - 1) {
+      _markReaderAloudForManualPageTurn();
       unawaited(_loadChapter(_chapterIndex + 1));
     } else if (velocity > 350 && _chapterIndex > 0) {
+      _markReaderAloudForManualPageTurn();
       unawaited(_loadChapter(_chapterIndex - 1));
     }
   }
@@ -125,7 +141,11 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     final clamped = index.clamp(0, _paginatedPages.length - 1);
     final next = _usesTwoPageLayout ? _spreadStartForPage(clamped) : clamped;
     if (next > _pageIndex) _sessionPagesRead++;
-    if (next != _pageIndex) _updateReaderState(() => _pageIndex = next);
+    if (next != _pageIndex) {
+      _hideControlsForPageTurn();
+      _updateReaderState(() => _pageIndex = next);
+      _restartReaderAloudFromCurrentPageAfterManualTurn();
+    }
     _pageCount = _paginatedPages.length;
     _scrollProgress.value = _pagedReadingProgress(_pageIndex, _pageCount);
     if (jumpPageView && _pageController.hasClients) {
@@ -215,6 +235,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   }
 
   Future<void> _turnForward() async {
+    _hideControlsForPageTurn();
     final imageContent = _content;
     if (imageContent != null && isImageOnlyBookSourceChapter(imageContent)) {
       if (_pageIndex + 1 < imageContent.images.length) return;
@@ -227,8 +248,10 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     }
     final pageStep = _usesTwoPageLayout ? 2 : 1;
     if (_pageIndex + pageStep < _pageCount) {
+      _markReaderAloudForManualPageTurn();
       _setPagedIndex(_pageIndex + pageStep, jumpPageView: true);
     } else if (_chapterIndex + 1 < _chapters.length) {
+      _markReaderAloudForManualPageTurn();
       await _loadChapter(_chapterIndex + 1, restoreProgress: 0);
     } else {
       _showControlsTemporarily();
@@ -236,6 +259,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   }
 
   Future<void> _turnBackward() async {
+    _hideControlsForPageTurn();
     final imageContent = _content;
     if (imageContent != null && isImageOnlyBookSourceChapter(imageContent)) {
       if (_pageIndex > 0) return;
@@ -248,8 +272,10 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     }
     final pageStep = _usesTwoPageLayout ? 2 : 1;
     if (_pageIndex >= pageStep) {
+      _markReaderAloudForManualPageTurn();
       _setPagedIndex(_pageIndex - pageStep, jumpPageView: true);
     } else if (_chapterIndex > 0) {
+      _markReaderAloudForManualPageTurn();
       await _loadChapter(_chapterIndex - 1, restoreProgress: 1);
     } else {
       _showControlsTemporarily();

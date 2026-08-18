@@ -4236,6 +4236,24 @@ abstract class AppLocalizations {
   /// **'Drag sideways to curl the page, then release to turn or rebound'**
   String get readerModePageCurlHint;
 
+  /// Reader text brightness label
+  ///
+  /// In en, this message translates to:
+  /// **'Text Brightness'**
+  String get readerTextBrightnessLabel;
+
+  /// Toggle for dimming reader text in dark mode
+  ///
+  /// In en, this message translates to:
+  /// **'Dim text in dark mode'**
+  String get readerDimTextInDarkModeTitle;
+
+  /// Reader dark mode text brightness hint
+  ///
+  /// In en, this message translates to:
+  /// **'Use 30% brightness in dark mode'**
+  String get readerDimTextInDarkModeHint;
+
   /// Slider label showing the current reader font size
   ///
   /// In en, this message translates to:

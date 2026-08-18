@@ -32,6 +32,9 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.tabletTwoPageTitle,
     required this.tabletTwoPageHint,
     required this.fontSizeLabel,
+    required this.textBrightnessLabel,
+    required this.dimTextInDarkModeTitle,
+    required this.dimTextInDarkModeHint,
     required this.fontWeightLabel,
     required this.fontWeightValueLabels,
     required this.fontWeightHint,
@@ -50,6 +53,8 @@ class ReaderSettingsSheet extends StatefulWidget {
     this.txtChapterTitlePageHint,
     required this.themeId,
     required this.fontSize,
+    required this.textBrightness,
+    required this.dimTextInDarkMode,
     required this.fontWeight,
     this.fontFamily,
     this.fontFamilyFallback = const <String>[],
@@ -75,6 +80,8 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.onTopBarStyleTap,
     required this.onTapZonesTap,
     required this.onFontSizeChanged,
+    required this.onTextBrightnessChanged,
+    required this.onDimTextInDarkModeChanged,
     required this.onFontWeightChanged,
     required this.onLineHeightChanged,
     required this.onLetterSpacingChanged,
@@ -111,6 +118,9 @@ class ReaderSettingsSheet extends StatefulWidget {
   final String tabletTwoPageTitle;
   final String tabletTwoPageHint;
   final String fontSizeLabel;
+  final String textBrightnessLabel;
+  final String dimTextInDarkModeTitle;
+  final String dimTextInDarkModeHint;
   final String fontWeightLabel;
   final List<String> fontWeightValueLabels;
   final String fontWeightHint;
@@ -129,6 +139,8 @@ class ReaderSettingsSheet extends StatefulWidget {
   final String? txtChapterTitlePageHint;
   final String themeId;
   final double fontSize;
+  final int textBrightness;
+  final bool dimTextInDarkMode;
   final int fontWeight;
   final String? fontFamily;
   final List<String> fontFamilyFallback;
@@ -154,6 +166,8 @@ class ReaderSettingsSheet extends StatefulWidget {
   final VoidCallback onTopBarStyleTap;
   final VoidCallback onTapZonesTap;
   final ValueChanged<double> onFontSizeChanged;
+  final ValueChanged<int> onTextBrightnessChanged;
+  final ValueChanged<bool> onDimTextInDarkModeChanged;
   final ValueChanged<int> onFontWeightChanged;
   final ValueChanged<double> onLineHeightChanged;
   final ValueChanged<double> onLetterSpacingChanged;
@@ -175,6 +189,8 @@ class ReaderSettingsSheet extends StatefulWidget {
 class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
   late String _themeId = widget.themeId;
   late double _fontSize = widget.fontSize;
+  late int _textBrightness = widget.textBrightness;
+  late bool _dimTextInDarkMode = widget.dimTextInDarkMode;
   late int _fontWeight = normalizeReaderFontWeight(widget.fontWeight);
   late double _lineHeight = widget.lineHeight;
   late double _letterSpacing = widget.letterSpacing;
@@ -253,6 +269,27 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
       divisions: 18,
       onChanged: (value) => setState(() => _fontSize = value),
       onChangeEnd: widget.onFontSizeChanged,
+    ),
+    ReaderSettingSlider(
+      key: const ValueKey('reader-text-brightness-slider'),
+      label: widget.textBrightnessLabel,
+      value: _textBrightness.toDouble(),
+      valueLabel: _textBrightness.toString(),
+      min: ReaderSettings.minTextBrightness.toDouble(),
+      max: ReaderSettings.maxTextBrightness.toDouble(),
+      divisions: ReaderSettings.maxTextBrightness,
+      onChanged: (value) => setState(() => _textBrightness = value.round()),
+      onChangeEnd: (value) => widget.onTextBrightnessChanged(value.round()),
+    ),
+    SwitchListTile.adaptive(
+      contentPadding: const EdgeInsets.only(bottom: 10),
+      title: Text(widget.dimTextInDarkModeTitle),
+      subtitle: Text(widget.dimTextInDarkModeHint),
+      value: _dimTextInDarkMode,
+      onChanged: (value) {
+        setState(() => _dimTextInDarkMode = value);
+        widget.onDimTextInDarkModeChanged(value);
+      },
     ),
     ReaderFontWeightControl(
       label: widget.fontWeightLabel,

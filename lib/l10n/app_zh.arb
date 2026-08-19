@@ -1513,7 +1513,7 @@
   "readerModePageCurlHint": "左右拖动卷起页面，松手后完成翻页或回弹",
   "readerTextBrightnessLabel": "文字亮度",
   "readerDimTextInDarkModeTitle": "夜间模式降低文字亮度",
-  "readerDimTextInDarkModeHint": "夜间模式下固定使用 30% 亮度",
+  "readerDimTextInDarkModeHint": "夜间模式下固定使用 70% 亮度",
   "readerFontSizeValue": "字体大小  {size}",
   "readerHorizontalMarginValue": "左右页边距  {margin}",
   "readerHorizontalMarginLabel": "左右页边距",

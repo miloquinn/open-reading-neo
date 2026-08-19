@@ -2080,7 +2080,7 @@
   "@readerDimTextInDarkModeTitle": {
     "description": "Toggle for dimming reader text in dark mode"
   },
-  "readerDimTextInDarkModeHint": "Use 30% brightness in dark mode",
+  "readerDimTextInDarkModeHint": "Use 70% brightness in dark mode",
   "@readerDimTextInDarkModeHint": {
     "description": "Reader dark mode text brightness hint"
   },

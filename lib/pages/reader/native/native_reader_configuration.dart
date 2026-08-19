@@ -138,6 +138,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
         dimInDarkMode: _dimTextInDarkMode,
         isDarkMode: _readerTheme.brightness == Brightness.dark,
       ),
+      isDarkMode: _readerTheme.brightness == Brightness.dark,
     ),
   );
 

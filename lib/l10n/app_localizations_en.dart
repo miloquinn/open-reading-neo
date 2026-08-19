@@ -2374,7 +2374,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerDimTextInDarkModeTitle => 'Dim text in dark mode';
 
   @override
-  String get readerDimTextInDarkModeHint => 'Use 30% brightness in dark mode';
+  String get readerDimTextInDarkModeHint => 'Use 70% brightness in dark mode';
 
   @override
   String readerFontSizeValue(int size) {

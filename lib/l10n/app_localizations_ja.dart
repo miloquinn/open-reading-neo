@@ -2292,7 +2292,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get readerDimTextInDarkModeTitle => 'ダークモードで文字を暗くする';
 
   @override
-  String get readerDimTextInDarkModeHint => 'ダークモードでは明るさを30%に固定します';
+  String get readerDimTextInDarkModeHint => 'ダークモードでは明るさを70%に固定します';
 
   @override
   String readerFontSizeValue(int size) {

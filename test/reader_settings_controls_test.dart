@@ -47,7 +47,7 @@ void main() {
             fontSizeLabel: 'Font size',
             textBrightnessLabel: 'Text brightness',
             dimTextInDarkModeTitle: 'Dim text in dark mode',
-            dimTextInDarkModeHint: 'Use 30% brightness in dark mode',
+            dimTextInDarkModeHint: 'Use 70% brightness in dark mode',
             fontWeightLabel: 'Font weight',
             fontWeightValueLabels: const <String>[
               'Light',

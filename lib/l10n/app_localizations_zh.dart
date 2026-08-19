@@ -2270,7 +2270,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerDimTextInDarkModeTitle => '夜间模式降低文字亮度';
 
   @override
-  String get readerDimTextInDarkModeHint => '夜间模式下固定使用 30% 亮度';
+  String get readerDimTextInDarkModeHint => '夜间模式下固定使用 70% 亮度';
 
   @override
   String readerFontSizeValue(int size) {
@@ -7713,7 +7713,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get readerDimTextInDarkModeTitle => '夜間模式降低文字亮度';
 
   @override
-  String get readerDimTextInDarkModeHint => '夜間模式下固定使用 30% 亮度';
+  String get readerDimTextInDarkModeHint => '夜間模式下固定使用 70% 亮度';
 
   @override
   String readerFontSizeValue(int size) {

@@ -10,9 +10,12 @@ enum ReaderTextAlignment { natural, justified }
 
 /// Converts the reader's 0–100 brightness setting into an opaque gray.
 ///
-/// The scale is deliberately absolute: 0 is #000000 and 100 is #FFFFFF.
-Color readerTextColorForBrightness(int brightness) {
-  final channel =
+/// Dark reader themes use the natural scale: 0 is #000000 and 100 is
+/// #FFFFFF. Light reader themes reverse it so 100 is #000000 and 0 is
+/// #FFFFFF, matching the direction users expect while reading on paper-like
+/// backgrounds.
+Color readerTextColorForBrightness(int brightness, {required bool isDarkMode}) {
+  final brightnessChannel =
       (brightness.clamp(
                 ReaderSettings.minTextBrightness,
                 ReaderSettings.maxTextBrightness,
@@ -20,6 +23,7 @@ Color readerTextColorForBrightness(int brightness) {
               255 /
               ReaderSettings.maxTextBrightness)
           .round();
+  final channel = isDarkMode ? brightnessChannel : 255 - brightnessChannel;
   return Color.fromARGB(255, channel, channel, channel);
 }
 
@@ -27,7 +31,7 @@ int effectiveReaderTextBrightness({
   required int brightness,
   required bool dimInDarkMode,
   required bool isDarkMode,
-}) => isDarkMode && dimInDarkMode ? 30 : brightness;
+}) => isDarkMode && dimInDarkMode ? 70 : brightness;
 
 int normalizeReaderFontWeight(num value) => ((value / 100).round() * 100).clamp(
   ReaderSettings.minFontWeight,
@@ -62,10 +66,11 @@ List<FontVariation> readerFontVariationsFromValue(
 class ReaderSettings {
   static const double defaultFontSize = 19;
 
-  /// 0 is black (#000000) and 100 is white (#FFFFFF).
+  /// Text brightness uses the active reader theme direction:
+  /// dark: 0 is black and 100 is white; light: 0 is white and 100 is black.
   static const int minTextBrightness = 0;
   static const int maxTextBrightness = 100;
-  static const int defaultTextBrightness = 0;
+  static const int defaultTextBrightness = 100;
   static const bool defaultDimTextInDarkMode = true;
   static const int minFontWeight = 300;
   static const int maxFontWeight = 700;
@@ -181,6 +186,8 @@ class ReaderSettings {
 class ReaderSettingsStore {
   static const fontSizeKey = 'native_reader_font_size';
   static const textBrightnessKey = 'native_reader_text_brightness';
+  static const _textBrightnessThemeRelativeVersionKey =
+      'native_reader_text_brightness_theme_relative_v1';
   static const dimTextInDarkModeKey = 'native_reader_dim_text_in_dark_mode';
   static const fontWeightKey = 'native_reader_font_weight';
   static const lineHeightKey = 'native_reader_line_height';
@@ -231,17 +238,29 @@ class ReaderSettingsStore {
     if (prefs.containsKey(_legacyPageTurnStyleKey)) {
       await prefs.remove(_legacyPageTurnStyleKey);
     }
+    final storedTextBrightness = prefs.getInt(textBrightnessKey);
+    final hasThemeRelativeBrightness =
+        prefs.getBool(_textBrightnessThemeRelativeVersionKey) ?? false;
+    final textBrightness = storedTextBrightness == null
+        ? ReaderSettings.defaultTextBrightness
+        : hasThemeRelativeBrightness
+        ? storedTextBrightness
+        : ReaderSettings.maxTextBrightness - storedTextBrightness;
+    if (!hasThemeRelativeBrightness) {
+      await Future.wait([
+        if (storedTextBrightness != null)
+          prefs.setInt(textBrightnessKey, textBrightness),
+        prefs.setBool(_textBrightnessThemeRelativeVersionKey, true),
+      ]);
+    }
 
     return ReaderSettings(
       fontSize: (prefs.getDouble(fontSizeKey) ?? ReaderSettings.defaultFontSize)
           .clamp(14, 32),
-      textBrightness:
-          (prefs.getInt(textBrightnessKey) ??
-                  ReaderSettings.defaultTextBrightness)
-              .clamp(
-                ReaderSettings.minTextBrightness,
-                ReaderSettings.maxTextBrightness,
-              ),
+      textBrightness: textBrightness.clamp(
+        ReaderSettings.minTextBrightness,
+        ReaderSettings.maxTextBrightness,
+      ),
       dimTextInDarkMode:
           prefs.getBool(dimTextInDarkModeKey) ??
           ReaderSettings.defaultDimTextInDarkMode,
@@ -299,6 +318,7 @@ class ReaderSettingsStore {
     await Future.wait([
       prefs.setDouble(fontSizeKey, settings.fontSize),
       prefs.setInt(textBrightnessKey, settings.textBrightness),
+      prefs.setBool(_textBrightnessThemeRelativeVersionKey, true),
       prefs.setBool(dimTextInDarkModeKey, settings.dimTextInDarkMode),
       prefs.setInt(fontWeightKey, settings.fontWeight),
       prefs.setDouble(lineHeightKey, settings.lineHeight),

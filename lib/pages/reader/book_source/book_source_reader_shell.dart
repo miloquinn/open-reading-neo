@@ -182,6 +182,7 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
         dimInDarkMode: _dimTextInDarkMode,
         isDarkMode: _readerTheme.brightness == Brightness.dark,
       ),
+      isDarkMode: _readerTheme.brightness == Brightness.dark,
     ),
     fontSize: _fontSize,
     fontWeight: readerFontWeightFromValue(_fontWeight),

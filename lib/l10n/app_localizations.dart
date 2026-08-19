@@ -4251,7 +4251,7 @@ abstract class AppLocalizations {
   /// Reader dark mode text brightness hint
   ///
   /// In en, this message translates to:
-  /// **'Use 30% brightness in dark mode'**
+  /// **'Use 70% brightness in dark mode'**
   String get readerDimTextInDarkModeHint;
 
   /// Slider label showing the current reader font size

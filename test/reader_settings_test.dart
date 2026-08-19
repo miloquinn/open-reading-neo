@@ -62,16 +62,30 @@ void main() {
     );
   });
 
-  test('maps text brightness from black to white and dims dark mode to 30', () {
-    expect(readerTextColorForBrightness(0), const Color(0xFF000000));
-    expect(readerTextColorForBrightness(100), const Color(0xFFFFFFFF));
+  test('maps text brightness relative to the active reader theme', () {
+    expect(
+      readerTextColorForBrightness(0, isDarkMode: true),
+      const Color(0xFF000000),
+    );
+    expect(
+      readerTextColorForBrightness(100, isDarkMode: true),
+      const Color(0xFFFFFFFF),
+    );
+    expect(
+      readerTextColorForBrightness(0, isDarkMode: false),
+      const Color(0xFFFFFFFF),
+    );
+    expect(
+      readerTextColorForBrightness(100, isDarkMode: false),
+      const Color(0xFF000000),
+    );
     expect(
       effectiveReaderTextBrightness(
         brightness: 82,
         dimInDarkMode: true,
         isDarkMode: true,
       ),
-      30,
+      70,
     );
     expect(
       effectiveReaderTextBrightness(
@@ -81,6 +95,23 @@ void main() {
       ),
       82,
     );
+  });
+
+  test('migrates the legacy absolute brightness scale once', () async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.textBrightnessKey: 18,
+    });
+
+    const store = ReaderSettingsStore();
+    final migrated = await store.load();
+
+    expect(migrated.textBrightness, 82);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt(ReaderSettingsStore.textBrightnessKey), 82);
+
+    await prefs.setInt(ReaderSettingsStore.textBrightnessKey, 64);
+    final reloaded = await store.load();
+    expect(reloaded.textBrightness, 64);
   });
 
   test(

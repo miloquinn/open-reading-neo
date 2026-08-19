@@ -7,7 +7,7 @@ import 'package:dio/io.dart';
 
 import '../protocol/book_source_protocol.dart';
 import '../services/book_download_cancellation.dart';
-import '../services/book_source_network_policy.dart';
+import '../networking/book_source_network_policy.dart';
 import 'source_cookie_jar.dart';
 import 'source_request_template.dart';
 import 'source_response.dart';
@@ -36,7 +36,7 @@ class SourceHttpTransport
 
   final Dio _dio;
   final Dio _systemDio;
-  final SourceWebViewLoader _webViewLoader;
+  final SourceWebViewLoaderPort _webViewLoader;
   final BookSourceNetworkPolicy _networkPolicy;
   final int maxResponseBytes;
   final Duration requestTimeout;
@@ -160,6 +160,10 @@ class SourceHttpTransport
     SourceRequestTemplate request, {
     BookDownloadCancellation? cancellation,
   }) async {
+    final syntheticBody = request.syntheticBody;
+    if (syntheticBody != null) {
+      return SourceResponse(body: syntheticBody, finalUri: request.url);
+    }
     if (request.useWebView) {
       cancellation?.throwIfCancelled();
       await _networkPolicy.validate(request.url);
@@ -217,6 +221,7 @@ class SourceHttpTransport
     final redirectHops = <String>[];
     final connectionRetries = <Uri, int>{};
     final systemFallbacks = <Uri>{};
+    final browserFallbacks = <Uri>{};
     CancelToken? activeCancelToken;
     void cancelRequest() =>
         activeCancelToken?.cancel('reading source request cancelled.');
@@ -384,10 +389,62 @@ class SourceHttpTransport
             redirects--;
             continue;
           }
-          // Unlike the HTTP 400 case above, no response at all means the
-          // server never confirmed it saw the request, so replaying it
-          // (including POST) is not a duplicate-submission risk the way
-          // replaying a request that already got a real response would be.
+          // A validated pinned address can still be unreachable on a mobile
+          // route while Android's system resolver/client can reach another
+          // CDN address. Fall back once for idempotent requests when the
+          // pinned channel produced no HTTP response at all. Never replay a
+          // POST across channels because the remote side may have received it.
+          if (error.response == null &&
+              identical(requestClient, _dio) &&
+              method != SourceRequestMethod.post &&
+              systemFallbacks.add(current)) {
+            if (redirectState != null) redirectStates.remove(redirectState);
+            redirects--;
+            continue;
+          }
+          if (error.response == null &&
+              identical(requestClient, _systemDio) &&
+              method == SourceRequestMethod.get &&
+              browserFallbacks.add(current)) {
+            cancellation?.throwIfCancelled();
+            await _networkPolicy.validate(current);
+            final browserHeaders = Map<String, String>.from(headers);
+            final storedCookieHeader = SourceCookieJar.mergeHeaders(
+              _cookieJar.header(request.cookieJarKey, current),
+              _cookieJar.headerFromJar(redirectCookies, current),
+            );
+            if (storedCookieHeader != null) {
+              browserHeaders[HttpHeaders.cookieHeader] = storedCookieHeader;
+            }
+            try {
+              final loaded = await _webViewLoader.load(
+                url: current,
+                method: 'GET',
+                headers: browserHeaders,
+              );
+              await _networkPolicy.validate(loaded.finalUri);
+              if (utf8.encode(loaded.body).length > maxResponseBytes) {
+                throw BookSourceProtocolException(
+                  'Reading source response exceeds $maxResponseBytes bytes.',
+                );
+              }
+              _cookieJar.storeBrowserCookies(
+                request.cookieJarKey,
+                loaded.finalUri,
+                loaded.cookieHeader,
+              );
+              return SourceResponse(
+                body: loaded.body,
+                finalUri: loaded.finalUri,
+                cookies: SourceResponseCodec.cookieMapFromHeader(
+                  loaded.cookieHeader,
+                ),
+              );
+            } on BookSourceProtocolException {
+              // Preserve the normal bounded retry/error path below when the
+              // Android browser bridge is unavailable or also cannot load.
+            }
+          }
           if (error.response == null && retries < 2) {
             connectionRetries[current] = retries + 1;
             if (redirectState != null) {

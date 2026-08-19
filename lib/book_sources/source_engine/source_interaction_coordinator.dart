@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'source_script_contract.dart';
+import 'scripting/source_script_contract.dart';
 
 abstract interface class SourceInteractionCoordinatorPort {
   Future<SourceScriptInteractionResult> request({

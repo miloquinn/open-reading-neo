@@ -37,9 +37,9 @@ class BookSourceRegistry {
   static final StreamController<void> _changesController =
       StreamController<void>.broadcast();
   static Future<void> _mutationTail = Future<void>.value();
+  static Future<void>? _storagePreparation;
 
   final BookSourceRegistryStorage _storage;
-  Future<void>? _storagePreparation;
 
   Stream<void> get changes => _changesController.stream;
 
@@ -50,6 +50,19 @@ class BookSourceRegistry {
   /// Moves the old single SharedPreferences blob to file-backed storage before
   /// the rest of the app initializes its preference caches.
   Future<void> prepareStorage() => _storagePreparation ??= _prepareStorage();
+
+  /// Drains the process-wide mutation tail and re-arms storage migration so
+  /// the next test does not inherit a rejected future or a stale prepare.
+  @visibleForTesting
+  static Future<void> resetForTesting() async {
+    try {
+      await _mutationTail;
+    } catch (_) {
+      // A failed mutate must not poison the next test's tail.
+    }
+    _mutationTail = Future<void>.value();
+    _storagePreparation = null;
+  }
 
   /// Loads the complete registry without parsing a large imported source file
   /// on the UI isolate.

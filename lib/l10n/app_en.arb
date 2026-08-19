@@ -221,6 +221,8 @@
   "bookSourcesDedupeReviewAction": "Review deduplication",
   "bookSourcesDedupeImportSummary": "{ready} ready, {duplicates} duplicate, {errors} invalid",
   "@bookSourcesDedupeImportSummary": {"placeholders":{"ready":{"type":"int"},"duplicates":{"type":"int"},"errors":{"type":"int"}}},
+  "bookSourcesImportTypeSummary": "{books} book · {comics} comic · {unsupported} currently unrunnable",
+  "@bookSourcesImportTypeSummary": {"placeholders":{"books":{"type":"int"},"comics":{"type":"int"},"unsupported":{"type":"int"}}},
   "bookSourcesDedupeRestoreDefaults": "Restore recommendations",
   "bookSourcesUrlLabel": "Source address",
   "bookSourcesUrlHint": "https://example.com or a discovery document URL",
@@ -551,6 +553,18 @@
   "readerFontDescription": "Used only for book text and chapter headings. It does not change the app interface.",
   "@readerFontDescription": {
     "description": "Explains the scope of the reading font"
+  },
+  "readerFontSelectionDescription": "Choose the typeface used for reading. System Default keeps fonts embedded by EPUB publishers when available.",
+  "@readerFontSelectionDescription": {
+    "description": "Explains reader font selection and EPUB embedded-font behavior"
+  },
+  "readerFontBookPriorityHint": "Uses the book’s embedded font when available; otherwise uses the device font.",
+  "@readerFontBookPriorityHint": {
+    "description": "Hint shown when the system reader font is selected"
+  },
+  "readerFontOverrideHint": "Overrides fonts embedded by the publisher.",
+  "@readerFontOverrideHint": {
+    "description": "Hint shown when a personalized reader font is selected"
   },
   "fontSystem": "System Default",
   "@fontSystem": {
@@ -1439,6 +1453,10 @@
   "@readerComicArchiveUnsupported": {
     "description": "Error shown when a comic archive uses an unsupported container such as 7z or an unrecognized file header"
   },
+  "readerComicChapterNoPages": "This chapter has no image pages.",
+  "@readerComicChapterNoPages": {
+    "description": "Error shown when an online comic chapter contains no readable images"
+  },
   "imageReaderSettings": "Reading settings",
   "@imageReaderSettings": {
     "description": "Title of the comic/PDF reader settings sheet and its bottom-bar entry"
@@ -1885,7 +1903,7 @@
   "@libraryResetCoverSuccess": {
     "description": "Toast shown after restoring the default cover"
   },
-  "libraryExportBook": "Export book",
+  "libraryExportBook": "Export book file",
   "libraryExportOriginalHint": "Copy the original file to another location",
   "libraryExportDownloadedTxtHint": "Export the downloaded book as a generated TXT file",
   "bookExportSuccess": "Exported to {location}",
@@ -2301,6 +2319,14 @@
   "settingsSectionAdvancedFeatures": "Advanced features",
   "settingsAdditionalSourceProtocolsTitle": "More source protocols",
   "settingsAdditionalSourceProtocolsSubtitle": "Enable support for additional source protocols.",
+  "settingsPrivateBookSourceNetworkTitle": "Allow private-network sources",
+  "@settingsPrivateBookSourceNetworkTitle": {
+    "description": "Settings toggle that allows book sources on LAN, loopback, and other private addresses"
+  },
+  "settingsPrivateBookSourceNetworkSubtitle": "Allow book sources on this device, the local network, and other private addresses. Leave this off unless you trust the source.",
+  "@settingsPrivateBookSourceNetworkSubtitle": {
+    "description": "Warning that private-network book sources are an explicit opt-in"
+  },
   "additionalSourcesImport": "Import more source protocols",
   "additionalSourcesImportTitle": "Import source JSON",
   "additionalSourcesImportNotice": "Import only parses and deduplicates locally; it does not probe every source online. Sources with callable rules keep their imported enabled state, and each capability is checked when used.",
@@ -4866,5 +4892,31 @@
   "accountInviteStepRedeemBody": "When they redeem a Lifetime Premium code, both accounts unlock Premium immediately.",
   "accountInviteMyBinding": "My invite relationship",
   "accountInviteBindIntro": "If someone invited you, bind their code here to keep the reward attached to your account.",
-  "accountInviteBindingNotNeeded": "This account already has Premium, so no invite code is needed."
+  "accountInviteBindingNotNeeded": "This account already has Premium, so no invite code is needed.",
+  "readingDataExportAction": "Export reading data",
+  "readingDataExportSubtitle": "Highlights, underlines, and notes",
+  "readingDataExportWholeBook": "Whole book",
+  "readingDataExportWholeBookHint": "Exports all of your annotations in this book. The book text and source file are not included.",
+  "readingDataExportPrivacySummary": "Includes highlighted or underlined excerpts and your private notes. The book file, full text, account details, and device information are not included.",
+  "readingDataExportCounts": "{highlights} highlights · {underlines} underlines · {notes} notes",
+  "@readingDataExportCounts": {"placeholders":{"highlights":{"type":"int"},"underlines":{"type":"int"},"notes":{"type":"int"}}},
+  "readingDataExportButton": "Export {count} annotations",
+  "@readingDataExportButton": {"placeholders":{"count":{"type":"int"}}},
+  "readingDataExportPreparing": "Preparing Markdown…",
+  "readingDataExportEmpty": "This book has no highlights, underlines, or notes to export.",
+  "readingDataExportSuccess": "Reading data exported to {location}",
+  "@readingDataExportSuccess": {"placeholders":{"location":{"type":"String"}}},
+  "readingDataExportFailed": "Could not export reading data",
+  "readingDataExportUnsupported": "Reading data export is not supported on this platform yet",
+  "readingDataExportReplaceTitle": "Replace existing file?",
+  "readingDataExportReplaceMessage": "A file already exists at {path}. Replacing it cannot be undone.",
+  "@readingDataExportReplaceMessage": {"placeholders":{"path":{"type":"String"}}},
+  "readingDataExportReplaceAction": "Replace",
+  "readingDataExportExportedAt": "Exported",
+  "readingDataExportAuthor": "Author",
+  "readingDataExportContents": "Contents",
+  "readingDataExportMyNote": "My note",
+  "readingDataExportPositionPage": "Page {page}",
+  "@readingDataExportPositionPage": {"placeholders":{"page":{"type":"int"}}},
+  "readingDataExportUnknownChapter": "Unlocated annotations"
 }

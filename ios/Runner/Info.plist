@@ -154,5 +154,12 @@
 	<string>用于将应用内生成或导出的图片保存到你的相册。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于兼容图片导入组件在处理照片时读取拍摄位置信息。开元阅读不会在后台获取位置，也不会将位置信息用于其他用途。</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于在你主动开启「允许内网书源」后，连接本机或局域网中的书源服务。应用不会扫描或收集局域网设备信息。</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

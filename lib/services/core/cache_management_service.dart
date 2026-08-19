@@ -4,9 +4,9 @@ import 'package:flutter/painting.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
-import '../../book_sources/services/book_source_chapter_cache.dart';
-import '../../book_sources/services/book_source_response_cache.dart';
-import '../../book_sources/services/source_cover_cache.dart';
+import '../../book_sources/caching/book_source_chapter_cache.dart';
+import '../../book_sources/caching/book_source_response_cache.dart';
+import '../../book_sources/caching/source_cover_cache.dart';
 import '../account/account_avatar_cache.dart';
 import 'database_service.dart';
 

@@ -8,15 +8,16 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
-import 'package:xxread/book_sources/services/book_source_response_cache.dart';
+import 'package:xxread/book_sources/caching/book_source_response_cache.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
 
   setUp(() async {
+    await BookSourceRegistry.resetForTesting();
     SharedPreferences.setMockInitialValues({});
     directory = await Directory.systemTemp.createTemp('source-client-cache-');
   });

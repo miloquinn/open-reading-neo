@@ -49,7 +49,6 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
       ReaderThemes.setCustomThemes(customThemes);
       ReaderThemes.setThemeOrder(themeOrder);
       _updateReaderState(() {
-        _rawChapters = rawChapters;
         _chapters = chapters;
         _navigationChapters = navigationChapters;
         _navigationCatalog = navigationCatalog;
@@ -244,7 +243,10 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
       return;
     }
     if (!mounted) return;
-    _updateReaderState(() => _shelfBookId = shelfBook?.id);
+    _updateReaderState(() {
+      _shelfBook = shelfBook;
+      _shelfBookId = shelfBook?.id;
+    });
     final shelfBookId = _shelfBookId;
     if (shelfBookId == null) return;
     unawaited(ReadingResumeService.markReading(shelfBookId));

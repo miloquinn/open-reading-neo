@@ -22,10 +22,10 @@ void main() {
   test('production modules do not import compatibility barrels', () {
     final violations = <String>[];
     for (final file in _productionFiles()) {
-      final source = file.readAsStringSync();
-      if (_imports(source, 'source_request.dart') ||
-          _imports(source, 'sourced_book_widgets.dart')) {
-        violations.add(file.path);
+      for (final spec in _importSpecs(file.readAsStringSync())) {
+        if (_isCompatibilityShimImport(file, spec)) {
+          violations.add('${file.path} -> $spec');
+        }
       }
     }
 
@@ -33,6 +33,47 @@ void main() {
       violations,
       isEmpty,
       reason: 'Import leaf modules directly:\n${violations.join('\n')}',
+    );
+  });
+
+  test('cache and network policy live outside services/', () {
+    const relocated = {
+      'book_source_chapter_cache.dart',
+      'book_source_response_cache.dart',
+      'book_source_response_cache_io.dart',
+      'book_source_response_cache_stub.dart',
+      'source_cover_cache.dart',
+      'book_source_network_policy.dart',
+    };
+    final leftover = Directory('lib/book_sources/services')
+        .listSync()
+        .whereType<File>()
+        .where((file) => relocated.contains(file.uri.pathSegments.last))
+        .map((file) => file.path)
+        .toList(growable: false);
+    expect(
+      leftover,
+      isEmpty,
+      reason:
+          'Keep cache files in book_sources/caching/ and network policy in '
+          'book_sources/networking/:\n${leftover.join('\n')}',
+    );
+
+    final staleImport = RegExp(
+      r'''import\s+['"][^'"]*/services/(?:book_source_chapter_cache|book_source_response_cache(?:_io|_stub)?|source_cover_cache|book_source_network_policy)\.dart['"]''',
+    );
+    final staleImports = <String>[];
+    for (final file in _scannedDartFiles()) {
+      if (staleImport.hasMatch(file.readAsStringSync())) {
+        staleImports.add(file.path);
+      }
+    }
+    expect(
+      staleImports,
+      isEmpty,
+      reason:
+          'Import caching/ and networking/ leaves, not old services/ paths:\n'
+          '${staleImports.join('\n')}',
     );
   });
 
@@ -62,12 +103,60 @@ Iterable<File> _productionFiles() sync* {
     'lib/pages/book_sources',
     'lib/pages/reader/book_source',
   ]) {
-    yield* Directory(root)
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((file) => file.path.endsWith('.dart'));
+    yield* _dartFiles(root);
   }
 }
 
-bool _imports(String source, String fileName) =>
-    RegExp("import\\s+['\"][^'\"]*$fileName['\"]").hasMatch(source);
+Iterable<File> _scannedDartFiles() sync* {
+  yield* _dartFiles('lib');
+  yield* _dartFiles('test');
+}
+
+Iterable<File> _dartFiles(String root) => Directory(root)
+    .listSync(recursive: true)
+    .whereType<File>()
+    .where((file) => file.path.endsWith('.dart'));
+
+final _importSpec = RegExp(r'''import\s+['"]([^'"]+)['"]''', multiLine: true);
+
+Iterable<String> _importSpecs(String source) =>
+    _importSpec.allMatches(source).map((match) => match.group(1)!);
+
+bool _isCompatibilityShimImport(File file, String spec) {
+  final normalized = spec.replaceAll(r'\', '/');
+  if (normalized.endsWith('/source_request.dart') ||
+      normalized == 'source_request.dart' ||
+      normalized.endsWith('/sourced_book_widgets.dart') ||
+      normalized == 'sourced_book_widgets.dart') {
+    return true;
+  }
+
+  if (RegExp(
+    r'(^|/)source_engine/source_rule_[^/]+\.dart$',
+  ).hasMatch(normalized)) {
+    return true;
+  }
+  if (RegExp(
+    r'(^|/)source_engine/source_script_[^/]+\.dart$',
+  ).hasMatch(normalized)) {
+    return true;
+  }
+  if (RegExp(r'(^|/)\.\./source_rule_[^/]+\.dart$').hasMatch(normalized)) {
+    return true;
+  }
+  if (RegExp(r'(^|/)\.\./source_script_[^/]+\.dart$').hasMatch(normalized)) {
+    return true;
+  }
+
+  final path = file.path.replaceAll(r'\', '/');
+  final inRules = path.contains('/source_engine/rules/');
+  final inScripting = path.contains('/source_engine/scripting/');
+  if (!inRules && RegExp(r'^source_rule_[^/]+\.dart$').hasMatch(normalized)) {
+    return true;
+  }
+  if (!inScripting &&
+      RegExp(r'^source_script_[^/]+\.dart$').hasMatch(normalized)) {
+    return true;
+  }
+  return false;
+}

@@ -67,9 +67,15 @@ open-reading/
 ```text
 lib/
 ├─ book_sources/
+│  ├─ caching/              章节、响应与封面缓存
+│  ├─ dedupe/               书源身份、质量评分与重复项整理
 │  ├─ models/               已注册书源等本地模型
-│  ├─ protocol/             Open Reading Source Protocol 数据结构与校验
-│  └─ services/             书源注册、请求、缓存、书架和阅读进度
+│  ├─ networking/           书源网络安全、地址校验与 SSRF 防护
+│  ├─ protocol/             ORSP 与 Reading Source 协议适配
+│  ├─ services/             书源门面、注册、书架、维护与阅读进度
+│  └─ source_engine/
+│     ├─ rules/             CSS、XPath、JSONPath、正则与规则编排
+│     └─ scripting/         QuickJS 契约、宿主 API 与平台实现
 ├─ core/reader/             阅读器共享核心
 ├─ data/migration/          SQLite 前向迁移
 ├─ l10n/                    ARB 与生成的多语言代码
@@ -118,7 +124,7 @@ lib/
 - `services/books/incoming_book_*`：统一系统“打开方式/分享”入站请求、冷/热启动 FIFO、初始化/协议门禁、格式与文件头校验、单书导入后打开及多书导入队列；原生层必须先把临时 URI/URL 物化成本地暂存文件。
 - `pages/reader/native/native_reader_page.dart`：本地 TXT、EPUB 等内容适配器；全局阅读字体尚未从磁盘恢复并完成运行时注册时只显示主题化打开占位。正文排版读取共享的字重、字间距与对齐方式，重排后按 canonical 文本锚点恢复位置。阅读位置通过 `core/reader/reader_position_save_queue.dart` 串行写入 SQLite，主动退出会等待最后一次写入完成，避免异步写入乱序覆盖新进度。EPUB 的 NCX/Navigation Document 目录链接会保留 fragment，并映射到解析后正文的 UTF-16 offset；同一 XHTML 内的二级标题可精确跳转，活动小节按全书目录目标位置判定，章节内容跨越相邻 XHTML 时仍保持上一小节为当前状态，直到下一个锚点进入阅读位置。
 - `pages/reader/book_source/book_source_reader_page.dart`：在线书源章节内容适配器；与本地阅读器共享字体就绪门禁、字重、字间距和自然/两端对齐设置，目录或正文先返回时也不会提前使用临时字体绘制。正文请求会携带书名、作者、书籍类型、章节序号和章节标题，供依赖实体上下文的脚本规则使用。
-- `book_sources/services/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
+- `book_sources/caching/book_source_chapter_cache.dart`：在线书源目录与正文的共享内存/磁盘缓存。章节目录命中后立即返回，超过 30 分钟在后台刷新；已读正文超过 12 小时同样采用旧内容先读、后台更新，目录和正文最多保留 30 天。缓存键包含书源 API 地址，书源迁移后不会误复用旧数据；设置页“书源章节缓存”可安全清空全部目录与正文缓存。
 - `pages/book_sources/source_search_page.dart`：在线书源搜索与发现；大型书源库的范围条按需构建，“全部书源”通过最多 8 个 worker 有界并发搜索，按单源超时渐进追加结果，清空、切换范围或离页时取消当前请求。手机入口先打开加载页，再在后台解析注册表并替换为搜索页。
 - `pages/book_sources/book_source_management_page.dart`：统一书源导入与管理。大型阅读书源聚合 JSON 在后台 isolate 做一次本地解析、按 URL 去重和能力标记，不以联网搜索/阅读结果作为保存条件；管理列表使用 Sliver 惰性构建，支持文本、启停/可执行状态、分组筛选和针对当前结果的批量操作。
 - `book_sources/source_engine/`：阅读书源 JSON 的原生执行层，负责 URL 模板、HTTP/WebView、QuickJS、CSS/旧式 DOM、XPath、JSONPath、正则与跨阶段状态。脚本上下文、网络请求/响应和 evaluator 接口集中在共享契约文件，原生与 Web 平台只保留各自执行实现；每来源的变量、键值、Java 状态和两级缓存由单一隔离状态对象管理。登录信息与登录 Header 通过系统安全存储按来源隔离，运行时自动注入请求并执行响应登录检查；声明式登录表单由 `SourceLoginField` 和 `SourceLoginPage` 承载。旧式 DOM 兼容 `&&`、`||`、`%%`、方括号索引/排除/区间/倒序以及 `@all`、`@ownText`、`@textNodes`。
@@ -179,7 +185,7 @@ lib/
 - 设计说明：`docs/book-format-support.md`（含 Lightink 对照与分阶段目标）。
 - **目标架构**：文字书最终都进入 `NativeTextPaginator` 统一分页；ZIP/RAR 为容器解压后再分流；PDF/漫画走专用渲染。
 - 文件选择器扩展名只使用 `BookFormatRegistry.pickerExtensions`（当前含 txt/epub/pdf/mobi/azw/azw3/fb2/rtf/doc/docx/html/htm/xhtml/md/markdown/cbz/cbt/cbr/cb7；zip/rar 为 planned，实现前不进选择器）。
-- 漫画容器（cbz/cbt/cbr/cb7）统一进 `ComicReaderPage`；`comic_book_parser.dart` 按文件头识别真实容器（ZIP/TAR 可解，改名的 CBR/CB7 自动识别），真 RAR/7z 抛类型化异常并展示本地化「转 CBZ」提示。
+- 漫画容器（cbz/cbt/cbr/cb7）仍从 `ComicReaderPage` 打开；在线图片源仍从 `OnlineComicReaderPage` 打开。两条入口共用 `ImageReaderHost` + `ImageReaderSource` 会话，页渲染继续走 `PagedImageReader`。`comic_book_parser.dart` 按文件头识别真实容器（ZIP/TAR 可解，改名的 CBR/CB7 自动识别），真 RAR/7z 抛类型化异常并展示本地化「转 CBZ」提示。
 - 漫画与 PDF 共用 `pages/reader/image/paged_image_reader.dart` 控制层：共享 3×3 点击区域（RTL 镜像列）、Android 音量键翻页与屏幕常亮，底栏含上/下一页、进度滑条与跳页输入；`core/reader/paged_image_reader_settings.dart` 按书持久化阅读方向（日漫从右到左）、全局持久化页面背景色（黑/灰/白），屏幕常亮与音量键开关与文字阅读器共用同一偏好键。
 - Lightink 1.22 对照：TXT/EPUB 完整文本引擎；ZIP/RAR 容器；MOBI/AZW3 仅 UI 级；PDF 无阅读引擎。Open Reading 在 Kindle/PDF/FB2 等上目标不低于并部分超过 Lightink。
 

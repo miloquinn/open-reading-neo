@@ -3,9 +3,17 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
 
 void main() {
+  setUp(() {
+    BookSourceNetworkPolicy.preferredPrivateNetwork = false;
+  });
+
+  tearDown(() {
+    BookSourceNetworkPolicy.preferredPrivateNetwork = false;
+  });
+
   test('rejects hostnames resolving to non-public targets', () async {
     for (final address in [
       '127.0.0.1',
@@ -47,6 +55,28 @@ void main() {
       completes,
     );
   });
+
+  test(
+    'live preference unlocks private literals without a pinned policy',
+    () async {
+      const policy = BookSourceNetworkPolicy();
+
+      await expectLater(
+        policy.validate(Uri.parse('http://192.168.1.10/api')),
+        throwsA(isA<BookSourceProtocolException>()),
+      );
+
+      BookSourceNetworkPolicy.preferredPrivateNetwork = true;
+      await expectLater(
+        policy.validate(Uri.parse('http://192.168.1.10/api')),
+        completes,
+      );
+      await expectLater(
+        policy.validate(Uri.parse('http://10.0.0.8/source.json')),
+        completes,
+      );
+    },
+  );
 
   test('pinned client falls back when the first DNS address fails', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

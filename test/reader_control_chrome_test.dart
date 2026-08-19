@@ -133,14 +133,16 @@ void main() {
             onBack: () {},
             onBookmark: () {},
             onTableOfContents: () {},
+            onSearch: () {},
             onReadAloud: () {},
-            onReplaceRules: () {},
+            onAskAi: () {},
             onSettings: () {},
             backTooltip: 'Back',
             bookmarkTooltip: 'Bookmark',
             tableOfContentsTooltip: 'Contents',
+            searchTooltip: 'Full-text search',
             readAloudTooltip: 'Read aloud',
-            replaceRulesTooltip: 'Replace & clean',
+            askAiTooltip: 'Ask AI',
             settingsTooltip: 'Settings',
             bookmarked: false,
             bottomKey: bottomKey,
@@ -173,7 +175,7 @@ void main() {
     expect(
       find.descendant(
         of: bottomControls,
-        matching: find.byIcon(Icons.find_replace_outlined),
+        matching: find.byIcon(Icons.search_rounded),
       ),
       findsOneWidget,
     );

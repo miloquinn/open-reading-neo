@@ -3,14 +3,22 @@ import 'package:flutter/material.dart';
 import '../../book_sources/source_engine/source_interaction_coordinator.dart';
 import '../../book_sources/source_engine/source_interactive_browser.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
-import '../../book_sources/source_engine/source_script_contract.dart';
+import '../../book_sources/source_engine/scripting/source_script_contract.dart';
 import '../../utils/localization_extension.dart';
 import '../../widgets/floating_subpage_scaffold.dart';
 
 class SourceVerificationPage extends StatefulWidget {
-  const SourceVerificationPage({super.key, required this.ticket});
+  const SourceVerificationPage({
+    super.key,
+    required this.ticket,
+    this.coordinator,
+  });
 
   final SourceInteractionTicket ticket;
+  final SourceInteractionCoordinator? coordinator;
+
+  SourceInteractionCoordinator get resolvedCoordinator =>
+      coordinator ?? SourceInteractionCoordinator.instance;
 
   @override
   State<SourceVerificationPage> createState() => _SourceVerificationPageState();
@@ -81,10 +89,7 @@ class _SourceVerificationPageState extends State<SourceVerificationPage> {
   void _complete(SourceScriptInteractionResult result) {
     if (_completed) return;
     _completed = true;
-    SourceInteractionCoordinator.instance.complete(
-      widget.ticket.requestId,
-      result,
-    );
+    widget.resolvedCoordinator.complete(widget.ticket.requestId, result);
     if (mounted) {
       setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) {

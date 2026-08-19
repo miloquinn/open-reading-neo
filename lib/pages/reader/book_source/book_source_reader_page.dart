@@ -11,7 +11,7 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_change_service.dart';
 import 'package:xxread/book_sources/services/book_source_chapter_text.dart';
-import 'package:xxread/book_sources/services/source_cover_cache.dart';
+import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
@@ -38,7 +38,8 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/models/bookmark.dart';
 import 'package:xxread/models/book_note.dart';
 import 'package:xxread/pages/book_sources/book_source_change_page.dart';
-import 'package:xxread/pages/settings/replace_rules_page.dart';
+import 'package:xxread/pages/export/reading_data_export_dialog.dart';
+import 'package:xxread/pages/settings/font_selection_sheet.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/books/book_note_dao.dart';
 import 'package:xxread/services/books/bookmark_dao.dart';
@@ -65,6 +66,7 @@ import 'package:xxread/widgets/reader_navigation_sheet.dart';
 import 'package:xxread/widgets/reader_opening_loader.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_pull_bookmark.dart';
+import 'package:xxread/widgets/reader_search_sheet.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 import 'package:xxread/widgets/reader_tap_observer.dart';
@@ -162,7 +164,6 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   final ReaderLeafStatusController _leafStatusController =
       ReaderLeafStatusController();
 
-  List<BookSourceChapter> _rawChapters = const [];
   List<BookSourceChapter> _chapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
   ReaderNavigationCatalog? _navigationCatalog;
@@ -224,6 +225,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   bool _exitPromptVisible = false;
   bool _allowPop = false;
   int? _shelfBookId;
+  Book? _shelfBook;
   Timer? _progressSaveTimer;
   Timer? _controlsTimer;
   Timer? _pagedLayoutWarmTimer;

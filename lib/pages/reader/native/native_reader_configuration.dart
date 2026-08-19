@@ -191,6 +191,8 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
           _styledSpanForRange(chapter, start, end, _readerTextStyle),
       onSaveTextAnnotation: _saveTextAnnotation,
       onAskAiSelection: _askAiAboutSelection,
+      onSearchSelection: (selection) =>
+          _showFullTextSearch(initialQuery: selection.selectedText),
       fillAvailableSpace: fillAvailableSpace,
       onInteractionChanged: (active) {
         if (!mounted || _annotationInteractionActive == active) return;

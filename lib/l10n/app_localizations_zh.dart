@@ -553,6 +553,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String bookSourcesImportTypeSummary(int books, int comics, int unsupported) {
+    return '书籍源 $books 个 · 漫画源 $comics 个 · 当前不可运行 $unsupported 个';
+  }
+
+  @override
   String get bookSourcesDedupeRestoreDefaults => '恢复推荐选择';
 
   @override
@@ -971,6 +976,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerFontDescription => '仅用于书籍正文和章节标题，不影响 App 界面。';
+
+  @override
+  String get readerFontSelectionDescription =>
+      '选择阅读正文使用的字体。选用“系统默认”时，EPUB 如有出版社内嵌字体会优先保留。';
+
+  @override
+  String get readerFontBookPriorityHint => '书籍有内嵌字体时优先使用，否则使用设备字体。';
+
+  @override
+  String get readerFontOverrideHint => '覆盖出版社在书籍中内嵌的字体。';
 
   @override
   String get fontSystem => '系统默认';
@@ -1779,6 +1794,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerComicArchiveUnsupported => '这本漫画的压缩格式暂不支持阅读，请先转换为 CBZ 格式';
 
   @override
+  String get readerComicChapterNoPages => '这一章没有图片页';
+
+  @override
   String get imageReaderSettings => '阅读设置';
 
   @override
@@ -2067,7 +2085,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libraryResetCoverSuccess => '已恢复默认封面';
 
   @override
-  String get libraryExportBook => '导出书籍';
+  String get libraryExportBook => '导出书籍文件';
 
   @override
   String get libraryExportOriginalHint => '复制原文件到设备上的其他位置';
@@ -2452,6 +2470,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAdditionalSourceProtocolsSubtitle => '开启后，可以支持更多的书源协议。';
+
+  @override
+  String get settingsPrivateBookSourceNetworkTitle => '允许内网书源';
+
+  @override
+  String get settingsPrivateBookSourceNetworkSubtitle =>
+      '允许访问本机、局域网和其他私网地址上的书源。只在你信任该来源时开启。';
 
   @override
   String get additionalSourcesImport => '导入更多协议书源';
@@ -5476,6 +5501,80 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountInviteBindingNotNeeded => '当前账号已解锁高级版，无需再绑定邀请码。';
+
+  @override
+  String get readingDataExportAction => '导出阅读数据';
+
+  @override
+  String get readingDataExportSubtitle => '高亮、下划线与笔记';
+
+  @override
+  String get readingDataExportWholeBook => '整本书';
+
+  @override
+  String get readingDataExportWholeBookHint => '导出这本书中的全部批注，不包含书籍全文或书籍文件。';
+
+  @override
+  String get readingDataExportPrivacySummary =>
+      '包含高亮或下划线原文和你的私人笔记；不包含书籍文件、书籍全文、账户或设备信息。';
+
+  @override
+  String readingDataExportCounts(int highlights, int underlines, int notes) {
+    return '$highlights 条高亮 · $underlines 条下划线 · $notes 条笔记';
+  }
+
+  @override
+  String readingDataExportButton(int count) {
+    return '导出 $count 条批注';
+  }
+
+  @override
+  String get readingDataExportPreparing => '正在生成 Markdown…';
+
+  @override
+  String get readingDataExportEmpty => '这本书还没有可导出的高亮、下划线或笔记。';
+
+  @override
+  String readingDataExportSuccess(String location) {
+    return '阅读数据已导出到 $location';
+  }
+
+  @override
+  String get readingDataExportFailed => '阅读数据导出失败';
+
+  @override
+  String get readingDataExportUnsupported => '当前平台暂不支持导出阅读数据';
+
+  @override
+  String get readingDataExportReplaceTitle => '替换已有文件？';
+
+  @override
+  String readingDataExportReplaceMessage(String path) {
+    return '$path 已存在文件。替换后无法撤销。';
+  }
+
+  @override
+  String get readingDataExportReplaceAction => '替换';
+
+  @override
+  String get readingDataExportExportedAt => '导出时间';
+
+  @override
+  String get readingDataExportAuthor => '作者';
+
+  @override
+  String get readingDataExportContents => '内容';
+
+  @override
+  String get readingDataExportMyNote => '我的笔记';
+
+  @override
+  String readingDataExportPositionPage(int page) {
+    return '第 $page 页';
+  }
+
+  @override
+  String get readingDataExportUnknownChapter => '未定位的批注';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -6027,6 +6126,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String bookSourcesImportTypeSummary(int books, int comics, int unsupported) {
+    return '書籍源 $books 個 · 漫畫源 $comics 個 · 目前無法執行 $unsupported 個';
+  }
+
+  @override
   String get bookSourcesDedupeRestoreDefaults => '恢復建議選取';
 
   @override
@@ -6445,6 +6549,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readerFontDescription => '僅用於書籍正文和章節標題，不影響 App 介面。';
+
+  @override
+  String get readerFontSelectionDescription =>
+      '選擇閱讀正文使用的字體。選用「系統預設」時，EPUB 如有出版社內嵌字體會優先保留。';
+
+  @override
+  String get readerFontBookPriorityHint => '書籍有內嵌字體時優先使用，否則使用裝置字體。';
+
+  @override
+  String get readerFontOverrideHint => '覆蓋出版社在書籍中內嵌的字體。';
 
   @override
   String get fontSystem => '系統預設';
@@ -7213,6 +7327,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get readerComicArchiveUnsupported => '這本漫畫的壓縮格式暫不支援閱讀，請先轉換為 CBZ 格式';
 
   @override
+  String get readerComicChapterNoPages => '這一章沒有圖片頁';
+
+  @override
   String get imageReaderSettings => '閱讀設定';
 
   @override
@@ -7501,7 +7618,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get libraryResetCoverSuccess => '已還原預設封面';
 
   @override
-  String get libraryExportBook => '匯出書籍';
+  String get libraryExportBook => '匯出書籍檔案';
 
   @override
   String get libraryExportOriginalHint => '將原始檔案複製到裝置上的其他位置';
@@ -7886,6 +8003,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAdditionalSourceProtocolsSubtitle => '開啟後，可以支援更多的書源協議。';
+
+  @override
+  String get settingsPrivateBookSourceNetworkTitle => '允許內網書源';
+
+  @override
+  String get settingsPrivateBookSourceNetworkSubtitle =>
+      '允許存取本機、區域網路和其他私網位址上的書源。只在你信任該來源時開啟。';
 
   @override
   String get additionalSourcesImport => '匯入更多協議書源';
@@ -10830,4 +10954,78 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountInviteBindingNotNeeded => '目前帳號已解鎖高級版，無需再綁定邀請碼。';
+
+  @override
+  String get readingDataExportAction => '匯出閱讀資料';
+
+  @override
+  String get readingDataExportSubtitle => '螢光標記、底線與筆記';
+
+  @override
+  String get readingDataExportWholeBook => '整本書';
+
+  @override
+  String get readingDataExportWholeBookHint => '匯出這本書中的全部批註，不包含書籍全文或書籍檔案。';
+
+  @override
+  String get readingDataExportPrivacySummary =>
+      '包含螢光標記或底線原文和你的私人筆記；不包含書籍檔案、書籍全文、帳號或裝置資訊。';
+
+  @override
+  String readingDataExportCounts(int highlights, int underlines, int notes) {
+    return '$highlights 條螢光標記 · $underlines 條底線 · $notes 條筆記';
+  }
+
+  @override
+  String readingDataExportButton(int count) {
+    return '匯出 $count 條批註';
+  }
+
+  @override
+  String get readingDataExportPreparing => '正在產生 Markdown…';
+
+  @override
+  String get readingDataExportEmpty => '這本書還沒有可匯出的螢光標記、底線或筆記。';
+
+  @override
+  String readingDataExportSuccess(String location) {
+    return '閱讀資料已匯出到 $location';
+  }
+
+  @override
+  String get readingDataExportFailed => '閱讀資料匯出失敗';
+
+  @override
+  String get readingDataExportUnsupported => '目前平台尚不支援匯出閱讀資料';
+
+  @override
+  String get readingDataExportReplaceTitle => '取代現有檔案？';
+
+  @override
+  String readingDataExportReplaceMessage(String path) {
+    return '$path 已有檔案。取代後無法復原。';
+  }
+
+  @override
+  String get readingDataExportReplaceAction => '取代';
+
+  @override
+  String get readingDataExportExportedAt => '匯出時間';
+
+  @override
+  String get readingDataExportAuthor => '作者';
+
+  @override
+  String get readingDataExportContents => '內容';
+
+  @override
+  String get readingDataExportMyNote => '我的筆記';
+
+  @override
+  String readingDataExportPositionPage(int page) {
+    return '第 $page 頁';
+  }
+
+  @override
+  String get readingDataExportUnknownChapter => '未定位的批註';
 }

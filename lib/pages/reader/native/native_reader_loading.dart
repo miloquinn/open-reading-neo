@@ -53,21 +53,6 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     // 等封面飞到静止的停留画面再执行，避免解码回调冻结飞行帧。
     if (_pageCache.isEmpty) await _waitForOpeningCoverHold();
     await _loadIndexedChapterWindow(chapters, initialChapterIndex);
-    final replacementProgress = _replacementRestoreChapterProgress;
-    if (replacementProgress != null) {
-      final chapter = chapters[initialChapterIndex];
-      await chapter.loadTextAsync();
-      final restoredOffset = (chapter.plainText.length * replacementProgress)
-          .round()
-          .clamp(0, chapter.plainText.length);
-      _anchorOffset = restoredOffset;
-      _verticalCanonicalOffset = restoredOffset;
-      _pageIndex = 0;
-      _restoreAnchorAfterLayout = true;
-      _initialPositionRestored = false;
-      _initialPositionRestoreScheduled = false;
-      _replacementRestoreChapterProgress = null;
-    }
     _navigationChapters =
         _navigationMemoryCache[_bookCacheKey] ??
         List<ReaderNavigationChapter>.generate(

@@ -63,4 +63,44 @@ void main() {
     expect(result.error, contains('timed out'));
     expect(coordinator.pendingCount, 0);
   });
+
+  test('cancelAll completes waiting interactions as cancelled', () async {
+    final coordinator = SourceInteractionCoordinator.forTesting();
+    final subscription = coordinator.requests.listen((_) {});
+    addTearDown(subscription.cancel);
+
+    final pending = coordinator.request(
+      sourceId: 'cancel',
+      sourceName: 'Cancel',
+      interaction: const SourceScriptInteractionRequest(
+        signature: 'cancel',
+        kind: SourceScriptInteractionKind.verificationCode,
+        url: 'https://cancel.test',
+      ),
+    );
+
+    expect(coordinator.pendingCount, 1);
+    coordinator.cancelAll();
+
+    expect((await pending).cancelled, isTrue);
+    expect(coordinator.pendingCount, 0);
+  });
+
+  test(
+    'singleton refuses work when the verification screen is not listening',
+    () async {
+      final result = await SourceInteractionCoordinator.instance.request(
+        sourceId: 'idle',
+        sourceName: 'Idle',
+        interaction: const SourceScriptInteractionRequest(
+          signature: 'idle',
+          kind: SourceScriptInteractionKind.verificationCode,
+          url: 'https://idle.test',
+        ),
+      );
+
+      expect(result.error, contains('not ready'));
+      expect(SourceInteractionCoordinator.instance.pendingCount, 0);
+    },
+  );
 }

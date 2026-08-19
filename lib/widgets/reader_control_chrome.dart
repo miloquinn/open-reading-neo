@@ -22,6 +22,8 @@ class ReaderChromeOverlay extends StatelessWidget {
     required this.onBookmark,
     required this.onTableOfContents,
     required this.onSettings,
+    this.onSearch,
+    this.searchTooltip,
     required this.backTooltip,
     required this.bookmarkTooltip,
     required this.tableOfContentsTooltip,
@@ -32,8 +34,6 @@ class ReaderChromeOverlay extends StatelessWidget {
     this.readAloudActive = false,
     this.onAskAi,
     this.askAiTooltip,
-    this.onReplaceRules,
-    this.replaceRulesTooltip,
     this.onChangeSource,
     this.changeSourceTooltip,
     this.bookmarkBusy = false,
@@ -59,11 +59,11 @@ class ReaderChromeOverlay extends StatelessWidget {
   final VoidCallback? onBookmark;
   final VoidCallback? onTableOfContents;
   final VoidCallback onSettings;
+  final VoidCallback? onSearch;
+  final String? searchTooltip;
   final VoidCallback? onReadAloud;
   final VoidCallback? onAskAi;
   final String? askAiTooltip;
-  final VoidCallback? onReplaceRules;
-  final String? replaceRulesTooltip;
   final VoidCallback? onChangeSource;
   final String? changeSourceTooltip;
   final String backTooltip;
@@ -203,11 +203,33 @@ class ReaderChromeOverlay extends StatelessWidget {
                             : Icons.bookmark_border_rounded,
                       ),
                       if (onChangeSource != null)
-                        ReaderControlIconButton(
-                          palette: palette,
-                          onPressed: onChangeSource,
-                          tooltip: changeSourceTooltip ?? '',
-                          icon: Icons.swap_horiz_rounded,
+                        PopupMenuButton<String>(
+                          key: const ValueKey('reader-more-menu'),
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).moreButtonTooltip,
+                          color: palette.background,
+                          icon: Icon(
+                            Icons.more_horiz_rounded,
+                            color: palette.text,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'change-source') {
+                              onChangeSource?.call();
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'change-source',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.swap_horiz_rounded),
+                                  const SizedBox(width: 12),
+                                  Text(changeSourceTooltip ?? ''),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),
@@ -244,6 +266,13 @@ class ReaderChromeOverlay extends StatelessWidget {
                         tooltip: tableOfContentsTooltip,
                         icon: Icons.format_list_bulleted_rounded,
                       ),
+                      if (onSearch != null)
+                        ReaderControlIconButton(
+                          palette: palette,
+                          onPressed: onSearch,
+                          tooltip: searchTooltip ?? '',
+                          icon: Icons.search_rounded,
+                        ),
                       if (onReadAloud != null)
                         ReaderControlIconButton(
                           palette: palette,
@@ -259,13 +288,6 @@ class ReaderChromeOverlay extends StatelessWidget {
                           onPressed: onAskAi,
                           tooltip: askAiTooltip ?? '',
                           icon: Icons.auto_awesome_outlined,
-                        ),
-                      if (onReplaceRules != null)
-                        ReaderControlIconButton(
-                          palette: palette,
-                          onPressed: onReplaceRules,
-                          tooltip: replaceRulesTooltip ?? '',
-                          icon: Icons.find_replace_outlined,
                         ),
                       if (showSettingsAction)
                         ReaderControlIconButton(

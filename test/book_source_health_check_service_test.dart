@@ -8,7 +8,10 @@ import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() async {
+    await BookSourceRegistry.resetForTesting();
+    SharedPreferences.setMockInitialValues({});
+  });
 
   test(
     'checkAll persists a health result readable back from the registry',

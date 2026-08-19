@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
-import 'package:xxread/book_sources/services/book_source_chapter_cache.dart';
+import 'package:xxread/book_sources/caching/book_source_chapter_cache.dart';
 
 void main() {
   setUp(BookSourceChapterCache.clearMemory);

@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/dedupe/book_source_dedupe_models.dart';
 import 'package:xxread/book_sources/services/book_source_import_analyzer.dart';
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
 import 'package:xxread/book_sources/source_engine/source_import_service.dart';
 
 Uint8List _bytes(Object value) =>
@@ -81,6 +81,40 @@ void main() {
       imported.single.sourceConfig?['_openReadingCompatibilityLevel'],
       'supported',
     );
+  });
+
+  test('import preview separates runnable books, comics, and fragments', () {
+    final result = BookSourceImportAnalyzer().analyzeBytes(
+      _bytes([
+        {
+          'bookSourceName': 'Novel',
+          'bookSourceUrl': 'https://novel.example',
+          'searchUrl': '/search?q={{key}}',
+          'ruleSearch': {'bookList': '.book'},
+          'ruleToc': {'chapterList': '.chapter'},
+          'ruleContent': {'content': '#content@text'},
+        },
+        {
+          'bookSourceName': 'Legacy comic',
+          'bookSourceGroup': '漫画',
+          'bookSourceType': 0,
+          'bookSourceUrl': 'https://comic.example',
+          'searchUrl': '/search?q={{key}}',
+          'ruleSearch': {'bookList': '.book'},
+          'ruleToc': {'chapterList': '.chapter'},
+          'ruleContent': {'content': 'img@data-src', 'imageStyle': 'FULL'},
+        },
+        {
+          'bookSourceName': 'Preference fragment',
+          'bookSourceUrl': 'https://fragment.example',
+        },
+      ]),
+    );
+
+    final preview = result.additionalPreview!;
+    expect(preview.runnableTextSources, 1);
+    expect(preview.runnableImageSources, 1);
+    expect(preview.unsupported, 1);
   });
 
   test('deduplicates by source URL and reports skipped entries', () {

@@ -296,14 +296,17 @@ class _FontOptionTile extends StatelessWidget {
         : option.isOnline || option.isCustom
         ? l10n.fontStaticWeight
         : null;
-    final description = _description(
-      context,
-      isDownloaded: isDownloaded,
-      isDownloading: isDownloading,
-      isFailed: isFailed,
-      progress: progress,
-      weightDescription: weightDescription,
-    );
+    final description =
+        domain == FontDomain.reader && option.id == FontCatalog.systemId
+        ? l10n.readerFontBookPriorityHint
+        : _description(
+            context,
+            isDownloaded: isDownloaded,
+            isDownloading: isDownloading,
+            isFailed: isFailed,
+            progress: progress,
+            weightDescription: weightDescription,
+          );
 
     Future<void> handleTap() async {
       if (option.isOnline && !isDownloaded && !isDownloading) {

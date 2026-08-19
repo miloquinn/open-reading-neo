@@ -1056,6 +1056,12 @@ abstract class AppLocalizations {
   /// **'{ready} ready, {duplicates} duplicate, {errors} invalid'**
   String bookSourcesDedupeImportSummary(int ready, int duplicates, int errors);
 
+  /// No description provided for @bookSourcesImportTypeSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{books} book · {comics} comic · {unsupported} currently unrunnable'**
+  String bookSourcesImportTypeSummary(int books, int comics, int unsupported);
+
   /// No description provided for @bookSourcesDedupeRestoreDefaults.
   ///
   /// In en, this message translates to:
@@ -1865,6 +1871,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Used only for book text and chapter headings. It does not change the app interface.'**
   String get readerFontDescription;
+
+  /// Explains reader font selection and EPUB embedded-font behavior
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the typeface used for reading. System Default keeps fonts embedded by EPUB publishers when available.'**
+  String get readerFontSelectionDescription;
+
+  /// Hint shown when the system reader font is selected
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the book’s embedded font when available; otherwise uses the device font.'**
+  String get readerFontBookPriorityHint;
+
+  /// Hint shown when a personalized reader font is selected
+  ///
+  /// In en, this message translates to:
+  /// **'Overrides fonts embedded by the publisher.'**
+  String get readerFontOverrideHint;
 
   /// System default font
   ///
@@ -3414,6 +3438,12 @@ abstract class AppLocalizations {
   /// **'This comic\'s archive format isn\'t readable yet. Please convert it to CBZ.'**
   String get readerComicArchiveUnsupported;
 
+  /// Error shown when an online comic chapter contains no readable images
+  ///
+  /// In en, this message translates to:
+  /// **'This chapter has no image pages.'**
+  String get readerComicChapterNoPages;
+
   /// Title of the comic/PDF reader settings sheet and its bottom-bar entry
   ///
   /// In en, this message translates to:
@@ -3897,7 +3927,7 @@ abstract class AppLocalizations {
   /// No description provided for @libraryExportBook.
   ///
   /// In en, this message translates to:
-  /// **'Export book'**
+  /// **'Export book file'**
   String get libraryExportBook;
 
   /// No description provided for @libraryExportOriginalHint.
@@ -4564,6 +4594,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enable support for additional source protocols.'**
   String get settingsAdditionalSourceProtocolsSubtitle;
+
+  /// Settings toggle that allows book sources on LAN, loopback, and other private addresses
+  ///
+  /// In en, this message translates to:
+  /// **'Allow private-network sources'**
+  String get settingsPrivateBookSourceNetworkTitle;
+
+  /// Warning that private-network book sources are an explicit opt-in
+  ///
+  /// In en, this message translates to:
+  /// **'Allow book sources on this device, the local network, and other private addresses. Leave this off unless you trust the source.'**
+  String get settingsPrivateBookSourceNetworkSubtitle;
 
   /// No description provided for @additionalSourcesImport.
   ///
@@ -10115,6 +10157,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This account already has Premium, so no invite code is needed.'**
   String get accountInviteBindingNotNeeded;
+
+  /// No description provided for @readingDataExportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Export reading data'**
+  String get readingDataExportAction;
+
+  /// No description provided for @readingDataExportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights, underlines, and notes'**
+  String get readingDataExportSubtitle;
+
+  /// No description provided for @readingDataExportWholeBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole book'**
+  String get readingDataExportWholeBook;
+
+  /// No description provided for @readingDataExportWholeBookHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Exports all of your annotations in this book. The book text and source file are not included.'**
+  String get readingDataExportWholeBookHint;
+
+  /// No description provided for @readingDataExportPrivacySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes highlighted or underlined excerpts and your private notes. The book file, full text, account details, and device information are not included.'**
+  String get readingDataExportPrivacySummary;
+
+  /// No description provided for @readingDataExportCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'{highlights} highlights · {underlines} underlines · {notes} notes'**
+  String readingDataExportCounts(int highlights, int underlines, int notes);
+
+  /// No description provided for @readingDataExportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Export {count} annotations'**
+  String readingDataExportButton(int count);
+
+  /// No description provided for @readingDataExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing Markdown…'**
+  String get readingDataExportPreparing;
+
+  /// No description provided for @readingDataExportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This book has no highlights, underlines, or notes to export.'**
+  String get readingDataExportEmpty;
+
+  /// No description provided for @readingDataExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading data exported to {location}'**
+  String readingDataExportSuccess(String location);
+
+  /// No description provided for @readingDataExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export reading data'**
+  String get readingDataExportFailed;
+
+  /// No description provided for @readingDataExportUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading data export is not supported on this platform yet'**
+  String get readingDataExportUnsupported;
+
+  /// No description provided for @readingDataExportReplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace existing file?'**
+  String get readingDataExportReplaceTitle;
+
+  /// No description provided for @readingDataExportReplaceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'A file already exists at {path}. Replacing it cannot be undone.'**
+  String readingDataExportReplaceMessage(String path);
+
+  /// No description provided for @readingDataExportReplaceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get readingDataExportReplaceAction;
+
+  /// No description provided for @readingDataExportExportedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported'**
+  String get readingDataExportExportedAt;
+
+  /// No description provided for @readingDataExportAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get readingDataExportAuthor;
+
+  /// No description provided for @readingDataExportContents.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents'**
+  String get readingDataExportContents;
+
+  /// No description provided for @readingDataExportMyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'My note'**
+  String get readingDataExportMyNote;
+
+  /// No description provided for @readingDataExportPositionPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page}'**
+  String readingDataExportPositionPage(int page);
+
+  /// No description provided for @readingDataExportUnknownChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocated annotations'**
+  String get readingDataExportUnknownChapter;
 }
 
 class _AppLocalizationsDelegate

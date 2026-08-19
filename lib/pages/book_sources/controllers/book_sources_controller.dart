@@ -6,8 +6,10 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_gateway.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/pages/book_sources/models/sourced_book.dart';
+export 'book_source_batch_fetcher.dart' show mergeLatestSourceBatches;
 export 'book_sources_state.dart';
 
+import 'book_source_batch_fetcher.dart';
 import 'book_sources_state.dart';
 
 class BookSourcesController extends ChangeNotifier {
@@ -27,6 +29,9 @@ class BookSourcesController extends ChangeNotifier {
   final int maxConcurrentSourceFetches;
   final int largeSourceLibraryThreshold;
   final int maxLatestItemsPerSource;
+  late final BookSourceBatchFetcher _batchFetcher = BookSourceBatchFetcher(
+    maxConcurrent: maxConcurrentSourceFetches,
+  );
   BookSourcesState _state;
   StreamSubscription<void>? _registrySubscription;
   int _sourceRevision = 0;
@@ -517,7 +522,7 @@ class BookSourcesController extends ChangeNotifier {
   }
 
   Future<List<BookSourceDiscoveryShelf>> _fetchShelves() async {
-    final batches = await _fetchSourceBatches(
+    final batches = await _batchFetcher.fetch(
       _state.scopedSourcesFor(BookSourcesSection.recommended),
       (source) async {
         final page = await gateway.getDiscovery(source);
@@ -537,7 +542,7 @@ class BookSourcesController extends ChangeNotifier {
   }
 
   Future<List<SourcedBookCategory>> _fetchCategories() async {
-    final batches = await _fetchSourceBatches(
+    final batches = await _batchFetcher.fetch(
       _state.scopedSourcesFor(BookSourcesSection.categories),
       (source) async =>
           _uniqueSourcedCategories(source, await gateway.getCategories(source)),
@@ -546,7 +551,7 @@ class BookSourcesController extends ChangeNotifier {
   }
 
   Future<List<SourcedBook>> _fetchLatest() async {
-    final batches = await _fetchSourceBatches(
+    final batches = await _batchFetcher.fetch(
       _state.scopedSourcesFor(BookSourcesSection.latest),
       (source) async {
         final page = await gateway.browse(source, sort: 'latest');
@@ -559,52 +564,6 @@ class BookSourcesController extends ChangeNotifier {
       batches,
       maxItemsPerSource: maxLatestItemsPerSource,
     );
-  }
-
-  Future<List<List<T>>> _fetchSourceBatches<T>(
-    List<RegisteredBookSource> sources,
-    Future<List<T>> Function(RegisteredBookSource source) fetch,
-  ) async {
-    if (sources.isEmpty) return const [];
-    final results = List<_SourceFetchResult<T>?>.filled(sources.length, null);
-    var nextIndex = 0;
-    Future<void> worker() async {
-      while (nextIndex < sources.length) {
-        final index = nextIndex++;
-        final source = sources[index];
-        try {
-          results[index] = _SourceFetchResult.success(
-            source,
-            await fetch(source),
-          );
-        } catch (error) {
-          results[index] = _SourceFetchResult.failure(source, error);
-        }
-      }
-    }
-
-    await Future.wait(
-      List.generate(
-        sources.length.clamp(1, maxConcurrentSourceFetches),
-        (_) => worker(),
-      ),
-    );
-    final completed = results.whereType<_SourceFetchResult<T>>().toList(
-      growable: false,
-    );
-    final batches = completed
-        .where((result) => result.error == null)
-        .map((result) => result.items)
-        .toList(growable: false);
-    final failures = completed.where((result) => result.error != null).toList();
-    if (!batches.any((items) => items.isNotEmpty) && failures.isNotEmpty) {
-      throw BookSourceProtocolException(
-        failures
-            .map((failure) => '${failure.source.name}: ${failure.error}')
-            .join('\n'),
-      );
-    }
-    return batches;
   }
 
   List<SourcedBookCategory> _uniqueSourcedCategories(
@@ -670,50 +629,4 @@ class BookSourcesController extends ChangeNotifier {
     _state = next;
     notifyListeners();
   }
-}
-
-List<SourcedBook> mergeLatestSourceBatches(
-  Iterable<List<SourcedBook>> batches, {
-  required int maxItemsPerSource,
-}) {
-  if (maxItemsPerSource <= 0) return const [];
-  final queues = batches
-      .where((batch) => batch.isNotEmpty)
-      .map((batch) => batch.take(maxItemsPerSource).toList(growable: false))
-      .toList();
-  queues.sort((left, right) {
-    final leftTime = left.first.book.updatedAt;
-    final rightTime = right.first.book.updatedAt;
-    if (leftTime != null && rightTime != null) {
-      final byTime = rightTime.compareTo(leftTime);
-      if (byTime != 0) return byTime;
-    } else if (leftTime != null) {
-      return -1;
-    } else if (rightTime != null) {
-      return 1;
-    }
-    return left.first.source.name.compareTo(right.first.source.name);
-  });
-
-  final results = <SourcedBook>[];
-  for (var index = 0; index < maxItemsPerSource; index++) {
-    var added = false;
-    for (final queue in queues) {
-      if (index >= queue.length) continue;
-      results.add(queue[index]);
-      added = true;
-    }
-    if (!added) break;
-  }
-  return results;
-}
-
-class _SourceFetchResult<T> {
-  final RegisteredBookSource source;
-  final List<T> items;
-  final Object? error;
-
-  const _SourceFetchResult.success(this.source, this.items) : error = null;
-
-  const _SourceFetchResult.failure(this.source, this.error) : items = const [];
 }

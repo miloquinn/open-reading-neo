@@ -40,7 +40,10 @@ Map<String, dynamic> _source({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() async {
+    await BookSourceRegistry.resetForTesting();
+    SharedPreferences.setMockInitialValues({});
+  });
 
   test('parses object, list, wrappers, BOM, and isolates bad items', () {
     final object = parseReadingSources(jsonEncode(_source()));
@@ -142,6 +145,44 @@ void main() {
     );
     expect(scripted.level, SourceCompatibilityLevel.supported);
     expect(scripted.canRun, isTrue);
+  });
+
+  test('infers legacy type-zero manga from its complete image rule chain', () {
+    final source = ReadingSourceConfig.fromJson({
+      ..._source(
+        name: '旧漫画源',
+        type: 0,
+        contentRule:
+            'img@data-src@js:result.split("\\n").map(u=>`<img src="\${u}">`).join("\\n")',
+      ),
+      'bookSourceGroup': '漫画',
+      'ruleContent': {
+        'content':
+            'img@data-src@js:result.split("\\n").map(u=>`<img src="\${u}">`).join("\\n")',
+        'imageStyle': 'FULL',
+      },
+    });
+
+    expect(source.isImageSource, isTrue);
+    expect(source.effectiveBookType, 64);
+    expect(const SourceCompatibilityScanner().scan(source).canRun, isTrue);
+  });
+
+  test('does not treat an incomplete source preference fragment as manga', () {
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': '漫画配置残片',
+      'bookSourceGroup': '能用',
+      'bookSourceType': 0,
+      'bookSourceUrl': 'https://fragment.example',
+      'enabled': true,
+    });
+
+    expect(source.isImageSource, isFalse);
+    expect(source.effectiveBookType, 8);
+    expect(
+      const SourceCompatibilityScanner().scan(source).level,
+      SourceCompatibilityLevel.unsupported,
+    );
   });
 
   test('metadata comments do not get interpreted as executable rules', () {
@@ -420,6 +461,78 @@ void main() {
       isNot(contains('App Source (impostor)')),
     );
   });
+
+  test(
+    'concurrent prepareStorage migrates the legacy preference once',
+    () async {
+      final source = ReadingSourceConfig.fromJson(
+        _source(),
+      ).toRegisteredSource();
+      final raw = jsonEncode([source.toJson()]);
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': raw,
+      });
+      final storage = _MemoryBookSourceRegistryStorage();
+      final first = BookSourceRegistry(storage: storage);
+      final second = BookSourceRegistry(storage: storage);
+
+      await Future.wait([first.prepareStorage(), second.prepareStorage()]);
+
+      final preferences = await SharedPreferences.getInstance();
+      expect(storage.writeCalls, 1);
+      expect(storage.raw, raw);
+      expect(preferences.containsKey('open_reading_book_sources_v1'), isFalse);
+      expect(await first.load(), hasLength(1));
+      expect(await second.load(), hasLength(1));
+    },
+  );
+
+  test('resetForTesting re-arms process-wide storage migration', () async {
+    final source = ReadingSourceConfig.fromJson(_source()).toRegisteredSource();
+    final raw = jsonEncode([source.toJson()]);
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': raw,
+    });
+    final firstStorage = _MemoryBookSourceRegistryStorage();
+    await BookSourceRegistry(storage: firstStorage).prepareStorage();
+    expect(firstStorage.writeCalls, 1);
+
+    await BookSourceRegistry.resetForTesting();
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': raw,
+    });
+    final secondStorage = _MemoryBookSourceRegistryStorage();
+    await BookSourceRegistry(storage: secondStorage).prepareStorage();
+
+    expect(secondStorage.writeCalls, 1);
+    expect(secondStorage.raw, raw);
+  });
+
+  test(
+    'resetForTesting clears a failed mutation before the next registry',
+    () async {
+      final source = ReadingSourceConfig.fromJson(
+        _source(),
+      ).toRegisteredSource(enabled: true);
+      final failing = _MemoryBookSourceRegistryStorage(
+        raw: jsonEncode([source.toJson()]),
+        writeSucceeds: false,
+      );
+      final failingRegistry = BookSourceRegistry(storage: failing);
+      await expectLater(
+        failingRegistry.setEnabled(source.id, false),
+        throwsA(isA<StateError>()),
+      );
+
+      await BookSourceRegistry.resetForTesting();
+      SharedPreferences.setMockInitialValues({});
+      final writable = _MemoryBookSourceRegistryStorage();
+      final restored = BookSourceRegistry(storage: writable);
+      final saved = await restored.upsert(source);
+      expect(saved, hasLength(1));
+      expect(writable.writeCalls, 1);
+    },
+  );
 }
 
 class _MemoryBookSourceRegistryStorage implements BookSourceRegistryStorage {

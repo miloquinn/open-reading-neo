@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../book_sources/networking/book_source_network_policy.dart';
 import '../../models/home_navigation_destination.dart';
 import '../../utils/font_catalog_helper.dart';
 import '../../utils/page_transitions.dart';
@@ -16,6 +17,8 @@ import 'online_font_service.dart';
 
 const String additionalSourceProtocolsPreferenceKey =
     'additional_source_protocols_v1';
+const String privateBookSourceNetworkPreferenceKey =
+    'private_book_source_network_v1';
 
 enum LibraryLayoutMode { card, grid }
 
@@ -67,6 +70,7 @@ class AppSettingsNotifier extends ChangeNotifier {
   LibraryBookOpenAnimationPace _libraryBookOpenAnimationPace =
       LibraryBookOpenAnimationPace.fast;
   bool _additionalSourceProtocolsEnabled = false;
+  bool _privateBookSourceNetworkEnabled = false;
   bool _powerSavingMode = false;
   bool _isInitialized = false;
   final CustomFontService _customFontService;
@@ -123,6 +127,7 @@ class AppSettingsNotifier extends ChangeNotifier {
       _libraryBookOpenAnimationPace;
   bool get additionalSourceProtocolsEnabled =>
       _additionalSourceProtocolsEnabled;
+  bool get privateBookSourceNetworkEnabled => _privateBookSourceNetworkEnabled;
   bool get powerSavingMode => _powerSavingMode;
 
   /// 用户自定义导入的字体列表（在线字体不在此列）。
@@ -358,6 +363,10 @@ class AppSettingsNotifier extends ChangeNotifier {
     };
     _additionalSourceProtocolsEnabled =
         prefs.getBool(additionalSourceProtocolsPreferenceKey) ?? false;
+    _privateBookSourceNetworkEnabled =
+        prefs.getBool(privateBookSourceNetworkPreferenceKey) ?? false;
+    BookSourceNetworkPolicy.preferredPrivateNetwork =
+        _privateBookSourceNetworkEnabled;
     _powerSavingMode =
         prefs.getBool(DisplayRefreshRateController.preferenceKey) ?? false;
     await _restoreSelectedFonts(prefs);
@@ -632,6 +641,15 @@ class AppSettingsNotifier extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(additionalSourceProtocolsPreferenceKey, value);
+  }
+
+  Future<void> setPrivateBookSourceNetworkEnabled(bool value) async {
+    if (_privateBookSourceNetworkEnabled == value) return;
+    _privateBookSourceNetworkEnabled = value;
+    BookSourceNetworkPolicy.preferredPrivateNetwork = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(privateBookSourceNetworkPreferenceKey, value);
   }
 
   Future<void> setPowerSavingMode(bool value) async {

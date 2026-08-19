@@ -7,7 +7,7 @@ import 'source_http_transport.dart';
 import 'source_interaction_coordinator.dart';
 import 'source_login_session.dart';
 import 'source_login_ui.dart';
-import 'source_rule_engine.dart';
+import 'rules/source_rule_engine.dart';
 import 'source_runtime_catalog.dart';
 import 'source_runtime_dependencies.dart';
 import 'source_runtime_login.dart';
@@ -15,7 +15,7 @@ import 'source_runtime_reading.dart';
 import 'source_runtime_requests.dart';
 import 'source_runtime_rules.dart';
 import 'source_runtime_state.dart';
-import 'source_script_contract.dart';
+import 'scripting/source_script_contract.dart';
 import 'source_transport.dart';
 
 class SourceRuntime {

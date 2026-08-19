@@ -311,6 +311,183 @@ void main() {
       },
     );
 
+    test(
+      'falls back to chapter anchors when an image source catalog rule is obsolete',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+            <h1>漫画</h1>
+            <a class="comics-chapters__item"
+               href="/user/page_direct?comic_id=one&chapter_slot=1">第02话</a>
+            <a class="comics-chapters__item"
+               href="/user/page_direct?comic_id=one&chapter_slot=0">第01话</a>
+            <a href="/comic/recommendation">另一部漫画</a>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleBookInfo'] = {'name': 'h1@text'}
+          ..['ruleToc'] = {
+            'chapterList': 'class.old-selector-that-no-longer-exists',
+            'chapterName': 'tag.span@text',
+            'chapterUrl': 'tag.a@href',
+          }
+          ..['ruleContent'] = {'content': 'img@src', 'imageStyle': 'FULL'};
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+
+        expect(chapters.map((chapter) => chapter.title), ['第02话', '第01话']);
+        expect(
+          chapters.map((chapter) => chapter.id),
+          everyElement(contains('/user/page_direct?')),
+        );
+      },
+    );
+
+    test(
+      'uses the original chapter link when an imported rewrite points to stale content',
+      () async {
+        const original =
+            'https://books.test/user/page_direct?comic_id=one&chapter_slot=0';
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+            <h1>漫画</h1>
+            <a class="chapter" href="/user/page_direct?comic_id=one&chapter_slot=0">第01话</a>
+          ''',
+          'https://stale.test/chapter': '<html><body>empty</body></html>',
+          original: '''
+            <div class="comic-contain">
+              <amp-img data-src="https://images.test/page-1.jpg"></amp-img>
+            </div>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleBookInfo'] = {'name': 'h1@text'}
+          ..['ruleToc'] = {
+            'chapterList': 'class.chapter',
+            'chapterName': 'text',
+            'chapterUrl': "'https://stale.test/chapter'",
+          }
+          ..['ruleContent'] = {
+            'content': 'class.old-content@html',
+            'imageStyle': 'FULL',
+          };
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: book.id,
+          chapterId: chapters.single.id,
+        );
+
+        expect(chapters.single.id, 'https://stale.test/chapter');
+        expect(
+          content.images.single.url.toString(),
+          'https://images.test/page-1.jpg',
+        );
+        expect(
+          transport.requests.map((request) => request.url.toString()),
+          contains(original),
+        );
+      },
+    );
+
+    test(
+      'image books without a catalog continue as one full-book chapter',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+          <h1>全本漫画</h1>
+          <div class="comic-contain">
+            <img src="https://images.test/page-1.jpg">
+          </div>
+        ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleBookInfo'] = {'name': 'h1@text'}
+          ..['ruleToc'] = {
+            'chapterList': 'class.missing-catalog',
+            'chapterName': 'text',
+            'chapterUrl': 'href',
+          }
+          ..['ruleContent'] = {
+            'content': 'class.comic-contain@html',
+            'imageStyle': 'FULL',
+          };
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: book.id,
+          chapterId: chapters.single.id,
+        );
+
+        expect(chapters.single.title, '全本');
+        expect(chapters.single.id, book.id);
+        expect(
+          content.images.single.url.toString(),
+          'https://images.test/page-1.jpg',
+        );
+      },
+    );
+
+    test(
+      'transformed HTML from an info init rule does not become a catalog URL',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+            <html><body><h1>漫画</h1>
+            <a class="chapter" href="/chapter/1">第01话</a>
+            </body></html>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleBookInfo'] = {
+            'name': 'h1@text',
+            'init': '@js:result',
+            'tocUrl': 'class.missing@href',
+          }
+          ..['ruleToc'] = {
+            'chapterList': 'class.chapter',
+            'chapterName': 'text',
+            'chapterUrl': 'href',
+          }
+          ..['ruleContent'] = {'content': 'img@src', 'imageStyle': 'FULL'};
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+
+        expect(chapters.single.title, '第01话');
+        expect(chapters.single.id, 'https://books.test/chapter/1');
+      },
+    );
+
     test('chapter URLs can depend on the parsed chapter title', () async {
       final transport = _FakeTransport({
         'https://books.test/book/1': '''

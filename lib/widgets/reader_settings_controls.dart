@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/reader/reader_layout.dart';
@@ -7,6 +9,29 @@ import '../core/reader/reader_custom_theme.dart';
 import '../core/reader/reader_system_ui.dart';
 import '../utils/reader_themes.dart';
 import 'reader_theme_background.dart';
+
+@immutable
+class ReaderFontChoice {
+  const ReaderFontChoice({
+    required this.valueLabel,
+    required this.hint,
+    required this.family,
+    required this.fallbackFamilies,
+    required this.supportsVariableWeight,
+    required this.fontWeightHint,
+    this.variableWeightMin,
+    this.variableWeightMax,
+  });
+
+  final String valueLabel;
+  final String hint;
+  final String? family;
+  final List<String> fallbackFamilies;
+  final bool supportsVariableWeight;
+  final String fontWeightHint;
+  final int? variableWeightMin;
+  final int? variableWeightMax;
+}
 
 class ReaderSettingsSheet extends StatefulWidget {
   const ReaderSettingsSheet({
@@ -31,6 +56,10 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.showTabletTwoPageToggle,
     required this.tabletTwoPageTitle,
     required this.tabletTwoPageHint,
+    required this.fontFamilyLabel,
+    required this.fontFamilyValueLabel,
+    required this.fontFamilyHint,
+    required this.onFontFamilyTap,
     required this.fontSizeLabel,
     required this.fontWeightLabel,
     required this.fontWeightValueLabels,
@@ -110,6 +139,10 @@ class ReaderSettingsSheet extends StatefulWidget {
   final bool showTabletTwoPageToggle;
   final String tabletTwoPageTitle;
   final String tabletTwoPageHint;
+  final String fontFamilyLabel;
+  final String fontFamilyValueLabel;
+  final String fontFamilyHint;
+  final Future<ReaderFontChoice?> Function() onFontFamilyTap;
   final String fontSizeLabel;
   final String fontWeightLabel;
   final List<String> fontWeightValueLabels;
@@ -176,6 +209,14 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
   late String _themeId = widget.themeId;
   late double _fontSize = widget.fontSize;
   late int _fontWeight = normalizeReaderFontWeight(widget.fontWeight);
+  late String _fontFamilyValueLabel = widget.fontFamilyValueLabel;
+  late String _fontFamilyHint = widget.fontFamilyHint;
+  late String? _fontFamily = widget.fontFamily;
+  late List<String> _fontFamilyFallback = widget.fontFamilyFallback;
+  late bool _fontWeightSupportsVariable = widget.fontWeightSupportsVariable;
+  late int? _fontWeightVariableMin = widget.fontWeightVariableMin;
+  late int? _fontWeightVariableMax = widget.fontWeightVariableMax;
+  late String _fontWeightHint = widget.fontWeightHint;
   late double _lineHeight = widget.lineHeight;
   late double _letterSpacing = widget.letterSpacing;
   late ReaderTextAlignment _textAlignment = widget.textAlignment;
@@ -243,7 +284,30 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
     );
   }
 
+  Future<void> _changeFontFamily() async {
+    final choice = await widget.onFontFamilyTap();
+    if (!mounted || choice == null) return;
+    setState(() {
+      _fontFamilyValueLabel = choice.valueLabel;
+      _fontFamilyHint = choice.hint;
+      _fontFamily = choice.family;
+      _fontFamilyFallback = choice.fallbackFamilies;
+      _fontWeightSupportsVariable = choice.supportsVariableWeight;
+      _fontWeightVariableMin = choice.variableWeightMin;
+      _fontWeightVariableMax = choice.variableWeightMax;
+      _fontWeightHint = choice.fontWeightHint;
+    });
+  }
+
   List<Widget> _textTabChildren(BuildContext context) => [
+    ReaderFontFamilyControl(
+      label: widget.fontFamilyLabel,
+      valueLabel: _fontFamilyValueLabel,
+      hint: _fontFamilyHint,
+      fontFamily: _fontFamily,
+      fontFamilyFallback: _fontFamilyFallback,
+      onTap: () => unawaited(_changeFontFamily()),
+    ),
     ReaderSettingSlider(
       label: widget.fontSizeLabel,
       value: _fontSize,
@@ -257,13 +321,13 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
     ReaderFontWeightControl(
       label: widget.fontWeightLabel,
       valueLabels: widget.fontWeightValueLabels,
-      hint: widget.fontWeightHint,
+      hint: _fontWeightHint,
       previewText: widget.fontWeightPreviewText,
-      fontFamily: widget.fontFamily,
-      fontFamilyFallback: widget.fontFamilyFallback,
-      fontWeightSupportsVariable: widget.fontWeightSupportsVariable,
-      fontWeightVariableMin: widget.fontWeightVariableMin,
-      fontWeightVariableMax: widget.fontWeightVariableMax,
+      fontFamily: _fontFamily,
+      fontFamilyFallback: _fontFamilyFallback,
+      fontWeightSupportsVariable: _fontWeightSupportsVariable,
+      fontWeightVariableMin: _fontWeightVariableMin,
+      fontWeightVariableMax: _fontWeightVariableMax,
       value: _fontWeight,
       onChanged: (value) => setState(() => _fontWeight = value),
       onChangeEnd: widget.onFontWeightChanged,
@@ -1052,6 +1116,125 @@ class _ReaderThemeCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ReaderFontFamilyControl extends StatelessWidget {
+  const ReaderFontFamilyControl({
+    super.key,
+    required this.label,
+    required this.valueLabel,
+    required this.hint,
+    required this.onTap,
+    this.fontFamily,
+    this.fontFamilyFallback = const <String>[],
+  });
+
+  final String label;
+  final String valueLabel;
+  final String hint;
+  final VoidCallback onTap;
+  final String? fontFamily;
+  final List<String> fontFamilyFallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('reader-font-choice-tile'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withValues(alpha: 0.52),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colors.outlineVariant.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  child: Text(
+                    'Aa',
+                    style: TextStyle(
+                      inherit: false,
+                      fontFamily: fontFamily,
+                      fontFamilyFallback: fontFamilyFallback.isEmpty
+                          ? null
+                          : fontFamilyFallback,
+                      color: colors.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: colors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        valueLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          inherit: false,
+                          fontFamily: fontFamily,
+                          fontFamilyFallback: fontFamilyFallback.isEmpty
+                              ? null
+                              : fontFamilyFallback,
+                          color: colors.onSurface,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        hint,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
             ),
           ),
         ),

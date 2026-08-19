@@ -7,6 +7,40 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     _scrollProgress.value = progress.clamp(0.0, 1.0);
   }
 
+  Future<List<ReaderSearchDocument>> _loadSearchDocuments() async {
+    final documents = <ReaderSearchDocument>[];
+    for (var index = 0; index < _chapters.length; index++) {
+      final content = await _continuousContentFor(index);
+      final text =
+          _readableChapterText[index] ??
+          readableBookSourceChapterText(
+            content,
+            fallbackTitle: _chapters[index].title,
+          );
+      documents.add(
+        ReaderSearchDocument(
+          chapterIndex: index,
+          chapterTitle: _chapters[index].title,
+          text: text,
+        ),
+      );
+    }
+    return documents;
+  }
+
+  Future<void> _showFullTextSearch({String initialQuery = ''}) async {
+    _controlsTimer?.cancel();
+    _updateReaderState(() => _controlsVisible = false);
+    await showReaderSearchSheet(
+      context,
+      palette: _readerTheme,
+      initialQuery: initialQuery,
+      loadDocuments: _loadSearchDocuments,
+      onResultSelected: (result) =>
+          unawaited(_loadChapter(result.chapterIndex, restoreProgress: 0)),
+    );
+  }
+
   void _showControlsTemporarily() {
     _controlsTimer?.cancel();
     if (mounted) _updateReaderState(() => _controlsVisible = true);
@@ -498,6 +532,15 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
               await _deleteAnnotation(annotation);
               if (mounted) setSheetState(() {});
             },
+            onExportAnnotations: _shelfBook == null
+                ? null
+                : () {
+                    final shelfBook = _shelfBook!;
+                    Navigator.of(sheetContext).pop();
+                    unawaited(
+                      showReadingDataExportDialog(context, book: shelfBook),
+                    );
+                  },
           ),
         ),
       ),

@@ -105,7 +105,8 @@ dart run tool/example_book_source_server.dart
 
 This server is intended for protocol development and API inspection. The
 production app's source network policy rejects loopback and private-network
-targets by default, so it cannot be registered directly through the app.
+targets by default. Enable **Allow private-network sources** in Settings →
+Advanced features to register a local or LAN source.
 
 ## Development
 

@@ -99,6 +99,37 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  testWidgets('reader system font explains EPUB embedded-font priority', (
+    tester,
+  ) async {
+    final settings = (await tester.runAsync(_loadNotifier))!;
+    addTearDown(settings.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: FontSelectionSheet(
+            settings: settings,
+            domain: FontDomain.reader,
+            title: 'Reading font',
+            description: 'Choose a reading font.',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Uses the book’s embedded font when available; otherwise uses the device font.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('selecting an available font applies it and closes the sheet', (
     tester,
   ) async {

@@ -11,7 +11,10 @@ The book-source feature follows a one-way dependency flow:
    `BookSourceGateway` to the ORSP or reading-source backend.
 4. Protocol backends translate protocol-specific data. ORSP owns HTTP/cache
    behavior; the reading-source backend adapts `SourceRuntime`.
-5. `SourceRuntime` is the composition root for request, login, catalog,
+5. Shared chapter/response/cover caches live in `caching/`. SSRF and pinned
+   HTTP policy live in `networking/`. `services/` stays the application
+   facade and composition root.
+6. `SourceRuntime` is the composition root for request, login, catalog,
    reading, rule, script, interaction, cookie, and transport capabilities.
 
 ## Ownership
@@ -28,6 +31,20 @@ pending network work; disposal must not wait indefinitely for that work first.
 barrels for existing callers. Production modules import leaf files directly so
 their dependencies remain explicit.
 
+Root `source_engine/source_rule_*.dart` and `source_engine/source_script_*.dart`
+files are export shims that preserve old package URIs for tests and tools.
+Production modules must import the implementations under `rules/` and
+`scripting/`.
+
+## Architecture map
+
+- `source_engine/rules/` — CSS, XPath, JSONPath, regex, and put/script-rule
+  orchestration (`SourceRuleEngine` and selector modules).
+- `source_engine/scripting/` — script contract, QuickJS host/bootstrap/APIs,
+  and the native/web platform export (`source_script_engine_platform.dart`).
+- Remaining `source_engine/*.dart` files stay at the package root until later
+  transport/runtime splits.
+
 ## Extension points
 
 - Add protocol behavior behind a `BookSourceGateway` backend.
@@ -43,4 +60,6 @@ Focused tests cover facade routing, owned/borrowed resources, runtime ports,
 request/response handling, rule/script parity, immutable controllers, page
 ownership, and the HTTP end-to-end reading flow. The architecture guard in
 `test/book_source_architecture_test.dart` prevents production files from
-exceeding 800 lines or importing compatibility barrels internally.
+exceeding 800 lines, importing compatibility barrels or root rule/script
+shims internally, or keeping cache/network-policy files on the old
+`services/` paths.

@@ -8,13 +8,23 @@ typedef BookSourceAddressLookup =
 class BookSourceNetworkPolicy {
   const BookSourceNetworkPolicy({
     BookSourceAddressLookup? lookup,
-    this.allowPrivateNetwork = false,
+    this.allowPrivateNetwork,
     this.allowSyntheticDns = false,
   }) : _lookup = lookup ?? InternetAddress.lookup;
 
+  /// Live opt-in used when [allowPrivateNetwork] is omitted.
+  /// Default stays off so third-party source rules cannot reach the LAN.
+  static bool preferredPrivateNetwork = false;
+
   final BookSourceAddressLookup _lookup;
-  final bool allowPrivateNetwork;
+
+  /// `null` follows [preferredPrivateNetwork]; an explicit value is for tests
+  /// and callers that must pin the decision.
+  final bool? allowPrivateNetwork;
   final bool allowSyntheticDns;
+
+  bool get allowsPrivateNetwork =>
+      allowPrivateNetwork ?? preferredPrivateNetwork;
 
   Future<void> validate(Uri uri) async {
     await resolve(uri);
@@ -30,13 +40,11 @@ class BookSourceNetworkPolicy {
     final addresses = literal == null ? await _lookup(uri.host) : [literal];
     if (addresses.isEmpty ||
         addresses.any(
-          (address) =>
-              _isAlwaysBlockedAddress(address) ||
-              (!allowPrivateNetwork &&
-                  isBlockedAddress(
-                    address,
-                    allowSyntheticDns: allowSyntheticDns,
-                  )),
+          (address) => isDisallowedAddress(
+            address,
+            allowPrivateNetwork: allowsPrivateNetwork,
+            allowSyntheticDns: allowSyntheticDns,
+          ),
         )) {
       throw const BookSourceProtocolException(
         'This address is not allowed as a book source target.',
@@ -99,6 +107,17 @@ class BookSourceNetworkPolicy {
       });
     };
     return client;
+  }
+
+  static bool isDisallowedAddress(
+    InternetAddress address, {
+    bool? allowPrivateNetwork,
+    bool allowSyntheticDns = false,
+  }) {
+    if (_isAlwaysBlockedAddress(address)) return true;
+    final allowPrivate = allowPrivateNetwork ?? preferredPrivateNetwork;
+    if (allowPrivate) return false;
+    return isBlockedAddress(address, allowSyntheticDns: allowSyntheticDns);
   }
 
   static bool isBlockedAddress(

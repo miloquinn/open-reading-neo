@@ -21,6 +21,7 @@ void main() {
   late MetadataSyncAdapters adapters;
 
   setUp(() async {
+    await BookSourceRegistry.resetForTesting();
     SharedPreferences.setMockInitialValues({});
     sqfliteFfiInit();
     database = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);

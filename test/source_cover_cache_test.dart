@@ -5,8 +5,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
-import 'package:xxread/book_sources/services/source_cover_cache.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
+import 'package:xxread/book_sources/caching/source_cover_cache.dart';
+import 'package:xxread/book_sources/source_engine/source_webview_loader.dart';
 
 void main() {
   test('bounds concurrent cover requests', () async {
@@ -130,6 +131,63 @@ void main() {
     expect(bytes.take(8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   });
 
+  test(
+    'falls back to the Android platform loader when pinned image GET fails',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'source-platform-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final dio = Dio()..httpClientAdapter = _ThrowingCoverAdapter();
+      final platform = _FakePlatformImageLoader();
+      final cache = SourceCoverCache(
+        dio: dio,
+        platformLoader: platform,
+        cacheDirectory: directory,
+        networkPolicy: BookSourceNetworkPolicy(
+          lookup: (_) async => [InternetAddress('93.184.216.34')],
+        ),
+      );
+
+      final bytes = await cache.load(
+        Uri.parse('https://images.example/page.jpg'),
+        headers: const {'Referer': 'https://books.example/'},
+      );
+
+      expect(bytes.take(8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      expect(platform.requests, 1);
+      expect(platform.lastHeaders?['Referer'], 'https://books.example/');
+    },
+  );
+
+  test('platform-preferred images skip the Dart network path', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-platform-first-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final dartAdapter = _ThrowingCoverAdapter();
+    final dio = Dio()..httpClientAdapter = dartAdapter;
+    final platform = _FakePlatformImageLoader();
+    final cache = SourceCoverCache(
+      dio: dio,
+      platformLoader: platform,
+      cacheDirectory: directory,
+      networkPolicy: BookSourceNetworkPolicy(
+        lookup: (_) async => [InternetAddress('93.184.216.34')],
+      ),
+    );
+
+    final bytes = await cache.load(
+      Uri.parse('https://images.example/page.jpg'),
+      headers: const {'Referer': 'https://books.example/'},
+      preferPlatform: true,
+    );
+
+    expect(bytes.take(8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(dartAdapter.requests, 0);
+    expect(platform.requests, 1);
+  });
+
   test('rejects HTML even when the server labels it as an image', () async {
     final directory = await Directory.systemTemp.createTemp('source-html-');
     addTearDown(() => directory.delete(recursive: true));
@@ -207,6 +265,69 @@ void main() {
       expect(calls, 2);
     },
   );
+}
+
+class _FakePlatformImageLoader implements SourceWebViewLoaderPort {
+  int requests = 0;
+  Map<String, String>? lastHeaders;
+
+  @override
+  Future<SourcePlatformBytesResult> loadBytes({
+    required Uri url,
+    required Map<String, String> headers,
+    required int maxBytes,
+  }) async {
+    requests++;
+    lastHeaders = headers;
+    return SourcePlatformBytesResult(
+      statusCode: HttpStatus.ok,
+      bytes: Uint8List.fromList([
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a,
+        0,
+        0,
+        0,
+        0,
+      ]),
+    );
+  }
+
+  @override
+  Future<SourceWebViewResult> load({
+    required Uri url,
+    required String method,
+    required Map<String, String> headers,
+    String? body,
+    String? webJs,
+    String? html,
+  }) => throw UnimplementedError();
+}
+
+class _ThrowingCoverAdapter implements HttpClientAdapter {
+  int requests = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests++;
+    throw DioException.connectionError(
+      requestOptions: options,
+      reason: 'pinned image route unavailable',
+      error: const SocketException('unreachable'),
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 class _ChunkedCoverAdapter implements HttpClientAdapter {

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:xxread/core/reader/paged_image_reader_settings.dart';
+import 'package:xxread/pages/reader/comic/comic_debug_log.dart';
 import 'package:xxread/core/reader/reader_keep_screen_on.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/core/reader/reader_tap_zones.dart';
@@ -383,6 +384,7 @@ class _PagedImageReaderState extends State<PagedImageReader> {
                     itemCount: widget.pageCount,
                     onPageChanged: _onPageChanged,
                     itemBuilder: (context, index) => _ZoomablePageView(
+                      pageIndex: index,
                       bytes: widget.loadPage(index),
                       onZoomChanged: _setZoomed,
                       lightBackground: _background.isLight,
@@ -701,11 +703,13 @@ class _SheetChoiceChip extends StatelessWidget {
 /// 单页视图：加载中转圈，加载后 InteractiveViewer 支持双击/双指缩放。
 class _ZoomablePageView extends StatefulWidget {
   const _ZoomablePageView({
+    required this.pageIndex,
     required this.bytes,
     required this.onZoomChanged,
     required this.lightBackground,
   });
 
+  final int pageIndex;
   final Future<Uint8List> bytes;
   final ValueChanged<bool> onZoomChanged;
   final bool lightBackground;
@@ -760,6 +764,12 @@ class _ZoomablePageViewState extends State<_ZoomablePageView> {
       future: widget.bytes,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
+          comicDebugLog(
+            'page-bytes',
+            'failed page=${widget.pageIndex + 1}',
+            error: snapshot.error,
+            stackTrace: snapshot.stackTrace,
+          );
           return Center(
             child: Icon(Icons.broken_image_outlined, color: placeholderColor),
           );
@@ -781,8 +791,18 @@ class _ZoomablePageViewState extends State<_ZoomablePageView> {
                 bytes,
                 fit: BoxFit.contain,
                 gaplessPlayback: true,
-                errorBuilder: (context, error, stackTrace) =>
-                    Icon(Icons.broken_image_outlined, color: placeholderColor),
+                errorBuilder: (context, error, stackTrace) {
+                  comicDebugLog(
+                    'image-decode',
+                    'failed page=${widget.pageIndex + 1} bytes=${bytes.length}',
+                    error: error,
+                    stackTrace: stackTrace,
+                  );
+                  return Icon(
+                    Icons.broken_image_outlined,
+                    color: placeholderColor,
+                  );
+                },
               ),
             ),
           ),

@@ -263,6 +263,19 @@ extension _LibraryPageBookDetails on _LibraryPageState {
                             },
                           ),
                       ],
+                      _buildOptionItem(
+                        context: context,
+                        icon: Icons.edit_note_rounded,
+                        iconColor: localScheme.primary,
+                        title: context.l10n.readingDataExportAction,
+                        trailing: context.l10n.readingDataExportSubtitle,
+                        onTap: () {
+                          Navigator.pop(context);
+                          unawaited(
+                            showReadingDataExportDialog(context, book: book),
+                          );
+                        },
+                      ),
                       if (!book.isOnline && book.filePath.isNotEmpty)
                         _buildOptionItem(
                           context: context,

@@ -234,12 +234,26 @@ class _DetectedSourceSummary extends StatelessWidget {
           if (analysis.kind == BookSourceImportKind.orsp)
             Text(analysis.sources.single.name)
           else if (preview != null)
-            Text(
-              context.l10n.bookSourcesDedupeImportSummary(
-                preview.sources.length,
-                preview.duplicates,
-                preview.errors.length,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.bookSourcesDedupeImportSummary(
+                    preview.sources.length,
+                    preview.duplicates,
+                    preview.errors.length,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  context.l10n.bookSourcesImportTypeSummary(
+                    preview.runnableTextSources,
+                    preview.runnableImageSources,
+                    preview.unsupported,
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
           if (preview != null && preview.dedupeResult.groups.isNotEmpty) ...[
             const SizedBox(height: 8),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/utils/page_transitions.dart';
 
@@ -28,6 +29,11 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    BookSourceNetworkPolicy.preferredPrivateNetwork = false;
+  });
+
+  tearDown(() {
+    BookSourceNetworkPolicy.preferredPrivateNetwork = false;
   });
 
   test('library defaults to a two-column cover grid', () async {
@@ -46,6 +52,8 @@ void main() {
       LibraryBookOpenAnimationPace.fast,
     );
     expect(notifier.additionalSourceProtocolsEnabled, isFalse);
+    expect(notifier.privateBookSourceNetworkEnabled, isFalse);
+    expect(BookSourceNetworkPolicy.preferredPrivateNetwork, isFalse);
   });
 
   test('additional source protocols stay opt-in and persist', () async {
@@ -61,6 +69,24 @@ void main() {
     final restored = await _loadNotifier();
     addTearDown(restored.dispose);
     expect(restored.additionalSourceProtocolsEnabled, isTrue);
+  });
+
+  test('private book-source network stays opt-in and persists', () async {
+    final notifier = await _loadNotifier();
+    addTearDown(notifier.dispose);
+
+    expect(notifier.privateBookSourceNetworkEnabled, isFalse);
+    expect(BookSourceNetworkPolicy.preferredPrivateNetwork, isFalse);
+    await notifier.setPrivateBookSourceNetworkEnabled(true);
+
+    expect(BookSourceNetworkPolicy.preferredPrivateNetwork, isTrue);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(privateBookSourceNetworkPreferenceKey), isTrue);
+
+    final restored = await _loadNotifier();
+    addTearDown(restored.dispose);
+    expect(restored.privateBookSourceNetworkEnabled, isTrue);
+    expect(BookSourceNetworkPolicy.preferredPrivateNetwork, isTrue);
   });
 
   test('library layout and cover columns restore and persist', () async {

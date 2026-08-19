@@ -18,6 +18,7 @@ void main() {
       bool? tapAnimation;
       bool? tabletTwoPage;
       bool? txtChapterTitlePage;
+      var fontPickerOpened = false;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -42,6 +43,22 @@ void main() {
             showTabletTwoPageToggle: true,
             tabletTwoPageTitle: 'Tablet two-page layout',
             tabletTwoPageHint: 'Show two pages in landscape',
+            fontFamilyLabel: 'Font',
+            fontFamilyValueLabel: 'Book and system font',
+            fontFamilyHint: 'Uses the book font when available',
+            onFontFamilyTap: () async {
+              fontPickerOpened = true;
+              return const ReaderFontChoice(
+                valueLabel: 'Reader Serif',
+                hint: 'Overrides the book font',
+                family: 'ReaderSerif',
+                fallbackFamilies: <String>[],
+                supportsVariableWeight: true,
+                fontWeightHint: 'True variable range 200–800',
+                variableWeightMin: 200,
+                variableWeightMax: 800,
+              );
+            },
             fontSizeLabel: 'Font size',
             fontWeightLabel: 'Font weight',
             fontWeightValueLabels: const <String>[
@@ -107,6 +124,16 @@ void main() {
 
       await tester.tap(find.text('Text tab'));
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('reader-font-choice-tile')),
+        findsOneWidget,
+      );
+      expect(find.text('Book and system font'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('reader-font-choice-tile')));
+      await tester.pumpAndSettle();
+      expect(fontPickerOpened, isTrue);
+      expect(find.text('Reader Serif'), findsOneWidget);
+      expect(find.text('Overrides the book font'), findsOneWidget);
       final fontWeightFinder = find.byKey(
         const ValueKey('reader-font-weight-slider'),
       );
@@ -198,6 +225,8 @@ void main() {
       expect(changedLetterSpacing, 0.8);
       expect(changedAlignment, ReaderTextAlignment.justified);
 
+      await tester.ensureVisible(find.text('Layout tab'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Layout tab'));
       await tester.pumpAndSettle();
       final titlePageSwitch = tester.widget<SwitchListTile>(

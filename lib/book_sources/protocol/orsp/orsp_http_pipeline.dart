@@ -4,8 +4,8 @@ import 'package:dio/dio.dart';
 
 import '../../models/registered_book_source.dart';
 import '../../services/book_download_cancellation.dart';
-import '../../services/book_source_network_policy.dart';
-import '../../services/book_source_response_cache.dart';
+import '../../caching/book_source_response_cache.dart';
+import '../../networking/book_source_network_policy.dart';
 import '../book_source_protocol.dart';
 
 class OrspHttpPipeline {

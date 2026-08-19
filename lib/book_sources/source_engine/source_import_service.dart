@@ -9,7 +9,7 @@ import '../dedupe/book_source_dedupe_engine.dart';
 import '../dedupe/book_source_dedupe_models.dart';
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
-import '../services/book_source_network_policy.dart';
+import '../networking/book_source_network_policy.dart';
 import 'source_config.dart';
 
 class SourceImportPreview {
@@ -70,6 +70,18 @@ class SourceImportPreview {
   int get supported => _count(SourceCompatibilityLevel.supported);
   int get partial => _count(SourceCompatibilityLevel.partial);
   int get unsupported => _count(SourceCompatibilityLevel.unsupported);
+  int get imageSources =>
+      _selectedEntries.where((entry) => entry.$2.isImageSource).length;
+  int get textSources =>
+      _selectedEntries.where((entry) => !entry.$2.isImageSource).length;
+  int get runnableImageSources => _selectedEntries.where((entry) {
+    return entry.$2.isImageSource &&
+        _reports[entry.$1]?.level != SourceCompatibilityLevel.unsupported;
+  }).length;
+  int get runnableTextSources => _selectedEntries.where((entry) {
+    return !entry.$2.isImageSource &&
+        _reports[entry.$1]?.level != SourceCompatibilityLevel.unsupported;
+  }).length;
   int get skipped => errors.length + duplicates;
 
   int _count(SourceCompatibilityLevel level) =>

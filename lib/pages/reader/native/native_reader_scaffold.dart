@@ -432,6 +432,8 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                   currentAnchorKey: currentBookmarkAnchorKey,
                                 ),
                               ),
+                              onSearch: () => unawaited(_showFullTextSearch()),
+                              searchTooltip: '全文搜索',
                               onReadAloud: isReaderAloudPlatformSupported
                                   ? () => unawaited(_showReaderAloudPanel())
                                   : null,
@@ -441,10 +443,6 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                 _showAskAiPanel(chapter, bookmarkPage),
                               ),
                               askAiTooltip: context.l10n.readerAskAi,
-                              onReplaceRules: () =>
-                                  unawaited(_showReplaceRules()),
-                              replaceRulesTooltip:
-                                  context.l10n.replaceRulesTitle,
                               onSettings: _showReadingSettings,
                               backTooltip: MaterialLocalizations.of(
                                 context,

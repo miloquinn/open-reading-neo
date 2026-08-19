@@ -12,7 +12,10 @@ import 'package:xxread/pages/book_sources/book_source_management_page.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() async {
+    await BookSourceRegistry.resetForTesting();
+    SharedPreferences.setMockInitialValues({});
+  });
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   void unmountPage(WidgetTester tester) {

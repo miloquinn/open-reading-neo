@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gbk_codec/gbk_codec.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
+import 'package:xxread/book_sources/source_engine/source_webview_loader.dart';
 
 void main() {
   group('SourceHttpTransport', () {
@@ -64,6 +66,64 @@ void main() {
       },
     );
 
+    test(
+      'falls back to the system client when pinned GET gets no response',
+      () async {
+        final pinned = Dio()..httpClientAdapter = _ThrowingAdapter();
+        final system = Dio()
+          ..httpClientAdapter = _SequenceAdapter([200], body: 'reachable');
+        final transport = SourceHttpTransport(
+          dio: pinned,
+          systemDio: system,
+          networkPolicy: BookSourceNetworkPolicy(
+            lookup: (_) async => [InternetAddress('93.184.216.34')],
+          ),
+        );
+        addTearDown(transport.close);
+
+        final response = await transport.send(
+          SourceRequestTemplate.parse(
+            'https://books.test/channel',
+            baseUri: Uri.parse('https://books.test'),
+          ),
+        );
+
+        expect(response.body, 'reachable');
+        expect((pinned.httpClientAdapter as _ThrowingAdapter).requests, 1);
+        expect((system.httpClientAdapter as _SequenceAdapter).requests, 1);
+      },
+    );
+
+    test(
+      'falls back to the Android browser bridge after both Dart GET clients fail',
+      () async {
+        final pinned = Dio()..httpClientAdapter = _ThrowingAdapter();
+        final system = Dio()..httpClientAdapter = _ThrowingAdapter();
+        final browser = _FakeWebViewLoader();
+        final transport = SourceHttpTransport(
+          dio: pinned,
+          systemDio: system,
+          webViewLoader: browser,
+          networkPolicy: BookSourceNetworkPolicy(
+            lookup: (_) async => [InternetAddress('93.184.216.34')],
+          ),
+        );
+        addTearDown(transport.close);
+
+        final response = await transport.send(
+          SourceRequestTemplate.parse(
+            'https://books.test/channel',
+            baseUri: Uri.parse('https://books.test'),
+          ),
+        );
+
+        expect(response.body, contains('browser-result'));
+        expect((pinned.httpClientAdapter as _ThrowingAdapter).requests, 1);
+        expect((system.httpClientAdapter as _ThrowingAdapter).requests, 1);
+        expect(browser.requests, 1);
+      },
+    );
+
     test('does not replay POST after HTTP 400', () async {
       final pinned = Dio()..httpClientAdapter = _SequenceAdapter([400]);
       final system = Dio()
@@ -90,41 +150,38 @@ void main() {
       expect((system.httpClientAdapter as _SequenceAdapter).requests, 0);
     });
 
-    test(
-      'a redirect loop error names each hop that led to it',
-      () async {
-        final adapter = _SelfRedirectAdapter();
-        final dio = Dio()..httpClientAdapter = adapter;
-        final transport = SourceHttpTransport(
-          dio: dio,
-          networkPolicy: BookSourceNetworkPolicy(
-            lookup: (_) async => [InternetAddress('93.184.216.34')],
-          ),
-        );
-        addTearDown(transport.close);
+    test('a redirect loop error names each hop that led to it', () async {
+      final adapter = _SelfRedirectAdapter();
+      final dio = Dio()..httpClientAdapter = adapter;
+      final transport = SourceHttpTransport(
+        dio: dio,
+        networkPolicy: BookSourceNetworkPolicy(
+          lookup: (_) async => [InternetAddress('93.184.216.34')],
+        ),
+      );
+      addTearDown(transport.close);
 
-        await expectLater(
-          transport.send(
-            SourceRequestTemplate.parse(
-              'https://books.test/login,{"method":"POST","body":"a=1"}',
-              baseUri: Uri.parse('https://books.test'),
+      await expectLater(
+        transport.send(
+          SourceRequestTemplate.parse(
+            'https://books.test/login,{"method":"POST","body":"a=1"}',
+            baseUri: Uri.parse('https://books.test'),
+          ),
+        ),
+        throwsA(
+          isA<BookSourceProtocolException>().having(
+            (error) => error.message,
+            'message',
+            allOf(
+              contains('entered a redirect loop'),
+              contains('POST https://books.test/login -> 302'),
+              contains('GET https://books.test/login -> 302'),
+              contains('anti-bot/challenge'),
             ),
           ),
-          throwsA(
-            isA<BookSourceProtocolException>().having(
-              (error) => error.message,
-              'message',
-              allOf(
-                contains('entered a redirect loop'),
-                contains('POST https://books.test/login -> 302'),
-                contains('GET https://books.test/login -> 302'),
-                contains('anti-bot/challenge'),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test(
       'a loop between two different URLs is not mislabeled as a challenge',
@@ -523,6 +580,58 @@ void main() {
       release.complete();
     });
   });
+}
+
+class _FakeWebViewLoader implements SourceWebViewLoaderPort {
+  int requests = 0;
+
+  @override
+  Future<SourcePlatformBytesResult> loadBytes({
+    required Uri url,
+    required Map<String, String> headers,
+    required int maxBytes,
+  }) async => SourcePlatformBytesResult(
+    statusCode: HttpStatus.ok,
+    bytes: Uint8List.fromList([0x89, 0x50, 0x4e, 0x47]),
+  );
+
+  @override
+  Future<SourceWebViewResult> load({
+    required Uri url,
+    required String method,
+    required Map<String, String> headers,
+    String? body,
+    String? webJs,
+    String? html,
+  }) async {
+    requests++;
+    return SourceWebViewResult(
+      body: '<html><body>browser-result</body></html>',
+      finalUri: url,
+      cookieHeader: 'sid=browser',
+    );
+  }
+}
+
+class _ThrowingAdapter implements HttpClientAdapter {
+  int requests = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests++;
+    throw DioException.connectionError(
+      requestOptions: options,
+      reason: 'pinned route unavailable',
+      error: const SocketException('unreachable'),
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 class _SequenceAdapter implements HttpClientAdapter {

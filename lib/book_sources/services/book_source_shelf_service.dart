@@ -17,7 +17,7 @@ import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_download_cancellation.dart';
 import 'book_source_client.dart';
-import 'source_cover_cache.dart';
+import '../caching/source_cover_cache.dart';
 
 class BookSourceShelfService {
   static const int _downloadBatchSize = 3;

@@ -1,12 +1,14 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import '../services/book_download_cancellation.dart';
 import 'source_config.dart';
 import 'source_explore.dart';
 import 'source_request_template.dart';
-import 'source_rule_engine.dart';
+import 'rules/source_rule_engine.dart';
 import 'source_runtime_login.dart';
 import 'source_runtime_requests.dart';
 import 'source_runtime_rules.dart';
@@ -42,47 +44,100 @@ class SourceRuntimeCatalog {
     BookDownloadCancellation? cancellation,
   }) async {
     final source = sourceFromRegistered(registered);
-    final response = await _requests.request(
+    final stopwatch = Stopwatch()..start();
+    _comicSearchLog(
       source,
-      source.searchUrl,
-      variables: {'key': query.trim(), 'page': '$page'},
-      cancellation: cancellation,
+      'start source=${source.name} declaredType=${source.type} '
+      'effectiveBookType=${source.effectiveBookType} page=$page '
+      'queryChars=${query.trim().length} searchRuleChars=${source.searchUrl.length} '
+      'searchRuleScript=${source.searchUrl.contains('@js:') || source.searchUrl.contains('<js>')}',
     );
-    final document = _requests.document(
-      source,
-      response,
-      variables: {'key': query, 'page': '$page'},
-    );
-    final rule = source.rule('ruleSearch');
-    final contexts = await _rules.list(
-      document,
-      null,
-      _rules.requiredRule(rule, 'bookList'),
-    );
-    if (page == 1 && contexts.isEmpty) {
-      throw const BookSourceProtocolException(
-        'The channel page opened, but its bookList rule matched no items. '
-        'The source rule may be outdated.',
+    try {
+      final response = await _requests.request(
+        source,
+        source.searchUrl,
+        variables: {'key': query.trim(), 'page': '$page'},
+        cancellation: cancellation,
       );
-    }
-    final books = <BookSourceBook>[];
-    for (final context in contexts.take(_maxSearchItems)) {
-      final book = await _bookFromRules(source, document, context, rule);
-      if (book != null) books.add(book);
-    }
-    if (page == 1 && books.isEmpty) {
-      throw const BookSourceProtocolException(
-        'The channel list matched elements, but none contained both a book '
-        'name and URL. The source rule may be outdated.',
+      _comicSearchLog(
+        source,
+        'response status=${response.statusCode} final=${_debugUri(response.finalUri)} '
+        'bodyChars=${response.body.length} elapsedMs=${stopwatch.elapsedMilliseconds}',
       );
+      final document = _requests.document(
+        source,
+        response,
+        variables: {'key': query, 'page': '$page'},
+      );
+      final rule = source.rule('ruleSearch');
+      final bookListRule = _rules.requiredRule(rule, 'bookList');
+      _comicSearchLog(
+        source,
+        'rules bookList=${_debugRule(bookListRule)} '
+        'name=${_debugRule(_rules.optionalRule(rule, 'name'))} '
+        'bookUrl=${_debugRule(_rules.optionalRule(rule, 'bookUrl'))}',
+      );
+      final contexts = await _rules.list(document, null, bookListRule);
+      _comicSearchLog(source, 'book-list contexts=${contexts.length}');
+      if (page == 1 && contexts.isEmpty) {
+        throw const BookSourceProtocolException(
+          'The channel page opened, but its bookList rule matched no items. '
+          'The source rule may be outdated.',
+        );
+      }
+      final books = <BookSourceBook>[];
+      var index = 0;
+      for (final context in contexts.take(_maxSearchItems)) {
+        var title = '';
+        var url = '';
+        final book = await _bookFromRules(
+          source,
+          document,
+          context,
+          rule,
+          debugResult: (parsedTitle, parsedUrl) {
+            title = parsedTitle;
+            url = parsedUrl;
+          },
+        );
+        if (index < 10) {
+          _comicSearchLog(
+            source,
+            'item index=$index titleChars=${title.length} '
+            'title=${_debugText(title)} url=${_debugTarget(url)} '
+            'accepted=${book != null}',
+          );
+        }
+        if (book != null) books.add(book);
+        index++;
+      }
+      if (page == 1 && books.isEmpty) {
+        throw const BookSourceProtocolException(
+          'The channel list matched elements, but none contained both a book '
+          'name and URL. The source rule may be outdated.',
+        );
+      }
+      await _sessions.flush(source);
+      _comicSearchLog(
+        source,
+        'success contexts=${contexts.length} accepted=${books.length} '
+        'returned=${books.take(pageSize).length} '
+        'elapsedMs=${stopwatch.elapsedMilliseconds}',
+      );
+      return BookSourceSearchPage(
+        items: books.take(pageSize).toList(growable: false),
+        page: page,
+        pageSize: pageSize,
+        hasMore: books.length > pageSize,
+      );
+    } catch (error, stackTrace) {
+      _comicSearchLog(
+        source,
+        'failed elapsedMs=${stopwatch.elapsedMilliseconds} error=${_debugText('$error')}',
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
-    await _sessions.flush(source);
-    return BookSourceSearchPage(
-      items: books.take(pageSize).toList(growable: false),
-      page: page,
-      pageSize: pageSize,
-      hasMore: books.length > pageSize,
-    );
   }
 
   Future<List<BookSourceCategory>> getExploreCategories(
@@ -190,7 +245,21 @@ class SourceRuntimeCatalog {
     final context = init.isEmpty
         ? null
         : (await _rules.list(contextualDocument, null, init)).firstOrNull;
-    final title = await _rules.value(contextualDocument, context, rule, 'name');
+    // Legado only overwrites the book name when the info-page rule actually
+    // produced one (BookInfo.kt: `if (it.isNotEmpty() && ...) book.name =
+    // it`); a source with no `ruleBookInfo.name` rule — common when the
+    // detail page repeats nothing new and the search-time title already
+    // carried over via bookContext — otherwise just keeps the existing
+    // name instead of failing the whole detail fetch.
+    final infoTitle = await _rules.value(
+      contextualDocument,
+      context,
+      rule,
+      'name',
+    );
+    final title = infoTitle.isNotEmpty
+        ? infoTitle
+        : '${bookContext['name'] ?? ''}';
     if (title.isEmpty) {
       throw const BookSourceProtocolException(
         'Compatible source did not return a book title.',
@@ -251,8 +320,9 @@ class SourceRuntimeCatalog {
     ReadingSourceConfig source,
     SourceRuleDocument document,
     Object? context,
-    Map<String, dynamic> rule,
-  ) async {
+    Map<String, dynamic> rule, {
+    void Function(String title, String url)? debugResult,
+  }) async {
     final bookContext = _state.bookContext(
       source,
       '',
@@ -265,6 +335,7 @@ class SourceRuntimeCatalog {
     );
     final title = await _rules.value(contextualDocument, context, rule, 'name');
     final url = await _rules.url(contextualDocument, context, rule, 'bookUrl');
+    debugResult?.call(title, url);
     if (title.isEmpty || url.isEmpty) return null;
     seedBookMetadata(bookContext, source: source, bookId: url, name: title);
     final cover = await _remoteAssetValue(
@@ -450,13 +521,57 @@ class SourceRuntimeCatalog {
   }
 }
 
-int bookType(ReadingSourceConfig source) => switch (source.type) {
-  1 => 32,
-  2 => 64,
-  3 => 136,
-  4 => 4,
-  _ => 8,
-};
+int bookType(ReadingSourceConfig source) => source.effectiveBookType;
+
+void _comicSearchLog(
+  ReadingSourceConfig source,
+  String message, {
+  StackTrace? stackTrace,
+}) {
+  if (!kDebugMode || !source.isImageSource) return;
+  debugPrint(
+    '[COMIC-TRACE] [search] ${message.replaceAll(RegExp(r'[\r\n\t]+'), ' ')}',
+  );
+  if (stackTrace != null) {
+    debugPrintStack(
+      label: '[COMIC-TRACE] [search] stack',
+      stackTrace: stackTrace,
+      maxFrames: 12,
+    );
+  }
+}
+
+String _debugUri(Uri uri) {
+  final keys = uri.queryParametersAll.keys.toList()..sort();
+  return uri
+      .replace(
+        userInfo: uri.userInfo.isEmpty ? null : '<redacted>',
+        query: keys.isEmpty
+            ? null
+            : keys.map((key) => '$key=<redacted>').join('&'),
+        fragment: uri.fragment.isEmpty ? null : '<redacted>',
+      )
+      .toString();
+}
+
+String _debugTarget(String value) {
+  if (value.trim().isEmpty) return '<empty>';
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme) return '<relative:${value.length}chars>';
+  return _debugUri(uri);
+}
+
+String _debugRule(String value) {
+  if (value.isEmpty) return '<empty>';
+  final oneLine = value.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
+  return oneLine.length <= 160 ? oneLine : '${oneLine.substring(0, 160)}…';
+}
+
+String _debugText(String value) {
+  if (value.isEmpty) return '<empty>';
+  final oneLine = value.replaceAll(RegExp(r'[\r\n\t]+'), ' ').trim();
+  return oneLine.length <= 80 ? oneLine : '${oneLine.substring(0, 80)}…';
+}
 
 Map<String, Object?> runtimeRuleStateFor(
   SourceRuntimeState stateStore,

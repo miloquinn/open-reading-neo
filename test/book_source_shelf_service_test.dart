@@ -10,7 +10,7 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
-import 'package:xxread/book_sources/services/source_cover_cache.dart';
+import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_dao.dart';
 

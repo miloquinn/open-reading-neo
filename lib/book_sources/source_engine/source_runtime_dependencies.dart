@@ -1,7 +1,7 @@
 import 'source_debug.dart';
 import 'source_request_template.dart';
 import 'source_response.dart';
-import 'source_script_engine_platform.dart';
+import 'scripting/source_script_engine_platform.dart';
 
 class SourceRuntimeTrace {
   SourceRuntimeTrace([this.recorder]);

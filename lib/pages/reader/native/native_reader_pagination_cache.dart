@@ -51,17 +51,6 @@ extension _NativeReaderPersistentPaginationCache on _NativeReaderPageState {
     }
   }
 
-  Future<void> _clearPersistedPaginationCache() async {
-    _persistedPaginationPayloads.clear();
-    final bookId = widget.book.id;
-    if (bookId == null) return;
-    try {
-      await _paginationCacheWriteQueue;
-      await _paginationCacheDao.deleteForBook(bookId);
-    } catch (error) {
-      debugPrint('clear pagination cache failed: $error');
-    }
-  }
 }
 
 Uint8List _encodeNativePagination(List<_ReaderPageData> pages) {

@@ -4,9 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 
-import 'package:xxread/book_sources/services/book_source_chapter_cache.dart';
-import 'package:xxread/book_sources/services/book_source_response_cache.dart';
-import 'package:xxread/book_sources/services/source_cover_cache.dart';
+import 'package:xxread/book_sources/caching/book_source_chapter_cache.dart';
+import 'package:xxread/book_sources/caching/book_source_response_cache.dart';
+import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/services/account/account_avatar_cache.dart';
 import 'package:xxread/services/core/cache_management_service.dart';
 

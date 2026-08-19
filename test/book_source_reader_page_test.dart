@@ -12,7 +12,7 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
-import 'package:xxread/book_sources/services/source_cover_cache.dart';
+import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/core/reader/reader_page_turn_geometry.dart';
 import 'package:xxread/core/reader/reader_margin_settings.dart';
 import 'package:xxread/core/reader/reader_settings.dart';

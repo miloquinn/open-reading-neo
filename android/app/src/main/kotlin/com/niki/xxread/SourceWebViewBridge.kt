@@ -13,6 +13,9 @@ import android.webkit.WebViewClient
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONTokener
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SourceWebViewBridge(
@@ -29,7 +32,7 @@ class SourceWebViewBridge(
 
     init {
         channel.setMethodCallHandler { call, result ->
-            if (call.method != "load") {
+            if (call.method != "load" && call.method != "loadBytes") {
                 result.notImplemented()
                 return@setMethodCallHandler
             }
@@ -42,13 +45,69 @@ class SourceWebViewBridge(
             val headers = (call.argument<Map<*, *>>("headers") ?: emptyMap<Any, Any>())
                 .entries
                 .associate { "${it.key}" to "${it.value}" }
+            val timeoutMs = (call.argument<Number>("timeoutMs")?.toLong() ?: 15_000L)
+                .coerceIn(2_000L, 30_000L)
+            if (call.method == "loadBytes") {
+                val maxBytes = (call.argument<Number>("maxBytes")?.toInt() ?: 8 * 1024 * 1024)
+                    .coerceIn(1, 24 * 1024 * 1024)
+                loadBytes(url, headers, timeoutMs.toInt(), maxBytes, result)
+                return@setMethodCallHandler
+            }
             val body = call.argument<String>("body") ?: ""
             val webJs = call.argument<String>("webJs")
             val html = call.argument<String>("html")
-            val timeoutMs = (call.argument<Number>("timeoutMs")?.toLong() ?: 15_000L)
-                .coerceIn(2_000L, 30_000L)
             load(url, method, headers, body, webJs, html, timeoutMs, result)
         }
+    }
+
+    private fun loadBytes(
+        url: String,
+        headers: Map<String, String>,
+        timeoutMs: Int,
+        maxBytes: Int,
+        result: MethodChannel.Result,
+    ) {
+        Thread {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = false
+                    connectTimeout = timeoutMs
+                    readTimeout = timeoutMs
+                    requestMethod = "GET"
+                    headers.forEach { (name, value) -> setRequestProperty(name, value) }
+                }
+                val status = connection.responseCode
+                val location = connection.getHeaderField("Location")
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                val output = ByteArrayOutputStream()
+                if (stream != null) {
+                    stream.use { input ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            if (output.size() + count > maxBytes) {
+                                throw IllegalStateException("Response exceeds $maxBytes bytes.")
+                            }
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                }
+                val payload = mapOf(
+                    "statusCode" to status,
+                    "bytes" to output.toByteArray(),
+                    "location" to location,
+                )
+                handler.post { result.success(payload) }
+            } catch (error: Exception) {
+                handler.post {
+                    result.error("byte_load_failed", error.message ?: "Platform byte request failed.", null)
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }.start()
     }
 
     @SuppressLint("SetJavaScriptEnabled")

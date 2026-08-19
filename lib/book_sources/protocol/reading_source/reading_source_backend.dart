@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/core/app_settings_service.dart';
 import '../../models/registered_book_source.dart';
 import '../../services/book_download_cancellation.dart';
-import '../../services/book_source_chapter_cache.dart';
+import '../../caching/book_source_chapter_cache.dart';
 import '../../source_engine/source_login_ui.dart';
 import '../../source_engine/source_runtime.dart';
 import '../book_source_protocol.dart';

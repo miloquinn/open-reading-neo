@@ -124,7 +124,7 @@ zip/rar → 解压到临时/托管目录
 
 ### 3.7 CBZ / CBT / CBR / CB7（漫画）
 
-- CBZ：**已接线**（2026-07-26）。`ComicReaderPage`（`pages/reader/comic/comic_reader_page.dart`）+ `comic_book_parser.dart`：isolate 解 ZIP 目录建页索引（数字感知排序、过滤 __MACOSX/隐藏文件）、按需解压单页、LRU 页缓存与相邻页预载、双击/双指缩放（缩放中锁翻页）、进度写回 `currentPage`。不走文本行盒。
+- CBZ：**已接线**（2026-07-26）。本地入口仍是 `ComicReaderPage`，在线入口仍是 `OnlineComicReaderPage`；两者都进入同一条 `ImageReaderHost` 会话（章节/页码/目录/重试），页渲染继续走 `PagedImageReader`。`comic_book_parser.dart` 在 isolate 内解 ZIP 目录建页索引（数字感知排序、过滤 __MACOSX/隐藏文件）、按需解压单页、LRU 页缓存与相邻页预载。不走文本行盒。
 - **共享控制层**（2026-07-26）：`image/paged_image_reader.dart` 为漫画与 PDF 提供统一控制层——共享 3×3 点击区域（`reader_tap_zones`，RTL 下镜像列）、Android 音量键翻页与屏幕常亮、上/下一页按钮、进度滑条、跳页输入；`paged_image_reader_settings.dart` 持久化按书阅读方向（日漫 RTL）与全局页面背景色（黑/灰/白）。
 - **容器嗅探**（2026-07-26）：所有漫画格式打开与导入时按文件头识别真实容器（ZIP 前缀魔数 / `Rar!` / 7z 魔数 / offset 257 的 `ustar`），扩展名只作无魔数时的兜底。市面上大量 CBR/CB7 实为 ZIP 改名，识别后直接走 CBZ 同款管线。  
 - CBT：**已接线**。TAR 容器由 `archive` 的 `TarDecoder` 解包，页索引/解压/阅读与 CBZ 完全共用；旧式 V7 TAR 无 ustar 魔数时按扩展名兜底。  

@@ -7,9 +7,9 @@ import '../protocol/orsp/orsp_book_source_backend.dart';
 import '../protocol/orsp/orsp_http_pipeline.dart';
 import '../protocol/reading_source/reading_source_backend.dart';
 import '../source_engine/source_runtime.dart';
-import 'book_source_chapter_cache.dart';
-import 'book_source_network_policy.dart';
-import 'book_source_response_cache.dart';
+import '../caching/book_source_chapter_cache.dart';
+import '../caching/book_source_response_cache.dart';
+import '../networking/book_source_network_policy.dart';
 
 class BookSourceClientResources {
   BookSourceClientResources._(

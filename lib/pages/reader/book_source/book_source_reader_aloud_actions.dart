@@ -164,6 +164,48 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
     );
   }
 
+  Future<ReaderFontChoice?> _showReaderFontPicker() async {
+    final appSettings = context.read<AppSettingsNotifier>();
+    await appSettings.prepareCustomFontPreviews();
+    if (!mounted) return null;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FontSelectionSheet(
+        settings: appSettings,
+        domain: FontDomain.reader,
+        title: context.l10n.readerFont,
+        description: context.l10n.readerFontSelectionDescription,
+      ),
+    );
+    if (!mounted) return null;
+    final selected = appSettings.readerFont;
+    return ReaderFontChoice(
+      valueLabel: FontCatalog.labelFor(context.l10n, selected),
+      hint: selected.family == null
+          ? context.l10n.readerFontBookPriorityHint
+          : context.l10n.readerFontOverrideHint,
+      family: selected.family,
+      fallbackFamilies:
+          readerFontFamilyFallbacks(
+            fontFamily: selected.family,
+            configuredFallbacks: selected.fallbackFamilies,
+            locale: Localizations.maybeLocaleOf(context),
+          ) ??
+          const <String>[],
+      supportsVariableWeight: selected.supportsVariableWeight,
+      fontWeightHint: selected.supportsVariableWeight
+          ? context.l10n.readerFontWeightVariableHint(
+              selected.variableWeightMin!,
+              selected.variableWeightMax!,
+            )
+          : context.l10n.readerFontWeightSyntheticHint,
+      variableWeightMin: selected.variableWeightMin,
+      variableWeightMax: selected.variableWeightMax,
+    );
+  }
+
   Future<void> _showReadingSettings() async {
     _controlsTimer?.cancel();
     final selectedMode = await showModalBottomSheet<BookSourcePageMode>(
@@ -193,6 +235,12 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
         ),
         tabletTwoPageTitle: context.l10n.readerTabletTwoPageTitle,
         tabletTwoPageHint: context.l10n.readerTabletTwoPageHint,
+        fontFamilyLabel: context.l10n.fontFamilyLabel,
+        fontFamilyValueLabel: FontCatalog.labelFor(context.l10n, _readerFont),
+        fontFamilyHint: _readerFont.family == null
+            ? context.l10n.readerFontBookPriorityHint
+            : context.l10n.readerFontOverrideHint,
+        onFontFamilyTap: _showReaderFontPicker,
         fontSizeLabel: context.l10n.fontSizeLabel,
         fontWeightLabel: context.l10n.readerFontWeightLabel,
         fontWeightValueLabels: <String>[
@@ -287,27 +335,6 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     await _updateReadingSettings(pageMode: selectedMode);
-  }
-
-  Future<void> _showReplaceRules() async {
-    final restoreProgress = _currentReadingProgress;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ReplaceRulesPage()));
-    if (!mounted) return;
-    final chapters = _withReplacedChapterTitles(_rawChapters);
-    _updateReaderState(() {
-      _chapters = chapters;
-      _navigationChapters = _navigationFor(chapters);
-      _readableChapterText.clear();
-      _pagedLayouts.clear();
-      _verticalLayouts.clear();
-    });
-    await _loadChapter(
-      _chapterIndex,
-      restoreProgress: restoreProgress,
-      saveCurrent: false,
-    );
   }
 
   Future<void> _changeBookSource() async {

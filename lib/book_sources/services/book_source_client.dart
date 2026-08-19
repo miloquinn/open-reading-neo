@@ -8,11 +8,11 @@ import '../protocol/book_source_protocol.dart';
 import '../protocol/orsp/orsp_book_source_backend.dart';
 import '../source_engine/source_login_ui.dart';
 import 'book_download_cancellation.dart';
-import 'book_source_chapter_cache.dart';
+import '../caching/book_source_chapter_cache.dart';
+import '../caching/book_source_response_cache.dart';
+import '../networking/book_source_network_policy.dart';
 import 'book_source_client_resources.dart';
 import 'book_source_gateway.dart';
-import 'book_source_network_policy.dart';
-import 'book_source_response_cache.dart';
 
 export 'book_source_gateway.dart' show BookSourceGateway, DiscoveredBookSource;
 
@@ -69,7 +69,8 @@ class BookSourceClient implements BookSourceGateway {
 
   static void ensureSafeTarget(Uri uri) {
     final address = InternetAddress.tryParse(uri.host);
-    if (address != null && BookSourceNetworkPolicy.isBlockedAddress(address)) {
+    if (address != null &&
+        BookSourceNetworkPolicy.isDisallowedAddress(address)) {
       throw const BookSourceProtocolException(
         'This address is not allowed as a book source target.',
       );

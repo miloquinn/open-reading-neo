@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../book_sources/services/source_cover_cache.dart';
+import '../book_sources/caching/source_cover_cache.dart';
 import 'image_decode_retry_controller.dart';
 
 class SourceCoverImage extends StatefulWidget {

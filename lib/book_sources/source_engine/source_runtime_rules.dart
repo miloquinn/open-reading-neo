@@ -1,6 +1,6 @@
 import '../protocol/book_source_protocol.dart';
-import 'source_rule_engine.dart';
-import 'source_script_contract.dart';
+import 'rules/source_rule_engine.dart';
+import 'scripting/source_script_contract.dart';
 
 abstract interface class SourceRuntimeRulePort {
   SourceRuleDocument document(

@@ -62,6 +62,43 @@ void main() {
     borrowedService.close();
   });
 
+  testWidgets('book options distinguish data and source-file exports', (
+    tester,
+  ) async {
+    final book = Book(
+      id: 1,
+      title: 'Exportable Book',
+      author: 'Author',
+      filePath: '/tmp/exportable.epub',
+      format: 'EPUB',
+    );
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => AppSettingsNotifier(),
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LibraryPage(booksLoader: () async => [book]),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await tester.pump();
+
+    await tester.longPress(find.text('Exportable Book').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('导出阅读数据'), findsOneWidget);
+    expect(find.text('导出书籍文件'), findsOneWidget);
+    expect(find.text('高亮、下划线与笔记'), findsOneWidget);
+  });
+
   testWidgets('loads books and filters by title or author', (tester) async {
     final books = [
       Book(

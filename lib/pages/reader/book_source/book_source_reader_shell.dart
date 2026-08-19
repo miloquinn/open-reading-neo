@@ -150,10 +150,13 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
   Widget _buildImageOnlyChapterReader(BookSourceChapterContent content) {
     final images = content.images;
     if (images.isEmpty) return const SizedBox.shrink();
+    // Mixed text/image books keep catalog ownership here. Dedicated comics
+    // go through ImageReaderHost; both land on the same PagedImageReader.
     return PagedImageReader(
       title: _chapters[_chapterIndex].title,
       pageCount: images.length,
       initialPage: _pageIndex.clamp(0, images.length - 1),
+      settingsId: 'comic:${widget.source.id}:${widget.book.id}',
       loadPage: (index) => _remoteImageCache.load(
         images[index].url,
         headers: images[index].headers,
@@ -353,6 +356,10 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                       onTableOfContents: _chapters.isEmpty
                           ? null
                           : _showCatalog,
+                      onSearch: _chapters.isEmpty
+                          ? null
+                          : () => unawaited(_showFullTextSearch()),
+                      searchTooltip: '全文搜索',
                       onReadAloud:
                           _chapters.isEmpty || !isReaderAloudPlatformSupported
                           ? null
@@ -363,8 +370,6 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                           ? null
                           : () => unawaited(_showAskAiPanel()),
                       askAiTooltip: context.l10n.readerAskAi,
-                      onReplaceRules: () => unawaited(_showReplaceRules()),
-                      replaceRulesTooltip: context.l10n.replaceRulesTitle,
                       onChangeSource: () => unawaited(_changeBookSource()),
                       changeSourceTooltip:
                           context.l10n.bookSourceChangeSourceTitle,

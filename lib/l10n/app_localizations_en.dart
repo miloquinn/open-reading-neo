@@ -584,6 +584,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String bookSourcesImportTypeSummary(int books, int comics, int unsupported) {
+    return '$books book · $comics comic · $unsupported currently unrunnable';
+  }
+
+  @override
   String get bookSourcesDedupeRestoreDefaults => 'Restore recommendations';
 
   @override
@@ -1016,6 +1021,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerFontDescription =>
       'Used only for book text and chapter headings. It does not change the app interface.';
+
+  @override
+  String get readerFontSelectionDescription =>
+      'Choose the typeface used for reading. System Default keeps fonts embedded by EPUB publishers when available.';
+
+  @override
+  String get readerFontBookPriorityHint =>
+      'Uses the book’s embedded font when available; otherwise uses the device font.';
+
+  @override
+  String get readerFontOverrideHint =>
+      'Overrides fonts embedded by the publisher.';
 
   @override
   String get fontSystem => 'System Default';
@@ -1853,6 +1870,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'This comic\'s archive format isn\'t readable yet. Please convert it to CBZ.';
 
   @override
+  String get readerComicChapterNoPages => 'This chapter has no image pages.';
+
+  @override
   String get imageReaderSettings => 'Reading settings';
 
   @override
@@ -2151,7 +2171,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libraryResetCoverSuccess => 'Default cover restored';
 
   @override
-  String get libraryExportBook => 'Export book';
+  String get libraryExportBook => 'Export book file';
 
   @override
   String get libraryExportOriginalHint =>
@@ -2568,6 +2588,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsAdditionalSourceProtocolsSubtitle =>
       'Enable support for additional source protocols.';
+
+  @override
+  String get settingsPrivateBookSourceNetworkTitle =>
+      'Allow private-network sources';
+
+  @override
+  String get settingsPrivateBookSourceNetworkSubtitle =>
+      'Allow book sources on this device, the local network, and other private addresses. Leave this off unless you trust the source.';
 
   @override
   String get additionalSourcesImport => 'Import more source protocols';
@@ -5768,4 +5796,81 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountInviteBindingNotNeeded =>
       'This account already has Premium, so no invite code is needed.';
+
+  @override
+  String get readingDataExportAction => 'Export reading data';
+
+  @override
+  String get readingDataExportSubtitle => 'Highlights, underlines, and notes';
+
+  @override
+  String get readingDataExportWholeBook => 'Whole book';
+
+  @override
+  String get readingDataExportWholeBookHint =>
+      'Exports all of your annotations in this book. The book text and source file are not included.';
+
+  @override
+  String get readingDataExportPrivacySummary =>
+      'Includes highlighted or underlined excerpts and your private notes. The book file, full text, account details, and device information are not included.';
+
+  @override
+  String readingDataExportCounts(int highlights, int underlines, int notes) {
+    return '$highlights highlights · $underlines underlines · $notes notes';
+  }
+
+  @override
+  String readingDataExportButton(int count) {
+    return 'Export $count annotations';
+  }
+
+  @override
+  String get readingDataExportPreparing => 'Preparing Markdown…';
+
+  @override
+  String get readingDataExportEmpty =>
+      'This book has no highlights, underlines, or notes to export.';
+
+  @override
+  String readingDataExportSuccess(String location) {
+    return 'Reading data exported to $location';
+  }
+
+  @override
+  String get readingDataExportFailed => 'Could not export reading data';
+
+  @override
+  String get readingDataExportUnsupported =>
+      'Reading data export is not supported on this platform yet';
+
+  @override
+  String get readingDataExportReplaceTitle => 'Replace existing file?';
+
+  @override
+  String readingDataExportReplaceMessage(String path) {
+    return 'A file already exists at $path. Replacing it cannot be undone.';
+  }
+
+  @override
+  String get readingDataExportReplaceAction => 'Replace';
+
+  @override
+  String get readingDataExportExportedAt => 'Exported';
+
+  @override
+  String get readingDataExportAuthor => 'Author';
+
+  @override
+  String get readingDataExportContents => 'Contents';
+
+  @override
+  String get readingDataExportMyNote => 'My note';
+
+  @override
+  String readingDataExportPositionPage(int page) {
+    return 'Page $page';
+  }
+
+  @override
+  String get readingDataExportUnknownChapter => 'Unlocated annotations';
 }

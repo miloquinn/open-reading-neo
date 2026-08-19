@@ -10,7 +10,8 @@ import 'package:dio/io.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
-import 'book_source_network_policy.dart';
+import '../networking/book_source_network_policy.dart';
+import '../source_engine/source_webview_loader.dart';
 
 typedef SourceCoverLoader = Future<Uint8List> Function(Uri uri);
 
@@ -46,6 +47,7 @@ class SourceCoverCache {
     this.maxImageBytes = 8 * 1024 * 1024,
     this.maxMemoryBytes = 24 * 1024 * 1024,
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
+    this._platformLoader = const SourceWebViewLoader(),
   }) : assert(maxConcurrent > 0),
        assert(maxImageBytes > 0),
        assert(maxMemoryBytes > 0),
@@ -81,6 +83,7 @@ class SourceCoverCache {
   final int maxMemoryBytes;
   final Directory? _cacheDirectory;
   final BookSourceNetworkPolicy _networkPolicy;
+  final SourceWebViewLoaderPort _platformLoader;
 
   late final Dio _dio;
   late final SourceCoverLoader _loader;
@@ -95,10 +98,15 @@ class SourceCoverCache {
   int get activeRequests => _active;
   int get memorySizeBytes => _memoryBytes;
 
-  Future<Uint8List> load(Uri uri, {Map<String, String> headers = const {}}) {
+  Future<Uint8List> load(
+    Uri uri, {
+    Map<String, String> headers = const {},
+    bool preferPlatform = false,
+  }) {
     _validateUri(uri);
     final normalizedHeaders = Map<String, String>.unmodifiable(headers);
-    final key = _key(uri, normalizedHeaders);
+    final key =
+        '${preferPlatform ? 'platform' : 'default'}:${_key(uri, normalizedHeaders)}';
     final memory = _memory.remove(key);
     if (memory != null) {
       _memory[key] = memory;
@@ -110,7 +118,7 @@ class SourceCoverCache {
     late final Future<Uint8List> tracked;
     tracked = () async {
       try {
-        return await _load(uri, key, normalizedHeaders, (
+        return await _load(uri, key, normalizedHeaders, preferPlatform, (
           _cacheEpoch,
           _keyEpochs[key] ?? 0,
         ));
@@ -126,6 +134,7 @@ class SourceCoverCache {
     Uri uri,
     String key,
     Map<String, String> headers,
+    bool preferPlatform,
     (int, int) epoch,
   ) async {
     final disk = await _readDisk(key);
@@ -139,7 +148,11 @@ class SourceCoverCache {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         final bytes = await _withPermit(
-          () => headers.isEmpty ? _loader(uri) : _download(uri, headers),
+          () => preferPlatform
+              ? _downloadWithPlatform(uri, headers)
+              : headers.isEmpty
+              ? _loader(uri)
+              : _download(uri, headers),
         );
         _validateBytes(bytes);
         if (_isCurrent(key, epoch)) {
@@ -265,22 +278,83 @@ class SourceCoverCache {
       }
       throw const SourceCoverLoadException('Cover request failed.');
     } on DioException catch (error) {
+      try {
+        return await _downloadWithPlatform(uri, requestHeaders);
+      } catch (_) {
+        throw SourceCoverLoadException(
+          'Cover request failed: ${error.message ?? error.type.name}',
+          transient: switch (error.type) {
+            DioExceptionType.connectionTimeout ||
+            DioExceptionType.sendTimeout ||
+            DioExceptionType.receiveTimeout ||
+            DioExceptionType.transformTimeout ||
+            DioExceptionType.connectionError ||
+            DioExceptionType.unknown => true,
+            DioExceptionType.badResponse => _isTransientStatus(
+              error.response?.statusCode ?? 0,
+            ),
+            DioExceptionType.cancel || DioExceptionType.badCertificate => false,
+          },
+        );
+      }
+    }
+  }
+
+  Future<Uint8List> _downloadWithPlatform(
+    Uri uri,
+    Map<String, String> requestHeaders,
+  ) async {
+    var current = uri;
+    var headers = <String, String>{
+      'Accept':
+          'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      'User-Agent': _sourceCoverUserAgent,
+      ...requestHeaders,
+    };
+    for (var redirects = 0; redirects <= 5; redirects++) {
+      await _networkPolicy.validate(current);
+      final response = await _platformLoader.loadBytes(
+        url: current,
+        headers: headers,
+        maxBytes: maxImageBytes,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final bytes = response.bytes;
+        if (!_hasSupportedImageSignature(bytes)) {
+          throw const SourceCoverLoadException(
+            'Cover response is not an image.',
+          );
+        }
+        return bytes;
+      }
+      if (response.statusCode >= 300 && response.statusCode < 400) {
+        if (redirects == 5) {
+          throw const SourceCoverLoadException(
+            'Cover redirected too many times.',
+          );
+        }
+        final next = BookSourceNetworkPolicy.redirectTarget(
+          current,
+          response.location,
+        );
+        if (current.authority != next.authority) {
+          headers.removeWhere((name, _) {
+            final normalized = name.toLowerCase();
+            return normalized == HttpHeaders.cookieHeader ||
+                normalized == HttpHeaders.authorizationHeader ||
+                normalized == 'proxy-authorization' ||
+                normalized == HttpHeaders.hostHeader;
+          });
+        }
+        current = next;
+        continue;
+      }
       throw SourceCoverLoadException(
-        'Cover request failed: ${error.message ?? error.type.name}',
-        transient: switch (error.type) {
-          DioExceptionType.connectionTimeout ||
-          DioExceptionType.sendTimeout ||
-          DioExceptionType.receiveTimeout ||
-          DioExceptionType.transformTimeout ||
-          DioExceptionType.connectionError ||
-          DioExceptionType.unknown => true,
-          DioExceptionType.badResponse => _isTransientStatus(
-            error.response?.statusCode ?? 0,
-          ),
-          DioExceptionType.cancel || DioExceptionType.badCertificate => false,
-        },
+        'Cover request failed with HTTP ${response.statusCode}.',
+        transient: _isTransientStatus(response.statusCode),
       );
     }
+    throw const SourceCoverLoadException('Cover request failed.');
   }
 
   bool _isTransient(Object error) =>
@@ -381,13 +455,15 @@ class SourceCoverCache {
 
   Future<void> evict(Uri uri, {Map<String, String> headers = const {}}) async {
     _validateUri(uri);
-    final key = _key(uri, headers);
-    _keyEpochs[key] = (_keyEpochs[key] ?? 0) + 1;
-    _inFlight.remove(key);
-    final memory = _memory.remove(key);
-    if (memory != null) _memoryBytes -= memory.lengthInBytes;
-    final file = await _fileFor(key);
-    if (await file.exists()) await file.delete();
+    final rawKey = _key(uri, headers);
+    for (final key in ['default:$rawKey', 'platform:$rawKey']) {
+      _keyEpochs[key] = (_keyEpochs[key] ?? 0) + 1;
+      _inFlight.remove(key);
+      final memory = _memory.remove(key);
+      if (memory != null) _memoryBytes -= memory.lengthInBytes;
+      final file = await _fileFor(key);
+      if (await file.exists()) await file.delete();
+    }
   }
 
   void clearMemory() {

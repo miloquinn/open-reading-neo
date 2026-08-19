@@ -154,9 +154,17 @@ List<String> _supportedDesktopFileArguments(List<String> arguments) {
 }
 
 class XxReadApp extends StatefulWidget {
-  const XxReadApp({super.key, this.initialFilePaths = const []});
+  const XxReadApp({
+    super.key,
+    this.initialFilePaths = const [],
+    this.sourceInteractionCoordinator,
+  });
 
   final List<String> initialFilePaths;
+  final SourceInteractionCoordinator? sourceInteractionCoordinator;
+
+  SourceInteractionCoordinator get _coordinator =>
+      sourceInteractionCoordinator ?? SourceInteractionCoordinator.instance;
 
   @override
   State<XxReadApp> createState() => _XxReadAppState();
@@ -201,10 +209,9 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     _notificationTapSubscription = BackgroundDownloadNotifier.taps.listen(
       _handleNotificationTap,
     );
-    _sourceInteractionSubscription = SourceInteractionCoordinator
-        .instance
-        .requests
-        .listen(_queueSourceInteraction);
+    _sourceInteractionSubscription = widget._coordinator.requests.listen(
+      _queueSourceInteraction,
+    );
     unawaited(BackgroundDownloadNotifier.initialize());
     _bootstrapServices();
     _checkAgreementStatus();
@@ -215,7 +222,7 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _notificationTapSubscription?.cancel();
     _sourceInteractionSubscription?.cancel();
-    SourceInteractionCoordinator.instance.cancelAll();
+    widget._coordinator.cancelAll();
     unawaited(_incomingBookService.dispose());
     super.dispose();
   }
@@ -239,7 +246,10 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     try {
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
-          builder: (_) => SourceVerificationPage(ticket: ticket),
+          builder: (_) => SourceVerificationPage(
+            ticket: ticket,
+            coordinator: widget._coordinator,
+          ),
         ),
       );
     } finally {

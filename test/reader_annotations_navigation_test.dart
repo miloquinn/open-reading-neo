@@ -11,6 +11,7 @@ void main() {
   ) async {
     BookNote? selected;
     BookNote? deleted;
+    var exportCalls = 0;
     final annotation = BookNote(
       id: 3,
       annotationId: 'annotation-3',
@@ -76,6 +77,7 @@ void main() {
             onBookmarkDeleted: (_) {},
             onAnnotationSelected: (value) => selected = value,
             onAnnotationDeleted: (value) => deleted = value,
+            onExportAnnotations: () => exportCalls++,
           ),
         ),
       ),
@@ -92,6 +94,14 @@ void main() {
     expect(find.text('这里是我的批注'), findsOneWidget);
     expect(find.text('第二章的页内高亮'), findsOneWidget);
     expect(find.text('旧手写记录'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('reader-annotations-export-button')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('reader-annotations-export-button')),
+    );
+    expect(exportCalls, 1);
     expect(
       tester.getTopLeft(find.text('这里是我的批注')).dy,
       lessThan(tester.getTopLeft(find.text('第二章的页内高亮')).dy),

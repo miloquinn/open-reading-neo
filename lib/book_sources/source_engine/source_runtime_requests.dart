@@ -7,12 +7,12 @@ import 'source_config.dart';
 import 'source_interaction_coordinator.dart';
 import 'source_request_template.dart';
 import 'source_response.dart';
-import 'source_rule_engine.dart';
+import 'rules/source_rule_engine.dart';
 import 'source_runtime_dependencies.dart';
 import 'source_runtime_login.dart';
 import 'source_runtime_rules.dart';
 import 'source_runtime_state.dart';
-import 'source_script_contract.dart';
+import 'scripting/source_script_contract.dart';
 import 'source_transport.dart';
 
 abstract interface class SourceRuntimeRequestPort {

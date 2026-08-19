@@ -140,6 +140,7 @@ class ReaderNavigationSheet extends StatefulWidget {
     this.annotations = const [],
     this.onAnnotationSelected,
     this.onAnnotationDeleted,
+    this.onExportAnnotations,
     this.currentAnchorKey,
     this.currentChapterOffset,
     this.currentChapterText,
@@ -168,6 +169,7 @@ class ReaderNavigationSheet extends StatefulWidget {
   final ValueChanged<Bookmark> onBookmarkDeleted;
   final ValueChanged<BookNote>? onAnnotationSelected;
   final ValueChanged<BookNote>? onAnnotationDeleted;
+  final VoidCallback? onExportAnnotations;
 
   @override
   State<ReaderNavigationSheet> createState() => _ReaderNavigationSheetState();
@@ -847,12 +849,31 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       if (chapter != 0) return chapter;
       return (a.startOffset ?? 0).compareTo(b.startOffset ?? 0);
     });
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
-      itemCount: annotations.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 9),
-      itemBuilder: (context, index) =>
-          _buildAnnotationTile(context, annotations[index]),
+    return Column(
+      children: [
+        if (widget.onExportAnnotations != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.tonalIcon(
+                key: const ValueKey('reader-annotations-export-button'),
+                onPressed: widget.onExportAnnotations,
+                icon: const Icon(Icons.file_download_outlined, size: 19),
+                label: Text(context.l10n.readingDataExportAction),
+              ),
+            ),
+          ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+            itemCount: annotations.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 9),
+            itemBuilder: (context, index) =>
+                _buildAnnotationTile(context, annotations[index]),
+          ),
+        ),
+      ],
     );
   }
 

@@ -51,6 +51,40 @@ class ReadingSourceConfig {
   String get comment => _string(raw['bookSourceComment']);
   String get jsLib => _string(raw['jsLib']);
   int get type => _integer(raw['bookSourceType']);
+
+  /// Some older Reading/Legado manga exports incorrectly keep
+  /// `bookSourceType` at 0 even though their complete reading chain emits
+  /// image pages. Infer image sources conservatively so imports, search
+  /// results, and reader routing agree on the same type.
+  bool get isImageSource {
+    if (type == 2) return true;
+    if (type != 0) return false;
+    final contentRule = rule('ruleContent');
+    if (rule('ruleToc').isEmpty || contentRule.isEmpty) return false;
+    final content = _string(contentRule['content']).toLowerCase();
+    final imageStyle = _string(contentRule['imageStyle']).toUpperCase();
+    final label = '$name\n$group'.toLowerCase();
+    final emitsImages =
+        imageStyle == 'FULL' ||
+        content.contains('<img') ||
+        content.contains('@img') ||
+        content.contains('img@') ||
+        content.contains('amp-img') ||
+        content.contains('data-original') ||
+        content.contains('data-src');
+    final labeledAsManga = label.contains('漫画') || label.contains('comic');
+    return emitsImages || labeledAsManga;
+  }
+
+  int get effectiveBookType => switch (type) {
+    1 => 32,
+    2 => 64,
+    3 => 136,
+    4 => 4,
+    _ when isImageSource => 64,
+    _ => 8,
+  };
+
   String get searchUrl => _string(raw['searchUrl']);
   String get exploreUrl => _string(raw['exploreUrl']);
   String get loginCheckJs => _string(raw['loginCheckJs']);

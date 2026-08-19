@@ -48,6 +48,7 @@ class ReaderAnnotatedTextPage extends StatefulWidget {
     this.onAnnotationUnavailable,
     this.onInteractionChanged,
     this.onAskAiSelection,
+    this.onSearchSelection,
     this.fillAvailableSpace = true,
   });
 
@@ -71,6 +72,8 @@ class ReaderAnnotatedTextPage extends StatefulWidget {
   final ValueChanged<bool>? onInteractionChanged;
   final Future<void> Function(ReaderSelectionSnapshot selection)?
   onAskAiSelection;
+  final Future<void> Function(ReaderSelectionSnapshot selection)?
+  onSearchSelection;
   final bool fillAvailableSpace;
 
   @override
@@ -223,6 +226,19 @@ class _ReaderAnnotatedTextPageState extends State<ReaderAnnotatedTextPage> {
     }
   }
 
+  Future<void> _searchSelection(SelectableRegionState regionState) async {
+    final selection = _selectionSnapshot;
+    final handler = widget.onSearchSelection;
+    if (selection == null || handler == null) return;
+    _clearSelection(regionState);
+    widget.onInteractionChanged?.call(true);
+    try {
+      await handler(selection);
+    } finally {
+      widget.onInteractionChanged?.call(false);
+    }
+  }
+
   Future<void> _askAi(SelectableRegionState regionState) async {
     final selection = _selectionSnapshot;
     final handler = widget.onAskAiSelection;
@@ -249,6 +265,9 @@ class _ReaderAnnotatedTextPageState extends State<ReaderAnnotatedTextPage> {
       onHighlight: () => unawaited(_createHighlight(regionState)),
       onNote: () => unawaited(_createNote(regionState)),
       onCopy: copyItem?.onPressed,
+      onSearch: widget.onSearchSelection == null
+          ? null
+          : () => unawaited(_searchSelection(regionState)),
       onAskAi: widget.onAskAiSelection == null
           ? null
           : () => unawaited(_askAi(regionState)),
@@ -285,6 +304,7 @@ class ReaderSelectionToolbar extends StatelessWidget {
     required this.onNote,
     required this.onCopy,
     this.onAskAi,
+    this.onSearch,
   });
 
   final ReaderThemePalette palette;
@@ -293,6 +313,7 @@ class ReaderSelectionToolbar extends StatelessWidget {
   final VoidCallback onNote;
   final VoidCallback? onCopy;
   final VoidCallback? onAskAi;
+  final VoidCallback? onSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +344,13 @@ class ReaderSelectionToolbar extends StatelessWidget {
           color: palette.text,
           onPressed: onNote,
         ),
+        if (onSearch != null)
+          _ReaderSelectionAction(
+            icon: Icons.search_rounded,
+            label: '搜索',
+            color: palette.text,
+            onPressed: onSearch,
+          ),
         if (onAskAi != null)
           _ReaderSelectionAction(
             icon: Icons.auto_awesome_outlined,
@@ -335,6 +363,53 @@ class ReaderSelectionToolbar extends StatelessWidget {
           label: material.copyButtonLabel,
           color: palette.text,
           onPressed: onCopy,
+        ),
+        _ReaderSelectionMoreAction(palette: palette),
+      ],
+    );
+  }
+}
+
+class _ReaderSelectionMoreAction extends StatelessWidget {
+  const _ReaderSelectionMoreAction({required this.palette});
+
+  final ReaderThemePalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      key: const ValueKey('reader-selection-more'),
+      tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+      color: palette.background,
+      icon: Icon(Icons.more_horiz_rounded, color: palette.text),
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: 'share',
+          child: ListTile(
+            leading: Icon(Icons.ios_share_rounded),
+            title: Text('分享'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'translate',
+          child: ListTile(
+            leading: Icon(Icons.translate_rounded),
+            title: Text('翻译'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'read',
+          child: ListTile(
+            leading: Icon(Icons.volume_up_outlined),
+            title: Text('朗读'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'feedback',
+          child: ListTile(
+            leading: Icon(Icons.flag_outlined),
+            title: Text('反馈'),
+          ),
         ),
       ],
     );

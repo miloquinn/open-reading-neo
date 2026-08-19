@@ -21,6 +21,7 @@ class SourceRequestTemplate {
     this.webViewHtml,
     this.body,
     this.cookieJarKey,
+    this.syntheticBody,
   });
 
   final Uri url;
@@ -32,6 +33,14 @@ class SourceRequestTemplate {
   final String? webViewHtml;
   final String? body;
   final String? cookieJarKey;
+
+  /// Set when [url] is a `data:` URI carrying a `type` option, mirroring
+  /// Legado's `AnalyzeUrl.getStrResponseAwait` short-circuit: the request is
+  /// never sent over the network. The payload is decoded locally and
+  /// hex-encoded (matching `HexUtil.encodeHexStr`) so rule scripts that
+  /// expect this convention (commonly paired with `java.hexDecodeToString`)
+  /// see the same bytes a real Legado client would produce.
+  final String? syntheticBody;
 
   static SourceRequestTemplate parse(
     String template, {
@@ -78,6 +87,17 @@ class SourceRequestTemplate {
     }
 
     final uri = baseUri.resolve(urlText);
+    final syntheticBody = _dataUriSyntheticBody(urlText, options);
+    if (syntheticBody != null) {
+      return SourceRequestTemplate(
+        url: uri,
+        method: SourceRequestMethod.get,
+        headers: const {},
+        charset: 'utf-8',
+        cookieJarKey: cookieJarKey,
+        syntheticBody: syntheticBody,
+      );
+    }
     if (!uri.hasAuthority || (uri.scheme != 'http' && uri.scheme != 'https')) {
       throw const BookSourceProtocolException(
         'reading source request targets must use HTTP or HTTPS.',
@@ -93,19 +113,18 @@ class SourceRequestTemplate {
         'Unsupported reading source request method: $methodText.',
       ),
     };
-    final body = options['body'];
-    if (body != null && body is! String) {
+    final rawBody = options['body'];
+    if (rawBody != null && rawBody is! String) {
       throw const BookSourceProtocolException(
         'reading source request body must be text.',
       );
     }
-    if (method != SourceRequestMethod.post &&
-        body is String &&
-        body.isNotEmpty) {
-      throw const BookSourceProtocolException(
-        'GET and HEAD reading source requests cannot contain a body.',
-      );
-    }
+    // Legado's own AnalyzeUrl never reads `body` for GET/HEAD (only POST
+    // branches read it), so a source script that always attaches a `body`
+    // option regardless of method — a common defensive habit in jsLib
+    // request() helpers — is not an error there. Match that: drop the body
+    // instead of rejecting the request.
+    final body = method == SourceRequestMethod.post ? rawBody : null;
 
     final headers = <String, String>{};
     for (final entry in sourceHeaders.entries) {
@@ -209,6 +228,35 @@ String resolveSourceRequestUrl(Uri baseUri, String value) {
   final resolved = baseUri.resolve(urlText).toString();
   if (optionsStart < 0) return resolved;
   return '$resolved${value.substring(optionsStart)}';
+}
+
+/// Decodes a `data:` request target into the hex string Legado-compatible
+/// rule scripts expect, or returns null when [value] is not a `data:` URI
+/// carrying a non-blank `type` option (the signal real Legado uses to treat
+/// the whole request as local bytes instead of a network fetch).
+String? _dataUriSyntheticBody(String value, Map<String, dynamic> options) {
+  if (!value.startsWith('data:')) return null;
+  final type = options['type'];
+  if (type == null || '$type'.trim().isEmpty) return null;
+  final comma = value.indexOf(',');
+  if (comma < 0) return null;
+  final metadata = value.substring(5, comma).toLowerCase();
+  final payload = value.substring(comma + 1);
+  try {
+    final bytes = metadata.contains(';base64')
+        ? base64Decode(payload.padRight(
+            payload.length + (4 - payload.length % 4) % 4,
+            '=',
+          ))
+        : utf8.encode(Uri.decodeComponent(payload));
+    final hex = StringBuffer();
+    for (final byte in bytes) {
+      hex.write(byte.toRadixString(16).padLeft(2, '0'));
+    }
+    return hex.toString();
+  } on Object {
+    return null;
+  }
 }
 
 int _requestOptionsStart(String value) {

@@ -563,6 +563,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String bookSourcesImportTypeSummary(int books, int comics, int unsupported) {
+    return '書籍ソース $books 件 · 漫画ソース $comics 件 · 現在実行不可 $unsupported 件';
+  }
+
+  @override
   String get bookSourcesDedupeRestoreDefaults => '推奨選択に戻す';
 
   @override
@@ -987,6 +992,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get readerFontDescription => '書籍本文と章見出しだけに使用します。アプリ画面には影響しません。';
+
+  @override
+  String get readerFontSelectionDescription =>
+      '読書に使う書体を選びます。「システム標準」では、EPUB に出版社の埋め込みフォントがある場合はそれを優先します。';
+
+  @override
+  String get readerFontBookPriorityHint => '埋め込みフォントがあれば優先し、なければ端末のフォントを使います。';
+
+  @override
+  String get readerFontOverrideHint => '出版社が書籍に埋め込んだフォントより優先します。';
 
   @override
   String get fontSystem => 'システム標準';
@@ -1800,6 +1815,9 @@ class AppLocalizationsJa extends AppLocalizations {
       'このコミックの圧縮形式はまだ対応していません。CBZ に変換してください';
 
   @override
+  String get readerComicChapterNoPages => 'この章には画像ページがありません';
+
+  @override
   String get imageReaderSettings => '閲覧設定';
 
   @override
@@ -2088,7 +2106,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get libraryResetCoverSuccess => '既定の表紙に戻しました';
 
   @override
-  String get libraryExportBook => '書籍を書き出す';
+  String get libraryExportBook => '書籍ファイルを書き出す';
 
   @override
   String get libraryExportOriginalHint => '元のファイルをデバイス上の別の場所へコピーします';
@@ -2480,6 +2498,13 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsAdditionalSourceProtocolsSubtitle =>
       '有効にすると、追加のブックソースプロトコルを利用できます。';
+
+  @override
+  String get settingsPrivateBookSourceNetworkTitle => 'プライベートネットワークのソースを許可';
+
+  @override
+  String get settingsPrivateBookSourceNetworkSubtitle =>
+      'この端末、ローカルネットワーク、その他のプライベートアドレス上のソースへのアクセスを許可します。信頼できる場合のみ有効にしてください。';
 
   @override
   String get additionalSourcesImport => '追加プロトコルのソースをインポート';
@@ -5559,4 +5584,80 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get accountInviteBindingNotNeeded =>
       'このアカウントはプレミアム解除済みのため、招待コードは不要です。';
+
+  @override
+  String get readingDataExportAction => '読書データを書き出す';
+
+  @override
+  String get readingDataExportSubtitle => 'ハイライト、下線、ノート';
+
+  @override
+  String get readingDataExportWholeBook => '本全体';
+
+  @override
+  String get readingDataExportWholeBookHint =>
+      'この本の注釈をすべて書き出します。本文全体や書籍ファイルは含まれません。';
+
+  @override
+  String get readingDataExportPrivacySummary =>
+      'ハイライトまたは下線を付けた引用と個人ノートを含みます。書籍ファイル、本文全体、アカウント情報、端末情報は含まれません。';
+
+  @override
+  String readingDataExportCounts(int highlights, int underlines, int notes) {
+    return 'ハイライト $highlights 件 · 下線 $underlines 件 · ノート $notes 件';
+  }
+
+  @override
+  String readingDataExportButton(int count) {
+    return '注釈 $count 件を書き出す';
+  }
+
+  @override
+  String get readingDataExportPreparing => 'Markdown を作成中…';
+
+  @override
+  String get readingDataExportEmpty => '書き出せるハイライト、下線、ノートはまだありません。';
+
+  @override
+  String readingDataExportSuccess(String location) {
+    return '読書データを $location に書き出しました';
+  }
+
+  @override
+  String get readingDataExportFailed => '読書データを書き出せませんでした';
+
+  @override
+  String get readingDataExportUnsupported =>
+      'このプラットフォームでは読書データの書き出しにまだ対応していません';
+
+  @override
+  String get readingDataExportReplaceTitle => '既存のファイルを置き換えますか？';
+
+  @override
+  String readingDataExportReplaceMessage(String path) {
+    return '$path にはすでにファイルがあります。置き換えると元に戻せません。';
+  }
+
+  @override
+  String get readingDataExportReplaceAction => '置き換える';
+
+  @override
+  String get readingDataExportExportedAt => '書き出し日時';
+
+  @override
+  String get readingDataExportAuthor => '著者';
+
+  @override
+  String get readingDataExportContents => '内容';
+
+  @override
+  String get readingDataExportMyNote => '自分のノート';
+
+  @override
+  String readingDataExportPositionPage(int page) {
+    return '$page ページ';
+  }
+
+  @override
+  String get readingDataExportUnknownChapter => '位置不明の注釈';
 }

@@ -263,6 +263,57 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     );
   }
 
+  Future<List<ReaderSearchDocument>> _loadSearchDocuments() async {
+    final documents = <ReaderSearchDocument>[];
+    for (var index = 0; index < _loadedChapters.length; index++) {
+      final chapter = _loadedChapters[index];
+      await chapter.loadTextAsync();
+      documents.add(
+        ReaderSearchDocument(
+          chapterIndex: index,
+          chapterTitle: chapter.title,
+          text: chapter.plainText,
+        ),
+      );
+    }
+    return documents;
+  }
+
+  Future<void> _showFullTextSearch({String initialQuery = ''}) async {
+    _setReaderState(() => _controlsVisible = false);
+    await showReaderSearchSheet(
+      context,
+      palette: _readerTheme,
+      initialQuery: initialQuery,
+      loadDocuments: _loadSearchDocuments,
+      onResultSelected: (result) => unawaited(_jumpToSearchResult(result)),
+    );
+  }
+
+  Future<void> _jumpToSearchResult(ReaderSearchResult result) async {
+    if (_loadedChapters.isEmpty) return;
+    final chapter = _loadedChapters[result.chapterIndex];
+    final locator = CanonicalLocator.fromComponents(
+      format: BookFormat.fromFileExtension(widget.book.format),
+      chapterId: chapter.id,
+      offset: result.offset,
+      excerpt: result.excerpt,
+      progression: chapter.plainText.isEmpty
+          ? 0
+          : result.offset / chapter.plainText.length,
+    );
+    await _jumpToBookmark(
+      Bookmark(
+        bookId: widget.book.id ?? 0,
+        pageNumber: result.chapterIndex,
+        chapterIndex: result.chapterIndex,
+        chapterTitle: result.chapterTitle,
+        canonicalLocator: LocatorCodec.encodeCanonicalLocator(locator),
+      ),
+      _loadedChapters,
+    );
+  }
+
   Future<void> _showTableOfContents(
     List<_NativeChapter> chapters, {
     String? currentAnchorKey,
@@ -328,6 +379,12 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
             onAnnotationDeleted: (annotation) async {
               await _deleteAnnotation(annotation);
               if (mounted) setSheetState(() {});
+            },
+            onExportAnnotations: () {
+              Navigator.of(sheetContext).pop();
+              unawaited(
+                showReadingDataExportDialog(context, book: widget.book),
+              );
             },
           ),
         ),

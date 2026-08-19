@@ -383,6 +383,8 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
       onSaveTextAnnotation: _saveTextAnnotation,
       onAnnotationUnavailable: () => _ensureAnnotationBook(),
       onAskAiSelection: _askAiAboutSelection,
+      onSearchSelection: (selection) =>
+          _showFullTextSearch(initialQuery: selection.selectedText),
       fillAvailableSpace: fillAvailableSpace,
       onInteractionChanged: (active) {
         if (!mounted || _annotationInteractionActive == active) return;

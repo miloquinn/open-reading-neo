@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
-import 'package:xxread/book_sources/services/book_source_network_policy.dart';
+import 'package:xxread/book_sources/networking/book_source_network_policy.dart';
 
 import '../tool/example_book_source_server.dart';
 

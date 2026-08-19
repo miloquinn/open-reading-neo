@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/protocol/reading_source/reading_source_backend.dart';
-import 'package:xxread/book_sources/services/book_source_chapter_cache.dart';
+import 'package:xxread/book_sources/caching/book_source_chapter_cache.dart';
 import 'package:xxread/book_sources/source_engine/source_runtime.dart';
 
 void main() {

@@ -3,7 +3,7 @@ import '../protocol/book_source_protocol.dart';
 import 'source_config.dart';
 import 'source_login_session.dart';
 import 'source_login_ui.dart';
-import 'source_script_contract.dart';
+import 'scripting/source_script_contract.dart';
 import 'source_transport.dart';
 
 abstract interface class SourceRuntimeSessionPort {

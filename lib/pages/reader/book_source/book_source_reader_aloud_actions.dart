@@ -1,6 +1,27 @@
 part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
+  void _markReaderAloudForManualPageTurn() {
+    final controller = _readerAloudController;
+    _restartReaderAloudAfterManualPageTurn =
+        controller?.state == ReaderAloudPlaybackState.playing;
+  }
+
+  void _restartReaderAloudFromCurrentPageAfterManualTurn() {
+    if (!_restartReaderAloudAfterManualPageTurn) return;
+    _restartReaderAloudAfterManualPageTurn = false;
+    final controller = _readerAloudController;
+    if (controller == null ||
+        controller.state != ReaderAloudPlaybackState.playing) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && controller.state == ReaderAloudPlaybackState.playing) {
+        unawaited(controller.start());
+      }
+    });
+  }
+
   void _onReaderAloudChanged() {
     final active = _readerAloudController?.isActive ?? false;
     final highlight = _readerAloudController?.highlight;
@@ -106,6 +127,19 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
       palette: _readerTheme,
       themeData: _readerThemeData,
     );
+  }
+
+  /// Starts or resumes read-aloud on the first toolbar tap. Once playback is
+  /// active, the same button becomes the entry point for its settings panel.
+  Future<void> _handleReaderAloudButtonPressed() async {
+    final controller = _ensureReaderAloudController();
+    if (controller == null) return;
+    if (controller.state == ReaderAloudPlaybackState.playing ||
+        controller.state == ReaderAloudPlaybackState.loading) {
+      await _showReaderAloudPanel();
+      return;
+    }
+    await controller.start();
   }
 
   Future<void> _showAskAiPanel() async {
@@ -242,6 +276,9 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
             : context.l10n.readerFontOverrideHint,
         onFontFamilyTap: _showReaderFontPicker,
         fontSizeLabel: context.l10n.fontSizeLabel,
+        textBrightnessLabel: context.l10n.readerTextBrightnessLabel,
+        dimTextInDarkModeTitle: context.l10n.readerDimTextInDarkModeTitle,
+        dimTextInDarkModeHint: context.l10n.readerDimTextInDarkModeHint,
         fontWeightLabel: context.l10n.readerFontWeightLabel,
         fontWeightValueLabels: <String>[
           context.l10n.readerFontWeightLight,
@@ -269,6 +306,8 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
         bottomMarginLabel: context.l10n.readerBottomMarginLabel,
         themeId: _readerThemeId,
         fontSize: _fontSize,
+        textBrightness: _textBrightness,
+        dimTextInDarkMode: _dimTextInDarkMode,
         fontWeight: _fontWeight,
         fontFamily: _readerFont.family,
         fontFamilyFallback:
@@ -301,6 +340,10 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
         onTapZonesTap: () => unawaited(_showTapZoneSettings()),
         onFontSizeChanged: (value) =>
             unawaited(_updateReadingSettings(fontSize: value)),
+        onTextBrightnessChanged: (value) =>
+            unawaited(_updateReadingSettings(textBrightness: value)),
+        onDimTextInDarkModeChanged: (value) =>
+            unawaited(_updateReadingSettings(dimTextInDarkMode: value)),
         onFontWeightChanged: (value) =>
             unawaited(_updateReadingSettings(fontWeight: value)),
         onLineHeightChanged: (value) =>

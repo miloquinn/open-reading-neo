@@ -54,6 +54,8 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
         _navigationCatalog = navigationCatalog;
         _chapterIndex = initialIndex;
         _fontSize = settings.fontSize;
+        _textBrightness = settings.textBrightness;
+        _dimTextInDarkMode = settings.dimTextInDarkMode;
         _fontWeight = settings.fontWeight;
         _horizontalMargin = settings.horizontalMargin;
         _topMargin = settings.topMargin;

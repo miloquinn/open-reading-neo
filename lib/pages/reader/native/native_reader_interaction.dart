@@ -32,6 +32,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
         _initialPositionRestored = false;
       }
     });
+    _restartReaderAloudFromCurrentPageAfterManualTurn();
     if (previousPageController != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => previousPageController.dispose(),
@@ -62,7 +63,9 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     required bool usesTwoPageLayout,
     bool animate = true,
   }) {
+    _hideControlsForPageTurn();
     if (_pageMode == NativePageMode.pageCurl && animate) {
+      _markReaderAloudForManualPageTurn();
       final controller = usesTwoPageLayout
           ? _spreadForwardPageCurlController
           : _pageCurlController;
@@ -70,6 +73,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
       return;
     }
     if (_pageMode == NativePageMode.coverSlide && animate) {
+      _markReaderAloudForManualPageTurn();
       unawaited(_coverPageTurnController.turnForward());
       return;
     }
@@ -78,11 +82,13 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
         pageController != null &&
         pageController.hasClients) {
       if (animate) {
+        _markReaderAloudForManualPageTurn();
         pageController.nextPage(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
         );
       } else {
+        _markReaderAloudForManualPageTurn();
         pageController.jumpToPage((pageController.page?.round() ?? 0) + 1);
       }
       return;
@@ -90,9 +96,12 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     final pageStep = usesTwoPageLayout ? 2 : 1;
     if (_pageIndex + pageStep < pages.length) {
       _sessionPagesRead++;
+      _markReaderAloudForManualPageTurn();
       _setReaderState(() => _pageIndex += pageStep);
+      _restartReaderAloudFromCurrentPageAfterManualTurn();
     } else if (_chapterIndex < chapterCount - 1) {
       _sessionPagesRead++;
+      _markReaderAloudForManualPageTurn();
       _setChapter(_chapterIndex + 1, chapterCount);
     }
   }
@@ -103,7 +112,9 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     required bool usesTwoPageLayout,
     bool animate = true,
   }) {
+    _hideControlsForPageTurn();
     if (_pageMode == NativePageMode.pageCurl && animate) {
+      _markReaderAloudForManualPageTurn();
       final controller = usesTwoPageLayout
           ? _spreadBackwardPageCurlController
           : _pageCurlController;
@@ -111,6 +122,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
       return;
     }
     if (_pageMode == NativePageMode.coverSlide && animate) {
+      _markReaderAloudForManualPageTurn();
       unawaited(_coverPageTurnController.turnBackward());
       return;
     }
@@ -119,11 +131,13 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
         pageController != null &&
         pageController.hasClients) {
       if (animate) {
+        _markReaderAloudForManualPageTurn();
         pageController.previousPage(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
         );
       } else {
+        _markReaderAloudForManualPageTurn();
         pageController.jumpToPage(
           math.max(0, (pageController.page?.round() ?? 0) - 1),
         );
@@ -132,9 +146,12 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     }
     final pageStep = usesTwoPageLayout ? 2 : 1;
     if (_pageIndex >= pageStep) {
+      _markReaderAloudForManualPageTurn();
       _setReaderState(() => _pageIndex -= pageStep);
+      _restartReaderAloudFromCurrentPageAfterManualTurn();
     } else if (_chapterIndex > 0) {
       _openPreviousChapterAtLastPage = true;
+      _markReaderAloudForManualPageTurn();
       _setChapter(_chapterIndex - 1, chapterCount);
     }
   }
@@ -252,6 +269,21 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
   }
 
   void _toggleControls() {
-    _setReaderState(() => _controlsVisible = !_controlsVisible);
+    if (_controlsVisible) {
+      _hideControlsForPageTurn();
+      return;
+    }
+    _controlsTimer?.cancel();
+    _setReaderState(() => _controlsVisible = true);
+    _controlsTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) _setReaderState(() => _controlsVisible = false);
+    });
+  }
+
+  void _hideControlsForPageTurn() {
+    _controlsTimer?.cancel();
+    if (mounted && _controlsVisible) {
+      _setReaderState(() => _controlsVisible = false);
+    }
   }
 }

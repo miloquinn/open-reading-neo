@@ -25,6 +25,8 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       _setReaderState(() {
         _pageMode = settings.pageMode;
         _fontSize = settings.fontSize;
+        _textBrightness = settings.textBrightness;
+        _dimTextInDarkMode = settings.dimTextInDarkMode;
         _fontWeight = settings.fontWeight;
         _lineHeight = settings.lineHeight;
         _letterSpacing = settings.letterSpacing;
@@ -94,6 +96,8 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
 
   ReaderSettings get _readerSettings => ReaderSettings(
     fontSize: _fontSize,
+    textBrightness: _textBrightness,
+    dimTextInDarkMode: _dimTextInDarkMode,
     fontWeight: _fontWeight,
     lineHeight: _lineHeight,
     letterSpacing: _letterSpacing,
@@ -128,7 +132,14 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
     ),
     height: _lineHeight,
     letterSpacing: _letterSpacing,
-    color: _readerTheme.text,
+    color: readerTextColorForBrightness(
+      effectiveReaderTextBrightness(
+        brightness: _textBrightness,
+        dimInDarkMode: _dimTextInDarkMode,
+        isDarkMode: _readerTheme.brightness == Brightness.dark,
+      ),
+      isDarkMode: _readerTheme.brightness == Brightness.dark,
+    ),
   );
 
   TextAlign get _readerTextAlign => switch (_textAlignment) {
@@ -253,6 +264,8 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
 
   Future<void> _updateLayout({
     double? fontSize,
+    int? textBrightness,
+    bool? dimTextInDarkMode,
     int? fontWeight,
     double? lineHeight,
     double? letterSpacing,
@@ -265,6 +278,11 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
   }) async {
     _setReaderState(() {
       _fontSize = fontSize ?? _fontSize;
+      _textBrightness = (textBrightness ?? _textBrightness).clamp(
+        ReaderSettings.minTextBrightness,
+        ReaderSettings.maxTextBrightness,
+      );
+      _dimTextInDarkMode = dimTextInDarkMode ?? _dimTextInDarkMode;
       _fontWeight = normalizeReaderFontWeight(fontWeight ?? _fontWeight);
       _lineHeight = (lineHeight ?? _lineHeight).clamp(1.4, 2.1);
       _letterSpacing = (letterSpacing ?? _letterSpacing).clamp(

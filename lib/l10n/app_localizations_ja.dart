@@ -2304,6 +2304,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get readerModePageCurlHint => '左右にドラッグしてページをめくり、離すと完了または戻ります';
 
   @override
+  String get readerTextBrightnessLabel => '文字の明るさ';
+
+  @override
+  String get readerDimTextInDarkModeTitle => 'ダークモードで文字を暗くする';
+
+  @override
+  String get readerDimTextInDarkModeHint => 'ダークモードでは明るさを70%に固定します';
+
+  @override
   String readerFontSizeValue(int size) {
     return '文字サイズ  $size';
   }

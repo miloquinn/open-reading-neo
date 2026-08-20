@@ -12,6 +12,8 @@ void main() {
       int? changedIndent;
       int? changedSpacing;
       int? changedFontWeight;
+      int? changedTextBrightness;
+      bool? dimTextInDarkMode;
       double? changedLetterSpacing;
       ReaderTextAlignment? changedAlignment;
       bool? pullBookmark;
@@ -60,6 +62,9 @@ void main() {
               );
             },
             fontSizeLabel: 'Font size',
+            textBrightnessLabel: 'Text brightness',
+            dimTextInDarkModeTitle: 'Dim text in dark mode',
+            dimTextInDarkModeHint: 'Use 70% brightness in dark mode',
             fontWeightLabel: 'Font weight',
             fontWeightValueLabels: const <String>[
               'Light',
@@ -84,6 +89,8 @@ void main() {
             txtChapterTitlePageHint: 'Show the title above body text when off',
             themeId: ReaderThemes.day.id,
             fontSize: 19,
+            textBrightness: 42,
+            dimTextInDarkMode: true,
             fontWeight: 400,
             lineHeight: 1.7,
             letterSpacing: 0.3,
@@ -104,6 +111,8 @@ void main() {
             onTopBarStyleTap: () {},
             onTapZonesTap: () {},
             onFontSizeChanged: (_) {},
+            onTextBrightnessChanged: (value) => changedTextBrightness = value,
+            onDimTextInDarkModeChanged: (value) => dimTextInDarkMode = value,
             onFontWeightChanged: (value) => changedFontWeight = value,
             onLineHeightChanged: (_) {},
             onLetterSpacingChanged: (value) => changedLetterSpacing = value,
@@ -134,6 +143,24 @@ void main() {
       expect(fontPickerOpened, isTrue);
       expect(find.text('Reader Serif'), findsOneWidget);
       expect(find.text('Overrides the book font'), findsOneWidget);
+
+      final textBrightnessFinder = find.descendant(
+        of: find.byKey(const ValueKey('reader-text-brightness-slider')),
+        matching: find.byType(Slider),
+      );
+      final textBrightnessSlider = tester.widget<Slider>(textBrightnessFinder);
+      expect(textBrightnessSlider.value, 42);
+      expect(textBrightnessSlider.min, 0);
+      expect(textBrightnessSlider.max, 100);
+      textBrightnessSlider.onChanged!(67.4);
+      await tester.pump();
+      tester.widget<Slider>(textBrightnessFinder).onChangeEnd!(67.4);
+      expect(changedTextBrightness, 67);
+      final dimSwitch = tester.widget<SwitchListTile>(
+        find.widgetWithText(SwitchListTile, 'Dim text in dark mode'),
+      );
+      dimSwitch.onChanged!(false);
+      expect(dimTextInDarkMode, isFalse);
       final fontWeightFinder = find.byKey(
         const ValueKey('reader-font-weight-slider'),
       );

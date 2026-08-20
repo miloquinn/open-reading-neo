@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/core/reader/reader_layout.dart';
@@ -51,12 +52,66 @@ void main() {
 
     expect(settings.pageMode, ReaderPageMode.horizontalSlide);
     expect(settings.fontWeight, ReaderSettings.defaultFontWeight);
+    expect(settings.textBrightness, ReaderSettings.defaultTextBrightness);
+    expect(settings.dimTextInDarkMode, isTrue);
     expect(settings.letterSpacing, ReaderSettings.defaultLetterSpacing);
     expect(settings.textAlignment, ReaderTextAlignment.natural);
     expect(
       await const ReaderSettingsStore().loadTxtChapterTitlePageEnabled(),
       isTrue,
     );
+  });
+
+  test('maps text brightness relative to the active reader theme', () {
+    expect(
+      readerTextColorForBrightness(0, isDarkMode: true),
+      const Color(0xFF000000),
+    );
+    expect(
+      readerTextColorForBrightness(100, isDarkMode: true),
+      const Color(0xFFFFFFFF),
+    );
+    expect(
+      readerTextColorForBrightness(0, isDarkMode: false),
+      const Color(0xFFFFFFFF),
+    );
+    expect(
+      readerTextColorForBrightness(100, isDarkMode: false),
+      const Color(0xFF000000),
+    );
+    expect(
+      effectiveReaderTextBrightness(
+        brightness: 82,
+        dimInDarkMode: true,
+        isDarkMode: true,
+      ),
+      70,
+    );
+    expect(
+      effectiveReaderTextBrightness(
+        brightness: 82,
+        dimInDarkMode: false,
+        isDarkMode: true,
+      ),
+      82,
+    );
+  });
+
+  test('migrates the legacy absolute brightness scale once', () async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.textBrightnessKey: 18,
+    });
+
+    const store = ReaderSettingsStore();
+    final migrated = await store.load();
+
+    expect(migrated.textBrightness, 82);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt(ReaderSettingsStore.textBrightnessKey), 82);
+
+    await prefs.setInt(ReaderSettingsStore.textBrightnessKey, 64);
+    final reloaded = await store.load();
+    expect(reloaded.textBrightness, 64);
   });
 
   test(
@@ -96,6 +151,8 @@ void main() {
     const store = ReaderSettingsStore();
     const settings = ReaderSettings(
       fontSize: 22,
+      textBrightness: 68,
+      dimTextInDarkMode: false,
       fontWeight: 600,
       lineHeight: 1.8,
       letterSpacing: 0.6,
@@ -119,6 +176,8 @@ void main() {
 
     expect(restored.fontSize, 22);
     expect(restored.fontWeight, 600);
+    expect(restored.textBrightness, 68);
+    expect(restored.dimTextInDarkMode, isFalse);
     expect(restored.letterSpacing, 0.6);
     expect(restored.textAlignment, ReaderTextAlignment.justified);
     expect(restored.topMargin, 7);
@@ -187,6 +246,8 @@ void main() {
     expect(restored.copyWith(paragraphSpacing: 9).paragraphSpacing, 2);
     expect(restored.copyWith(fontWeight: 349).fontWeight, 300);
     expect(restored.copyWith(fontWeight: 351).fontWeight, 400);
+    expect(restored.copyWith(textBrightness: 120).textBrightness, 100);
+    expect(restored.copyWith(textBrightness: -1).textBrightness, 0);
     expect(
       restored.copyWith(letterSpacing: -1).letterSpacing,
       ReaderSettings.minLetterSpacing,

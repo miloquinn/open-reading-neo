@@ -179,7 +179,14 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
       configuredFallbacks: _readerFont.fallbackFamilies,
       locale: Localizations.maybeLocaleOf(context),
     ),
-    color: _readerTheme.text,
+    color: readerTextColorForBrightness(
+      effectiveReaderTextBrightness(
+        brightness: _textBrightness,
+        dimInDarkMode: _dimTextInDarkMode,
+        isDarkMode: _readerTheme.brightness == Brightness.dark,
+      ),
+      isDarkMode: _readerTheme.brightness == Brightness.dark,
+    ),
     fontSize: _fontSize,
     fontWeight: readerFontWeightFromValue(_fontWeight),
     fontVariations: readerFontVariationsFromValue(
@@ -363,7 +370,7 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                       onReadAloud:
                           _chapters.isEmpty || !isReaderAloudPlatformSupported
                           ? null
-                          : () => unawaited(_showReaderAloudPanel()),
+                          : () => unawaited(_handleReaderAloudButtonPressed()),
                       readAloudTooltip: context.l10n.ttsReading,
                       readAloudActive: _readerAloudActive,
                       onAskAi: _chapters.isEmpty

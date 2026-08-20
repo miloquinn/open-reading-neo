@@ -121,6 +121,7 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
     List<_NativeChapter> chapters, {
     int pagesReadDelta = 0,
   }) {
+    _hideControlsForPageTurn();
     final movedForward =
         page.chapterIndex > _chapterIndex ||
         (page.chapterIndex == _chapterIndex && page.pageIndex > _pageIndex);
@@ -154,6 +155,7 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
         _horizontalLastChapter++;
       }
     });
+    _restartReaderAloudFromCurrentPageAfterManualTurn();
     if (chapterChanged && widget.book.id != null) {
       unawaited(_queueBookProgress(widget.book.id!, page.chapterIndex));
     }

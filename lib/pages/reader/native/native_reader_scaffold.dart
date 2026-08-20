@@ -435,7 +435,9 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                               onSearch: () => unawaited(_showFullTextSearch()),
                               searchTooltip: '全文搜索',
                               onReadAloud: isReaderAloudPlatformSupported
-                                  ? () => unawaited(_showReaderAloudPanel())
+                                  ? () => unawaited(
+                                      _handleReaderAloudButtonPressed(),
+                                    )
                                   : null,
                               readAloudTooltip: context.l10n.ttsReading,
                               readAloudActive: _readerAloudActive,

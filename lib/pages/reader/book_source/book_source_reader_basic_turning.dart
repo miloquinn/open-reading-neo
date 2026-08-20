@@ -124,8 +124,13 @@ extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
         : _pagedLayoutFor(nextChapterIndex, nextContent, _pagedViewportSize);
     final nextPageCount = nextLayout?.pages.length ?? 1;
     final trailing = hasNextChapter ? nextPageCount : 0;
-    return NotificationListener<ScrollEndNotification>(
+    return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
+        if (notification is ScrollStartNotification &&
+            notification.dragDetails != null) {
+          _markReaderAloudForManualPageTurn();
+        }
+        if (notification is! ScrollEndNotification) return false;
         _schedulePendingSlideChapterCommit();
         return false;
       },

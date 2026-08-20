@@ -340,8 +340,13 @@ extension _NativeReaderHorizontalPaging on _NativeReaderPageState {
     // and page list from the same build so an in-flight gesture cannot map an
     // old child list through a newer origin.
     final controllerOrigin = _horizontalPageIndexMap.origin;
-    return NotificationListener<ScrollEndNotification>(
-      onNotification: (_) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollStartNotification &&
+            notification.dragDetails != null) {
+          _markReaderAloudForManualPageTurn();
+        }
+        if (notification is! ScrollEndNotification) return false;
         _commitHorizontalWindowMaintenanceWhenIdle(
           bookPages,
           chapters,

@@ -3456,6 +3456,12 @@ abstract class AppLocalizations {
   /// **'Reading direction'**
   String get imageReaderDirectionTitle;
 
+  /// Continuous top-to-bottom scrolling mode for image books
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous vertical'**
+  String get imageReaderDirectionVertical;
+
   /// Standard left-to-right page-turn direction option
   ///
   /// In en, this message translates to:

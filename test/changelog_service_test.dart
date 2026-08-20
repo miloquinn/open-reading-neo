@@ -21,8 +21,8 @@ void main() {
       final catalogs = await Future.wait(locales.map(service.load));
       final versions = catalogs.first.map((entry) => entry.version).toList();
 
-      expect(versions, hasLength(48));
-      expect(versions.first, '2.6.0');
+      expect(versions, hasLength(49));
+      expect(versions.first, '2.6.1');
       expect(
         versions,
         containsAll(['2.5.7', '2.5.6', '2.5.5', '2.5.4', '2.2.8', '2.2.3']),

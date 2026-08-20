@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/core/reader/paged_image_reader_settings.dart';
 import 'package:xxread/core/reader/reader_keep_screen_on.dart';
@@ -26,6 +27,9 @@ Widget _buildReader({
   ValueChanged<int>? onPageChanged,
   int? bookId,
   String? settingsId,
+  ImageReaderDirection defaultDirection = ImageReaderDirection.ltr,
+  Future<Uint8List> Function(int index, {bool preload})? loadPage,
+  Future<void> Function(int index)? onRetryPage,
   VoidCallback? onReachedEnd,
   VoidCallback? onReachedStart,
 }) {
@@ -37,13 +41,17 @@ Widget _buildReader({
         title: '测试书',
         pageCount: pageCount,
         initialPage: initialPage,
-        loadPage: (index) async {
-          requested.add(index);
-          return _tinyPng;
-        },
+        loadPage:
+            loadPage ??
+            (index, {preload = false}) async {
+              requested.add(index);
+              return _tinyPng;
+            },
+        onRetryPage: onRetryPage,
         onPageChanged: onPageChanged,
         bookId: bookId,
         settingsId: settingsId,
+        defaultDirection: defaultDirection,
         onReachedEnd: onReachedEnd,
         onReachedStart: onReachedStart,
       ),
@@ -188,32 +196,81 @@ void main() {
     await _tapAndSettle(tester, const Offset(700, 300));
     expect(find.text('2 / 3'), findsOneWidget);
 
-    // 控制栏默认隐藏，Slider 不接收点击。
-    final chromeOpacity = tester.widget<AnimatedOpacity>(
-      find
-          .ancestor(
-            of: find.byType(Slider),
-            matching: find.byType(AnimatedOpacity),
-          )
-          .first,
+    // 控制栏默认移出视口。
+    final hidden = tester.widget<AnimatedPositioned>(
+      find.byType(AnimatedPositioned).last,
     );
-    expect(chromeOpacity.opacity, 0);
+    expect(hidden.bottom, lessThan(0));
 
     // 中间：呼出控制栏。
     await _tapAndSettle(tester, const Offset(400, 300));
-    final visibleOpacity = tester.widget<AnimatedOpacity>(
-      find
-          .ancestor(
-            of: find.byType(Slider),
-            matching: find.byType(AnimatedOpacity),
-          )
-          .first,
+    final visible = tester.widget<AnimatedPositioned>(
+      find.byType(AnimatedPositioned).last,
     );
-    expect(visibleOpacity.opacity, 1);
+    expect(visible.bottom, greaterThan(0));
 
     // 控制栏可见时任意位置轻点先收起，不触发翻页。
     await _tapAndSettle(tester, const Offset(700, 300));
     expect(find.text('2 / 3'), findsOneWidget);
+    await _unmountReader(tester);
+  });
+
+  testWidgets('纵向模式使用连续列表并保存可见页进度', (tester) async {
+    final requested = <int>[];
+    final changes = <int>[];
+    await tester.pumpWidget(
+      _buildReader(
+        pageCount: 4,
+        initialPage: 1,
+        requested: requested,
+        onPageChanged: changes.add,
+        defaultDirection: ImageReaderDirection.vertical,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScrollablePositionedList), findsOneWidget);
+    expect(find.byType(PageView), findsNothing);
+    expect(find.text('2 / 4'), findsOneWidget);
+
+    await tester.fling(
+      find.byType(ScrollablePositionedList),
+      const Offset(0, -500),
+      1000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(changes, isNotEmpty);
+    expect(changes.last, greaterThanOrEqualTo(2));
+    await _unmountReader(tester);
+  });
+
+  testWidgets('失败页可驱逐并原地重试', (tester) async {
+    final requested = <int>[];
+    var loads = 0;
+    var invalidations = 0;
+    await tester.pumpWidget(
+      _buildReader(
+        pageCount: 1,
+        initialPage: 0,
+        requested: requested,
+        loadPage: (index, {preload = false}) async {
+          loads++;
+          if (loads == 1) throw StateError('temporary image failure');
+          return _tinyPng;
+        },
+        onRetryPage: (index) async => invalidations++,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Retry'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(invalidations, 1);
+    expect(loads, 2);
+    expect(find.text('Retry'), findsNothing);
     await _unmountReader(tester);
   });
 
@@ -252,9 +309,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 呼出控制栏后切换方向。
+    // 呼出设置面板后切换方向。
     await _tapAndSettle(tester, const Offset(400, 300));
-    await tester.tap(find.text('Left to right'));
+    await tester.tap(find.text('Reading settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Right to left (manga)'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(20, 100));
     await tester.pumpAndSettle();
     expect(tester.widget<PageView>(find.byType(PageView)).reverse, isTrue);
     final prefs = await SharedPreferences.getInstance();

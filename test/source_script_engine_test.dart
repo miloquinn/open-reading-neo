@@ -48,6 +48,16 @@ void main() {
       ),
       '甲,乙',
     );
+    expect(
+      evaluator.evaluate(
+        "java.getString('img@data-original')",
+        SourceScriptContext(
+          source: source,
+          result: '<img data-original="/1.jpg"><img data-original="/2.jpg">',
+        ),
+      ),
+      '/1.jpg\n/2.jpg',
+    );
   });
 
   test('QuickJS keeps source variables and java state per source', () {

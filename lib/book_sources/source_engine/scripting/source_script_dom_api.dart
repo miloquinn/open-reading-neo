@@ -4,6 +4,7 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import 'package:xxread/book_sources/source_engine/rules/source_rule_engine.dart';
+import 'package:xxread/book_sources/source_engine/rules/source_rule_regex.dart';
 
 import 'source_script_contract.dart';
 import 'source_script_state.dart';
@@ -35,7 +36,9 @@ class SourceScriptDomApi {
     final content = arguments.length > 1 ? arguments[1] : context.result;
     final document = _document(content, context);
     if (!listMode) {
-      return _selectors.evaluateString(document, document.value, rule);
+      final values = _selectors.evaluateList(document, document.value, rule);
+      if (values.isEmpty) return '';
+      return values.map(sourceRuleStringValue).join('\n');
     }
     return _selectors
         .evaluateList(document, document.value, rule)

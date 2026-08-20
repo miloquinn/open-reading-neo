@@ -114,8 +114,8 @@ part 'native_reader_continuous_layout.dart';
 
 typedef NativePageMode = ReaderPageMode;
 
-const int _largeTxtFileThreshold = 16 * 1024 * 1024;
-const int _txtChapterCacheVersion = 4;
+const int _largeTxtFileThreshold = 2 * 1024 * 1024;
+const int _txtChapterCacheVersion = 5;
 const double _imagePageGap = 10;
 const int _imagePageImageFlex = 5;
 const int _imagePageTextFlex = 6;
@@ -559,7 +559,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   }
 
   String get _bookCacheKey =>
-      '${widget.book.format.toLowerCase() == 'txt' ? 'txt-parser-v5:' : ''}'
+      '${widget.book.format.toLowerCase() == 'txt' ? 'txt-parser-v6:' : ''}'
       '${widget.book.contentHash ?? widget.book.filePath}:'
       '${widget.book.fileModifiedTime ?? (kIsWeb ? 0 : File(widget.book.filePath).lastModifiedSync().millisecondsSinceEpoch)}:'
       '${widget.book.textEncoding ?? 'auto'}';

@@ -16,7 +16,6 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/books/enhanced_txt_import_service.dart';
 import 'package:xxread/services/books/epub_native_parser.dart';
-import 'package:xxread/services/books/text_preprocessor_helper.dart';
 import 'package:xxread/services/books/cover_generator_service.dart';
 import 'package:xxread/services/books/book_import_limits.dart';
 import 'package:xxread/services/books/book_import_isolate_service.dart';
@@ -57,7 +56,6 @@ class BookImportService implements BookFileImporter {
   final WebBookFileStore _webBookFileStore;
   final Future<void> Function(Book book) _scheduleAnalysis;
   final _enhancedTxtService = EnhancedTxtImportService();
-  final _preprocessor = TextPreprocessor();
 
   /// 流式复制文件，支持大文件和进度回调
   ///

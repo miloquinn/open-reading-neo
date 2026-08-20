@@ -41,9 +41,24 @@ extension _BookImportTextMetadata on BookImportService {
       }
     }
 
-    // 📖 修改：TXT文件也完整读取，不再限制为10MB
-    // 这样可以确保元数据提取基于完整内容
     Uint8List bytes;
+
+    // TXT 的书名、作者和编码只需要检查文件头。完整读取并预处理数万行
+    // 文本会让导入卡在 UI isolate 上，且元数据结果并不会因此更准确。
+    // 多读 4 字节，让编码检测知道 256 KiB 样本可能截在 UTF-8 字符中间。
+    const int maxTxtBytesForMetadata = 256 * 1024 + 4;
+    if (ext == 'txt' && fileSize > maxTxtBytesForMetadata) {
+      progressCallback?.call(0.1, '读取文本头部...');
+      bytes = await _readFilePrefix(file, maxTxtBytesForMetadata);
+      progressCallback?.call(0.4, '分析文本信息...');
+      return _extractEnhancedMetadataFromBytes(
+        bytes,
+        fileName,
+        extension,
+        progressCallback: progressCallback,
+        totalByteLength: fileSize,
+      );
+    }
 
     // 对于超大的非TXT文件（如大PDF），仍然限制读取大小避免内存问题
     const int maxBytesForMetadata = 10 * 1024 * 1024; // 10MB
@@ -100,7 +115,20 @@ extension _BookImportTextMetadata on BookImportService {
       fileName,
       extension,
       progressCallback: progressCallback,
+      totalByteLength: fileSize,
     );
+  }
+
+  Future<Uint8List> _readFilePrefix(File file, int byteCount) async {
+    final chunks = await file.openRead(0, byteCount).toList();
+    final length = chunks.fold<int>(0, (sum, chunk) => sum + chunk.length);
+    final result = Uint8List(length);
+    var offset = 0;
+    for (final chunk in chunks) {
+      result.setRange(offset, offset + chunk.length, chunk);
+      offset += chunk.length;
+    }
+    return result;
   }
 
   Future<EnhancedBookMetadata> _extractEnhancedMetadataFromBytes(
@@ -108,6 +136,7 @@ extension _BookImportTextMetadata on BookImportService {
     String fileName,
     String extension, {
     Function(double, String)? progressCallback,
+    int? totalByteLength,
   }) async {
     final ext = extension.toLowerCase();
     try {
@@ -117,7 +146,11 @@ extension _BookImportTextMetadata on BookImportService {
           fileName,
         ),
         'pdf' => await _extractPdfMetadata(bytes, fileName),
-        'txt' => await _extractTxtMetadata(bytes, fileName),
+        'txt' => await _extractTxtMetadata(
+          bytes,
+          fileName,
+          totalByteLength: totalByteLength,
+        ),
         'mobi' ||
         'azw' ||
         'azw3' => await _extractMobiMetadata(bytes, fileName),
@@ -228,74 +261,21 @@ extension _BookImportTextMetadata on BookImportService {
   /// 使用增强服务提取TXT元数据（使用isolate优化），编码自动检测
   Future<EnhancedBookMetadata> _extractTxtMetadata(
     Uint8List bytes,
-    String fileName,
-  ) async {
+    String fileName, {
+    int? totalByteLength,
+  }) async {
     try {
       var resolvedEncoding = _enhancedTxtService.detectEncoding(bytes);
-
-      // 对于大文件，使用isolate处理
-      SimpleMetadata simpleMetadata;
-      if (bytes.length > 5 * 1024 * 1024) {
-        // 大于5MB，使用isolate。isolate 消息是拷贝语义，只传
-        // 元数据分析所需的头部切片，完整长度单独传给页数估算。
-        const headSliceBytes = 100 * 1024;
-        simpleMetadata = await compute(
-          extractTxtMetadataInIsolate,
-          MetadataExtractionParams(
-            // sublist 而非 sublistView：视图发给 isolate 会连带
-            // 拷贝整个底层缓冲区
-            bytes: bytes.sublist(0, headSliceBytes),
-            fileName: fileName,
-            extension: 'txt',
-            encodingOverride: resolvedEncoding,
-            totalByteLength: bytes.length,
-          ),
-        );
-      } else {
-        // 小文件在主线程处理
-        String content;
-        try {
-          final decodeResult = _enhancedTxtService.decodeWithResult(
-            bytes,
-            encodingOverride: resolvedEncoding,
-          );
-          content = decodeResult.content;
-          resolvedEncoding = decodeResult.encoding;
-        } catch (e) {
-          content = utf8.decode(bytes, allowMalformed: true);
-          resolvedEncoding = 'utf8';
-        }
-
-        // 文本预处理：压缩空行、添加缩进、段落间距
-        content = _preprocessor.process(
-          content,
-          indentSize: 2,
-          indentDialogue: true,
-          compressEmptyLines: true,
-          paragraphSpacing: 0,
-        );
-
-        // 不要使用 trim()，否则会移除段首缩进
-        final lines = content
-            .split('\n')
-            .where((e) => e.trim().isNotEmpty)
-            .toList();
-        var title = lines.isNotEmpty
-            ? lines.first.substring(0, lines.first.length.clamp(0, 50))
-            : fileName.replaceAll(RegExp(r'\.(txt)$'), '');
-        if (_looksGarbled(title)) {
-          title = fileName.replaceAll(RegExp(r'\.(txt)$'), '');
-        }
-        final estimatedPages = (content.length / 1500).ceil().clamp(1, 9999);
-
-        simpleMetadata = SimpleMetadata(
-          title: title,
-          author: 'Unknown',
-          estimatedPages: estimatedPages,
-          description: content.length > 200 ? content.substring(0, 200) : null,
-          language: 'zh',
-        );
-      }
+      final simpleMetadata = await compute(
+        extractTxtMetadataInIsolate,
+        MetadataExtractionParams(
+          bytes: bytes,
+          fileName: fileName,
+          extension: 'txt',
+          encodingOverride: resolvedEncoding,
+          totalByteLength: totalByteLength ?? bytes.length,
+        ),
+      );
 
       // TXT 没有嵌入封面，仅在本地生成默认封面。
       Uint8List? coverImage;
@@ -323,75 +303,27 @@ extension _BookImportTextMetadata on BookImportService {
         language: simpleMetadata.language,
         coverImage: coverImage,
         textEncoding: resolvedEncoding,
-        additionalInfo: {'format': 'TXT', 'fileSize': bytes.length},
+        additionalInfo: {
+          'format': 'TXT',
+          'fileSize': totalByteLength ?? bytes.length,
+        },
       );
     } catch (e, stackTrace) {
       debugPrint('❌ TXT元数据提取失败，回退到基础提取: $e');
       debugPrint('Stack trace: $stackTrace');
-      return _extractBasicMetadata(bytes, fileName);
+      final fallback = _extractBasicMetadata(bytes, fileName);
+      return EnhancedBookMetadata(
+        title: fallback.title,
+        author: fallback.author,
+        estimatedPages: ((totalByteLength ?? bytes.length) / 10000)
+            .ceil()
+            .clamp(1, 9999),
+        textEncoding: _enhancedTxtService.detectEncoding(bytes),
+        additionalInfo: {
+          'format': 'TXT',
+          'fileSize': totalByteLength ?? bytes.length,
+        },
+      );
     }
-  }
-
-  bool _looksGarbled(String text) {
-    final value = text.trim();
-    if (value.isEmpty) {
-      return true;
-    }
-
-    int total = 0;
-    int cjk = 0;
-    int asciiLetters = 0;
-    int digits = 0;
-    int latinExtended = 0;
-    int otherNonAscii = 0;
-    int replacement = 0;
-
-    for (final rune in value.runes) {
-      if (rune <= 0x20) {
-        continue;
-      }
-      total++;
-      if (rune == 0xfffd) {
-        replacement++;
-        continue;
-      }
-      if ((rune >= 0x4e00 && rune <= 0x9fff) ||
-          (rune >= 0x3400 && rune <= 0x4dbf) ||
-          (rune >= 0xf900 && rune <= 0xfaff)) {
-        cjk++;
-        continue;
-      }
-      if ((rune >= 0x41 && rune <= 0x5a) || (rune >= 0x61 && rune <= 0x7a)) {
-        asciiLetters++;
-        continue;
-      }
-      if (rune >= 0x30 && rune <= 0x39) {
-        digits++;
-        continue;
-      }
-      if (rune >= 0x00c0 && rune <= 0x024f) {
-        latinExtended++;
-        continue;
-      }
-      if (rune > 0x7e) {
-        otherNonAscii++;
-      }
-    }
-
-    if (total == 0 || replacement > 0) {
-      return true;
-    }
-
-    final asciiRatio = (asciiLetters + digits) / total;
-    final cjkRatio = cjk / total;
-    final nonAsciiRatio = (latinExtended + otherNonAscii) / total;
-
-    if (cjkRatio >= 0.2) {
-      return false;
-    }
-    if (asciiRatio >= 0.6) {
-      return false;
-    }
-    return nonAsciiRatio >= 0.3;
   }
 }

@@ -1803,6 +1803,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageReaderDirectionTitle => '阅读方向';
 
   @override
+  String get imageReaderDirectionVertical => '上下连续滚动';
+
+  @override
   String get imageReaderDirectionLtr => '从左到右';
 
   @override
@@ -7343,6 +7346,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get imageReaderDirectionTitle => '閱讀方向';
+
+  @override
+  String get imageReaderDirectionVertical => '上下連續捲動';
 
   @override
   String get imageReaderDirectionLtr => '從左到右';

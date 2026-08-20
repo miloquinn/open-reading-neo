@@ -7,6 +7,7 @@ import '../protocol/book_source_protocol.dart';
 import 'source_config.dart';
 import 'source_runtime_catalog.dart';
 import 'source_request_template.dart';
+import 'rules/source_rule_engine.dart' show SourceRuleDocument;
 import 'source_runtime_login.dart';
 import 'source_runtime_requests.dart';
 import 'source_runtime_rules.dart';
@@ -125,7 +126,7 @@ class SourceRuntimeReading {
             );
           }
         }
-        var url = await _rules.url(
+        var url = await _optionalResolvedUrl(
           contextualDocument,
           context,
           rule,
@@ -146,7 +147,12 @@ class SourceRuntimeReading {
           ..remove(url)
           ..[url] = title;
       }
-      nextUrl = await _rules.url(contextualDocument, null, rule, 'nextTocUrl');
+      nextUrl = await _optionalResolvedUrl(
+        contextualDocument,
+        null,
+        rule,
+        'nextTocUrl',
+      );
     }
     if (chapterTitles.isEmpty && source.isImageSource) {
       chapterTitles[bookId] = '全本';
@@ -259,7 +265,7 @@ class SourceRuntimeReading {
         _rules.optionalRule(rule, 'replaceRegex'),
       );
       if (content.trim().isNotEmpty) parts.add(content.trim());
-      nextUrl = await _rules.url(
+      nextUrl = await _optionalResolvedUrl(
         contextualDocument,
         null,
         rule,
@@ -417,6 +423,22 @@ class SourceRuntimeReading {
     }
   }
 
+  Future<String> _optionalResolvedUrl(
+    SourceRuleDocument document,
+    Object? context,
+    Map<String, dynamic> rules,
+    String key,
+  ) async {
+    try {
+      return await _rules.url(document, context, rules, key);
+    } on FormatException {
+      return '';
+    } on BookSourceProtocolException catch (error) {
+      if (_isNonNetworkUrlError(error)) return '';
+      rethrow;
+    }
+  }
+
   String _fallbackComicImageHtml(String body) {
     if (body.trim().isEmpty) return '';
     final fragment = html_parser.parse(body);
@@ -528,9 +550,9 @@ class SourceRuntimeReading {
     }
 
     visit(fragment.nodes);
-    // Legado asset options use a non-HTML suffix such as
-    // `url,{headers:{Referer:'...'}}`; nested quotes make some HTML parsers
-    // truncate the attribute. Recover that narrow legacy shape from the raw
+    // Some imported image rules append request options after the URL, such as
+    // `url,{headers:{Referer:'...'}}`; nested quotes make HTML parsers truncate
+    // the attribute. Recover that narrow compatibility shape from the raw
     // payload after the standards-compliant DOM pass.
     final legacyPattern = RegExp(
       r'''(?:src|data-src|data-original|data-original-src|data-lazy|data-lazy-src|data-url|data-image)\s*=\s*(["'])(.*?)\1''',
@@ -566,6 +588,13 @@ class SourceRuntimeReading {
     final whitespace = first.indexOf(RegExp(r'\s'));
     return whitespace < 0 ? first : first.substring(0, whitespace);
   }
+}
+
+bool _isNonNetworkUrlError(BookSourceProtocolException error) {
+  final message = error.message.toLowerCase();
+  return message.contains('non-http url') ||
+      message.contains('must use http or https') ||
+      message.contains('targets must use http or https');
 }
 
 bool _looksLikePlaceholderContent(String value) {

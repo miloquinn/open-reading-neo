@@ -648,6 +648,7 @@
   "readerComicChapterNoPages": "この章には画像ページがありません",
   "imageReaderSettings": "閲覧設定",
   "imageReaderDirectionTitle": "読む方向",
+  "imageReaderDirectionVertical": "縦に連続スクロール",
   "imageReaderDirectionLtr": "左から右",
   "imageReaderDirectionRtl": "右から左（マンガ）",
   "imageReaderJumpToPage": "ページ指定",

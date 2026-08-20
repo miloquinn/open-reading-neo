@@ -2,6 +2,54 @@
     "schemaVersion": 1,
     "entries": [
         {
+            "version": "2.6.1",
+            "notes": {
+                "en": [
+                    "Validated source snapshots and identities before opening online shelf books across Library, Home, and startup resume",
+                    "Made optional non-network URLs from compatible reading sources degrade safely and preserved real book-link fallbacks",
+                    "Added continuous vertical comic reading with per-book mode persistence alongside left-to-right and right-to-left paging",
+                    "Added in-place image retry with targeted cache eviction and prioritized visible pages over queued preloads",
+                    "Separated long-lived source image-page storage from cover storage and included it in cache management",
+                    "Limited large-TXT metadata analysis to a background file-head sample and used filenames unless explicit title or author labels exist",
+                    "Split multi-megabyte unchaptered TXT files into bounded sections for faster opening and pagination"
+                ],
+                "zh": [
+                    "在线书籍进入阅读器前会统一校验书源配置、书籍快照和身份信息；损坏、缺失或错配的书架记录不再通过空值强制解包进入不稳定状态，首页、书库和启动恢复使用同一条安全解析链路。",
+                    "修复部分兼容阅读源把封面、下一页或目录辅助字段返回为非网络地址时导致整本书加载失败的问题；可选地址无效时会安全忽略，并在结果条目中尝试使用真实书籍链接。",
+                    "改进脚本 DOM 单值读取的兼容行为，多个命中项按正文语义合并，减少正文片段丢失。",
+                    "目录与章节缓存现在会保存远程图片地址和请求头，漫画书籍重复打开后仍能从缓存恢复完整图片页。",
+                    "新增上下连续滚动模式，在线漫画默认使用纵向阅读，也可在纵向、从左到右和从右到左之间按书保存选择。",
+                    "漫画目录切换、当前页进度和跨章节连续浏览保持同步；相邻章节内容按窗口回收，降低长时间阅读的内存占用。",
+                    "图片加载失败后可在当前页直接重试；重试会驱逐损坏缓存并重新请求，不必退出阅读器。",
+                    "可见图片请求优先于后台预加载，正文图片使用独立的长效缓存和更合适的容量限制，减少首屏等待和封面缓存相互挤占。",
+                    "统一漫画、PDF 和书源图片章节的阅读工具栏、主题配色、跳页和设置界面。",
+                    "大型 TXT 元数据只读取文件头并在后台 isolate 中分析，不再为了书名和编码扫描完整文件，显著减少导入期间的内存与主线程压力。",
+                    "没有明确“书名/作者”标记时优先使用文件名作为书名，避免把正文第一行或数字编号误识别成书名；明确标注的书名和作者仍会保留。",
+                    "将大型 TXT 的分段读取阈值提前到 2 MiB，并为没有标准章节标题的多兆字节文本切分有界区段，避免超长单章拖慢打开和分页。",
+                    "缓存管理会同时统计并清理书源封面缓存和正文图片页缓存。",
+                    "补充在线书架数据校验、书源 URL 降级、图片缓存恢复、可见请求优先级、纵向漫画进度、失败页重试和大型 TXT 分段的回归测试。"
+                ],
+                "zh-TW": [
+                    "線上書籍進入閱讀器前會統一驗證書源設定、書籍快照與識別資訊，損壞、缺失或不一致的書架記錄不再透過強制解包進入不穩定狀態",
+                    "相容閱讀源的可選網址若不是網路位址會安全忽略，並保留結果項目中的真實書籍連結作為備援",
+                    "新增上下連續捲動漫畫閱讀，並可依書籍保存縱向、由左至右或由右至左模式",
+                    "圖片載入失敗可在原頁重試，重試前會清除對應快取，可見頁也會優先於背景預載",
+                    "正文圖片頁使用獨立的長效快取，並納入快取統計與清理",
+                    "大型 TXT 只分析檔案開頭且在背景 isolate 執行，沒有明確書名或作者時安全使用檔名",
+                    "多 MB 且沒有標準章節標題的 TXT 會切成有界區段，加快開啟與分頁"
+                ],
+                "ja": [
+                    "オンライン本棚の書籍を開く前に、書源設定・書籍スナップショット・識別情報を一括検証し、欠損や不一致のあるデータを安全に拒否するようにしました",
+                    "互換書源の任意 URL がネットワーク URL でない場合は安全に無視し、結果項目の実際の書籍リンクをフォールバックとして保持しました",
+                    "上下連続スクロールの漫画表示を追加し、縦読み・左から右・右から左を書籍ごとに保存できるようにしました",
+                    "画像の読み込み失敗をその場で再試行できるようにし、対象キャッシュを削除してから再取得します。表示中のページはバックグラウンド先読みより優先されます",
+                    "本文画像ページを表紙とは別の長期キャッシュに保存し、キャッシュ管理の集計と削除対象に追加しました",
+                    "大きな TXT のメタデータ解析をファイル先頭のサンプルとバックグラウンド isolate に限定し、明示的な題名や著者がない場合はファイル名を使用します",
+                    "標準的な章見出しがない数 MB の TXT を bounded section に分割し、起動とページ分割を高速化しました"
+                ]
+            }
+        },
+        {
             "version": "2.6.0",
             "notes": {
                 "en": [

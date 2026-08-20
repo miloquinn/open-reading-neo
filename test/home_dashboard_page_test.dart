@@ -250,10 +250,58 @@ void main() {
     );
 
     expect(reader, isA<BookSourceReaderPage>());
-    final sourceReader = reader! as BookSourceReaderPage;
+    final sourceReader = reader as BookSourceReaderPage;
     expect(sourceReader.source.id, source.id);
     expect(sourceReader.book.id, sourceBook.id);
     expect(sourceReader.client, same(client));
     expect(sourceReader.initialTheme, ReaderThemes.pureBlack);
+  });
+
+  test('首页在线阅读入口拒绝损坏或身份不一致的书架数据', () {
+    final source = RegisteredBookSource(
+      id: 'test.source',
+      name: '测试书源',
+      description: '',
+      manifestUrl: Uri.parse('https://example.org/source.json'),
+      apiBaseUrl: Uri.parse('https://example.org/api/'),
+      protocolVersion: '1.0',
+      languages: const ['zh-CN'],
+      capabilities: const {'search', 'catalog', 'content'},
+      enabled: true,
+      addedAt: DateTime.utc(2026, 7, 23),
+    );
+    const sourceBook = BookSourceBook(
+      id: 'online-book',
+      title: '在线测试书',
+      author: '测试作者',
+      description: '',
+      categories: [],
+    );
+    final broken = Book(
+      title: sourceBook.title,
+      author: sourceBook.author,
+      filePath: '',
+      format: 'source',
+      storageType: 'online',
+      sourceId: source.id,
+      sourceBookId: 'different-book',
+      sourceJson: jsonEncode(source.toJson()),
+      sourceBookJson: jsonEncode(sourceBook.toJson()),
+    );
+    final client = BookSourceClient();
+    final shelfService = BookSourceShelfService(client: client);
+    addTearDown(() {
+      shelfService.close();
+      client.close();
+    });
+
+    expect(
+      () => HomeMobileDashboardPage.buildOnlineReader(
+        book: broken,
+        client: client,
+        shelfService: shelfService,
+      ),
+      throwsA(isA<OnlineShelfBookBindingException>()),
+    );
   });
 }

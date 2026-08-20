@@ -138,7 +138,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       (widget.shelfServiceFactory ??
           (client) => BookSourceShelfService(client: client))(_client);
   late final SourceCoverCache _remoteImageCache =
-      widget.remoteImageCache ?? SourceCoverCache.instance;
+      widget.remoteImageCache ?? SourceCoverCache.imagePageInstance;
   PageController _pageController = PageController();
   final ItemScrollController _verticalPageScrollController =
       ItemScrollController();

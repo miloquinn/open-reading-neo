@@ -533,26 +533,31 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
       if (book.isOnline) {
         final client = BookSourceClient();
         final shelfService = BookSourceShelfService(client: client);
-        final source = shelfService.sourceFrom(book);
-        final sourceBook = shelfService.sourceBookFrom(book);
-        final reader = isOnlineComicSource(source, sourceBook)
-            ? OnlineComicReaderPage(
-                source: source,
-                book: sourceBook,
-                client: client,
-                shelfService: shelfService,
-              )
-            : BookSourceReaderPage(
-                source: source,
-                book: sourceBook,
-                client: client,
-                shelfService: shelfService,
-              );
-        final route = BookOpenTransition.createRoute<void>(
-          reader,
-          waitForReaderReady: true,
-        );
-        await BookOpenTransition.push<void>(context, route);
+        try {
+          final binding = shelfService.bindingFrom(book);
+          final reader = isOnlineComicSource(binding.source, binding.book)
+              ? OnlineComicReaderPage(
+                  source: binding.source,
+                  book: binding.book,
+                  client: client,
+                  shelfService: shelfService,
+                )
+              : BookSourceReaderPage(
+                  source: binding.source,
+                  book: binding.book,
+                  client: client,
+                  shelfService: shelfService,
+                );
+          final route = BookOpenTransition.createRoute<void>(
+            reader,
+            waitForReaderReady: true,
+          );
+          await BookOpenTransition.push<void>(context, route);
+        } catch (_) {
+          shelfService.close();
+          client.close();
+          rethrow;
+        }
       } else {
         await NativeReaderService.openBook(context, book);
       }

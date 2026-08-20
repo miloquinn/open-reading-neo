@@ -1824,6 +1824,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get imageReaderDirectionTitle => '読む方向';
 
   @override
+  String get imageReaderDirectionVertical => '縦に連続スクロール';
+
+  @override
   String get imageReaderDirectionLtr => '左から右';
 
   @override

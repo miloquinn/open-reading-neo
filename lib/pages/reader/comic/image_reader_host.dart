@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:xxread/core/reader/paged_image_reader_settings.dart';
 import 'package:xxread/pages/reader/comic/comic_debug_log.dart';
+import 'package:xxread/pages/reader/comic/continuous_image_reader.dart';
 import 'package:xxread/pages/reader/comic/image_reader_source.dart';
 import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/utils/book_open_transition.dart';
@@ -20,7 +22,7 @@ class ImageReaderHost extends StatefulWidget {
 }
 
 class _ImageReaderHostState extends State<ImageReaderHost> {
-  late final Future<ImageReaderDocument> _documentFuture = widget.source
+  late Future<ImageReaderDocument> _documentFuture = widget.source
       .loadDocument();
   int _chapterIndex = 0;
   int _pageIndex = 0;
@@ -30,16 +32,39 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
   int? _pageCountChapterIndex;
   int? _pageCountRetrySerial;
   Future<int>? _pageCountFuture;
+  ImageReaderDirection? _resolvedDirection;
 
   @override
   void initState() {
     super.initState();
     widget.source.attach();
+    unawaited(_resolveDirection());
     comicDebugLog(
       'host',
       'attach source=${widget.source.runtimeType} title=${widget.source.bookTitle} '
           'settingsId=${widget.source.settingsId}',
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant ImageReaderHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.source, widget.source)) return;
+    oldWidget.source.dispose();
+    widget.source.attach();
+    unawaited(_resolveDirection());
+    setState(() {
+      _documentFuture = widget.source.loadDocument();
+      _chapterIndex = 0;
+      _pageIndex = 0;
+      _retrySerial = 0;
+      _appliedInitialLocation = false;
+      _contentReadyMarked = false;
+      _pageCountChapterIndex = null;
+      _pageCountRetrySerial = null;
+      _pageCountFuture = null;
+      _resolvedDirection = null;
+    });
   }
 
   @override
@@ -71,6 +96,18 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
     });
   }
 
+  void _retryDocument() {
+    comicDebugLog('retry', 'document title=${widget.source.bookTitle}');
+    setState(() {
+      _documentFuture = widget.source.loadDocument();
+      _appliedInitialLocation = false;
+      _pageCountChapterIndex = null;
+      _pageCountRetrySerial = null;
+      _pageCountFuture = null;
+      _resolvedDirection = null;
+    });
+  }
+
   void _retryChapter() {
     comicDebugLog(
       'retry',
@@ -78,6 +115,38 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
     );
     widget.source.invalidateChapter(_chapterIndex);
     setState(() => _retrySerial++);
+  }
+
+  Future<void> _resolveDirection() async {
+    final store = const PagedImageReaderSettingsStore();
+    final direction = widget.source.settingsId == null
+        ? await store.loadDirection(
+            widget.source.localBookId,
+            fallback: widget.source.defaultDirection,
+          )
+        : await store.loadDirectionForKey(
+            widget.source.settingsId,
+            fallback: widget.source.defaultDirection,
+          );
+    if (!mounted) return;
+    setState(() => _resolvedDirection = direction);
+  }
+
+  Future<void> _setHorizontalMode() async {
+    final store = const PagedImageReaderSettingsStore();
+    if (widget.source.settingsId == null) {
+      await store.saveDirection(
+        widget.source.localBookId,
+        ImageReaderDirection.ltr,
+      );
+    } else {
+      await store.saveDirectionForKey(
+        widget.source.settingsId,
+        ImageReaderDirection.ltr,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _resolvedDirection = ImageReaderDirection.ltr);
   }
 
   Future<void> _showCatalog(ImageReaderDocument document) async {
@@ -95,7 +164,17 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
         ),
       ),
     );
-    if (selected != null) await _openChapter(selected, page: 0);
+    if (selected != null) {
+      if (_resolvedDirection == ImageReaderDirection.vertical) {
+        setState(() {
+          _chapterIndex = selected;
+          _pageIndex = 0;
+          _retrySerial++;
+        });
+      } else {
+        await _openChapter(selected, page: 0);
+      }
+    }
   }
 
   @override
@@ -117,6 +196,7 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
               title: source.bookTitle,
               message: source.describeError(catalog.error!, context.l10n),
               palette: source.theme,
+              onRetry: _retryDocument,
             );
           }
           final document = catalog.data;
@@ -150,6 +230,27 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
             0,
             document.chapters.length - 1,
           );
+          final direction = _resolvedDirection;
+          if (direction == null) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white70),
+            );
+          }
+          if (direction == ImageReaderDirection.vertical) {
+            _markContentReady();
+            return ContinuousImageReader(
+              key: ValueKey('continuous-image-reader-$_retrySerial'),
+              document: document,
+              source: source,
+              initialChapterIndex: chapterIndex,
+              initialPageIndex: _pageIndex,
+              onTableOfContents: document.chapters.length > 1
+                  ? () => unawaited(_showCatalog(document))
+                  : null,
+              onSettings: _setHorizontalMode,
+              onChangeReadingMode: _setHorizontalMode,
+            );
+          }
           if (_pageCountFuture == null ||
               _pageCountChapterIndex != chapterIndex ||
               _pageCountRetrySerial != _retrySerial) {
@@ -212,7 +313,12 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
                 initialPage: initialPage,
                 settingsId: source.settingsId,
                 bookId: source.localBookId,
-                loadPage: (index) => source.loadPage(chapterIndex, index),
+                palette: source.theme,
+                defaultDirection: direction,
+                loadPage: (index, {preload = false}) =>
+                    source.loadPage(chapterIndex, index, preload: preload),
+                onRetryPage: (index) =>
+                    source.invalidatePage(chapterIndex, index),
                 onPageChanged: (index) {
                   _pageIndex = index;
                   unawaited(

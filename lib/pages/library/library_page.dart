@@ -184,18 +184,17 @@ class _LibraryPageState extends State<LibraryPage> {
       if (!mounted) return;
       if (fullBook.isOnline) {
         try {
-          final source = _sourceShelfService.sourceFrom(fullBook);
-          final sourceBook = _sourceShelfService.sourceBookFrom(fullBook);
-          final reader = isOnlineComicSource(source, sourceBook)
+          final binding = _sourceShelfService.bindingFrom(fullBook);
+          final reader = isOnlineComicSource(binding.source, binding.book)
               ? OnlineComicReaderPage(
-                  source: source,
-                  book: sourceBook,
+                  source: binding.source,
+                  book: binding.book,
                   shelfService: _sourceShelfService,
                   initialTheme: initialTheme,
                 )
               : BookSourceReaderPage(
-                  source: source,
-                  book: sourceBook,
+                  source: binding.source,
+                  book: binding.book,
                   shelfService: _sourceShelfService,
                   initialTheme: initialTheme,
                 );

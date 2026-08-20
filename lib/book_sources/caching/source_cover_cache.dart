@@ -15,6 +15,8 @@ import '../source_engine/source_webview_loader.dart';
 
 typedef SourceCoverLoader = Future<Uint8List> Function(Uri uri);
 
+enum SourceImageLoadPriority { preload, visible }
+
 const String _sourceCoverUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
     'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -41,6 +43,7 @@ class SourceCoverCache {
     Dio? dio,
     SourceCoverLoader? loader,
     this._cacheDirectory,
+    this.cacheDirectoryName = directoryName,
     this.maxConcurrent = 4,
     this.retryDelay = const Duration(milliseconds: 350),
     this.maxDiskAge = const Duration(days: 7),
@@ -74,8 +77,16 @@ class SourceCoverCache {
   }
 
   static final SourceCoverCache instance = SourceCoverCache();
+  static final SourceCoverCache imagePageInstance = SourceCoverCache(
+    cacheDirectoryName: imagePageDirectoryName,
+    maxDiskAge: const Duration(days: 30),
+    maxImageBytes: 24 * 1024 * 1024,
+    maxMemoryBytes: 64 * 1024 * 1024,
+  );
   static const String directoryName = 'source_covers';
+  static const String imagePageDirectoryName = 'source_image_pages';
 
+  final String cacheDirectoryName;
   final int maxConcurrent;
   final Duration retryDelay;
   final Duration maxDiskAge;
@@ -89,19 +100,23 @@ class SourceCoverCache {
   late final SourceCoverLoader _loader;
   final LinkedHashMap<String, Uint8List> _memory = LinkedHashMap();
   final Map<String, Future<Uint8List>> _inFlight = {};
-  final Queue<Completer<void>> _waiters = Queue();
+  final Queue<_SourceImageWaiter> _visibleWaiters = Queue();
+  final Queue<_SourceImageWaiter> _preloadWaiters = Queue();
   final Map<String, int> _keyEpochs = {};
   int _active = 0;
   int _memoryBytes = 0;
   int _cacheEpoch = 0;
 
   int get activeRequests => _active;
+  int get queuedVisibleRequests => _visibleWaiters.length;
+  int get queuedPreloadRequests => _preloadWaiters.length;
   int get memorySizeBytes => _memoryBytes;
 
   Future<Uint8List> load(
     Uri uri, {
     Map<String, String> headers = const {},
     bool preferPlatform = false,
+    SourceImageLoadPriority priority = SourceImageLoadPriority.visible,
   }) {
     _validateUri(uri);
     final normalizedHeaders = Map<String, String>.unmodifiable(headers);
@@ -118,10 +133,14 @@ class SourceCoverCache {
     late final Future<Uint8List> tracked;
     tracked = () async {
       try {
-        return await _load(uri, key, normalizedHeaders, preferPlatform, (
-          _cacheEpoch,
-          _keyEpochs[key] ?? 0,
-        ));
+        return await _load(
+          uri,
+          key,
+          normalizedHeaders,
+          preferPlatform,
+          priority,
+          (_cacheEpoch, _keyEpochs[key] ?? 0),
+        );
       } finally {
         if (identical(_inFlight[key], tracked)) _inFlight.remove(key);
       }
@@ -135,6 +154,7 @@ class SourceCoverCache {
     String key,
     Map<String, String> headers,
     bool preferPlatform,
+    SourceImageLoadPriority priority,
     (int, int) epoch,
   ) async {
     final disk = await _readDisk(key);
@@ -153,6 +173,7 @@ class SourceCoverCache {
               : headers.isEmpty
               ? _loader(uri)
               : _download(uri, headers),
+          priority: priority,
         );
         _validateBytes(bytes);
         if (_isCurrent(key, epoch)) {
@@ -173,8 +194,11 @@ class SourceCoverCache {
     Error.throwWithStackTrace(lastError!, lastStack!);
   }
 
-  Future<T> _withPermit<T>(Future<T> Function() action) async {
-    await _acquirePermit();
+  Future<T> _withPermit<T>(
+    Future<T> Function() action, {
+    required SourceImageLoadPriority priority,
+  }) async {
+    await _acquirePermit(priority);
     try {
       return await action();
     } finally {
@@ -182,21 +206,27 @@ class SourceCoverCache {
     }
   }
 
-  Future<void> _acquirePermit() async {
+  Future<void> _acquirePermit(SourceImageLoadPriority priority) async {
     if (_active < maxConcurrent) {
       _active++;
       return;
     }
-    final waiter = Completer<void>();
-    _waiters.add(waiter);
-    await waiter.future;
+    final waiter = _SourceImageWaiter();
+    final queue = priority == SourceImageLoadPriority.visible
+        ? _visibleWaiters
+        : _preloadWaiters;
+    queue.add(waiter);
+    await waiter.completer.future;
   }
 
   void _releasePermit() {
-    if (_waiters.isNotEmpty) {
-      // Transfer the occupied slot directly to the oldest waiter. Keeping
-      // [_active] unchanged prevents a newly arriving request from stealing it.
-      _waiters.removeFirst().complete();
+    final queue = _visibleWaiters.isNotEmpty
+        ? _visibleWaiters
+        : _preloadWaiters;
+    if (queue.isNotEmpty) {
+      // Transfer the occupied slot to the highest-priority waiter. Keeping
+      // [_active] unchanged prevents a new request from stealing the slot.
+      queue.removeFirst().completer.complete();
       return;
     }
     _active--;
@@ -429,7 +459,7 @@ class SourceCoverCache {
   Future<Directory> directory() async {
     if (_cacheDirectory != null) return _cacheDirectory;
     final root = await getApplicationCacheDirectory();
-    return Directory(path.join(root.path, directoryName));
+    return Directory(path.join(root.path, cacheDirectoryName));
   }
 
   Future<File> _fileFor(String key) async =>
@@ -504,6 +534,10 @@ class SourceCoverCache {
     }
     return total;
   }
+}
+
+class _SourceImageWaiter {
+  final Completer<void> completer = Completer<void>();
 }
 
 bool _hasSupportedImageSignature(Uint8List bytes) {

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 
+import 'package:xxread/core/reader/paged_image_reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/utils/reader_themes.dart';
 
@@ -30,6 +31,10 @@ abstract class ImageReaderSource {
   String get bookTitle;
   ReaderThemePalette get theme;
 
+  /// Online image books default to continuous vertical reading. Formats that
+  /// naturally use discrete pages can keep the horizontal default.
+  ImageReaderDirection get defaultDirection => ImageReaderDirection.ltr;
+
   /// Local shelf books persist direction by numeric id.
   int? get localBookId => null;
 
@@ -40,7 +45,11 @@ abstract class ImageReaderSource {
 
   Future<int> loadChapterPageCount(int chapterIndex);
 
-  Future<Uint8List> loadPage(int chapterIndex, int pageIndex);
+  Future<Uint8List> loadPage(
+    int chapterIndex,
+    int pageIndex, {
+    bool preload = false,
+  });
 
   Future<void> saveProgress({
     required int chapterIndex,
@@ -50,6 +59,14 @@ abstract class ImageReaderSource {
 
   /// Drop a cached chapter so the next load retries the network or archive.
   void invalidateChapter(int chapterIndex) {}
+
+  /// Clear one failed page before a page-level retry. Implementations with a
+  /// persistent image cache can evict the exact request identity here.
+  Future<void> invalidatePage(int chapterIndex, int pageIndex) async {}
+
+  /// Keep only the requested chapter window in session memory. Persistent
+  /// caches remain available when an evicted chapter becomes visible again.
+  void retainChapterWindow(int firstChapterIndex, int lastChapterIndex) {}
 
   String pageTitle(ImageReaderDocument document, int chapterIndex) {
     final chapter = document.chapters[chapterIndex];

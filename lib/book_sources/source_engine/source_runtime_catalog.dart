@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:html/dom.dart' as dom;
 
 import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
@@ -334,7 +335,14 @@ class SourceRuntimeCatalog {
       bookWriter: (value) => bookContext.addAll(value),
     );
     final title = await _rules.value(contextualDocument, context, rule, 'name');
-    final url = await _rules.url(contextualDocument, context, rule, 'bookUrl');
+    final fallbackUrl = _bookContextUrl(contextualDocument, context);
+    final url = await _safeCatalogUrl(
+      contextualDocument,
+      context,
+      rule,
+      'bookUrl',
+      fallback: fallbackUrl,
+    );
     debugResult?.call(title, url);
     if (title.isEmpty || url.isEmpty) return null;
     seedBookMetadata(bookContext, source: source, bookId: url, name: title);
@@ -496,13 +504,49 @@ class SourceRuntimeCatalog {
     source.rule('ruleContent'),
   ].any((rule) => '$rule'.contains(RegExp(r'\b(?:book|chapter)\s*\.')));
 
+  Future<String> _safeCatalogUrl(
+    SourceRuleDocument document,
+    Object? context,
+    Map<String, dynamic> rules,
+    String key, {
+    String fallback = '',
+  }) async {
+    try {
+      return await _rules.url(document, context, rules, key);
+    } on FormatException {
+      return fallback;
+    } on BookSourceProtocolException catch (error) {
+      if (_isNonNetworkCatalogUrlError(error)) return fallback;
+      rethrow;
+    }
+  }
+
+  String _bookContextUrl(SourceRuleDocument document, Object? context) {
+    if (context is dom.Element) {
+      final anchor = context.localName == 'a'
+          ? context
+          : context.querySelector('a[href]');
+      final href = anchor?.attributes['href']?.trim() ?? '';
+      if (href.isNotEmpty) {
+        final resolved = resolveSourceRequestUrl(document.baseUri, href);
+        final uri = Uri.tryParse(resolved.split(RegExp(r',\s*\{')).first);
+        if (uri != null &&
+            uri.hasAuthority &&
+            (uri.scheme == 'http' || uri.scheme == 'https')) {
+          return resolved;
+        }
+      }
+    }
+    return '';
+  }
+
   Future<SourceRuntimeRemoteAsset?> _remoteAssetValue(
     SourceRuleDocument document,
     Object? context,
     Map<String, dynamic> rules,
     String key,
   ) async {
-    final value = await _rules.url(document, context, rules, key);
+    final value = await _safeCatalogUrl(document, context, rules, key);
     if (value.isEmpty) return null;
     final source = document.scriptContext?.source;
     final asset = parseRemoteAsset(
@@ -519,6 +563,13 @@ class SourceRuntimeCatalog {
       headers: Map.unmodifiable(headers),
     );
   }
+}
+
+bool _isNonNetworkCatalogUrlError(BookSourceProtocolException error) {
+  final message = error.message.toLowerCase();
+  return message.contains('non-http url') ||
+      message.contains('must use http or https') ||
+      message.contains('targets must use http or https');
 }
 
 int bookType(ReadingSourceConfig source) => source.effectiveBookType;

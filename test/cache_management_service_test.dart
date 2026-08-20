@@ -25,6 +25,7 @@ void main() {
       }
     });
     final covers = Directory(path.join(root.path, 'cover-cache'));
+    final imagePages = Directory(path.join(root.path, 'image-page-cache'));
     final avatars = Directory(path.join(root.path, 'avatar-cache'));
     final chapters = Directory(
       path.join(root.path, BookSourceChapterCache.directoryName),
@@ -44,6 +45,7 @@ void main() {
     final userDocuments = Directory(path.join(root.path, 'books'));
     for (final directory in [
       covers,
+      imagePages,
       avatars,
       chapters,
       nativeReaderEpub,
@@ -84,6 +86,11 @@ void main() {
       loader: (_) async => Uint8List.fromList([2, 3, 4]),
     );
     await coverCache.load(Uri.parse('https://example.org/cover.jpg'));
+    final imagePageCache = SourceCoverCache(
+      cacheDirectory: imagePages,
+      loader: (_) async => Uint8List.fromList([6, 7, 8, 9]),
+    );
+    await imagePageCache.load(Uri.parse('https://example.org/page.jpg'));
     final avatarCache = AccountAvatarCache(
       cacheDirectory: avatars,
       loader: (_) async => Uint8List.fromList([5, 6]),
@@ -91,6 +98,7 @@ void main() {
     await avatarCache.load(Uri.parse('https://example.org/avatar.jpg'));
     final manager = AppCacheManager(
       sourceCoverCache: coverCache,
+      sourceImagePageCache: imagePageCache,
       accountAvatarCache: avatarCache,
       sourceResponseCache: BookSourceResponseCache(cacheDirectory: responses),
       temporaryDirectory: root,
@@ -101,14 +109,15 @@ void main() {
     );
 
     final usage = await manager.usage();
-    expect(usage.bytesFor(AppCacheCategory.sourceCovers), 34);
+    expect(usage.bytesFor(AppCacheCategory.sourceCovers), 38);
     expect(usage.bytesFor(AppCacheCategory.sourceData), 10);
     expect(usage.bytesFor(AppCacheCategory.readingCache), 43);
     expect(usage.bytesFor(AppCacheCategory.temporaryFiles), 13);
-    expect(usage.totalBytes, 100);
+    expect(usage.totalBytes, 104);
 
     await manager.clear(AppCacheCategory.sourceCovers);
     expect(await covers.exists(), isFalse);
+    expect(await imagePages.exists(), isFalse);
     expect(await avatars.exists(), isFalse);
     expect(imageCacheClears, 1);
     expect(await chapters.exists(), isTrue);

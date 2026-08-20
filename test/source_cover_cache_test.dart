@@ -37,6 +37,58 @@ void main() {
     expect(maxActive, 3);
   });
 
+  test('visible requests bypass queued preloads', () async {
+    final directory = await Directory.systemTemp.createTemp('source-priority-');
+    addTearDown(() => directory.delete(recursive: true));
+    final firstStarted = Completer<void>();
+    final releaseFirst = Completer<void>();
+    final starts = <String>[];
+    final cache = SourceCoverCache(
+      cacheDirectory: directory,
+      maxConcurrent: 1,
+      loader: (uri) async {
+        starts.add(uri.path);
+        if (uri.path == '/active.jpg') {
+          firstStarted.complete();
+          await releaseFirst.future;
+        }
+        return Uint8List.fromList([1, 2, 3]);
+      },
+    );
+
+    final active = cache.load(Uri.parse('https://example.org/active.jpg'));
+    await firstStarted.future;
+    final preload = cache.load(
+      Uri.parse('https://example.org/preload.jpg'),
+      priority: SourceImageLoadPriority.preload,
+    );
+    for (
+      var attempt = 0;
+      attempt < 50 && cache.queuedPreloadRequests < 1;
+      attempt++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(cache.queuedPreloadRequests, 1);
+    final visible = cache.load(
+      Uri.parse('https://example.org/visible.jpg'),
+      priority: SourceImageLoadPriority.visible,
+    );
+    for (
+      var attempt = 0;
+      attempt < 50 && cache.queuedVisibleRequests < 1;
+      attempt++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(cache.queuedVisibleRequests, 1);
+    releaseFirst.complete();
+
+    await Future.wait([active, preload, visible]);
+
+    expect(starts, ['/active.jpg', '/visible.jpg', '/preload.jpg']);
+  });
+
   test('deduplicates requests and retries one transient failure', () async {
     final directory = await Directory.systemTemp.createTemp('source-retry-');
     addTearDown(() => directory.delete(recursive: true));
@@ -187,6 +239,37 @@ void main() {
     expect(dartAdapter.requests, 0);
     expect(platform.requests, 1);
   });
+
+  test(
+    'page request identity keeps headers through retry and eviction',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'source-request-chain-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final platform = _FakePlatformImageLoader();
+      final cache = SourceCoverCache(
+        cacheDirectory: directory,
+        platformLoader: platform,
+        networkPolicy: BookSourceNetworkPolicy(
+          lookup: (_) async => [InternetAddress('93.184.216.34')],
+        ),
+      );
+      final uri = Uri.parse('https://images.example/chapter/page.jpg');
+      const headers = {
+        'Referer': 'https://books.example/chapter/1',
+        'Cookie': 'session=reader',
+      };
+
+      await cache.load(uri, headers: headers, preferPlatform: true);
+      await cache.evict(uri, headers: headers);
+      await cache.load(uri, headers: headers, preferPlatform: true);
+
+      expect(platform.requests, 2);
+      expect(platform.lastHeaders?['Referer'], headers['Referer']);
+      expect(platform.lastHeaders?['Cookie'], headers['Cookie']);
+    },
+  );
 
   test('rejects HTML even when the server labels it as an image', () async {
     final directory = await Directory.systemTemp.createTemp('source-html-');

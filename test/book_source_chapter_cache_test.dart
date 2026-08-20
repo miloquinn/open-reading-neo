@@ -328,6 +328,55 @@ void main() {
     },
   );
 
+  test('persists remote image metadata with chapter content', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-chapter-images-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    var loads = 0;
+
+    Future<BookSourceChapterContent> loader() async {
+      loads++;
+      return BookSourceChapterContent(
+        bookId: 'image-book',
+        chapterId: 'image-chapter',
+        title: '图片章节',
+        content: '<img src="https://images.test/1.jpg">',
+        contentType: 'text/html',
+        images: [
+          BookSourceRemoteImage(
+            url: Uri.parse('https://images.test/1.jpg'),
+            headers: const {'Referer': 'https://books.test/chapter/1'},
+          ),
+        ],
+      );
+    }
+
+    await BookSourceChapterCache(cacheDirectory: directory).getOrLoad(
+      sourceId: 'image-source',
+      bookId: 'image-book',
+      chapterId: 'image-chapter',
+      loader: loader,
+    );
+    await _waitForJsonFile(directory);
+    BookSourceChapterCache.clearMemory();
+
+    final cached = await BookSourceChapterCache(cacheDirectory: directory)
+        .getOrLoad(
+          sourceId: 'image-source',
+          bookId: 'image-book',
+          chapterId: 'image-chapter',
+          loader: loader,
+        );
+
+    expect(loads, 1);
+    expect(cached.images.single.url.toString(), 'https://images.test/1.jpg');
+    expect(
+      cached.images.single.headers['Referer'],
+      'https://books.test/chapter/1',
+    );
+  });
+
   test(
     'returns stale chapter content while refreshing it in background',
     () async {

@@ -115,25 +115,12 @@ Future<SimpleMetadata> extractTxtMetadataInIsolate(
         .take(20)
         .toList();
 
-    String title = params.fileName.replaceAll(
-      RegExp(r'\.(txt)$', caseSensitive: false),
-      '',
-    );
-    if (lines.isNotEmpty) {
-      // 查找合适的标题行
-      for (var line in lines) {
-        if (line.length >= 2 && line.length <= 50 && !line.contains('http')) {
-          title = line.substring(0, line.length.clamp(0, 50));
-          break;
-        }
-      }
-    }
+    final fallbackTitle = _txtFileTitle(params.fileName);
+    var title = _extractExplicitTxtTitle(lines) ?? fallbackTitle;
     if (_looksGarbled(title) && params.encodingOverride != null) {
-      title = params.fileName.replaceAll(
-        RegExp(r'\.(txt)$', caseSensitive: false),
-        '',
-      );
+      title = fallbackTitle;
     }
+    final author = _extractExplicitTxtAuthor(lines) ?? 'Unknown';
 
     // 估算页数（基于文件大小，避免完全解析）
     final estimatedPages = (params.effectiveTotalLength / 1500).ceil().clamp(
@@ -149,7 +136,7 @@ Future<SimpleMetadata> extractTxtMetadataInIsolate(
 
     return SimpleMetadata(
       title: title,
-      author: 'Unknown',
+      author: author,
       estimatedPages: estimatedPages,
       description: description,
       language: 'zh',
@@ -158,10 +145,7 @@ Future<SimpleMetadata> extractTxtMetadataInIsolate(
     debugPrint('TXT元数据提取失败: $e');
     // 返回基础元数据
     return SimpleMetadata(
-      title: params.fileName.replaceAll(
-        RegExp(r'\.(txt)$', caseSensitive: false),
-        '',
-      ),
+      title: _txtFileTitle(params.fileName),
       author: 'Unknown',
       estimatedPages: (params.effectiveTotalLength / 10000).ceil().clamp(
         1,
@@ -169,6 +153,48 @@ Future<SimpleMetadata> extractTxtMetadataInIsolate(
       ),
     );
   }
+}
+
+String _txtFileTitle(String fileName) {
+  return fileName.replaceFirst(RegExp(r'\.[^.]+$'), '').trim();
+}
+
+String? _extractExplicitTxtTitle(List<String> lines) {
+  final patterns = <RegExp>[
+    RegExp(r'^书名\s*[:：]\s*(.+)$'),
+    RegExp(r'^标题\s*[:：]\s*(.+)$'),
+    RegExp(r'^title\s*[:：]\s*(.+)$', caseSensitive: false),
+    RegExp(r'^《(.+)》$'),
+  ];
+  for (final line in lines) {
+    for (final pattern in patterns) {
+      final value = pattern.firstMatch(line)?.group(1)?.trim();
+      if (value != null && value.isNotEmpty && value.length <= 100) {
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
+String? _extractExplicitTxtAuthor(List<String> lines) {
+  final patterns = <RegExp>[
+    RegExp(r'^作者\s*[:：]\s*(.+)$'),
+    RegExp(r'^著\s*[:：]\s*(.+)$'),
+    RegExp(r'^author\s*[:：]\s*(.+)$', caseSensitive: false),
+    RegExp(r'^by\s*[:：]?\s*(.+)$', caseSensitive: false),
+    RegExp(r'^文\s*[:：]\s*(.+)$'),
+    RegExp(r'^\[(.+)\]\s*著$'),
+  ];
+  for (final line in lines) {
+    for (final pattern in patterns) {
+      final value = pattern.firstMatch(line)?.group(1)?.trim();
+      if (value != null && value.isNotEmpty && value.length <= 50) {
+        return value;
+      }
+    }
+  }
+  return null;
 }
 
 bool _looksGarbled(String text) {

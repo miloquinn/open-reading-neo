@@ -157,9 +157,13 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
       pageCount: images.length,
       initialPage: _pageIndex.clamp(0, images.length - 1),
       settingsId: 'comic:${widget.source.id}:${widget.book.id}',
-      loadPage: (index) => _remoteImageCache.load(
+      palette: _readerTheme,
+      loadPage: (index, {preload = false}) => _remoteImageCache.load(
         images[index].url,
         headers: images[index].headers,
+        priority: preload
+            ? SourceImageLoadPriority.preload
+            : SourceImageLoadPriority.visible,
       ),
       onPageChanged: (index) {
         if (!mounted) return;

@@ -57,7 +57,11 @@ class LocalComicSource extends ImageReaderSource {
   Future<int> loadChapterPageCount(int chapterIndex) async => _pages.length;
 
   @override
-  Future<Uint8List> loadPage(int chapterIndex, int pageIndex) {
+  Future<Uint8List> loadPage(
+    int chapterIndex,
+    int pageIndex, {
+    bool preload = false,
+  }) {
     final cached = _pageCache.remove(pageIndex);
     if (cached != null) {
       _pageCache[pageIndex] = cached;
@@ -80,6 +84,12 @@ class LocalComicSource extends ImageReaderSource {
         })
         .whenComplete(() => _pendingPages.remove(pageIndex));
     return future;
+  }
+
+  @override
+  Future<void> invalidatePage(int chapterIndex, int pageIndex) async {
+    _pageCache.remove(pageIndex);
+    _pendingPages.remove(pageIndex);
   }
 
   @override

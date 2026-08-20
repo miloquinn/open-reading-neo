@@ -1879,6 +1879,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageReaderDirectionTitle => 'Reading direction';
 
   @override
+  String get imageReaderDirectionVertical => 'Continuous vertical';
+
+  @override
   String get imageReaderDirectionLtr => 'Left to right';
 
   @override

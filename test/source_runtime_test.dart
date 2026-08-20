@@ -406,6 +406,87 @@ void main() {
     );
 
     test(
+      'falls back to the original chapter link when the URL rule is not network-safe',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+            <h1>漫画</h1>
+            <a class="chapter" href="/chapter/1">第01话</a>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleBookInfo'] = {'name': 'h1@text'}
+          ..['ruleToc'] = {
+            'chapterList': 'class.chapter',
+            'chapterName': 'text',
+            'chapterUrl': "'javascript:void(0)'",
+          }
+          ..['ruleContent'] = {'content': 'img@src', 'imageStyle': 'FULL'};
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+
+        expect(chapters.single.id, 'https://books.test/chapter/1');
+        expect(chapters.single.title, '第01话');
+      },
+    );
+
+    test(
+      'keeps parsed images when a content pagination URL is not network-safe',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
+            <h1>漫画</h1>
+            <a class="chapter" href="/chapter/1">第01话</a>
+          ''',
+          'https://books.test/chapter/1': '''
+            <div class="comic-content">
+              <img src="https://images.test/page-1.jpg">
+            </div>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleBookInfo'] = {'name': 'h1@text'}
+          ..['ruleToc'] = {
+            'chapterList': 'class.chapter',
+            'chapterName': 'text',
+            'chapterUrl': 'href',
+          }
+          ..['ruleContent'] = {
+            'content': 'class.comic-content@html',
+            'nextContentUrl': "'javascript:void(0)'",
+            'imageStyle': 'FULL',
+          };
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final book = await runtime.getBook(source, 'https://books.test/book/1');
+        final chapters = await runtime.getChapters(source, book.id);
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: book.id,
+          chapterId: chapters.single.id,
+        );
+
+        expect(
+          content.images.single.url.toString(),
+          'https://images.test/page-1.jpg',
+        );
+        expect(transport.requests.length, 2);
+      },
+    );
+
+    test(
       'image books without a catalog continue as one full-book chapter',
       () async {
         final transport = _FakeTransport({
@@ -616,6 +697,37 @@ void main() {
     );
 
     test(
+      'falls back to result links and drops invalid cover rules during search',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/search?q=art&page=1': '''
+            <div class="book">
+              <a href="/book/1"><span class="name">Art Book</span></a>
+              <img src="https://cdn.test/cover.jpg">
+            </div>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['ruleSearch'] = {
+            'bookList': 'class.book',
+            'name': 'class.name@text',
+            'bookUrl': "'javascript:void(0)'",
+            'coverUrl': "'blob:invalid-cover'",
+          };
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final page = await runtime.search(
+          ReadingSourceConfig.fromJson(raw).toRegisteredSource(enabled: true),
+          'art',
+        );
+
+        expect(page.items.single.id, 'https://books.test/book/1');
+        expect(page.items.single.coverUrl, isNull);
+      },
+    );
+
+    test(
       'preserves remote image request headers and chapter image pages',
       () async {
         final transport = _FakeTransport({
@@ -666,7 +778,7 @@ void main() {
     );
 
     test(
-      'accepts image-only Legado chapters, lazy attributes, srcset, and page joins',
+      'accepts compatible image-only chapters, lazy attributes, srcset, and page joins',
       () async {
         final transport = _FakeTransport({
           'https://books.test/chapter/image-1': '''
@@ -674,9 +786,13 @@ void main() {
               <img data-lazy="/images/1.webp">
               <img data-original="/images/2.webp">
             </div>
+            <a class="next" href="/chapter/image-2">Next</a>
           ''',
-          'https://books.test/chapter/image-2':
-              '<img srcset="/images/3.webp 1x, /images/3@2x.webp 2x">',
+          'https://books.test/chapter/image-2': '''
+            <div class="pages">
+              <img srcset="/images/3.webp 1x, /images/3@2x.webp 2x">
+            </div>
+          ''',
         });
         final raw = Map<String, dynamic>.from(_htmlSource().raw)
           ..['enabledCookieJar'] = true
@@ -702,7 +818,12 @@ void main() {
         expect(content.images.map((image) => image.url), [
           Uri.parse('https://books.test/images/1.webp'),
           Uri.parse('https://books.test/images/2.webp'),
+          Uri.parse('https://books.test/images/3.webp'),
         ]);
+        expect(
+          transport.requests.map((request) => request.url.toString()),
+          contains('https://books.test/chapter/image-2'),
+        );
         expect(content.images.first.headers['Referer'], 'https://books.test/');
       },
     );

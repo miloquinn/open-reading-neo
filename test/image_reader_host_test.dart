@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xxread/core/reader/paged_image_reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
+import 'package:xxread/pages/reader/comic/continuous_image_reader.dart';
 import 'package:xxread/pages/reader/comic/image_reader_host.dart';
 import 'package:xxread/pages/reader/comic/image_reader_source.dart';
 import 'package:xxread/pages/reader/comic/online_comic_kind.dart';
@@ -28,6 +30,7 @@ class _FakeImageSource extends ImageReaderSource {
     this.initialChapterIndex = 0,
     this.initialPageIndex = 0,
     this.failingChapters = const {},
+    this.documentFailures = 0,
   });
 
   final List<ImageReaderChapter> chapters;
@@ -35,9 +38,12 @@ class _FakeImageSource extends ImageReaderSource {
   final int initialChapterIndex;
   final int initialPageIndex;
   final Set<int> failingChapters;
+  final int documentFailures;
 
   final List<({int chapterIndex, int pageIndex, int pageCount})> saved = [];
   final List<int> invalidated = [];
+  final List<({int chapterIndex, int pageIndex, bool preload})> pageLoads = [];
+  int documentLoads = 0;
   int pageCountLoads = 0;
 
   @override
@@ -47,7 +53,17 @@ class _FakeImageSource extends ImageReaderSource {
   ReaderThemePalette get theme => ReaderThemes.day;
 
   @override
+  String get settingsId => 'fake-settings';
+
+  @override
+  ImageReaderDirection get defaultDirection => ImageReaderDirection.vertical;
+
+  @override
   Future<ImageReaderDocument> loadDocument() async {
+    documentLoads++;
+    if (documentLoads <= documentFailures) {
+      throw StateError('document failed');
+    }
     return ImageReaderDocument(
       chapters: chapters,
       initialChapterIndex: initialChapterIndex,
@@ -65,7 +81,18 @@ class _FakeImageSource extends ImageReaderSource {
   }
 
   @override
-  Future<Uint8List> loadPage(int chapterIndex, int pageIndex) async => _tinyPng;
+  Future<Uint8List> loadPage(
+    int chapterIndex,
+    int pageIndex, {
+    bool preload = false,
+  }) async {
+    pageLoads.add((
+      chapterIndex: chapterIndex,
+      pageIndex: pageIndex,
+      preload: preload,
+    ));
+    return _tinyPng;
+  }
 
   @override
   Future<void> saveProgress({
@@ -171,6 +198,10 @@ void main() {
   testWidgets('host restores the saved chapter and page on one reading line', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PagedImageReaderSettingsStore.directionOverridesKey:
+          '{"fake-settings":"ltr"}',
+    });
     final source = _FakeImageSource(
       chapters: const [
         ImageReaderChapter(id: 'c1', title: 'One'),
@@ -191,8 +222,51 @@ void main() {
   });
 
   testWidgets(
+    'vertical reading mounts a three chapter window and preloads neighbors',
+    (tester) async {
+      final source = _FakeImageSource(
+        chapters: const [
+          ImageReaderChapter(id: 'c1', title: 'One'),
+          ImageReaderChapter(id: 'c2', title: 'Two'),
+          ImageReaderChapter(id: 'c3', title: 'Three'),
+        ],
+        pagesByChapter: const {0: 1, 1: 2, 2: 1},
+        initialChapterIndex: 1,
+      );
+
+      await _pumpHost(tester, source);
+
+      expect(find.byType(ContinuousImageReader), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey('${ContinuousImageReader.chapterBoundaryKeyPrefix}1'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('${ContinuousImageReader.chapterBoundaryKeyPrefix}2'),
+        ),
+        findsOneWidget,
+      );
+      expect(source.pageCountLoads, 3);
+      expect(
+        source.pageLoads
+            .where((load) => load.preload)
+            .map((load) => load.chapterIndex),
+        containsAll(<int>[0, 2]),
+      );
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
     'crossing the last page opens the next chapter on the same host',
     (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        PagedImageReaderSettingsStore.directionOverridesKey:
+            '{"fake-settings":"ltr"}',
+      });
       final source = _FakeImageSource(
         chapters: const [
           ImageReaderChapter(id: 'c1', title: 'One'),
@@ -214,9 +288,46 @@ void main() {
     },
   );
 
+  testWidgets('document failure can retry without leaving the reader', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PagedImageReaderSettingsStore.directionOverridesKey:
+          '{"fake-settings":"ltr"}',
+    });
+    final source = _FakeImageSource(
+      chapters: const [ImageReaderChapter(id: 'c1', title: 'One')],
+      pagesByChapter: const {0: 2},
+      documentFailures: 1,
+    );
+
+    await _pumpHost(tester, source);
+    expect(find.textContaining('Failed to open'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    for (
+      var attempt = 0;
+      attempt < 10 &&
+          find.textContaining('Failed to open').evaluate().isNotEmpty;
+      attempt++
+    ) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(source.documentLoads, 2);
+    expect(find.textContaining('Failed to open'), findsNothing);
+    await _unmount(tester);
+  });
+
   testWidgets('retry invalidates the failed chapter and reloads it', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PagedImageReaderSettingsStore.directionOverridesKey:
+          '{"fake-settings":"ltr"}',
+    });
     final source = _FakeImageSource(
       chapters: const [ImageReaderChapter(id: 'c1', title: 'One')],
       pagesByChapter: const {0: 2},

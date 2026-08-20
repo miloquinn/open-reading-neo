@@ -43,6 +43,37 @@ void main() {
     },
   );
 
+  test('validates online shelf metadata before opening', () async {
+    final service = BookSourceShelfService(bookDao: _MemoryBookDao());
+    final added = await service.addOnline(source: _source, book: _sourceBook);
+
+    final binding = service.bindingFrom(added);
+
+    expect(binding.source.id, _source.id);
+    expect(binding.book.id, _sourceBook.id);
+    expect(
+      () => service.bindingFrom(
+        added.copyWith(sourceBookId: 'different-book-id'),
+      ),
+      throwsA(isA<OnlineShelfBookBindingException>()),
+    );
+    expect(
+      () => service.bindingFrom(
+        Book(
+          title: 'Broken online book',
+          filePath: '',
+          format: 'source',
+          storageType: 'online',
+          sourceId: _source.id,
+          sourceBookId: _sourceBook.id,
+          sourceJson: '{broken',
+          sourceBookJson: added.sourceBookJson,
+        ),
+      ),
+      throwsA(isA<OnlineShelfBookBindingException>()),
+    );
+  });
+
   test(
     'large downloads use bounded workers and report every chapter',
     () async {

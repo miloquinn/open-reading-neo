@@ -239,6 +239,8 @@ class BookSourceChapterCache {
           'title': content.title,
           'content': content.content,
           'contentType': content.contentType,
+          if (content.images.isNotEmpty)
+            'images': [for (final image in content.images) image.toJson()],
         }),
         generation,
       );

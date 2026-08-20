@@ -52,8 +52,8 @@ class ReadingSourceConfig {
   String get jsLib => _string(raw['jsLib']);
   int get type => _integer(raw['bookSourceType']);
 
-  /// Some older Reading/Legado manga exports incorrectly keep
-  /// `bookSourceType` at 0 even though their complete reading chain emits
+  /// Some older compatible manga exports incorrectly keep `bookSourceType`
+  /// at 0 even though their complete reading chain emits
   /// image pages. Infer image sources conservatively so imports, search
   /// results, and reader routing agree on the same type.
   bool get isImageSource {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xxread/services/books/book_import_isolate_service.dart';
 import 'package:xxread/services/books/enhanced_txt_import_service.dart';
 
 void main() {
@@ -41,6 +42,36 @@ void main() {
 
       expect(result.encoding, 'utf8');
       expect(result.content, '# 三江感言\n正文');
+    });
+  });
+
+  group('TXT import metadata', () {
+    test('uses the filename when content has no explicit title', () async {
+      final result = await extractTxtMetadataInIsolate(
+        MetadataExtractionParams(
+          bytes: Uint8List.fromList(utf8.encode('1.\n正文第一段\n正文第二段')),
+          fileName: '她不会死.txt',
+          extension: 'txt',
+          totalByteLength: 3 * 1024 * 1024,
+        ),
+      );
+
+      expect(result.title, '她不会死');
+      expect(result.author, 'Unknown');
+      expect(result.estimatedPages, (3 * 1024 * 1024 / 1500).ceil());
+    });
+
+    test('keeps explicitly labelled title and author', () async {
+      final result = await extractTxtMetadataInIsolate(
+        MetadataExtractionParams(
+          bytes: Uint8List.fromList(utf8.encode('书名：明确书名\n作者：明确作者\n第一章 正文')),
+          fileName: '文件名.txt',
+          extension: 'txt',
+        ),
+      );
+
+      expect(result.title, '明确书名');
+      expect(result.author, '明确作者');
     });
   });
 }

@@ -19,6 +19,23 @@ import 'book_download_cancellation.dart';
 import 'book_source_client.dart';
 import '../caching/source_cover_cache.dart';
 
+class OnlineShelfBookBinding {
+  const OnlineShelfBookBinding({required this.source, required this.book});
+
+  final RegisteredBookSource source;
+  final BookSourceBook book;
+}
+
+class OnlineShelfBookBindingException implements Exception {
+  const OnlineShelfBookBindingException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => cause == null ? message : '$message ($cause)';
+}
+
 class BookSourceShelfService {
   static const int _downloadBatchSize = 3;
 
@@ -317,27 +334,63 @@ class BookSourceShelfService {
     return downloaded.copyWith(id: id);
   }
 
-  RegisteredBookSource sourceFrom(Book book) {
-    final json = jsonDecode(book.sourceJson!);
-    return RegisteredBookSource.fromJson(
-      (json as Map).map((key, value) => MapEntry('$key', value)),
-    );
+  OnlineShelfBookBinding bindingFrom(Book book) {
+    if (!book.isOnline) {
+      throw const OnlineShelfBookBindingException(
+        'This shelf record is not an online book.',
+      );
+    }
+    try {
+      final sourceJson = _storedJsonObject(book.sourceJson, 'source metadata');
+      final sourceBookJson = _storedJsonObject(
+        book.sourceBookJson,
+        'source book metadata',
+      );
+      final source = RegisteredBookSource.fromJson(sourceJson);
+      final sourceBook = BookSourceBook.fromJson(
+        sourceBookJson,
+        baseUri: source.apiBaseUrl,
+      );
+      final sourceId = book.sourceId?.trim() ?? '';
+      if (sourceId.isEmpty || source.id != sourceId) {
+        throw const BookSourceProtocolException(
+          'Stored source identity does not match the shelf record.',
+        );
+      }
+      final sourceBookId = book.sourceBookId?.trim() ?? '';
+      if (sourceBookId.isEmpty || sourceBook.id != sourceBookId) {
+        throw const BookSourceProtocolException(
+          'Stored source-book identity does not match the shelf record.',
+        );
+      }
+      return OnlineShelfBookBinding(source: source, book: sourceBook);
+    } on OnlineShelfBookBindingException {
+      rethrow;
+    } catch (error) {
+      throw OnlineShelfBookBindingException(
+        'Stored online book data is invalid.',
+        cause: error,
+      );
+    }
   }
 
-  BookSourceBook sourceBookFrom(Book book) {
-    final json = jsonDecode(book.sourceBookJson!);
-    Uri? baseUri;
-    final sourceRaw = book.sourceJson;
-    if (sourceRaw != null && sourceRaw.isNotEmpty) {
-      final sourceJson = jsonDecode(sourceRaw);
-      if (sourceJson is Map && sourceJson['apiBaseUrl'] is String) {
-        baseUri = Uri.tryParse(sourceJson['apiBaseUrl'] as String);
-      }
+  RegisteredBookSource sourceFrom(Book book) => bindingFrom(book).source;
+
+  BookSourceBook sourceBookFrom(Book book) => bindingFrom(book).book;
+
+  Map<String, dynamic> _storedJsonObject(String? raw, String label) {
+    if (raw == null || raw.trim().isEmpty) {
+      throw BookSourceProtocolException(
+        'Stored online book is missing $label.',
+      );
     }
-    return BookSourceBook.fromJson(
-      (json as Map).map((key, value) => MapEntry('$key', value)),
-      baseUri: baseUri,
-    );
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw BookSourceProtocolException(
+        'Stored online book $label must be a JSON object.',
+      );
+    }
+    return decoded.map((key, value) => MapEntry('$key', value));
   }
 
   String _safeFileName(String value) {

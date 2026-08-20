@@ -648,6 +648,7 @@
   "readerComicChapterNoPages": "這一章沒有圖片頁",
   "imageReaderSettings": "閱讀設定",
   "imageReaderDirectionTitle": "閱讀方向",
+  "imageReaderDirectionVertical": "上下連續捲動",
   "imageReaderDirectionLtr": "從左到右",
   "imageReaderDirectionRtl": "從右到左（漫畫）",
   "imageReaderJumpToPage": "跳轉頁碼",

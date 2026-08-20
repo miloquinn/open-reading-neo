@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:xxread/book_sources/models/registered_book_source.dart';
+import 'package:xxread/core/reader/paged_image_reader_settings.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
@@ -21,8 +22,8 @@ class OnlineComicSource extends ImageReaderSource {
     ReaderThemePalette? theme,
   }) : _client = client ?? BookSourceClient(),
        _ownsClient = client == null,
-       _imageCache = imageCache ?? SourceCoverCache.instance,
-       theme = theme ?? ReaderThemes.day;
+       _imageCache = imageCache ?? SourceCoverCache.imagePageInstance,
+       theme = theme ?? ReaderThemes.pureBlack;
 
   final RegisteredBookSource source;
   final BookSourceBook book;
@@ -33,6 +34,9 @@ class OnlineComicSource extends ImageReaderSource {
 
   @override
   final ReaderThemePalette theme;
+
+  @override
+  ImageReaderDirection get defaultDirection => ImageReaderDirection.vertical;
 
   List<BookSourceChapter> _chapters = const [];
   BookSourceReadingProgress? _savedProgress;
@@ -142,13 +146,14 @@ class OnlineComicSource extends ImageReaderSource {
   }
 
   @override
-  Future<Uint8List> loadPage(int chapterIndex, int pageIndex) async {
+  Future<Uint8List> loadPage(
+    int chapterIndex,
+    int pageIndex, {
+    bool preload = false,
+  }) async {
     final content = await _loadContent(chapterIndex);
     final image = content.images[pageIndex];
-    final headers = <String, String>{...image.headers};
-    if (!headers.keys.any((name) => name.toLowerCase() == 'referer')) {
-      headers['Referer'] = source.apiBaseUrl.toString();
-    }
+    final headers = _imageHeaders(image);
     final stopwatch = Stopwatch()..start();
     comicDebugLog(
       'image-fetch',
@@ -162,6 +167,9 @@ class OnlineComicSource extends ImageReaderSource {
         headers: headers,
         preferPlatform:
             !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+        priority: preload
+            ? SourceImageLoadPriority.preload
+            : SourceImageLoadPriority.visible,
       );
       comicDebugLog(
         'image-fetch',
@@ -211,12 +219,36 @@ class OnlineComicSource extends ImageReaderSource {
   }
 
   @override
+  Future<void> invalidatePage(int chapterIndex, int pageIndex) async {
+    final content = await _loadContent(chapterIndex);
+    if (pageIndex < 0 || pageIndex >= content.images.length) return;
+    final image = content.images[pageIndex];
+    final headers = _imageHeaders(image);
+    await _imageCache.evict(image.url, headers: headers);
+  }
+
+  @override
+  void retainChapterWindow(int firstChapterIndex, int lastChapterIndex) {
+    _contentCache.removeWhere(
+      (index, _) => index < firstChapterIndex || index > lastChapterIndex,
+    );
+  }
+
+  @override
   String emptyPagesMessage(AppLocalizations l10n) =>
       l10n.readerComicChapterNoPages;
 
   @override
   String describeError(Object error, AppLocalizations l10n) =>
       l10n.readerOpenFailed('$error');
+
+  Map<String, String> _imageHeaders(BookSourceRemoteImage image) {
+    final headers = <String, String>{...image.headers};
+    if (!headers.keys.any((name) => name.toLowerCase() == 'referer')) {
+      headers['Referer'] = source.apiBaseUrl.toString();
+    }
+    return headers;
+  }
 
   Future<BookSourceChapterContent> _loadContent(int index) {
     final cached = _contentCache[index];

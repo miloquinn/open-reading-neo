@@ -228,7 +228,8 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
             title: widget.book.title,
             pageCount: document.pagesCount,
             initialPage: widget.book.currentPage,
-            loadPage: (index) => _loadPage(document, index),
+            palette: widget.initialTheme,
+            loadPage: (index, {preload = false}) => _loadPage(document, index),
             onPageChanged: (index) => _saveProgress(index, document.pagesCount),
             bookId: widget.book.id,
           );

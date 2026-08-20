@@ -1465,6 +1465,10 @@
   "@imageReaderDirectionTitle": {
     "description": "Section label for the comic/PDF page-turn direction choice"
   },
+  "imageReaderDirectionVertical": "Continuous vertical",
+  "@imageReaderDirectionVertical": {
+    "description": "Continuous top-to-bottom scrolling mode for image books"
+  },
   "imageReaderDirectionLtr": "Left to right",
   "@imageReaderDirectionLtr": {
     "description": "Standard left-to-right page-turn direction option"

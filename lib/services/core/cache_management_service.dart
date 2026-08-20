@@ -30,6 +30,7 @@ class AppCacheUsage {
 class AppCacheManager {
   AppCacheManager({
     SourceCoverCache? sourceCoverCache,
+    SourceCoverCache? sourceImagePageCache,
     AccountAvatarCache? accountAvatarCache,
     BookSourceResponseCache? sourceResponseCache,
     this._temporaryDirectory,
@@ -38,6 +39,8 @@ class AppCacheManager {
     Future<void> Function()? clearFlutterImageCache,
     int Function()? imageCacheBytesReader,
   }) : _sourceCoverCache = sourceCoverCache ?? SourceCoverCache.instance,
+       _sourceImagePageCache =
+           sourceImagePageCache ?? SourceCoverCache.imagePageInstance,
        _accountAvatarCache = accountAvatarCache ?? AccountAvatarCache.instance,
        _sourceResponseCache =
            sourceResponseCache ?? BookSourceResponseCache.instance,
@@ -58,6 +61,7 @@ class AppCacheManager {
   static const String paginationCacheDirectoryName = 'pagination_cache';
 
   final SourceCoverCache _sourceCoverCache;
+  final SourceCoverCache _sourceImagePageCache;
   final AccountAvatarCache _accountAvatarCache;
   final BookSourceResponseCache _sourceResponseCache;
   final Directory? _temporaryDirectory;
@@ -75,6 +79,7 @@ class AppCacheManager {
     bytesByCategory[AppCacheCategory.sourceCovers] =
         bytesByCategory[AppCacheCategory.sourceCovers]! +
         _sourceCoverCache.memorySizeBytes +
+        _sourceImagePageCache.memorySizeBytes +
         _accountAvatarCache.memorySizeBytes +
         await _accountAvatarCache.diskSizeBytes() +
         _imageCacheBytesReader();
@@ -89,6 +94,7 @@ class AppCacheManager {
     switch (category) {
       case AppCacheCategory.sourceCovers:
         await _sourceCoverCache.clear();
+        await _sourceImagePageCache.clear();
         await _accountAvatarCache.clear();
         await _clearFlutterImageCache();
         return;

@@ -7,13 +7,21 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 翻页方向：[ltr] 常规从左到右，[rtl] 日漫从右到左。
+/// 图片阅读方式：纵向连续滚动，或左右整页翻阅。
 enum ImageReaderDirection {
+  vertical,
   ltr,
   rtl;
 
-  static ImageReaderDirection fromName(String? name) =>
-      name == rtl.name ? rtl : ltr;
+  static ImageReaderDirection fromName(
+    String? name, {
+    ImageReaderDirection fallback = ImageReaderDirection.ltr,
+  }) {
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return fallback;
+  }
 }
 
 /// 页面外围（信箱区）背景色；页面本体仍由图片内容决定。
@@ -37,22 +45,28 @@ enum ImageReaderBackground {
   }
 }
 
-/// 图片阅读器设置存取；方向按书覆盖（默认从左到右不占存储），背景全局共享。
+/// 图片阅读器设置存取；阅读方式可按书覆盖，页面背景全局共享。
 class PagedImageReaderSettingsStore {
   const PagedImageReaderSettingsStore();
 
   static const directionOverridesKey = 'image_reader_direction_overrides_v1';
   static const backgroundKey = 'image_reader_background_v1';
 
-  Future<ImageReaderDirection> loadDirection(int? bookId) async {
-    if (bookId == null) return ImageReaderDirection.ltr;
-    return loadDirectionForKey('$bookId');
+  Future<ImageReaderDirection> loadDirection(
+    int? bookId, {
+    ImageReaderDirection fallback = ImageReaderDirection.ltr,
+  }) async {
+    if (bookId == null) return fallback;
+    return loadDirectionForKey('$bookId', fallback: fallback);
   }
 
-  Future<ImageReaderDirection> loadDirectionForKey(String? key) async {
-    if (key == null || key.isEmpty) return ImageReaderDirection.ltr;
+  Future<ImageReaderDirection> loadDirectionForKey(
+    String? key, {
+    ImageReaderDirection fallback = ImageReaderDirection.ltr,
+  }) async {
+    if (key == null || key.isEmpty) return fallback;
     final overrides = await _loadOverrides();
-    return ImageReaderDirection.fromName(overrides[key]);
+    return ImageReaderDirection.fromName(overrides[key], fallback: fallback);
   }
 
   Future<void> saveDirection(
@@ -69,11 +83,7 @@ class PagedImageReaderSettingsStore {
   ) async {
     if (key == null || key.isEmpty) return;
     final overrides = await _loadOverrides();
-    if (direction == ImageReaderDirection.ltr) {
-      overrides.remove(key);
-    } else {
-      overrides[key] = direction.name;
-    }
+    overrides[key] = direction.name;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(directionOverridesKey, jsonEncode(overrides));
   }

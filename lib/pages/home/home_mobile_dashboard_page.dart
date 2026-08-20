@@ -115,27 +115,25 @@ class HomeMobileDashboardPage extends StatefulWidget {
   shelfServiceFactory;
 
   @visibleForTesting
-  static Widget? buildOnlineReader({
+  static Widget buildOnlineReader({
     required Book book,
     required BookSourceClient client,
     required BookSourceShelfService shelfService,
     ReaderThemePalette? initialTheme,
   }) {
-    if (!book.isOnline) return null;
-    final source = shelfService.sourceFrom(book);
-    final sourceBook = shelfService.sourceBookFrom(book);
-    if (isOnlineComicSource(source, sourceBook)) {
+    final binding = shelfService.bindingFrom(book);
+    if (isOnlineComicSource(binding.source, binding.book)) {
       return OnlineComicReaderPage(
-        source: source,
-        book: sourceBook,
+        source: binding.source,
+        book: binding.book,
         client: client,
         shelfService: shelfService,
         initialTheme: initialTheme,
       );
     }
     return BookSourceReaderPage(
-      source: source,
-      book: sourceBook,
+      source: binding.source,
+      book: binding.book,
       client: client,
       shelfService: shelfService,
       initialTheme: initialTheme,
@@ -357,7 +355,7 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
             client: _sourceClient,
             shelfService: _sourceShelfService,
             initialTheme: initialTheme,
-          )!;
+          );
           final route = BookOpenTransition.createRoute<void>(
             reader,
             origin: ReaderPageTransitionOrigin.home,

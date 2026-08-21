@@ -215,19 +215,17 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
     );
     if (!mounted) return null;
     final selected = appSettings.readerFont;
+    final profile = resolveReaderFontProfile(
+      selection: selected,
+      locale: Localizations.maybeLocaleOf(context),
+    );
     return ReaderFontChoice(
       valueLabel: FontCatalog.labelFor(context.l10n, selected),
-      hint: selected.family == null
+      hint: profile.isPlatformDefault
           ? context.l10n.readerFontBookPriorityHint
           : context.l10n.readerFontOverrideHint,
-      family: selected.family,
-      fallbackFamilies:
-          readerFontFamilyFallbacks(
-            fontFamily: selected.family,
-            configuredFallbacks: selected.fallbackFamilies,
-            locale: Localizations.maybeLocaleOf(context),
-          ) ??
-          const <String>[],
+      family: profile.fontFamily,
+      fallbackFamilies: profile.fontFamilyFallback,
       supportsVariableWeight: selected.supportsVariableWeight,
       fontWeightHint: selected.supportsVariableWeight
           ? context.l10n.readerFontWeightVariableHint(
@@ -271,7 +269,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
         tabletTwoPageHint: context.l10n.readerTabletTwoPageHint,
         fontFamilyLabel: context.l10n.fontFamilyLabel,
         fontFamilyValueLabel: FontCatalog.labelFor(context.l10n, _readerFont),
-        fontFamilyHint: _readerFont.family == null
+        fontFamilyHint: _readerFontProfile.isPlatformDefault
             ? context.l10n.readerFontBookPriorityHint
             : context.l10n.readerFontOverrideHint,
         onFontFamilyTap: _showReaderFontPicker,
@@ -309,14 +307,8 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
         textBrightness: _textBrightness,
         dimTextInDarkMode: _dimTextInDarkMode,
         fontWeight: _fontWeight,
-        fontFamily: _readerFont.family,
-        fontFamilyFallback:
-            readerFontFamilyFallbacks(
-              fontFamily: _readerFont.family,
-              configuredFallbacks: _readerFont.fallbackFamilies,
-              locale: Localizations.maybeLocaleOf(context),
-            ) ??
-            const <String>[],
+        fontFamily: _readerFontProfile.fontFamily,
+        fontFamilyFallback: _readerFontProfile.fontFamilyFallback,
         fontWeightSupportsVariable: _readerFont.supportsVariableWeight,
         fontWeightVariableMin: _readerFont.variableWeightMin,
         fontWeightVariableMax: _readerFont.variableWeightMax,

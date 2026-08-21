@@ -10,6 +10,7 @@ List<_ReaderPageData> _paginateChapter(
   required int paragraphSpacing,
   required bool normalizeParagraphBreaks,
   required bool showDedicatedChapterTitlePage,
+  required bool preserveEpubFont,
 }) {
   final imageOffsets = <(int, int)>[];
   var searchFrom = 0;
@@ -80,8 +81,13 @@ List<_ReaderPageData> _paginateChapter(
           isReaderLineBreakCodeUnit(
             chapter.plainText.codeUnitAt(sourceOffset - 1),
           ),
-      sourceSpanBuilder: (sourceStart, sourceEnd) =>
-          _styledSpanForRange(chapter, sourceStart, sourceEnd, style),
+      sourceSpanBuilder: (sourceStart, sourceEnd) => _styledSpanForRange(
+        chapter,
+        sourceStart,
+        sourceEnd,
+        style,
+        preserveEpubFont: preserveEpubFont,
+      ),
     );
     final result = textPages
         .map(_ReaderPageData.fromTextPage)

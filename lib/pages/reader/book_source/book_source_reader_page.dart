@@ -21,6 +21,7 @@ import 'package:xxread/core/reader/platform_reader_aloud_media_session.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
 import 'package:xxread/core/reader/reader_annotation.dart';
 import 'package:xxread/core/reader/reader_custom_theme.dart';
+import 'package:xxread/core/reader/reader_font_profile.dart';
 import 'package:xxread/core/reader/reader_leaf_status.dart';
 import 'package:xxread/core/reader/reader_layout.dart';
 import 'package:xxread/core/reader/reader_keep_screen_on.dart';
@@ -398,7 +399,16 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       // Reader widgets remain embeddable in tests and isolated previews.
     }
     _readerFontReady = nextReaderFontReady;
-    if (_readerFont.id == nextReaderFont.id) return;
+    final locale = Localizations.maybeLocaleOf(context);
+    final currentProfileSignature = resolveReaderFontProfile(
+      selection: _readerFont,
+      locale: locale,
+    ).cacheSignature;
+    final nextProfileSignature = resolveReaderFontProfile(
+      selection: nextReaderFont,
+      locale: locale,
+    ).cacheSignature;
+    if (currentProfileSignature == nextProfileSignature) return;
     _readerFont = nextReaderFont;
     _paginationKey = null;
     _paginatedPages = const [];

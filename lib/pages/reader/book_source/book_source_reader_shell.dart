@@ -175,14 +175,17 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
     );
   }
 
+  ReaderFontProfile get _readerFontProfile => resolveReaderFontProfile(
+    selection: _readerFont,
+    locale: Localizations.maybeLocaleOf(context),
+  );
+
   TextStyle get _bodyTextStyle => TextStyle(
     inherit: false,
-    fontFamily: _readerFont.family,
-    fontFamilyFallback: readerFontFamilyFallbacks(
-      fontFamily: _readerFont.family,
-      configuredFallbacks: _readerFont.fallbackFamilies,
-      locale: Localizations.maybeLocaleOf(context),
-    ),
+    fontFamily: _readerFontProfile.fontFamily,
+    fontFamilyFallback: _readerFontProfile.fontFamilyFallback.isEmpty
+        ? null
+        : _readerFontProfile.fontFamilyFallback,
     color: readerTextColorForBrightness(
       effectiveReaderTextBrightness(
         brightness: _textBrightness,

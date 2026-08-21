@@ -114,14 +114,17 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
     tabletTwoPageEnabled: _tabletTwoPageEnabled,
   );
 
+  ReaderFontProfile get _readerFontProfile => resolveReaderFontProfile(
+    selection: _readerFont,
+    locale: Localizations.maybeLocaleOf(context),
+  );
+
   TextStyle get _readerTextStyle => TextStyle(
     inherit: false,
-    fontFamily: _readerFont.family,
-    fontFamilyFallback: readerFontFamilyFallbacks(
-      fontFamily: _readerFont.family,
-      configuredFallbacks: _readerFont.fallbackFamilies,
-      locale: Localizations.maybeLocaleOf(context),
-    ),
+    fontFamily: _readerFontProfile.fontFamily,
+    fontFamilyFallback: _readerFontProfile.fontFamilyFallback.isEmpty
+        ? null
+        : _readerFontProfile.fontFamilyFallback,
     fontSize: _fontSize,
     fontWeight: readerFontWeightFromValue(_fontWeight),
     fontVariations: readerFontVariationsFromValue(
@@ -198,8 +201,13 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       flowStyle: flowStyle,
       annotations: _annotations,
       spokenHighlight: _readerAloudHighlight,
-      baseSourceSpanBuilder: (start, end) =>
-          _styledSpanForRange(chapter, start, end, _readerTextStyle),
+      baseSourceSpanBuilder: (start, end) => _styledSpanForRange(
+        chapter,
+        start,
+        end,
+        _readerTextStyle,
+        preserveEpubFont: _readerFontProfile.isPlatformDefault,
+      ),
       onSaveTextAnnotation: _saveTextAnnotation,
       onAskAiSelection: _askAiAboutSelection,
       onSearchSelection: (selection) =>
@@ -328,7 +336,8 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       '${_horizontalMargin.toStringAsFixed(1)}:'
       '${_topMargin.toStringAsFixed(1)}:'
       '${_bottomMargin.toStringAsFixed(1)}:${_pageMode.name}:'
-      '$_firstLineIndent:$_paragraphSpacing:${_readerFont.id}:'
+      '$_firstLineIndent:$_paragraphSpacing:'
+      '${_readerFontProfile.cacheSignature}:'
       '${widget.book.format.toLowerCase() == 'txt' ? _txtChapterTitlePageEnabled : true}';
 
   Future<void> _setTopBarStyle(ReaderTopBarStyle style) async {

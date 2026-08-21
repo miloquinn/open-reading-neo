@@ -554,11 +554,11 @@
   "@readerFontDescription": {
     "description": "Explains the scope of the reading font"
   },
-  "readerFontSelectionDescription": "Choose the typeface used for reading. System Default keeps fonts embedded by EPUB publishers when available.",
+  "readerFontSelectionDescription": "Choose the typeface used for reading. Platform Default keeps fonts embedded by EPUB publishers when available.",
   "@readerFontSelectionDescription": {
     "description": "Explains reader font selection and EPUB embedded-font behavior"
   },
-  "readerFontBookPriorityHint": "Uses the book’s embedded font when available; otherwise uses the device font.",
+  "readerFontBookPriorityHint": "Uses the book’s embedded font when available; otherwise uses the platform-default reading font.",
   "@readerFontBookPriorityHint": {
     "description": "Hint shown when the system reader font is selected"
   },
@@ -566,7 +566,7 @@
   "@readerFontOverrideHint": {
     "description": "Hint shown when a personalized reader font is selected"
   },
-  "fontSystem": "System Default",
+  "fontSystem": "Platform Default",
   "@fontSystem": {
     "description": "System default font"
   },
@@ -590,7 +590,7 @@
   "@fontNewsreader": {
     "description": "Newsreader font"
   },
-  "fontSystemDescription": "Follows the native font of the current device and operating system.",
+  "fontSystemDescription": "Uses a platform-optimized reading font for stable glyphs and pagination.",
   "@fontSystemDescription": {
     "description": "System font option description"
   },

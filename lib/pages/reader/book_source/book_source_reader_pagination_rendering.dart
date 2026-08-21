@@ -28,8 +28,10 @@ extension _BookSourceReaderPaginationRendering on _BookSourceReaderPageState {
       firstLineIndent: _firstLineIndent,
       paragraphSpacing: _paragraphSpacing,
       textDirection: Directionality.of(context),
-      extra: '${_readerSafeArea.paginationSignature}:${_readerFont.id}',
-    ).cacheKey('book-source-line-v5');
+      extra:
+          '${_readerSafeArea.paginationSignature}:'
+          '${_readerFontProfile.cacheSignature}',
+    ).cacheKey('book-source-line-v6');
     final cached = _pagedLayouts[chapterIndex];
     if (cached?.fingerprint == key) return cached!;
     final pages = paginateBookSourceText(

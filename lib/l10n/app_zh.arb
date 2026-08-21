@@ -554,11 +554,11 @@
   "@readerFontDescription": {
     "description": "说明阅读字体的作用范围"
   },
-  "readerFontSelectionDescription": "选择阅读正文使用的字体。选用“系统默认”时，EPUB 如有出版社内嵌字体会优先保留。",
+  "readerFontSelectionDescription": "选择阅读正文使用的字体。选用“平台默认”时，EPUB 如有出版社内嵌字体会优先保留。",
   "@readerFontSelectionDescription": {
     "description": "说明阅读字体选择及 EPUB 内嵌字体规则"
   },
-  "readerFontBookPriorityHint": "书籍有内嵌字体时优先使用，否则使用设备字体。",
+  "readerFontBookPriorityHint": "书籍有内嵌字体时优先使用，否则使用平台默认阅读字体。",
   "@readerFontBookPriorityHint": {
     "description": "选用系统阅读字体时的提示"
   },
@@ -566,7 +566,7 @@
   "@readerFontOverrideHint": {
     "description": "选用个性化阅读字体时的提示"
   },
-  "fontSystem": "系统默认",
+  "fontSystem": "平台默认",
   "@fontSystem": {
     "description": "系统默认字体"
   },
@@ -590,7 +590,7 @@
   "@fontNewsreader": {
     "description": "Newsreader 字体"
   },
-  "fontSystemDescription": "跟随当前设备和操作系统的原生字体。",
+  "fontSystemDescription": "使用为当前平台优化的默认阅读字体，保持字形与分页稳定。",
   "@fontSystemDescription": {
     "description": "系统字体选项说明"
   },

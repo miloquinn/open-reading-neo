@@ -75,8 +75,13 @@ extension _NativeReaderContinuousLayout on _NativeReaderPageState {
           ).createPainter(
             part.content.buildSpan(
               style: _readerTextStyle,
-              sourceSpanBuilder: (start, end) =>
-                  _styledSpanForRange(chapter, start, end, _readerTextStyle),
+              sourceSpanBuilder: (start, end) => _styledSpanForRange(
+                chapter,
+                start,
+                end,
+                _readerTextStyle,
+                preserveEpubFont: _readerFontProfile.isPlatformDefault,
+              ),
             ),
           )
           ..layout(

@@ -1024,18 +1024,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerFontSelectionDescription =>
-      'Choose the typeface used for reading. System Default keeps fonts embedded by EPUB publishers when available.';
+      'Choose the typeface used for reading. Platform Default keeps fonts embedded by EPUB publishers when available.';
 
   @override
   String get readerFontBookPriorityHint =>
-      'Uses the book’s embedded font when available; otherwise uses the device font.';
+      'Uses the book’s embedded font when available; otherwise uses the platform-default reading font.';
 
   @override
   String get readerFontOverrideHint =>
       'Overrides fonts embedded by the publisher.';
 
   @override
-  String get fontSystem => 'System Default';
+  String get fontSystem => 'Platform Default';
 
   @override
   String get fontSourceHanSerif => 'Source Han Serif';
@@ -1054,7 +1054,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fontSystemDescription =>
-      'Follows the native font of the current device and operating system.';
+      'Uses a platform-optimized reading font for stable glyphs and pagination.';
 
   @override
   String get fontSerifDescription =>

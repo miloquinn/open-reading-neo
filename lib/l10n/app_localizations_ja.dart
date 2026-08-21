@@ -995,16 +995,17 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get readerFontSelectionDescription =>
-      '読書に使う書体を選びます。「システム標準」では、EPUB に出版社の埋め込みフォントがある場合はそれを優先します。';
+      '読書に使う書体を選びます。「プラットフォーム標準」では、EPUB に出版社の埋め込みフォントがある場合はそれを優先します。';
 
   @override
-  String get readerFontBookPriorityHint => '埋め込みフォントがあれば優先し、なければ端末のフォントを使います。';
+  String get readerFontBookPriorityHint =>
+      '埋め込みフォントがあれば優先し、なければプラットフォーム標準の読書フォントを使います。';
 
   @override
   String get readerFontOverrideHint => '出版社が書籍に埋め込んだフォントより優先します。';
 
   @override
-  String get fontSystem => 'システム標準';
+  String get fontSystem => 'プラットフォーム標準';
 
   @override
   String get fontSourceHanSerif => '源ノ明朝';
@@ -1022,7 +1023,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fontNewsreader => 'Newsreader';
 
   @override
-  String get fontSystemDescription => '現在の端末と OS の標準フォントを使用します。';
+  String get fontSystemDescription =>
+      '現在のプラットフォーム向けに最適化した標準読書フォントを使用し、字形とページ分割を安定させます。';
 
   @override
   String get fontSerifDescription => '落ち着いた出版物らしいセリフ体で、長時間の読書に適しています。';

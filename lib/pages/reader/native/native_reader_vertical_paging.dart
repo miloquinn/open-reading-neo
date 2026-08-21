@@ -339,6 +339,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
             sourceStart,
             sourceEnd,
             _readerTextStyle,
+            preserveEpubFont: _readerFontProfile.isPlatformDefault,
           ),
         ).single;
         parts.add(_ContinuousReaderPart(_ReaderPageData.fromTextPage(page)));

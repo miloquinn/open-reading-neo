@@ -979,16 +979,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerFontSelectionDescription =>
-      '选择阅读正文使用的字体。选用“系统默认”时，EPUB 如有出版社内嵌字体会优先保留。';
+      '选择阅读正文使用的字体。选用“平台默认”时，EPUB 如有出版社内嵌字体会优先保留。';
 
   @override
-  String get readerFontBookPriorityHint => '书籍有内嵌字体时优先使用，否则使用设备字体。';
+  String get readerFontBookPriorityHint => '书籍有内嵌字体时优先使用，否则使用平台默认阅读字体。';
 
   @override
   String get readerFontOverrideHint => '覆盖出版社在书籍中内嵌的字体。';
 
   @override
-  String get fontSystem => '系统默认';
+  String get fontSystem => '平台默认';
 
   @override
   String get fontSourceHanSerif => '思源宋体';
@@ -1006,7 +1006,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fontNewsreader => 'Newsreader';
 
   @override
-  String get fontSystemDescription => '跟随当前设备和操作系统的原生字体。';
+  String get fontSystemDescription => '使用为当前平台优化的默认阅读字体，保持字形与分页稳定。';
 
   @override
   String get fontSerifDescription => '沉静、有出版物气质的衬线字体，适合长时间阅读。';
@@ -6564,16 +6564,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readerFontSelectionDescription =>
-      '選擇閱讀正文使用的字體。選用「系統預設」時，EPUB 如有出版社內嵌字體會優先保留。';
+      '選擇閱讀正文使用的字體。選用「平台預設」時，EPUB 如有出版社內嵌字體會優先保留。';
 
   @override
-  String get readerFontBookPriorityHint => '書籍有內嵌字體時優先使用，否則使用裝置字體。';
+  String get readerFontBookPriorityHint => '書籍有內嵌字體時優先使用，否則使用平台預設閱讀字體。';
 
   @override
   String get readerFontOverrideHint => '覆蓋出版社在書籍中內嵌的字體。';
 
   @override
-  String get fontSystem => '系統預設';
+  String get fontSystem => '平台預設';
 
   @override
   String get fontSourceHanSerif => '思源宋體';
@@ -6591,7 +6591,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get fontNewsreader => 'Newsreader';
 
   @override
-  String get fontSystemDescription => '跟隨目前裝置和作業系統的原生字體。';
+  String get fontSystemDescription => '使用針對目前平台最佳化的預設閱讀字體，保持字形與分頁穩定。';
 
   @override
   String get fontSerifDescription => '沉靜、具出版物氣質的襯線字體，適合長時間閱讀。';

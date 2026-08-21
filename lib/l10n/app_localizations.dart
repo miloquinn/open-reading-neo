@@ -1875,13 +1875,13 @@ abstract class AppLocalizations {
   /// Explains reader font selection and EPUB embedded-font behavior
   ///
   /// In en, this message translates to:
-  /// **'Choose the typeface used for reading. System Default keeps fonts embedded by EPUB publishers when available.'**
+  /// **'Choose the typeface used for reading. Platform Default keeps fonts embedded by EPUB publishers when available.'**
   String get readerFontSelectionDescription;
 
   /// Hint shown when the system reader font is selected
   ///
   /// In en, this message translates to:
-  /// **'Uses the book’s embedded font when available; otherwise uses the device font.'**
+  /// **'Uses the book’s embedded font when available; otherwise uses the platform-default reading font.'**
   String get readerFontBookPriorityHint;
 
   /// Hint shown when a personalized reader font is selected
@@ -1893,7 +1893,7 @@ abstract class AppLocalizations {
   /// System default font
   ///
   /// In en, this message translates to:
-  /// **'System Default'**
+  /// **'Platform Default'**
   String get fontSystem;
 
   /// Source Han Serif font
@@ -1929,7 +1929,7 @@ abstract class AppLocalizations {
   /// System font option description
   ///
   /// In en, this message translates to:
-  /// **'Follows the native font of the current device and operating system.'**
+  /// **'Uses a platform-optimized reading font for stable glyphs and pagination.'**
   String get fontSystemDescription;
 
   /// Serif font option description

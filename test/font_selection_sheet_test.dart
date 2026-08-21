@@ -124,7 +124,7 @@ void main() {
 
     expect(
       find.text(
-        'Uses the book’s embedded font when available; otherwise uses the device font.',
+        'Uses the book’s embedded font when available; otherwise uses the platform-default reading font.',
       ),
       findsOneWidget,
     );

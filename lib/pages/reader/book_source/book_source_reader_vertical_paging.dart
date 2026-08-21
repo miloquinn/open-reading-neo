@@ -140,8 +140,9 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
       firstLineIndent: _firstLineIndent,
       paragraphSpacing: _paragraphSpacing,
       textDirection: direction,
-      extra: '${chrome.paginationSignature}:${_readerFont.id}',
-    ).cacheKey('book-source-vertical-v2');
+      extra:
+          '${chrome.paginationSignature}:${_readerFontProfile.cacheSignature}',
+    ).cacheKey('book-source-vertical-v3');
     final cached = _verticalLayouts[chapterIndex];
     if (cached?.fingerprint == fingerprint) return cached!;
     final text =
@@ -562,7 +563,8 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
           '${_fontSize.toStringAsFixed(1)}:$_fontWeight:'
           '${_lineHeight.toStringAsFixed(2)}:'
           '${_letterSpacing.toStringAsFixed(1)}:${_textAlignment.name}:'
-          '$_firstLineIndent:$_paragraphSpacing:${_readerFont.id}:'
+          '$_firstLineIndent:$_paragraphSpacing:'
+          '${_readerFontProfile.cacheSignature}:'
           '${_verticalChrome.paginationSignature}',
         ),
         itemScrollController: _verticalChapterScrollController,

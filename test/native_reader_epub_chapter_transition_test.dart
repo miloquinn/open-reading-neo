@@ -17,11 +17,12 @@ import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 
 void main() {
-  test('reader font overrides EPUB font except for the system default', () {
+  test('reader font overrides EPUB font except for the platform default', () {
     expect(
       resolveNativeReaderFontFamily(
-        readerFontFamily: null,
+        readerFontFamily: 'sans-serif',
         epubFontFamily: 'Embedded EPUB Font',
+        preserveEpubFont: true,
       ),
       'Embedded EPUB Font',
     );
@@ -29,6 +30,7 @@ void main() {
       resolveNativeReaderFontFamily(
         readerFontFamily: 'PingFang SC',
         epubFontFamily: 'Embedded EPUB Font',
+        preserveEpubFont: false,
       ),
       'PingFang SC',
     );

@@ -463,9 +463,16 @@ double _nativeDouble(Object? value) => switch (value) {
 String? resolveNativeReaderFontFamily({
   required String? readerFontFamily,
   required String? epubFontFamily,
-}) => readerFontFamily ?? epubFontFamily;
+  bool preserveEpubFont = true,
+}) => preserveEpubFont && epubFontFamily != null
+    ? epubFontFamily
+    : readerFontFamily;
 
-TextStyle _styleForNativeBlock(_NativeBlock block, TextStyle base) {
+TextStyle _styleForNativeBlock(
+  _NativeBlock block,
+  TextStyle base, {
+  required bool preserveEpubFont,
+}) {
   return base.copyWith(
     fontSize: (base.fontSize ?? 19) * block.fontScale,
     fontWeight: block.bold ? FontWeight.w700 : base.fontWeight,
@@ -473,6 +480,7 @@ TextStyle _styleForNativeBlock(_NativeBlock block, TextStyle base) {
     fontFamily: resolveNativeReaderFontFamily(
       readerFontFamily: base.fontFamily,
       epubFontFamily: block.fontFamily,
+      preserveEpubFont: preserveEpubFont,
     ),
     // Keep EPUB typography, but the reader theme owns foreground color so
     // embedded black/white text cannot disappear in night/day modes.
@@ -484,8 +492,9 @@ TextSpan _styledSpanForRange(
   _NativeChapter chapter,
   int start,
   int end,
-  TextStyle base,
-) {
+  TextStyle base, {
+  bool preserveEpubFont = true,
+}) {
   if (start >= end) return TextSpan(style: base, text: '');
   final children = <InlineSpan>[];
   var cursor = start;
@@ -516,7 +525,11 @@ TextSpan _styledSpanForRange(
     children.add(
       TextSpan(
         text: chapter.plainText.substring(overlapStart, overlapEnd),
-        style: _styleForNativeBlock(block, base),
+        style: _styleForNativeBlock(
+          block,
+          base,
+          preserveEpubFont: preserveEpubFont,
+        ),
       ),
     );
     cursor = overlapEnd;

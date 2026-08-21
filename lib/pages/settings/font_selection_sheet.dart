@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:xxread/core/reader/reader_font_profile.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/core/custom_font_service.dart';
 import 'package:xxread/services/core/online_font_models.dart';
@@ -296,6 +297,15 @@ class _FontOptionTile extends StatelessWidget {
         : option.isOnline || option.isCustom
         ? l10n.fontStaticWeight
         : null;
+    final previewProfile = domain == FontDomain.reader
+        ? resolveReaderFontProfile(
+            selection: option,
+            locale: Localizations.maybeLocaleOf(context),
+          )
+        : null;
+    final previewFamily = previewProfile?.fontFamily ?? option.family;
+    final previewFallback =
+        previewProfile?.fontFamilyFallback ?? option.fallbackFamilies;
     final description =
         domain == FontDomain.reader && option.id == FontCatalog.systemId
         ? l10n.readerFontBookPriorityHint
@@ -348,10 +358,10 @@ class _FontOptionTile extends StatelessWidget {
                         FontCatalog.labelFor(l10n, option),
                         style: TextStyle(
                           inherit: false,
-                          fontFamily: option.family,
-                          fontFamilyFallback: option.fallbackFamilies.isEmpty
+                          fontFamily: previewFamily,
+                          fontFamilyFallback: previewFallback.isEmpty
                               ? null
-                              : option.fallbackFamilies,
+                              : previewFallback,
                           color: selected
                               ? colorScheme.primary
                               : colorScheme.onSurface,

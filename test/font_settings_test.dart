@@ -345,6 +345,12 @@ void main() {
     );
     expect(
       FontCatalog.readerFontsForPlatform(
+        TargetPlatform.macOS,
+      ).map((font) => font.id),
+      contains(FontCatalog.pingFangScId),
+    );
+    expect(
+      FontCatalog.readerFontsForPlatform(
         TargetPlatform.android,
       ).map((font) => font.id),
       isNot(contains(FontCatalog.pingFangScId)),

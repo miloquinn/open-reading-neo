@@ -252,7 +252,7 @@ class FontCatalog {
       readerFontsForPlatform(defaultTargetPlatform);
 
   static List<FontOption> readerFontsForPlatform(TargetPlatform platform) =>
-      platform == TargetPlatform.iOS
+      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS
       ? <FontOption>[systemFont, pingFangSc, ..._readerFonts.skip(1)]
       : _readerFonts;
 

@@ -418,6 +418,222 @@ void main() {
   });
 
   test(
+    'revalidates with validators and refreshes not-modified entries',
+    () async {
+      var now = DateTime.utc(2026, 1, 1);
+      final cache = BookSourceResponseCache(
+        cacheDirectory: directory,
+        now: () => now,
+      );
+      addTearDown(cache.flushPendingWrites);
+      BookSourceCacheValidators? received;
+
+      expect(
+        await cache.getOrRevalidateJson(
+          key: 'validated',
+          ttl: const Duration(minutes: 5),
+          loader: (_) async => const BookSourceCacheLoadResult.modified(
+            {'value': 1},
+            etag: '"one"',
+            lastModified: 'Wed, 01 Jan 2026 00:00:00 GMT',
+          ),
+        ),
+        {'value': 1},
+      );
+      now = now.add(const Duration(minutes: 6));
+      expect(
+        await cache.getOrRevalidateJson(
+          key: 'validated',
+          ttl: const Duration(minutes: 5),
+          loader: (validators) async {
+            received = validators;
+            return const BookSourceCacheLoadResult.notModified();
+          },
+        ),
+        {'value': 1},
+      );
+      expect(received?.etag, '"one"');
+      expect(received?.lastModified, 'Wed, 01 Jan 2026 00:00:00 GMT');
+
+      now = now.add(const Duration(minutes: 4));
+      var loads = 0;
+      expect(
+        await cache.getOrRevalidateJson(
+          key: 'validated',
+          ttl: const Duration(minutes: 5),
+          loader: (_) async {
+            loads++;
+            return const BookSourceCacheLoadResult.modified({'value': 2});
+          },
+        ),
+        {'value': 1},
+      );
+      expect(loads, 0);
+    },
+  );
+
+  test('modified response replaces payload and validators on disk', () async {
+    var now = DateTime.utc(2026, 1, 1);
+    final first = BookSourceResponseCache(
+      cacheDirectory: directory,
+      now: () => now,
+    );
+    addTearDown(first.flushPendingWrites);
+    await first.getOrRevalidateJson(
+      key: 'disk-validators',
+      ttl: const Duration(minutes: 1),
+      loader: (_) async =>
+          const BookSourceCacheLoadResult.modified({'value': 1}, etag: 'old'),
+    );
+    await first.flushPendingWrites();
+    now = now.add(const Duration(minutes: 2));
+
+    final second = BookSourceResponseCache(
+      cacheDirectory: directory,
+      now: () => now,
+    );
+    addTearDown(second.flushPendingWrites);
+    expect(
+      await second.getOrRevalidateJson(
+        key: 'disk-validators',
+        ttl: const Duration(minutes: 1),
+        loader: (validators) async {
+          expect(validators.etag, 'old');
+          return const BookSourceCacheLoadResult.modified({
+            'value': 2,
+          }, etag: 'new');
+        },
+      ),
+      {'value': 2},
+    );
+  });
+
+  test('stale-if-error is bounded and configurable', () async {
+    var now = DateTime.utc(2026, 1, 1);
+    final cache = BookSourceResponseCache(
+      cacheDirectory: directory,
+      now: () => now,
+      maxDiskEntries: 0,
+    );
+    await cache.getOrRevalidateJson(
+      key: 'stale',
+      ttl: const Duration(minutes: 1),
+      loader: (_) async =>
+          const BookSourceCacheLoadResult.modified({'value': 1}),
+    );
+    now = now.add(const Duration(minutes: 2));
+    expect(
+      await cache.getOrRevalidateJson(
+        key: 'stale',
+        ttl: const Duration(minutes: 1),
+        staleIfError: const Duration(minutes: 5),
+        loader: (_) async => throw StateError('offline'),
+      ),
+      {'value': 1},
+    );
+    now = now.add(const Duration(minutes: 1));
+    await expectLater(
+      cache.getOrRevalidateJson(
+        key: 'stale',
+        ttl: const Duration(minutes: 1),
+        staleIfError: const Duration(minutes: 5),
+        staleErrorTest: (error) => error is TimeoutException,
+        loader: (_) async => throw StateError('404'),
+      ),
+      throwsStateError,
+    );
+    now = now.add(const Duration(minutes: 4));
+    await expectLater(
+      cache.getOrRevalidateJson(
+        key: 'stale',
+        ttl: const Duration(minutes: 1),
+        staleIfError: const Duration(minutes: 5),
+        loader: (_) async => throw StateError('offline'),
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('deduplicates revalidation loads by default', () async {
+    final cache = BookSourceResponseCache(cacheDirectory: directory);
+    final completer = Completer<BookSourceCacheLoadResult>();
+    var loads = 0;
+    Future<BookSourceCacheLoadResult> loader(
+      BookSourceCacheValidators validators,
+    ) {
+      loads++;
+      return completer.future;
+    }
+
+    final first = cache.getOrRevalidateJson(
+      key: 'revalidation-flight',
+      ttl: Duration.zero,
+      persistToDisk: false,
+      loader: loader,
+    );
+    final second = cache.getOrRevalidateJson(
+      key: 'revalidation-flight',
+      ttl: Duration.zero,
+      persistToDisk: false,
+      loader: loader,
+    );
+    expect(loads, 1);
+    completer.complete(const BookSourceCacheLoadResult.modified({'value': 1}));
+    expect(await first, {'value': 1});
+    expect(await second, {'value': 1});
+  });
+
+  test('reads schema v1 payloads and supplies empty validators', () async {
+    const key = 'legacy';
+    final seed = BookSourceResponseCache(cacheDirectory: directory);
+    await seed.getOrLoadJson(
+      key: key,
+      ttl: const Duration(hours: 1),
+      loader: () async => {'legacy': true},
+    );
+    await seed.flushPendingWrites();
+    final file =
+        await directory.list().where((entity) => entity is File).single as File;
+    final contents = await file.readAsString();
+    await file.writeAsString(contents.replaceFirst('"schema":2', '"schema":1'));
+
+    final cache = BookSourceResponseCache(cacheDirectory: directory);
+    addTearDown(cache.flushPendingWrites);
+    BookSourceCacheValidators? validators;
+    expect(
+      await cache.getOrRevalidateJson(
+        key: key,
+        ttl: Duration.zero,
+        loader: (value) async {
+          validators = value;
+          return const BookSourceCacheLoadResult.notModified();
+        },
+      ),
+      {'legacy': true},
+    );
+    expect(validators?.isEmpty, isTrue);
+  });
+
+  test('invalidation generation prevents revalidation write-back', () async {
+    final cache = BookSourceResponseCache(cacheDirectory: directory);
+    addTearDown(cache.flushPendingWrites);
+    final response = Completer<BookSourceCacheLoadResult>();
+    final pending = cache.getOrRevalidateJson(
+      key: 'generation',
+      ttl: Duration.zero,
+      loader: (_) => response.future,
+    );
+    await cache.invalidate('generation');
+    response.complete(
+      const BookSourceCacheLoadResult.modified({'value': 'old'}),
+    );
+    expect(await pending, {'value': 'old'});
+    expect(cache.memoryEntryCount, 0);
+    await cache.flushPendingWrites();
+    expect(await cache.diskSizeBytes(), 0);
+  });
+
+  test(
     'optional in-flight isolation runs cancellable-style loaders separately',
     () async {
       final cache = BookSourceResponseCache(cacheDirectory: directory);

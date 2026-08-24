@@ -1,6 +1,9 @@
 part of 'native_reader_page.dart';
 
 extension _NativeReaderLoading on _NativeReaderPageState {
+  String get _navigationReplacementCacheKey =>
+      '$_bookCacheKey:${ReplaceRuleService.instance.rulesSignature}';
+
   void _initializeReaderDependencies() {
     if (_readerDependenciesInitialized) return;
     final cacheKey = _bookCacheKey;
@@ -18,7 +21,9 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         _bookMemoryCache.length >= 2) {
       final oldestKey = _bookMemoryCache.keys.first;
       _bookMemoryCache.remove(oldestKey);
-      _navigationMemoryCache.remove(oldestKey);
+      _navigationMemoryCache.removeWhere(
+        (key, _) => key == oldestKey || key.startsWith('$oldestKey:'),
+      );
       _paginationMemoryCache.remove(oldestKey);
     }
     _pageCache = _paginationMemoryCache.putIfAbsent(cacheKey, () => {});
@@ -41,12 +46,33 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     Future<List<_NativeChapter>> chaptersFuture,
   ) async {
     await _paginationCacheLoadFuture;
+    await ReplaceRuleService.instance.load();
     final chapters = await chaptersFuture;
     if (chapters.isEmpty) return chapters;
     for (final chapter in chapters) {
       chapter.configureReplacement(widget.book.title);
     }
+    final replacementService = ReplaceRuleService.instance;
+    for (final chapter in chapters) {
+      chapter.prepareReplacementRevision(replacementService.revision);
+    }
+    const titleBatchSize = 256;
+    for (var start = 0; start < chapters.length; start += titleBatchSize) {
+      final end = math.min(start + titleBatchSize, chapters.length);
+      final batch = chapters.sublist(start, end);
+      final cleaned = await replacementService.applyBatchAsync(
+        batch.map((chapter) => chapter.originalTitle).toList(growable: false),
+        bookTitle: widget.book.title,
+        title: true,
+      );
+      for (var index = 0; index < batch.length; index++) {
+        batch[index].applyPreparedTitle(cleaned.values[index]);
+      }
+    }
 
+    final preparedNavigation = await _prepareNavigationTitles(
+      _parsedNavigationChapters,
+    );
     _loadedChapters = chapters;
     final initialChapterIndex = _chapterIndex.clamp(0, chapters.length - 1);
     // 冷缓存打开时，章节文本的读取与 UTF-8 解码（UI isolate 上数十毫秒）
@@ -54,19 +80,45 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     if (_pageCache.isEmpty) await _waitForOpeningCoverHold();
     await _loadIndexedChapterWindow(chapters, initialChapterIndex);
     _navigationChapters =
-        _navigationMemoryCache[_bookCacheKey] ??
-        List<ReaderNavigationChapter>.generate(
-          chapters.length,
-          (index) => ReaderNavigationChapter(
-            title: chapters[index].title,
-            index: index,
-            id: chapters[index].id,
-            depth: chapters[index].depth,
-          ),
-          growable: false,
-        );
+        _navigationMemoryCache[_navigationReplacementCacheKey] ??
+        (preparedNavigation.isNotEmpty
+            ? preparedNavigation
+            : List<ReaderNavigationChapter>.generate(
+                chapters.length,
+                (index) => ReaderNavigationChapter(
+                  title: chapters[index].title,
+                  index: index,
+                  id: chapters[index].id,
+                  depth: chapters[index].depth,
+                ),
+                growable: false,
+              ));
+    _navigationMemoryCache[_navigationReplacementCacheKey] =
+        _navigationChapters;
     _navigationCatalog = ReaderNavigationCatalog(_navigationChapters);
     return chapters;
+  }
+
+  Future<List<ReaderNavigationChapter>> _prepareNavigationTitles(
+    List<ReaderNavigationChapter> navigation,
+  ) async {
+    if (navigation.isEmpty) return const <ReaderNavigationChapter>[];
+    final cleaned = await ReplaceRuleService.instance.applyBatchAsync(
+      navigation.map((entry) => entry.title).toList(growable: false),
+      bookTitle: widget.book.title,
+      title: true,
+    );
+    return List<ReaderNavigationChapter>.generate(
+      navigation.length,
+      (index) => ReaderNavigationChapter(
+        title: cleaned.values[index],
+        index: navigation[index].index,
+        id: navigation[index].id,
+        fragment: navigation[index].fragment,
+        depth: navigation[index].depth,
+      ),
+      growable: false,
+    );
   }
 
   Future<void> _loadIndexedChapterWindow(
@@ -96,8 +148,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
       await _loadEpubChapterBatch(epubChapters);
     }
     await Future.wait<void>([
-      for (final index in indexes)
-        if (!chapters[index].isLazyEpub) chapters[index].loadTextAsync(),
+      for (final index in indexes) chapters[index].prepareReplacementAsync(),
     ]);
     final retainedChapterIndex = retainAroundCurrentChapter
         ? _chapterIndex.clamp(0, chapters.length - 1)
@@ -335,22 +386,29 @@ extension _NativeReaderLoading on _NativeReaderPageState {
             ),
           )
           .toList(growable: false);
-      final navigation = (index['navigation'] as List<dynamic>? ?? const [])
-          .map((entry) {
-            final values = Map<String, dynamic>.from(entry as Map);
-            final chapterIndex = values['chapterIndex'] as int;
-            return ReaderNavigationChapter(
-              title: values['title'] as String? ?? '',
-              index: chapterIndex,
-              id: chapters[chapterIndex].id,
-              fragment: values['fragment'] as String?,
-              depth: values['depth'] as int? ?? 0,
-            );
-          })
-          .toList(growable: false);
-      if (navigation.isNotEmpty) {
-        _navigationMemoryCache[_bookCacheKey] = navigation;
-      }
+      _parsedNavigationChapters =
+          (index['navigation'] as List<dynamic>? ?? const <dynamic>[])
+              .map((raw) {
+                final descriptor = Map<String, dynamic>.from(raw as Map);
+                final chapterIndex = (descriptor['chapterIndex'] as num?)
+                    ?.toInt();
+                if (chapterIndex == null ||
+                    chapterIndex < 0 ||
+                    chapterIndex >= chapters.length) {
+                  return null;
+                }
+                final chapter = chapters[chapterIndex];
+                return ReaderNavigationChapter(
+                  title: descriptor['title'] as String? ?? chapter.title,
+                  index: chapterIndex,
+                  id: chapter.id,
+                  fragment: descriptor['fragment'] as String?,
+                  depth:
+                      (descriptor['depth'] as num?)?.toInt() ?? chapter.depth,
+                );
+              })
+              .whereType<ReaderNavigationChapter>()
+              .toList(growable: false);
       return chapters;
     }
 

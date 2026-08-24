@@ -14,6 +14,7 @@ import 'package:xxread/pages/reader/native/native_reader_page.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/core/custom_font_service.dart';
 import 'package:xxread/services/core/online_font_service.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
 import 'package:xxread/utils/reader_themes.dart';
@@ -36,6 +37,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       ReaderSettingsStore.pageModeKey: ReaderPageMode.instantPage.name,
     });
+    ReplaceRuleService.instance.resetForTesting();
     temporaryDirectory = Directory.systemTemp.createTempSync(
       'open-reading-txt-title-page-',
     );
@@ -72,6 +74,70 @@ void main() {
     if (temporaryDirectory.existsSync()) {
       temporaryDirectory.deleteSync(recursive: true);
     }
+  });
+
+  testWidgets('native TXT replacement rules clean title and content', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: ReaderPageMode.instantPage.name,
+      ReplaceRuleService.preferenceKey: '''[
+        {
+          "id":"title",
+          "name":"title",
+          "pattern":"风暴",
+          "replacement":"晨曦",
+          "enabled":true,
+          "isRegex":false,
+          "scopeTitle":true,
+          "scopeContent":false,
+          "order":0
+        },
+        {
+          "id":"content",
+          "name":"content",
+          "pattern":"墨色",
+          "replacement":"银色",
+          "enabled":true,
+          "isRegex":false,
+          "scopeTitle":false,
+          "scopeContent":true,
+          "order":1
+        }
+      ]''',
+    });
+    ReplaceRuleService.instance.resetForTesting();
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: NativeReaderPage(
+          book: Book(
+            title: '测试书',
+            filePath: bookFile.path,
+            format: 'txt',
+            textEncoding: 'utf8',
+            fileModifiedTime: bookFile
+                .lastModifiedSync()
+                .millisecondsSinceEpoch,
+          ),
+        ),
+      ),
+    );
+
+    await tester.runAsync(() async {
+      for (var attempt = 0; attempt < 30; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await tester.pump();
+        if (find.textContaining('晨曦').evaluate().isNotEmpty) return;
+      }
+    });
+    await _pumpUntilFound(tester, find.textContaining('晨曦'));
+    expect(find.textContaining('风暴'), findsNothing);
+    expect(_richTextContaining('墨色'), findsNothing);
   });
 
   testWidgets('TXT chapter title is a dedicated first page', (tester) async {

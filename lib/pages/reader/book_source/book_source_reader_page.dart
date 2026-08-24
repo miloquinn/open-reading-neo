@@ -166,6 +166,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       ReaderLeafStatusController();
 
   List<BookSourceChapter> _chapters = const [];
+  Map<String, String> _rawChapterTitlesById = const <String, String>{};
   List<ReaderNavigationChapter> _navigationChapters = const [];
   ReaderNavigationCatalog? _navigationCatalog;
   BookSourceChapterContent? _content;

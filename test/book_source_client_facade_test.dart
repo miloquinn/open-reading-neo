@@ -24,7 +24,11 @@ void main() {
 
       expect((await client.search(_source(), 'query')).page, 1);
       expect((await client.search(_source(reading: true), 'query')).page, 2);
-      await client.getDiscovery(_source(reading: true));
+      await client.getDiscovery(_source());
+      expect(
+        () => client.getDiscovery(_source(reading: true)),
+        throwsA(isA<BookSourceProtocolException>()),
+      );
       await client.invalidateResponseCache(_source(reading: true));
 
       expect(orsp.searchCalls, 1);

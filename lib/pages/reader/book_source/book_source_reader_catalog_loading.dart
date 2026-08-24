@@ -26,7 +26,10 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
       ]);
       final rawChapters = [...results[0]! as List<BookSourceChapter>]
         ..sort((a, b) => a.order.compareTo(b.order));
-      final chapters = _withReplacedChapterTitles(rawChapters);
+      final rawChapterTitlesById = <String, String>{
+        for (final chapter in rawChapters) chapter.id: chapter.title,
+      };
+      final chapters = await _withReplacedChapterTitles(rawChapters);
       final navigationChapters = _navigationFor(chapters);
       final navigationCatalog = ReaderNavigationCatalog(navigationChapters);
       final saved = results[1] as BookSourceReadingProgress?;
@@ -49,6 +52,9 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
       ReaderThemes.setCustomThemes(customThemes);
       ReaderThemes.setThemeOrder(themeOrder);
       _updateReaderState(() {
+        _rawChapterTitlesById = Map<String, String>.unmodifiable(
+          rawChapterTitlesById,
+        );
         _chapters = chapters;
         _navigationChapters = navigationChapters;
         _navigationCatalog = navigationCatalog;
@@ -93,28 +99,32 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
     }
   }
 
-  String _cleanChapterTitle(String title) {
-    final cleaned = ReplaceRuleService.instance.apply(
-      title,
+  Future<List<BookSourceChapter>> _withReplacedChapterTitles(
+    List<BookSourceChapter> chapters,
+  ) async {
+    if (chapters.isEmpty) return const <BookSourceChapter>[];
+    final cleaned = await ReplaceRuleService.instance.applyBatchAsync(
+      chapters.map((chapter) => chapter.title).toList(growable: false),
       bookTitle: widget.book.title,
       sourceName: widget.source.name,
       title: true,
     );
-    return cleaned.trim().isEmpty ? title : cleaned;
+    return List<BookSourceChapter>.generate(
+      chapters.length,
+      (index) => BookSourceChapter(
+        id: chapters[index].id,
+        title: cleaned.values[index],
+        order: chapters[index].order,
+        updatedAt: chapters[index].updatedAt,
+      ),
+      growable: false,
+    );
   }
 
-  List<BookSourceChapter> _withReplacedChapterTitles(
-    List<BookSourceChapter> chapters,
-  ) => chapters
-      .map(
-        (chapter) => BookSourceChapter(
-          id: chapter.id,
-          title: _cleanChapterTitle(chapter.title),
-          order: chapter.order,
-          updatedAt: chapter.updatedAt,
-        ),
-      )
-      .toList(growable: false);
+  String _sourceChapterTitle(int index) {
+    final chapter = _chapters[index];
+    return _rawChapterTitlesById[chapter.id] ?? chapter.title;
+  }
 
   List<ReaderNavigationChapter> _navigationFor(
     List<BookSourceChapter> chapters,

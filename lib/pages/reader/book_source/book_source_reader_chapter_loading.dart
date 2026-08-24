@@ -160,7 +160,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
             sourceVariables: {
               ...widget.book.sourceVariables,
               'chapterIndex': '$index',
-              'chapterTitle': _chapters[index].title,
+              'chapterTitle': _sourceChapterTitle(index),
               'bookName': widget.book.title,
               'bookAuthor': widget.book.author,
               'bookType': '${widget.book.type}',
@@ -173,14 +173,14 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
               ? ''
               : await readableBookSourceChapterTextAsync(
                   content,
-                  fallbackTitle: _chapters[index].title,
+                  fallbackTitle: _sourceChapterTitle(index),
                 );
-          await ReplaceRuleService.instance.load();
-          _readableChapterText[index] = ReplaceRuleService.instance.apply(
-            readable,
-            bookTitle: widget.book.title,
-            sourceName: widget.source.name,
-          );
+          _readableChapterText[index] = await ReplaceRuleService.instance
+              .applyAsync(
+                readable,
+                bookTitle: widget.book.title,
+                sourceName: widget.source.name,
+              );
           while (_readableChapterText.length >
               _bookSourceReadableChapterTextLimit) {
             _readableChapterText.remove(_readableChapterText.keys.first);

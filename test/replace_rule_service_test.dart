@@ -212,4 +212,58 @@ void main() {
       throwsA(isA<ReplaceRuleValidationException>()),
     );
   });
+
+  test('async batch preserves order, scopes, and capture expansion', () async {
+    await service.load();
+    await service.saveAll(const [
+      ReplaceRule(
+        id: 'one',
+        name: 'one',
+        pattern: r'(广告)(\d+)',
+        replacement: r'$2-$1',
+        scope: 'Target Source',
+        order: 0,
+      ),
+      ReplaceRule(
+        id: 'two',
+        name: 'two',
+        pattern: '2-广告',
+        replacement: 'clean',
+        isRegex: false,
+        order: 1,
+      ),
+    ]);
+
+    final result = await service.applyBatchAsync(
+      const ['广告1', '广告2'],
+      bookTitle: 'Book',
+      sourceName: 'Target Source',
+    );
+
+    expect(result.values, ['1-广告', 'clean']);
+    expect(result.degraded, isFalse);
+  });
+
+  test('async cleaning retains non-empty source when rules erase it', () async {
+    await service.load();
+    await service.saveAll(const [
+      ReplaceRule(
+        id: 'erase',
+        name: 'erase',
+        pattern: r'(?s).*',
+        replacement: '',
+      ),
+    ]);
+
+    final result = await service.applyBatchAsync(const [
+      'meaningful chapter',
+    ], bookTitle: 'Book');
+
+    expect(result.values.single, 'meaningful chapter');
+    expect(result.degraded, isTrue);
+    expect(
+      result.diagnostics.map((item) => item.kind.name),
+      contains('emptyOutput'),
+    );
+  });
 }

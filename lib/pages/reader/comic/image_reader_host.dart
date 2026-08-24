@@ -9,6 +9,8 @@ import 'package:xxread/pages/reader/comic/image_reader_source.dart';
 import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
+import 'package:xxread/utils/reader_themes.dart';
+import 'package:xxread/widgets/reader_settings_controls.dart';
 
 /// Shared comic/image-book host. Entries stay separate; this is the one
 /// reading line for chapter/page state, catalog, retry, and page chrome.
@@ -33,6 +35,7 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
   int? _pageCountRetrySerial;
   Future<int>? _pageCountFuture;
   ImageReaderDirection? _resolvedDirection;
+  int _directionGeneration = 0;
 
   @override
   void initState() {
@@ -69,6 +72,7 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
 
   @override
   void dispose() {
+    _directionGeneration++;
     widget.source.dispose();
     super.dispose();
   }
@@ -118,35 +122,105 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
   }
 
   Future<void> _resolveDirection() async {
+    final source = widget.source;
+    final generation = ++_directionGeneration;
     final store = const PagedImageReaderSettingsStore();
-    final direction = widget.source.settingsId == null
+    final direction = source.settingsId == null
         ? await store.loadDirection(
-            widget.source.localBookId,
-            fallback: widget.source.defaultDirection,
+            source.localBookId,
+            fallback: source.defaultDirection,
           )
         : await store.loadDirectionForKey(
-            widget.source.settingsId,
-            fallback: widget.source.defaultDirection,
+            source.settingsId,
+            fallback: source.defaultDirection,
           );
-    if (!mounted) return;
+    if (!mounted ||
+        generation != _directionGeneration ||
+        !identical(source, widget.source)) {
+      return;
+    }
     setState(() => _resolvedDirection = direction);
   }
 
-  Future<void> _setHorizontalMode() async {
+  Future<void> _showContinuousSettings() async {
+    final source = widget.source;
+    final current = _resolvedDirection ?? source.defaultDirection;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => ReaderSettingsSheetFrame(
+        key: const ValueKey('continuous-reader-settings-sheet'),
+        palette: source.theme,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              context.l10n.imageReaderSettings,
+              style: TextStyle(
+                color: source.theme.text,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.l10n.imageReaderDirectionTitle,
+              style: TextStyle(
+                color: source.theme.secondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _ContinuousDirectionChoice(
+              label: context.l10n.imageReaderDirectionVertical,
+              selected: current == ImageReaderDirection.vertical,
+              palette: source.theme,
+              onTap: () => Navigator.of(sheetContext).pop(),
+            ),
+            const SizedBox(height: 8),
+            _ContinuousDirectionChoice(
+              label: context.l10n.imageReaderDirectionLtr,
+              selected: current == ImageReaderDirection.ltr,
+              palette: source.theme,
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                unawaited(_setDirection(ImageReaderDirection.ltr));
+              },
+            ),
+            const SizedBox(height: 8),
+            _ContinuousDirectionChoice(
+              label: context.l10n.imageReaderDirectionRtl,
+              selected: current == ImageReaderDirection.rtl,
+              palette: source.theme,
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                unawaited(_setDirection(ImageReaderDirection.rtl));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setDirection(ImageReaderDirection direction) async {
+    final source = widget.source;
+    final generation = ++_directionGeneration;
     final store = const PagedImageReaderSettingsStore();
-    if (widget.source.settingsId == null) {
-      await store.saveDirection(
-        widget.source.localBookId,
-        ImageReaderDirection.ltr,
-      );
+    if (source.settingsId == null) {
+      await store.saveDirection(source.localBookId, direction);
     } else {
-      await store.saveDirectionForKey(
-        widget.source.settingsId,
-        ImageReaderDirection.ltr,
-      );
+      await store.saveDirectionForKey(source.settingsId, direction);
     }
-    if (!mounted) return;
-    setState(() => _resolvedDirection = ImageReaderDirection.ltr);
+    if (!mounted ||
+        generation != _directionGeneration ||
+        !identical(source, widget.source)) {
+      return;
+    }
+    setState(() => _resolvedDirection = direction);
   }
 
   Future<void> _showCatalog(ImageReaderDocument document) async {
@@ -247,8 +321,9 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
               onTableOfContents: document.chapters.length > 1
                   ? () => unawaited(_showCatalog(document))
                   : null,
-              onSettings: _setHorizontalMode,
-              onChangeReadingMode: _setHorizontalMode,
+              onSettings: () => unawaited(_showContinuousSettings()),
+              onChangeReadingMode: () =>
+                  unawaited(_setDirection(ImageReaderDirection.ltr)),
             );
           }
           if (_pageCountFuture == null ||
@@ -342,6 +417,57 @@ class _ImageReaderHostState extends State<ImageReaderHost> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _ContinuousDirectionChoice extends StatelessWidget {
+  const _ContinuousDirectionChoice({
+    required this.label,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final ReaderThemePalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? palette.accent.withValues(alpha: 0.14)
+          : palette.controlFill.withValues(alpha: 0.42),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                size: 20,
+                color: selected ? palette.accent : palette.secondaryText,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: TextStyle(
+                  color: palette.text,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

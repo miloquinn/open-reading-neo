@@ -126,7 +126,10 @@ void main() {
       await client.invalidateResponseCache(
         _source(BookSourceProtocolKind.readingSource),
       );
-      expect(cache.invalidations, 0);
+      // Compatible sources share the protocol-independent discovery cache,
+      // so login/refresh invalidation clears that namespace even though their
+      // runtime requests never enter the ORSP HTTP response cache.
+      expect(cache.invalidations, 1);
     },
   );
 }
@@ -216,18 +219,27 @@ class _RecordingResponseCache extends BookSourceResponseCache {
   final List<bool> persistToDiskValues = [];
 
   @override
-  Future<Map<String, dynamic>> getOrLoadJson({
+  Future<Map<String, dynamic>> getOrRevalidateJson({
     required String key,
     required Duration ttl,
-    required Future<Map<String, dynamic>> Function() loader,
+    required Future<BookSourceCacheLoadResult> Function(
+      BookSourceCacheValidators validators,
+    )
+    loader,
+    Duration? staleIfError,
+    bool Function(Object error)? staleErrorTest,
     bool forceRefresh = false,
     bool deduplicateInFlight = true,
     bool persistToDisk = true,
-  }) {
+  }) async {
     loads++;
     deduplicateInFlightValues.add(deduplicateInFlight);
     persistToDiskValues.add(persistToDisk);
-    return loader();
+    final result = await loader(const BookSourceCacheValidators());
+    return switch (result) {
+      BookSourceCacheModified() => result.payload,
+      BookSourceCacheNotModified() => throw StateError('unexpected 304'),
+    };
   }
 
   @override

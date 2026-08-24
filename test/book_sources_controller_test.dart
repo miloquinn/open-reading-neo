@@ -66,6 +66,37 @@ void main() {
   );
 
   test(
+    'includes compatible text and comic sources in latest discovery',
+    () async {
+      final comic = _source(
+        'comic',
+        protocol: BookSourceProtocolKind.readingSource,
+        sourceConfig: const {'bookSourceType': 2},
+      );
+      final text = _source(
+        'text',
+        protocol: BookSourceProtocolKind.readingSource,
+        sourceConfig: const {'bookSourceType': 0},
+      );
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([comic, text]),
+      );
+
+      await controller.load();
+
+      expect(controller.state.sourcesFor(BookSourcesSection.latest), [
+        comic,
+        text,
+      ]);
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseIds, containsAll(['comic', 'text']));
+      await controller.close();
+    },
+  );
+
+  test(
     'listGroupsRevision bumps only on a real load or channel fetch, not on unrelated updates',
     () async {
       final sources = [_source('a'), _source('b')];
@@ -299,6 +330,7 @@ class _ControllerGateway extends BookSourceClient {
   final List<Future<BookSourceDiscoveryPage>> discoveryResults;
   final List<Future<BookSourceSearchPage>> browseResults;
   final List<String> discoveryIds = [];
+  final List<String> browseIds = [];
   int _browseIndex = 0;
   int _discoveryIndex = 0;
   int active = 0;
@@ -341,12 +373,17 @@ class _ControllerGateway extends BookSourceClient {
     int page = 1,
     int pageSize = 20,
   }) {
+    browseIds.add(source.id);
     if (browseResults.isNotEmpty) return browseResults[_browseIndex++];
     return Future.value(_page([_book('${source.id}-$page')]));
   }
 }
 
-RegisteredBookSource _source(String id) => RegisteredBookSource(
+RegisteredBookSource _source(
+  String id, {
+  BookSourceProtocolKind protocol = BookSourceProtocolKind.orsp,
+  Map<String, dynamic>? sourceConfig,
+}) => RegisteredBookSource(
   id: id,
   name: id,
   description: '',
@@ -357,6 +394,8 @@ RegisteredBookSource _source(String id) => RegisteredBookSource(
   capabilities: const {'discover', 'categories', 'browse'},
   enabled: true,
   addedAt: DateTime.utc(2026, 8, 9),
+  sourceProtocol: protocol,
+  sourceConfig: sourceConfig,
 );
 
 BookSourceBook _book(String id) => BookSourceBook(

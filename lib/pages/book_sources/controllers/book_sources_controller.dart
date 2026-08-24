@@ -511,11 +511,6 @@ class BookSourcesController extends ChangeNotifier {
       result[section] = sources
           .where((source) => source.enabled)
           .where((source) => source.capabilities.contains(capability))
-          .where(
-            (source) =>
-                section != BookSourcesSection.latest ||
-                source.sourceProtocol == BookSourceProtocolKind.orsp,
-          )
           .toList(growable: false);
     }
     return Map.unmodifiable(result);

@@ -33,6 +33,27 @@ class OrspHttpPipeline {
     Duration? receiveTimeout,
     BookDownloadCancellation? cancellation,
   }) async {
+    final response = await _getBoundedResponse(
+      uri,
+      maxBytes: maxBytes,
+      receiveTimeout: receiveTimeout,
+      cancellation: cancellation,
+    );
+    if (response.statusCode == HttpStatus.notModified) {
+      throw const BookSourceProtocolException(
+        'Source returned HTTP 304 without a cached response.',
+      );
+    }
+    return response.data;
+  }
+
+  Future<Response<Object?>> _getBoundedResponse(
+    Uri uri, {
+    int maxBytes = maxResponseBytes,
+    Duration? receiveTimeout,
+    BookDownloadCancellation? cancellation,
+    Map<String, dynamic>? headers,
+  }) async {
     final cancelToken = CancelToken();
     void cancelRequest() => cancelToken.cancel('Book download cancelled.');
     cancellation?.throwIfCancelled();
@@ -48,6 +69,7 @@ class OrspHttpPipeline {
         final response = await client.getUri<Object?>(
           current,
           options: Options(
+            headers: headers,
             receiveTimeout: receiveTimeout,
             followRedirects: false,
             validateStatus: (status) =>
@@ -61,9 +83,9 @@ class OrspHttpPipeline {
           },
         );
         final status = response.statusCode ?? 0;
-        if (status < 300) {
+        if (status == HttpStatus.notModified || status < 300) {
           cancellation?.throwIfCancelled();
-          return response.data;
+          return response;
         }
         if (redirects == 5) {
           throw const BookSourceProtocolException(
@@ -94,17 +116,41 @@ class OrspHttpPipeline {
     bool deduplicateInFlight = true,
     bool persistToDisk = true,
   }) async {
-    final json = await _responseCache.getOrLoadJson(
+    final json = await _responseCache.getOrRevalidateJson(
       key: key,
       ttl: ttl,
       deduplicateInFlight: deduplicateInFlight,
       persistToDisk: persistToDisk,
-      loader: () async {
-        final value = decodeBookSourceJson(
-          await getBounded(uri, cancellation: cancellation),
+      staleIfError: const Duration(days: 7),
+      staleErrorTest: _canUseStaleResponse,
+      loader: (validators) async {
+        final response = await _getBoundedResponse(
+          uri,
+          cancellation: cancellation,
+          headers: {
+            if (validators.etag != null)
+              HttpHeaders.ifNoneMatchHeader: validators.etag,
+            if (validators.lastModified != null)
+              HttpHeaders.ifModifiedSinceHeader: validators.lastModified,
+          },
         );
+        final etag = response.headers.value(HttpHeaders.etagHeader);
+        final lastModified = response.headers.value(
+          HttpHeaders.lastModifiedHeader,
+        );
+        if (response.statusCode == HttpStatus.notModified) {
+          return BookSourceCacheLoadResult.notModified(
+            etag: etag,
+            lastModified: lastModified,
+          );
+        }
+        final value = decodeBookSourceJson(response.data);
         validate(value);
-        return value;
+        return BookSourceCacheLoadResult.modified(
+          value,
+          etag: etag,
+          lastModified: lastModified,
+        );
       },
     );
     try {
@@ -176,6 +222,22 @@ class OrspHttpPipeline {
 
   static String discoveryCacheKey(Uri manifestUrl) =>
       'orsp-discovery|${Uri.encodeComponent(manifestUrl.toString())}';
+
+  bool _canUseStaleResponse(Object error) {
+    if (error is! DioException) return false;
+    if (CancelToken.isCancel(error)) return false;
+    final status = error.response?.statusCode;
+    if (status != null) {
+      return status == HttpStatus.tooManyRequests || status >= 500;
+    }
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.connectionError => true,
+      _ => false,
+    };
+  }
 
   bool _isRetryable(DioException error) {
     final status = error.response?.statusCode;

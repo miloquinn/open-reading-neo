@@ -48,6 +48,7 @@ class _NativeChapter {
   final int depth;
   final bool isNeedSplitTitle;
   String replaceBookTitle;
+  int _replacementRevision = -1;
   final String? _plainText;
   final List<_NativeBlock>? _blocks;
   final String? _dataPath;
@@ -59,6 +60,7 @@ class _NativeChapter {
   String? _loadedText;
   Future<String>? _textLoad;
   Future<void>? _pendingLoad;
+  Future<void>? _replacementLoad;
   List<_NativeBlock>? _loadedBlocks;
   List<_NativeBlock>? _replacedBlocks;
   List<_NativeBlock>? _textBlocks;
@@ -74,22 +76,135 @@ class _NativeChapter {
   Map<String, dynamic> get epubDescriptor => _epubDescriptor!;
   Map<String, dynamic> get epubLoadArguments => _epubLoadArguments!;
 
-  String get title {
-    final cached = _replacedTitle;
-    if (cached != null) return cached;
-    final replaced = ReplaceRuleService.instance.apply(
-      _title,
-      bookTitle: replaceBookTitle,
-      title: true,
-    );
-    return _replacedTitle = replaced.trim().isEmpty ? _title : replaced;
-  }
+  /// Replacement work is prepared in catalog-sized batches before chapters are
+  /// published to layout/navigation. Getters never execute user regular
+  /// expressions on the UI isolate.
+  String get title => _replacedTitle ?? _title;
+  String get originalTitle => _title;
 
   void configureReplacement(String bookTitle) {
     if (replaceBookTitle == bookTitle) return;
     replaceBookTitle = bookTitle;
     _replacedTitle = null;
     _resetReplacementCache();
+  }
+
+  void prepareReplacementRevision(int revision) {
+    if (_replacementRevision == revision) return;
+    _replacedTitle = null;
+    _resetReplacementCache();
+    _replacementRevision = revision;
+  }
+
+  void applyPreparedTitle(String cleaned) {
+    _replacedTitle = cleaned.trim().isEmpty ? _title : cleaned;
+  }
+
+  Future<void> prepareReplacementAsync() {
+    if (_rulesApplied) return Future<void>.value();
+    return _replacementLoad ??= _prepareReplacementAsync().whenComplete(() {
+      _replacementLoad = null;
+    });
+  }
+
+  Future<void> _prepareReplacementAsync() async {
+    await loadTextAsync();
+    if (_rulesApplied) return;
+    final service = ReplaceRuleService.instance;
+    final raw = _plainText ?? _loadedText ?? '';
+    final sourceBlocks = _blocks ?? _loadedBlocks;
+    if (sourceBlocks == null ||
+        (sourceBlocks.length == 1 && sourceBlocks.first.startOffset < 0)) {
+      _replacedText = await service.applyAsync(
+        raw,
+        bookTitle: replaceBookTitle,
+      );
+      _replacedBlocks = <_NativeBlock>[_NativeBlock.text(_replacedText!)];
+    } else {
+      final result = await _replaceRichContentAsync(raw, sourceBlocks);
+      _replacedText = result.text;
+      _replacedBlocks = result.blocks;
+    }
+    _rulesApplied = true;
+  }
+
+  Future<({String text, List<_NativeBlock> blocks})> _replaceRichContentAsync(
+    String raw,
+    List<_NativeBlock> sourceBlocks,
+  ) async {
+    final segments = <String>[];
+    final templates = <_NativeBlock?>[];
+    var cursor = 0;
+
+    void appendText(int start, int end, _NativeBlock? template) {
+      final safeStart = start.clamp(0, raw.length);
+      final safeEnd = end.clamp(safeStart, raw.length);
+      if (safeEnd <= safeStart) return;
+      segments.add(raw.substring(safeStart, safeEnd));
+      templates.add(template);
+    }
+
+    for (final block in sourceBlocks) {
+      final start = block.startOffset.clamp(0, raw.length);
+      if (start > cursor) {
+        appendText(cursor, start, null);
+        cursor = start;
+      }
+      if (block.hasImage) {
+        segments.add('');
+        templates.add(block);
+        continue;
+      }
+      if (block.text == null || block.startOffset < 0) continue;
+      final end = block.endOffset.clamp(start, raw.length);
+      appendText(start, end, block);
+      cursor = end;
+    }
+    if (cursor < raw.length) appendText(cursor, raw.length, null);
+
+    final textSegments = <String>[
+      for (var index = 0; index < segments.length; index++)
+        if (!(templates[index]?.hasImage ?? false)) segments[index],
+    ];
+    if (textSegments.isEmpty) {
+      return (text: raw, blocks: List<_NativeBlock>.from(sourceBlocks));
+    }
+    final cleaned = await ReplaceRuleService.instance.applyBatchAsync(
+      textSegments,
+      bookTitle: replaceBookTitle,
+      preserveNonEmpty: false,
+    );
+    final output = StringBuffer();
+    final replacedBlocks = <_NativeBlock>[];
+    var textIndex = 0;
+    for (var index = 0; index < segments.length; index++) {
+      final template = templates[index];
+      if (template?.hasImage ?? false) {
+        replacedBlocks.add(
+          template!.copyWith(
+            startOffset: output.length,
+            endOffset: output.length,
+          ),
+        );
+        continue;
+      }
+      final value = cleaned.values[textIndex++];
+      final start = output.length;
+      output.write(value);
+      if (value.isNotEmpty && template != null) {
+        replacedBlocks.add(
+          template.copyWith(
+            text: value,
+            startOffset: start,
+            endOffset: output.length,
+          ),
+        );
+      }
+    }
+    if (replacedBlocks.isEmpty) {
+      replacedBlocks.add(_NativeBlock.text(output.toString()));
+    }
+    return (text: output.toString(), blocks: replacedBlocks);
   }
 
   String get plainText {
@@ -125,14 +240,6 @@ class _NativeChapter {
     } finally {
       if (identical(_textLoad, future)) _textLoad = null;
     }
-  }
-
-  String _readIndexedText() {
-    return readIndexedUtf8RangeSync(
-      path: _dataPath!,
-      startOffset: _startOffset,
-      endOffset: _endOffset,
-    );
   }
 
   Future<String> _readIndexedTextAsync() => readIndexedUtf8Range(
@@ -197,73 +304,17 @@ class _NativeChapter {
 
   void _ensureRulesApplied() {
     if (_rulesApplied) return;
-    final raw = _plainText ?? (_loadedText ??= _readIndexedText());
-    final sourceBlocks = _blocks ?? _loadedBlocks;
-    if (sourceBlocks == null ||
-        (sourceBlocks.length == 1 && sourceBlocks.first.startOffset < 0)) {
-      _replacedText = ReplaceRuleService.instance.apply(
-        raw,
-        bookTitle: replaceBookTitle,
-      );
-      _replacedBlocks = <_NativeBlock>[_NativeBlock.text(_replacedText!)];
-    } else {
-      final result = _replaceRichContent(raw, sourceBlocks);
-      _replacedText = result.text;
-      _replacedBlocks = result.blocks;
+    // Reader loading prepares every visible/prefetched chapter asynchronously.
+    // A raw fallback is retained for isolated model tests and non-reader tools,
+    // but deliberately never executes user regular expressions in a getter.
+    final raw = _plainText ?? _loadedText;
+    if (raw == null) {
+      throw StateError('Native chapter text must be loaded asynchronously.');
     }
+    _replacedText = raw;
+    _replacedBlocks =
+        _blocks ?? _loadedBlocks ?? <_NativeBlock>[_NativeBlock.text(raw)];
     _rulesApplied = true;
-  }
-
-  ({String text, List<_NativeBlock> blocks}) _replaceRichContent(
-    String raw,
-    List<_NativeBlock> sourceBlocks,
-  ) {
-    final output = StringBuffer();
-    final replacedBlocks = <_NativeBlock>[];
-    final service = ReplaceRuleService.instance;
-    final rules = service.enabledRules;
-    var cursor = 0;
-
-    String clean(String text) =>
-        service.applyRules(rules, text, bookTitle: replaceBookTitle);
-
-    void appendUnstyledUntil(int offset) {
-      final end = offset.clamp(cursor, raw.length);
-      if (end <= cursor) return;
-      output.write(clean(raw.substring(cursor, end)));
-      cursor = end;
-    }
-
-    for (final block in sourceBlocks) {
-      final start = block.startOffset.clamp(0, raw.length);
-      appendUnstyledUntil(start);
-      if (block.hasImage) {
-        replacedBlocks.add(
-          block.copyWith(startOffset: output.length, endOffset: output.length),
-        );
-        continue;
-      }
-      if (block.text == null || block.startOffset < 0) continue;
-      final end = block.endOffset.clamp(start, raw.length);
-      final cleaned = clean(raw.substring(start, end));
-      final replacedStart = output.length;
-      output.write(cleaned);
-      if (cleaned.isNotEmpty) {
-        replacedBlocks.add(
-          block.copyWith(
-            text: cleaned,
-            startOffset: replacedStart,
-            endOffset: output.length,
-          ),
-        );
-      }
-      cursor = end;
-    }
-    appendUnstyledUntil(raw.length);
-    if (replacedBlocks.isEmpty) {
-      replacedBlocks.add(_NativeBlock.text(output.toString()));
-    }
-    return (text: output.toString(), blocks: replacedBlocks);
   }
 
   void _resetReplacementCache() {

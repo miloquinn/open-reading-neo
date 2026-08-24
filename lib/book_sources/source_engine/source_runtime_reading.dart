@@ -206,6 +206,7 @@ class SourceRuntimeReading {
     );
     final parts = <String>[];
     final rawPages = <String>[];
+    final directImageValues = <({String value, Uri baseUri})>[];
     final seenPages = <String>{};
     final rememberedChapter = _state.chapterContext(source, bookId, chapterId);
     final fallbackUrl = '${rememberedChapter['fallbackUrl'] ?? ''}'.trim();
@@ -251,6 +252,19 @@ class SourceRuntimeReading {
         bookWriter: (value) => bookContext.addAll(value),
         chapterWriter: (value) => chapterContext.addAll(value),
       );
+      final contentRule = _rules.requiredRule(rule, 'content');
+      if (source.isImageSource) {
+        final values = await _rules.list(contextualDocument, null, contentRule);
+        for (final value in values) {
+          final text = _sourceContentValue(value).trim();
+          if (text.isNotEmpty) {
+            directImageValues.add((
+              value: text,
+              baseUri: contextualDocument.baseUri,
+            ));
+          }
+        }
+      }
       var content = await _rules.value(
         contextualDocument,
         null,
@@ -277,6 +291,14 @@ class SourceRuntimeReading {
     var joinedContent = parts.join('\n\n');
     final imageHeaders = await _requests.sourceHeaders(source);
     var images = _chapterImages(source, joinedContent, imageHeaders);
+    if (source.isImageSource && directImageValues.isNotEmpty) {
+      final directImages = _directChapterImages(
+        source,
+        directImageValues,
+        imageHeaders,
+      );
+      if (directImages.length > images.length) images = directImages;
+    }
     if (images.isEmpty &&
         fallbackUrl.isNotEmpty &&
         !seenPages.contains(fallbackUrl)) {
@@ -316,13 +338,24 @@ class SourceRuntimeReading {
         images = _chapterImages(source, joinedContent, imageHeaders);
       }
     }
-    if (images.isEmpty && source.isImageSource) {
+    if (source.isImageSource) {
       final recovered = _fallbackComicImageHtml(rawPages.join('\n'));
       if (recovered.isNotEmpty) {
-        joinedContent = joinedContent.isEmpty
+        final recoveredContent = joinedContent.isEmpty
             ? recovered
             : '$joinedContent\n$recovered';
-        images = _chapterImages(source, joinedContent, imageHeaders);
+        final recoveredImages = _chapterImages(
+          source,
+          recoveredContent,
+          imageHeaders,
+        );
+        // Attribute-terminal rules such as `img@data-original` use scalar
+        // semantics and may expose only the first matching URL. Prefer the
+        // safely scoped raw-page recovery when it finds more comic pages.
+        if (recoveredImages.length > images.length) {
+          joinedContent = recoveredContent;
+          images = recoveredImages;
+        }
       }
     }
     if ((parts.isEmpty || parts.every(_looksLikePlaceholderContent)) &&
@@ -445,6 +478,8 @@ class SourceRuntimeReading {
     final scoped = <dom.Element>[];
     for (final selector in const [
       '.comic-contain',
+      '.comiclist',
+      '.comicpage',
       '#imgsec',
       '#images',
       '.reading-content',
@@ -483,6 +518,37 @@ class SourceRuntimeReading {
       }
     }
     return tags.join('\n');
+  }
+
+  List<BookSourceRemoteImage> _directChapterImages(
+    ReadingSourceConfig source,
+    List<({String value, Uri baseUri})> values,
+    Map<String, String> sourceHeaders,
+  ) {
+    final images = <BookSourceRemoteImage>[];
+    final seen = <String>{};
+    for (final entry in values) {
+      // HTML-valued rules remain handled by the DOM extractor below. This path
+      // is specifically for multi-valued attribute terminals such as
+      // `img@data-original` and JSON lists of image URLs.
+      if (entry.value.contains('<')) continue;
+      final asset = parseRemoteAsset(
+        _firstSrcSetValue(entry.value),
+        entry.baseUri,
+        sourceHeaders,
+      );
+      if (asset == null || !seen.add(asset.url.toString())) continue;
+      final headers = <String, String>{...asset.headers};
+      final cookie = _requests.cookieHeader(source, asset.url);
+      if (cookie.isNotEmpty) headers['Cookie'] = cookie;
+      images.add(
+        BookSourceRemoteImage(
+          url: asset.url,
+          headers: Map.unmodifiable(headers),
+        ),
+      );
+    }
+    return images;
   }
 
   List<BookSourceRemoteImage> _chapterImages(
@@ -589,6 +655,13 @@ class SourceRuntimeReading {
     return whitespace < 0 ? first : first.substring(0, whitespace);
   }
 }
+
+String _sourceContentValue(Object? value) => switch (value) {
+  dom.Document document => document.outerHtml,
+  dom.Element element => element.outerHtml,
+  null => '',
+  _ => '$value',
+};
 
 bool _isNonNetworkUrlError(BookSourceProtocolException error) {
   final message = error.message.toLowerCase();

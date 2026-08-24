@@ -9,6 +9,7 @@ import '../protocol/orsp/orsp_book_source_backend.dart';
 import '../source_engine/source_login_ui.dart';
 import 'book_download_cancellation.dart';
 import '../caching/book_source_chapter_cache.dart';
+import '../caching/book_source_discovery_cache.dart';
 import '../caching/book_source_response_cache.dart';
 import '../networking/book_source_network_policy.dart';
 import 'book_source_client_resources.dart';
@@ -22,6 +23,7 @@ class BookSourceClient implements BookSourceGateway {
     Dio? systemDio,
     BookSourceChapterCache? chapterCache,
     BookSourceResponseCache? responseCache,
+    BookSourceDiscoveryCache? discoveryCache,
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(
       allowSyntheticDns: true,
     ),
@@ -33,14 +35,20 @@ class BookSourceClient implements BookSourceGateway {
            responseCache: responseCache,
            networkPolicy: networkPolicy,
          ),
+         discoveryCache ??
+             BookSourceDiscoveryCache(responseCache: responseCache),
        );
 
-  BookSourceClient._(this._resources);
+  BookSourceClient._(this._resources, this._discoveryCache);
 
   @visibleForTesting
-  BookSourceClient.withResources(this._resources);
+  BookSourceClient.withResources(
+    this._resources, {
+    BookSourceDiscoveryCache? discoveryCache,
+  }) : _discoveryCache = discoveryCache ?? BookSourceDiscoveryCache();
 
   final BookSourceClientResources _resources;
+  final BookSourceDiscoveryCache _discoveryCache;
 
   static const int maxResponseBytes = 8 * 1024 * 1024;
   static const int maxDownloadResponseBytes = 24 * 1024 * 1024;
@@ -61,11 +69,16 @@ class BookSourceClient implements BookSourceGateway {
   Future<void> loginSource(
     RegisteredBookSource source,
     Map<String, String> values,
-  ) => _resources.readingBackend.loginSource(source, values);
+  ) async {
+    await _resources.readingBackend.loginSource(source, values);
+    await _discoveryCache.invalidateSource(source);
+  }
 
   @override
-  Future<void> clearSourceLogin(RegisteredBookSource source) =>
-      _resources.readingBackend.clearSourceLogin(source);
+  Future<void> clearSourceLogin(RegisteredBookSource source) async {
+    await _resources.readingBackend.clearSourceLogin(source);
+    await _discoveryCache.invalidateSource(source);
+  }
 
   static void ensureSafeTarget(Uri uri) {
     final address = InternetAddress.tryParse(uri.host);
@@ -111,16 +124,26 @@ class BookSourceClient implements BookSourceGateway {
   }
 
   @override
-  Future<BookSourceDiscoveryPage> getDiscovery(RegisteredBookSource source) =>
-      _resources.orspBackend.getDiscovery(source);
+  Future<BookSourceDiscoveryPage> getDiscovery(RegisteredBookSource source) {
+    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+      throw const BookSourceProtocolException(
+        'This source does not support curated discovery.',
+      );
+    }
+    return _discoveryCache.getDiscovery(
+      source,
+      () => _resources.orspBackend.getDiscovery(source),
+    );
+  }
 
   @override
-  Future<List<BookSourceCategory>> getCategories(RegisteredBookSource source) {
-    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
-      return _resources.readingBackend.getCategories(source);
-    }
-    return _resources.orspBackend.getCategories(source);
-  }
+  Future<List<BookSourceCategory>> getCategories(RegisteredBookSource source) =>
+      _discoveryCache.getCategories(source, () {
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+          return _resources.readingBackend.getCategories(source);
+        }
+        return _resources.orspBackend.getCategories(source);
+      });
 
   @override
   Future<BookSourceSearchPage> browse(
@@ -129,23 +152,30 @@ class BookSourceClient implements BookSourceGateway {
     String sort = 'latest',
     int page = 1,
     int pageSize = 20,
-  }) {
-    if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
-      return _resources.readingBackend.browse(
+  }) => _discoveryCache.browse(
+    source,
+    category: category,
+    sort: sort,
+    page: page,
+    pageSize: pageSize,
+    loader: () {
+      if (source.sourceProtocol == BookSourceProtocolKind.readingSource) {
+        return _resources.readingBackend.browse(
+          source,
+          category: category,
+          page: page,
+          pageSize: pageSize,
+        );
+      }
+      return _resources.orspBackend.browse(
         source,
         category: category,
+        sort: sort,
         page: page,
         pageSize: pageSize,
       );
-    }
-    return _resources.orspBackend.browse(
-      source,
-      category: category,
-      sort: sort,
-      page: page,
-      pageSize: pageSize,
-    );
-  }
+    },
+  );
 
   @override
   Future<BookSourceBook> getBook(
@@ -268,21 +298,25 @@ class BookSourceClient implements BookSourceGateway {
   }
 
   @override
-  Future<void> invalidateResponseCache(RegisteredBookSource source) {
-    if (source.sourceProtocol != BookSourceProtocolKind.orsp) {
-      return Future<void>.value();
+  Future<void> invalidateResponseCache(RegisteredBookSource source) async {
+    await _discoveryCache.invalidateSource(source);
+    if (source.sourceProtocol == BookSourceProtocolKind.orsp) {
+      await _resources.orspBackend.invalidateResponseCache(source);
     }
-    return _resources.orspBackend.invalidateResponseCache(source);
   }
 
   @override
   Future<void> invalidateResponseCaches(
     Iterable<RegisteredBookSource> sources,
-  ) => _resources.orspBackend.invalidateResponseCaches(
-    sources.where(
-      (source) => source.sourceProtocol == BookSourceProtocolKind.orsp,
-    ),
-  );
+  ) async {
+    final sourceList = sources.toList(growable: false);
+    await _discoveryCache.invalidateSources(sourceList);
+    await _resources.orspBackend.invalidateResponseCaches(
+      sourceList.where(
+        (source) => source.sourceProtocol == BookSourceProtocolKind.orsp,
+      ),
+    );
+  }
 
   @override
   Future<void> invalidateDiscoveryResponseCache(String input) =>

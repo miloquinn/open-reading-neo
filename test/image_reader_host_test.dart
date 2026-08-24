@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +25,87 @@ final Uint8List _tinyPng = Uint8List.fromList(const <int>[
   0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
 ]);
 
+/// 1x8 portrait PNG: at fit-width it expands well beyond the 320px loader.
+final Uint8List _tallPng = Uint8List.fromList(const <int>[
+  137,
+  80,
+  78,
+  71,
+  13,
+  10,
+  26,
+  10,
+  0,
+  0,
+  0,
+  13,
+  73,
+  72,
+  68,
+  82,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  8,
+  8,
+  6,
+  0,
+  0,
+  0,
+  56,
+  26,
+  149,
+  65,
+  0,
+  0,
+  0,
+  20,
+  73,
+  68,
+  65,
+  84,
+  120,
+  156,
+  99,
+  248,
+  255,
+  255,
+  255,
+  127,
+  38,
+  6,
+  6,
+  6,
+  6,
+  252,
+  4,
+  0,
+  150,
+  170,
+  4,
+  11,
+  62,
+  22,
+  161,
+  219,
+  0,
+  0,
+  0,
+  0,
+  73,
+  69,
+  78,
+  68,
+  174,
+  66,
+  96,
+  130,
+]);
+
 class _FakeImageSource extends ImageReaderSource {
   _FakeImageSource({
     required this.chapters,
@@ -31,6 +114,7 @@ class _FakeImageSource extends ImageReaderSource {
     this.initialPageIndex = 0,
     this.failingChapters = const {},
     this.documentFailures = 0,
+    this.delayedPages = const {},
   });
 
   final List<ImageReaderChapter> chapters;
@@ -39,10 +123,13 @@ class _FakeImageSource extends ImageReaderSource {
   final int initialPageIndex;
   final Set<int> failingChapters;
   final int documentFailures;
+  final Map<({int chapterIndex, int pageIndex}), Completer<Uint8List>>
+  delayedPages;
 
   final List<({int chapterIndex, int pageIndex, int pageCount})> saved = [];
   final List<int> invalidated = [];
   final List<({int chapterIndex, int pageIndex, bool preload})> pageLoads = [];
+  final List<({int first, int last})> retainedWindows = [];
   int documentLoads = 0;
   int pageCountLoads = 0;
 
@@ -91,6 +178,9 @@ class _FakeImageSource extends ImageReaderSource {
       pageIndex: pageIndex,
       preload: preload,
     ));
+    final delayed =
+        delayedPages[(chapterIndex: chapterIndex, pageIndex: pageIndex)];
+    if (delayed != null && !preload) return delayed.future;
     return _tinyPng;
   }
 
@@ -105,6 +195,11 @@ class _FakeImageSource extends ImageReaderSource {
       pageIndex: pageIndex,
       pageCount: pageCount,
     ));
+  }
+
+  @override
+  void retainChapterWindow(int firstChapterIndex, int lastChapterIndex) {
+    retainedWindows.add((first: firstChapterIndex, last: lastChapterIndex));
   }
 
   @override
@@ -250,12 +345,199 @@ void main() {
         findsOneWidget,
       );
       expect(source.pageCountLoads, 3);
+      expect(source.retainedWindows.last, (first: 0, last: 2));
       expect(
         source.pageLoads
             .where((load) => load.preload)
             .map((load) => load.chapterIndex),
         containsAll(<int>[0, 2]),
       );
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets('a delayed image completion does not fight an active drag', (
+    tester,
+  ) async {
+    final delayed = Completer<Uint8List>();
+    final source = _FakeImageSource(
+      chapters: const [ImageReaderChapter(id: 'c1', title: 'One')],
+      pagesByChapter: const {0: 3},
+      initialPageIndex: 0,
+      delayedPages: {(chapterIndex: 0, pageIndex: 0): delayed},
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ContinuousImageReader(
+          document: const ImageReaderDocument(
+            chapters: [ImageReaderChapter(id: 'c1', title: 'One')],
+            initialChapterIndex: 0,
+            initialPageIndex: 0,
+          ),
+          source: source,
+          initialChapterIndex: 0,
+          initialPageIndex: 0,
+          onTableOfContents: null,
+          onSettings: () {},
+          onChangeReadingMode: () {},
+        ),
+      ),
+    );
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(find.text('1 / 3'), findsWidgets);
+    final pageOne = find.byKey(
+      const ValueKey('${ContinuousImageReader.pageKeyPrefix}0-1'),
+    );
+    final beforeDrag = tester.getTopLeft(pageOne).dy;
+    final gesture = await tester.startGesture(const Offset(400, 500));
+    await gesture.moveBy(const Offset(0, -80));
+    await tester.pump();
+    delayed.complete(_tallPng);
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -120));
+    await tester.pump();
+    final duringDrag = tester.getTopLeft(pageOne).dy;
+    expect(duringDrag, lessThan(beforeDrag - 150));
+    await gesture.up();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    expect(find.text('1 / 3'), findsNothing);
+    expect(source.saved, isNotEmpty);
+    expect(tester.takeException(), isNull);
+    await _unmount(tester);
+  });
+
+  testWidgets(
+    'opening continuous reading settings keeps the original reader UI',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final source = _FakeImageSource(
+        chapters: const [ImageReaderChapter(id: 'c1', title: 'One')],
+        pagesByChapter: const {0: 1},
+      );
+
+      await _pumpHost(tester, source);
+      expect(find.byType(ContinuousImageReader), findsOneWidget);
+
+      await tester.tapAt(const Offset(400, 300));
+      await tester.pump(const Duration(milliseconds: 300));
+      final button = tester.widget<Widget>(
+        find.byKey(ContinuousImageReader.settingsButtonKey),
+      );
+      expect(button, isNotNull);
+      final settingsTap = tester.widget<InkResponse>(
+        find.descendant(
+          of: find.byKey(ContinuousImageReader.settingsButtonKey),
+          matching: find.byType(InkResponse),
+        ),
+      );
+      settingsTap.onTap!.call();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('continuous-reader-settings-sheet')),
+        findsOneWidget,
+      );
+      expect(find.text('Reading direction'), findsWidgets);
+      expect(find.text('Right to left (manga)'), findsOneWidget);
+      expect(find.byType(ContinuousImageReader), findsOneWidget);
+      expect(find.byType(PagedImageReader), findsNothing);
+      var prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(PagedImageReaderSettingsStore.directionOverridesKey),
+        isNull,
+      );
+
+      await tester.tap(find.text('Left to right'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContinuousImageReader), findsNothing);
+      expect(find.byType(PagedImageReader), findsOneWidget);
+      prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(PagedImageReaderSettingsStore.directionOverridesKey),
+        contains('"fake-settings":"ltr"'),
+      );
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'vertical reading anchors an empty initial chapter without fake progress',
+    (tester) async {
+      final source = _FakeImageSource(
+        chapters: const [
+          ImageReaderChapter(id: 'c1', title: 'One'),
+          ImageReaderChapter(id: 'c2', title: 'Two'),
+          ImageReaderChapter(id: 'c3', title: 'Three'),
+        ],
+        pagesByChapter: const {0: 1, 1: 0, 2: 1},
+        initialChapterIndex: 1,
+      );
+
+      await _pumpHost(tester, source);
+
+      expect(
+        find.byKey(
+          const ValueKey('${ContinuousImageReader.emptyChapterKeyPrefix}1'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('0 / 0'), findsWidgets);
+      expect(
+        source.saved.where((progress) => progress.chapterIndex == 1),
+        isEmpty,
+      );
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'scrolling onto an empty chapter recenters without fake page progress',
+    (tester) async {
+      final source = _FakeImageSource(
+        chapters: const [
+          ImageReaderChapter(id: 'c1', title: 'One'),
+          ImageReaderChapter(id: 'c2', title: 'Two'),
+          ImageReaderChapter(id: 'c3', title: 'Three'),
+        ],
+        pagesByChapter: const {0: 1, 1: 0, 2: 1},
+      );
+
+      await _pumpHost(tester, source);
+      await tester.drag(
+        find.byType(ContinuousImageReader),
+        const Offset(0, -360),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey('${ContinuousImageReader.emptyChapterKeyPrefix}1'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        source.saved.where((progress) => progress.chapterIndex == 1),
+        isEmpty,
+      );
+
+      for (final delta in const [-90.0, 90.0, -90.0, 90.0]) {
+        await tester.drag(find.byType(ContinuousImageReader), Offset(0, delta));
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
       await _unmount(tester);
     },
   );

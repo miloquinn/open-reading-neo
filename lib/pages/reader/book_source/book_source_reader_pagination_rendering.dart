@@ -30,7 +30,8 @@ extension _BookSourceReaderPaginationRendering on _BookSourceReaderPageState {
       textDirection: Directionality.of(context),
       extra:
           '${_readerSafeArea.paginationSignature}:'
-          '${_readerFontProfile.cacheSignature}',
+          '${_readerFontProfile.cacheSignature}:'
+          '${ReplaceRuleService.instance.rulesSignature}',
     ).cacheKey('book-source-line-v6');
     final cached = _pagedLayouts[chapterIndex];
     if (cached?.fingerprint == key) return cached!;
@@ -121,9 +122,7 @@ extension _BookSourceReaderPaginationRendering on _BookSourceReaderPageState {
   }) {
     final resolvedIndex = chapterIndex ?? _chapterIndex;
     final resolvedContent = chapterContent ?? _content!;
-    final chapterTitle = resolvedContent.title.isEmpty
-        ? _chapters[resolvedIndex].title
-        : _cleanChapterTitle(resolvedContent.title);
+    final chapterTitle = _chapters[resolvedIndex].title;
     final metadata = ReaderPaperPageMetadata(
       pageIdentity:
           'source:${widget.source.id}:${widget.book.id}:'
@@ -191,9 +190,7 @@ extension _BookSourceReaderPaginationRendering on _BookSourceReaderPageState {
           '${_chapters[resolvedIndex].id}:$pageIndex:${page.startOffset}',
       layoutFingerprint: layoutFingerprint,
       themeId: _readerTheme.cacheKey,
-      chapterTitle: (chapterContent ?? _content!).title.isEmpty
-          ? _chapters[resolvedIndex].title
-          : (chapterContent ?? _content!).title,
+      chapterTitle: _chapters[resolvedIndex].title,
       pageNumber: pageIndex + 1,
       pageCount: pageCount,
     );

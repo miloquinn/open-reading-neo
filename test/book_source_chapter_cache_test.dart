@@ -377,6 +377,51 @@ void main() {
     );
   });
 
+  test('repairs legacy image HTML cached without page metadata', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-chapter-legacy-images-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    var loads = 0;
+
+    Future<BookSourceChapterContent> loader() async {
+      loads++;
+      return BookSourceChapterContent(
+        bookId: 'image-book',
+        chapterId: 'image-chapter',
+        title: '图片章节',
+        content: '<img src="https://images.test/1.jpg">',
+        contentType: 'text/html',
+        images: loads == 1
+            ? const []
+            : [
+                BookSourceRemoteImage(
+                  url: Uri.parse('https://images.test/1.jpg'),
+                ),
+              ],
+      );
+    }
+
+    final cache = BookSourceChapterCache(cacheDirectory: directory);
+    final legacy = await cache.getOrLoad(
+      sourceId: 'image-source',
+      bookId: 'image-book',
+      chapterId: 'image-chapter',
+      loader: loader,
+    );
+    expect(legacy.images, isEmpty);
+
+    final repaired = await cache.getOrLoad(
+      sourceId: 'image-source',
+      bookId: 'image-book',
+      chapterId: 'image-chapter',
+      loader: loader,
+    );
+
+    expect(loads, 2);
+    expect(repaired.images.single.url.toString(), 'https://images.test/1.jpg');
+  });
+
   test(
     'returns stale chapter content while refreshing it in background',
     () async {

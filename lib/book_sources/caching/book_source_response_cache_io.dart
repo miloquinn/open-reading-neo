@@ -7,13 +7,50 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+class BookSourceCacheValidators {
+  const BookSourceCacheValidators({this.etag, this.lastModified});
+
+  final String? etag;
+  final String? lastModified;
+
+  bool get isEmpty => etag == null && lastModified == null;
+}
+
+sealed class BookSourceCacheLoadResult {
+  const BookSourceCacheLoadResult();
+
+  const factory BookSourceCacheLoadResult.modified(
+    Map<String, dynamic> payload, {
+    String? etag,
+    String? lastModified,
+  }) = BookSourceCacheModified;
+
+  const factory BookSourceCacheLoadResult.notModified({
+    String? etag,
+    String? lastModified,
+  }) = BookSourceCacheNotModified;
+}
+
+class BookSourceCacheModified extends BookSourceCacheLoadResult {
+  const BookSourceCacheModified(this.payload, {this.etag, this.lastModified});
+  final Map<String, dynamic> payload;
+  final String? etag;
+  final String? lastModified;
+}
+
+class BookSourceCacheNotModified extends BookSourceCacheLoadResult {
+  const BookSourceCacheNotModified({this.etag, this.lastModified});
+  final String? etag;
+  final String? lastModified;
+}
+
 /// Two-level cache for public book-source metadata responses.
 ///
 /// The persistent format intentionally stores only raw JSON. Reading-source
 /// runtime results can contain source variables or authentication-derived
 /// state, so callers must keep those responses out of this cache.
 class BookSourceResponseCache {
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
   static const String directoryName = 'book_source_responses';
   static final BookSourceResponseCache instance = BookSourceResponseCache();
 
@@ -48,6 +85,131 @@ class BookSourceResponseCache {
 
   int get memorySizeBytes => _memoryBytes;
   int get memoryEntryCount => _memory.length;
+
+  Future<Map<String, dynamic>> getOrRevalidateJson({
+    required String key,
+    required Duration ttl,
+    required Future<BookSourceCacheLoadResult> Function(
+      BookSourceCacheValidators validators,
+    )
+    loader,
+    Duration? staleIfError,
+    bool Function(Object error)? staleErrorTest,
+    bool forceRefresh = false,
+    bool deduplicateInFlight = true,
+    bool persistToDisk = true,
+  }) async {
+    Future<Map<String, dynamic>> run() => _runRevalidation(
+      key: key,
+      ttl: ttl,
+      loader: loader,
+      staleIfError: staleIfError,
+      staleErrorTest: staleErrorTest,
+      forceRefresh: forceRefresh,
+      persistToDisk: persistToDisk,
+    );
+    if (!deduplicateInFlight) return run();
+
+    final flightKey =
+        '$key\u0000revalidate${forceRefresh ? '\u0000refresh' : ''}';
+    final pending = _inFlight[flightKey];
+    if (pending != null) return pending;
+    final future = run();
+    _inFlight[flightKey] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_inFlight[flightKey], future)) _inFlight.remove(flightKey);
+    }
+  }
+
+  Future<Map<String, dynamic>> _runRevalidation({
+    required String key,
+    required Duration ttl,
+    required Future<BookSourceCacheLoadResult> Function(
+      BookSourceCacheValidators validators,
+    )
+    loader,
+    required Duration? staleIfError,
+    required bool Function(Object error)? staleErrorTest,
+    required bool forceRefresh,
+    required bool persistToDisk,
+  }) async {
+    final state = _retainKeyState(key);
+    if (forceRefresh) state.generation++;
+    final generation = state.generation;
+    final clearEpoch = _clearEpoch;
+    try {
+      var entry = _memory.remove(key);
+      if (entry != null) _memoryBytes -= entry.size;
+      if (entry == null && persistToDisk) {
+        await _diskReadBarrier;
+        entry = await _readDiskEntry(key);
+      }
+      if (!forceRefresh && entry != null && _isFresh(entry.cachedAt, ttl)) {
+        _remember(key, entry);
+        return entry.value;
+      }
+      try {
+        final result = await loader(
+          BookSourceCacheValidators(
+            etag: entry?.etag,
+            lastModified: entry?.lastModified,
+          ),
+        );
+        final now = _now().toUtc();
+        final next = switch (result) {
+          BookSourceCacheModified() => _MemoryEntry(
+            Map<String, dynamic>.unmodifiable(result.payload),
+            now,
+            _estimateSize(result.payload),
+            etag: result.etag,
+            lastModified: result.lastModified,
+          ),
+          BookSourceCacheNotModified() when entry != null => _MemoryEntry(
+            entry.value,
+            now,
+            entry.size,
+            etag: result.etag ?? entry.etag,
+            lastModified: result.lastModified ?? entry.lastModified,
+          ),
+          BookSourceCacheNotModified() => throw StateError(
+            'notModified requires an existing cached payload',
+          ),
+        };
+        if (_isCurrent(state, generation, clearEpoch)) {
+          _remember(key, next);
+          if (persistToDisk) {
+            _scheduleWrite(
+              key,
+              state,
+              () => _writeDisk(
+                key,
+                state,
+                generation,
+                clearEpoch,
+                next,
+                jsonEncode(next.value),
+                ttl,
+              ),
+            );
+          }
+        }
+        return next.value;
+      } catch (error) {
+        if (entry != null &&
+            staleIfError != null &&
+            (staleErrorTest == null || staleErrorTest(error)) &&
+            _isWithinStaleWindow(entry.cachedAt, ttl, staleIfError)) {
+          if (_isCurrent(state, generation, clearEpoch)) _remember(key, entry);
+          return entry.value;
+        }
+        rethrow;
+      }
+    } finally {
+      _releaseKeyState(key, state);
+    }
+  }
 
   Future<Map<String, dynamic>> getOrLoadJson({
     required String key,
@@ -307,6 +469,15 @@ class BookSourceResponseCache {
     return !age.isNegative && age < ttl;
   }
 
+  bool _isWithinStaleWindow(
+    DateTime cachedAt,
+    Duration ttl,
+    Duration staleIfError,
+  ) {
+    final age = _now().toUtc().difference(cachedAt);
+    return !age.isNegative && age < ttl + staleIfError;
+  }
+
   int _estimateSize(Object? value) {
     final limit = maxMemoryBytes > 0 ? maxMemoryBytes : 0;
 
@@ -364,20 +535,25 @@ class BookSourceResponseCache {
   }
 
   Future<_MemoryEntry?> _readDisk(String key, Duration ttl) async {
+    final entry = await _readDiskEntry(key);
+    return entry != null && _isFresh(entry.cachedAt, ttl) ? entry : null;
+  }
+
+  Future<_MemoryEntry?> _readDiskEntry(String key) async {
     File? file;
     try {
       file = await _fileFor(key);
       if (!await file.exists()) return null;
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map ||
-          decoded['schema'] != schemaVersion ||
+          (decoded['schema'] != 1 && decoded['schema'] != schemaVersion) ||
           decoded['key'] != key ||
           decoded['payload'] is! Map) {
         await _deleteIfPresent(file);
         return null;
       }
       final cachedAt = DateTime.tryParse('${decoded['cachedAt']}')?.toUtc();
-      if (cachedAt == null || !_isFresh(cachedAt, ttl)) {
+      if (cachedAt == null) {
         await _deleteIfPresent(file);
         return null;
       }
@@ -385,7 +561,13 @@ class BookSourceResponseCache {
         (key, value) => MapEntry('$key', value),
       );
       final size = utf8.encode(jsonEncode(value)).length;
-      return _MemoryEntry(Map.unmodifiable(value), cachedAt, size);
+      return _MemoryEntry(
+        Map.unmodifiable(value),
+        cachedAt,
+        size,
+        etag: decoded['etag'] as String?,
+        lastModified: decoded['lastModified'] as String?,
+      );
     } catch (_) {
       if (file != null) await _deleteIfPresent(file);
       return null;
@@ -411,6 +593,8 @@ class BookSourceResponseCache {
           '"key":${jsonEncode(key)},'
           '"cachedAt":${jsonEncode(entry.cachedAt.toIso8601String())},'
           '"expiresAt":${jsonEncode(expiresAt)},'
+          '"etag":${jsonEncode(entry.etag)},'
+          '"lastModified":${jsonEncode(entry.lastModified)},'
           '"payload":$encodedPayload}';
       if (utf8.encode(contents).length > maxDiskBytes) return;
       final temporary = File('${file.path}.tmp');
@@ -523,11 +707,19 @@ class BookSourceResponseCache {
 }
 
 class _MemoryEntry {
-  const _MemoryEntry(this.value, this.cachedAt, this.size);
+  const _MemoryEntry(
+    this.value,
+    this.cachedAt,
+    this.size, {
+    this.etag,
+    this.lastModified,
+  });
 
   final Map<String, dynamic> value;
   final DateTime cachedAt;
   final int size;
+  final String? etag;
+  final String? lastModified;
 }
 
 class _KeyState {

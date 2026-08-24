@@ -141,7 +141,8 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
       paragraphSpacing: _paragraphSpacing,
       textDirection: direction,
       extra:
-          '${chrome.paginationSignature}:${_readerFontProfile.cacheSignature}',
+          '${chrome.paginationSignature}:${_readerFontProfile.cacheSignature}:'
+          '${ReplaceRuleService.instance.rulesSignature}',
     ).cacheKey('book-source-vertical-v3');
     final cached = _verticalLayouts[chapterIndex];
     if (cached?.fingerprint == fingerprint) return cached!;
@@ -351,9 +352,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     required BookSourceChapterContent content,
     bool fillAvailableSpace = true,
   }) {
-    final chapterTitle = content.title.isEmpty
-        ? _chapters[chapterIndex].title
-        : _cleanChapterTitle(content.title);
+    final chapterTitle = _chapters[chapterIndex].title;
     final sourceText =
         _readableChapterText[chapterIndex] ??
         readableBookSourceChapterText(
@@ -418,9 +417,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
             children: [
               if (pageIndex == 0) ...[
                 ReaderInlineChapterTitle(
-                  title: content.title.isEmpty
-                      ? _chapters[chapterIndex].title
-                      : _cleanChapterTitle(content.title),
+                  title: _chapters[chapterIndex].title,
                   bodyStyle: _bodyTextStyle,
                 ),
                 const SizedBox(height: ReaderInlineChapterTitle.spacingAfter),

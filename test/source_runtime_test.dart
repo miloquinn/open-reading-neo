@@ -828,6 +828,112 @@ void main() {
       },
     );
 
+    test(
+      'recovers every lazy comic page when an attribute rule is scalar',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/chapter/1': '''
+            <div class="comiclist">
+              <div class="comicpage">
+                <img class="lazy" data-original="https://images.test/1.jpg">
+                <img class="lazy" data-original="https://images.test/2.jpg">
+              </div>
+            </div>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleContent'] = {
+            'content': 'class.comicpage@tag.img@data-original',
+            'imageStyle': 'FULL',
+          };
+        final source = ReadingSourceConfig.fromJson(
+          raw,
+        ).toRegisteredSource(enabled: true);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final content = await runtime.getChapterContent(
+          source,
+          bookId: 'https://books.test/book/1',
+          chapterId: 'https://books.test/chapter/1',
+        );
+
+        expect(content.images.map((image) => image.url), [
+          Uri.parse('https://images.test/1.jpg'),
+          Uri.parse('https://images.test/2.jpg'),
+        ]);
+      },
+    );
+
+    test(
+      'parses every image attribute without relying on fallback containers',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/chapter/1': '''
+            <main class="reader-pages">
+              <img data-original="/images/1.jpg">
+              <img data-original="/images/2.jpg">
+            </main>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 2
+          ..['ruleContent'] = {
+            'content': 'class.reader-pages@tag.img@data-original',
+            'imageStyle': 'FULL',
+          };
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final content = await runtime.getChapterContent(
+          ReadingSourceConfig.fromJson(raw).toRegisteredSource(enabled: true),
+          bookId: 'https://books.test/book/1',
+          chapterId: 'https://books.test/chapter/1',
+        );
+
+        expect(content.images.map((image) => image.url), [
+          Uri.parse('https://books.test/images/1.jpg'),
+          Uri.parse('https://books.test/images/2.jpg'),
+        ]);
+      },
+    );
+
+    test(
+      'infers a legacy type-zero image rule and preserves all image values',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/chapter/1': '''
+            <main class="reader-pages">
+              <img data-src="https://images.test/1.webp">
+              <img data-src="https://images.test/2.webp">
+            </main>
+          ''',
+        });
+        final raw = Map<String, dynamic>.from(_htmlSource().raw)
+          ..['bookSourceType'] = 0
+          ..['ruleContent'] = {
+            'content': 'class.reader-pages@tag.img@data-src',
+            'imageStyle': 'FULL',
+          };
+        final config = ReadingSourceConfig.fromJson(raw);
+        expect(config.isImageSource, isTrue);
+        final runtime = SourceRuntime(transport: transport);
+        addTearDown(runtime.close);
+
+        final content = await runtime.getChapterContent(
+          config.toRegisteredSource(enabled: true),
+          bookId: 'https://books.test/book/1',
+          chapterId: 'https://books.test/chapter/1',
+        );
+
+        expect(content.images.map((image) => image.url), [
+          Uri.parse('https://images.test/1.webp'),
+          Uri.parse('https://images.test/2.webp'),
+        ]);
+      },
+    );
+
     test('supports a basic JSON source end to end', () async {
       final transport = _FakeTransport({
         'https://api.test/search?q=%E5%B1%B1%E6%B5%B7':

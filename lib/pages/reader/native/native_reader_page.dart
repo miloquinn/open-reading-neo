@@ -264,6 +264,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Future<void> _paginationCacheLoadFuture = Future<void>.value();
   Future<void> _paginationCacheWriteQueue = Future<void>.value();
   List<_NativeChapter> _loadedChapters = const [];
+  List<ReaderNavigationChapter> _parsedNavigationChapters = const [];
   List<ReaderNavigationChapter> _navigationChapters = const [];
   ReaderNavigationCatalog? _navigationCatalog;
   int? _lastNavigationJumpPosition;

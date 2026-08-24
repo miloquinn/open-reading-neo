@@ -36,6 +36,21 @@ class ContinuousImageReader extends StatefulWidget {
   @visibleForTesting
   static const chapterBoundaryKeyPrefix = 'continuous-chapter-boundary-';
 
+  @visibleForTesting
+  static const emptyChapterKeyPrefix = 'continuous-empty-chapter-';
+
+  @visibleForTesting
+  static const settingsButtonKey = ValueKey('continuous-reader-settings');
+
+  @visibleForTesting
+  static const modeButtonKey = ValueKey('continuous-reader-mode');
+
+  @visibleForTesting
+  static const pageKeyPrefix = 'continuous-page-';
+
+  @visibleForTesting
+  static const pageContentKeyPrefix = 'continuous-page-content-';
+
   @override
   State<ContinuousImageReader> createState() => _ContinuousImageReaderState();
 }
@@ -53,6 +68,9 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
   bool _chromeVisible = false;
   bool _initialJumpPending = true;
   int _windowGeneration = 0;
+  bool _scrolling = false;
+  bool _windowLoadInFlight = false;
+  int? _pendingWindowChapter;
 
   ReaderThemePalette get _palette => widget.source.theme;
 
@@ -96,23 +114,33 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
     });
   }
 
-  Future<void> _ensureWindow(int anchorChapter) async {
+  Future<bool> _ensureWindow(int anchorChapter) async {
     final generation = ++_windowGeneration;
-    final first = (anchorChapter - 1).clamp(
+    final requestedFirst = (anchorChapter - 1).clamp(
       0,
       widget.document.chapters.length - 1,
     );
-    final last = (anchorChapter + 1).clamp(
+    final requestedLast = (anchorChapter + 1).clamp(
       0,
       widget.document.chapters.length - 1,
     );
+    final first = requestedFirst;
+    final last = requestedLast;
     final loads = <Future<int>>[
       for (var index = first; index <= last; index++) _loadCount(index),
     ];
     await Future.wait(loads);
-    if (!mounted || generation != _windowGeneration) return;
-    widget.source.retainChapterWindow(first, last);
-    _counts.removeWhere((index, _) => index < first || index > last);
+    if (!mounted || generation != _windowGeneration) return false;
+    _counts.removeWhere(
+      (chapter, _) => chapter < requestedFirst || chapter > requestedLast,
+    );
+    _prefetchedChapters.removeWhere(
+      (chapter) => chapter < requestedFirst || chapter > requestedLast,
+    );
+    widget.source.retainChapterWindow(requestedFirst, requestedLast);
+    final anchorChapterBeforeRebuild = _currentChapter;
+    final anchorPageBeforeRebuild = _currentPage;
+    final anchorAlignment = _currentEntryAlignment();
     final entries = <_ContinuousEntry>[];
     for (var chapter = first; chapter <= last; chapter++) {
       if (entries.isNotEmpty) {
@@ -139,18 +167,60 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
       }
     }
     setState(() => _entries = List.unmodifiable(entries));
-    _scheduleInitialJump();
+    if (_initialJumpPending) {
+      _scheduleInitialJump();
+    } else {
+      _scheduleAnchorRestore(
+        anchorChapterBeforeRebuild,
+        anchorPageBeforeRebuild,
+        anchorAlignment,
+      );
+    }
     _prefetchAdjacentChapters(anchorChapter);
+    return true;
   }
 
-  void _scheduleInitialJump() {
+  double _currentEntryAlignment() {
+    final current = _entryIndexFor(_currentChapter, _currentPage);
+    if (current < 0) return 0;
+    for (final position in _positions.itemPositions.value) {
+      if (position.index == current) {
+        return position.itemLeadingEdge.clamp(0.0, 1.0);
+      }
+    }
+    return 0;
+  }
+
+  void _scheduleAnchorRestore(
+    int chapterIndex,
+    int pageIndex,
+    double alignment,
+  ) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _entryIndexFor(chapterIndex, pageIndex);
+      if (_itemController.isAttached && target >= 0) {
+        _itemController.jumpTo(index: target, alignment: alignment);
+      }
+    });
+  }
+
+  void _scheduleInitialJump([int attemptsRemaining = 4]) {
     if (!_initialJumpPending) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_itemController.isAttached) return;
+      if (!mounted || !_initialJumpPending) return;
       final target = _entryIndexFor(_currentChapter, _currentPage);
-      if (target < 0) return;
-      _itemController.jumpTo(index: target, alignment: 0);
-      _initialJumpPending = false;
+      if (_itemController.isAttached && target >= 0) {
+        _itemController.jumpTo(index: target, alignment: 0);
+        _initialJumpPending = false;
+        return;
+      }
+      if (attemptsRemaining > 0) {
+        _scheduleInitialJump(attemptsRemaining - 1);
+      } else {
+        _initialJumpPending = false;
+        _handlePositions();
+      }
     });
   }
 
@@ -170,6 +240,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
         await widget.source.loadPage(chapterIndex, page, preload: true);
       }
     } catch (error, stackTrace) {
+      _prefetchedChapters.remove(chapterIndex);
       comicDebugLog(
         'chapter-preload',
         'failed chapterIndex=$chapterIndex',
@@ -179,16 +250,33 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
     }
   }
 
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollStartNotification) {
+      _scrolling = true;
+    } else if (notification is ScrollEndNotification) {
+      _scrolling = false;
+      final pending = _pendingWindowChapter;
+      if (pending != null && !_windowLoadInFlight) {
+        _pendingWindowChapter = null;
+        unawaited(_recenterWindow(pending));
+      }
+    }
+    return false;
+  }
+
   void _handlePositions() {
-    if (!mounted || _entries.isEmpty) return;
-    final visible = _positions.itemPositions.value.where(
-      (position) =>
-          position.itemTrailingEdge > 0 &&
-          position.itemLeadingEdge < 1 &&
-          position.index >= 0 &&
-          position.index < _entries.length &&
-          _entries[position.index].kind == _ContinuousEntryKind.page,
-    );
+    if (!mounted || _entries.isEmpty || _initialJumpPending) return;
+    final visible = _positions.itemPositions.value.where((position) {
+      if (position.itemTrailingEdge <= 0 ||
+          position.itemLeadingEdge >= 1 ||
+          position.index < 0 ||
+          position.index >= _entries.length) {
+        return false;
+      }
+      final kind = _entries[position.index].kind;
+      return kind == _ContinuousEntryKind.page ||
+          kind == _ContinuousEntryKind.empty;
+    });
     if (visible.isEmpty) return;
     final nearest = visible.reduce((left, right) {
       return left.itemLeadingEdge.abs() <= right.itemLeadingEdge.abs()
@@ -197,26 +285,30 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
     });
     final entry = _entries[nearest.index];
     final chapterChanged = entry.chapterIndex != _currentChapter;
-    if (entry.chapterIndex == _currentChapter &&
-        entry.pageIndex == _currentPage) {
-      return;
-    }
+    final pageChanged =
+        entry.kind == _ContinuousEntryKind.page &&
+        entry.pageIndex != _currentPage;
+    if (!chapterChanged && !pageChanged) return;
     setState(() {
       _currentChapter = entry.chapterIndex;
-      _currentPage = entry.pageIndex;
+      _currentPage = entry.kind == _ContinuousEntryKind.page
+          ? entry.pageIndex
+          : 0;
     });
-    unawaited(
-      widget.source.saveProgress(
-        chapterIndex: entry.chapterIndex,
-        pageIndex: entry.pageIndex,
-        pageCount: entry.pageCount,
-      ),
-    );
+    if (entry.kind == _ContinuousEntryKind.page) {
+      unawaited(
+        widget.source.saveProgress(
+          chapterIndex: entry.chapterIndex,
+          pageIndex: entry.pageIndex,
+          pageCount: entry.pageCount,
+        ),
+      );
+    }
     _prefetchAdjacentChapters(entry.chapterIndex);
     if (chapterChanged &&
         (entry.chapterIndex == _windowFirst ||
             entry.chapterIndex == _windowLast)) {
-      unawaited(_recenterWindow(entry.chapterIndex, nearest.index));
+      unawaited(_recenterWindow(entry.chapterIndex));
     }
   }
 
@@ -240,36 +332,51 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
     return _currentChapter;
   }
 
-  Future<void> _recenterWindow(int chapterIndex, int oldIndex) async {
+  Future<void> _recenterWindow(int chapterIndex) async {
     if (chapterIndex <= 0 ||
-        chapterIndex >= widget.document.chapters.length - 1) {
+        chapterIndex >= widget.document.chapters.length - 1 ||
+        (_windowFirst <= chapterIndex - 1 && _windowLast >= chapterIndex + 1)) {
       return;
     }
-    if ((_windowFirst == chapterIndex - 1 && _windowLast == chapterIndex + 1)) {
+    if (_scrolling || _windowLoadInFlight) {
+      _pendingWindowChapter = chapterIndex;
       return;
     }
-    final oldEntry = _entries[oldIndex];
-    final oldLeading = _positions.itemPositions.value
-        .where((position) => position.index == oldIndex)
-        .firstOrNull
-        ?.itemLeadingEdge;
-    _initialJumpPending = false;
-    await _ensureWindow(chapterIndex);
-    if (!mounted || !_itemController.isAttached) return;
-    final target = _entryIndexFor(oldEntry.chapterIndex, oldEntry.pageIndex);
-    if (target < 0) return;
-    _itemController.jumpTo(
-      index: target,
-      alignment: oldLeading?.clamp(0, 1) ?? 0,
-    );
+
+    _windowLoadInFlight = true;
+    var nextChapter = chapterIndex;
+    try {
+      while (mounted) {
+        _pendingWindowChapter = null;
+        _initialJumpPending = false;
+        await _ensureWindow(nextChapter);
+        final pending = _pendingWindowChapter;
+        if (_scrolling) return;
+        if (pending == null ||
+            pending <= 0 ||
+            pending >= widget.document.chapters.length - 1 ||
+            (_windowFirst <= pending - 1 && _windowLast >= pending + 1)) {
+          return;
+        }
+        nextChapter = pending;
+      }
+    } finally {
+      _windowLoadInFlight = false;
+    }
   }
 
   int _entryIndexFor(int chapterIndex, int pageIndex) {
-    return _entries.indexWhere(
+    final page = _entries.indexWhere(
       (entry) =>
           entry.kind == _ContinuousEntryKind.page &&
           entry.chapterIndex == chapterIndex &&
           entry.pageIndex == pageIndex,
+    );
+    if (page >= 0) return page;
+    return _entries.indexWhere(
+      (entry) =>
+          entry.kind == _ContinuousEntryKind.empty &&
+          entry.chapterIndex == chapterIndex,
     );
   }
 
@@ -313,7 +420,8 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
 
   @override
   Widget build(BuildContext context) {
-    final pageCount = _counts[_currentChapter] ?? 1;
+    final pageCount = _counts[_currentChapter] ?? 0;
+    final displayPage = pageCount > 0 ? _currentPage + 1 : 0;
     return ColoredBox(
       color: Colors.black,
       child: Stack(
@@ -329,40 +437,47 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
                         palette: _palette,
                         label: widget.document.chapters[_currentChapter].title,
                       )
-                    : ScrollablePositionedList.builder(
-                        itemScrollController: _itemController,
-                        itemPositionsListener: _positions,
-                        itemCount: _entries.length,
-                        padding: EdgeInsets.zero,
-                        itemBuilder: (context, index) {
-                          final entry = _entries[index];
-                          return switch (entry.kind) {
-                            _ContinuousEntryKind.boundary => _ChapterBoundary(
-                              key: ValueKey(
-                                '${ContinuousImageReader.chapterBoundaryKeyPrefix}${entry.chapterIndex}',
+                    : NotificationListener<ScrollNotification>(
+                        onNotification: _handleScrollNotification,
+                        child: ScrollablePositionedList.builder(
+                          itemScrollController: _itemController,
+                          itemPositionsListener: _positions,
+                          itemCount: _entries.length,
+                          padding: EdgeInsets.zero,
+                          itemBuilder: (context, index) {
+                            final entry = _entries[index];
+                            return switch (entry.kind) {
+                              _ContinuousEntryKind.boundary => _ChapterBoundary(
+                                key: ValueKey(
+                                  '${ContinuousImageReader.chapterBoundaryKeyPrefix}${entry.chapterIndex}',
+                                ),
+                                palette: _palette,
+                                title: entry.title,
                               ),
-                              palette: _palette,
-                              title: entry.title,
-                            ),
-                            _ContinuousEntryKind.empty => _EmptyChapter(
-                              palette: _palette,
-                              message: widget.source.emptyPagesMessage(
-                                context.l10n,
+                              _ContinuousEntryKind.empty => _EmptyChapter(
+                                key: ValueKey(
+                                  '${ContinuousImageReader.emptyChapterKeyPrefix}${entry.chapterIndex}',
+                                ),
+                                palette: _palette,
+                                message: widget.source.emptyPagesMessage(
+                                  context.l10n,
+                                ),
+                                onRetry: () => unawaited(
+                                  _retryChapter(entry.chapterIndex),
+                                ),
                               ),
-                              onRetry: () =>
-                                  unawaited(_retryChapter(entry.chapterIndex)),
-                            ),
-                            _ContinuousEntryKind.page => _ContinuousChapterPage(
-                              key: ValueKey(
-                                'flow-${entry.chapterIndex}-${entry.pageIndex}',
+                              _ContinuousEntryKind.page => _ContinuousChapterPage(
+                                key: ValueKey(
+                                  '${ContinuousImageReader.pageKeyPrefix}${entry.chapterIndex}-${entry.pageIndex}',
+                                ),
+                                source: widget.source,
+                                chapterIndex: entry.chapterIndex,
+                                pageIndex: entry.pageIndex,
+                                palette: _palette,
                               ),
-                              source: widget.source,
-                              chapterIndex: entry.chapterIndex,
-                              pageIndex: entry.pageIndex,
-                              palette: _palette,
-                            ),
-                          };
-                        },
+                            };
+                          },
+                        ),
                       ),
               ),
             ),
@@ -370,7 +485,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
           _ProgressPill(
             palette: _palette,
             visible: !_chromeVisible,
-            page: _currentPage + 1,
+            page: displayPage,
             pageCount: pageCount,
             chapterTitle: widget.document.chapters[_currentChapter].title,
           ),
@@ -378,7 +493,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
             palette: _palette,
             visible: _chromeVisible,
             title: widget.document.chapters[_currentChapter].title,
-            page: _currentPage + 1,
+            page: displayPage,
             pageCount: pageCount,
             onBack: () {
               BookOpenTransition.beginExit();
@@ -396,7 +511,8 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
   Future<void> _retryChapter(int chapterIndex) async {
     widget.source.invalidateChapter(chapterIndex);
     _counts.remove(chapterIndex);
-    await _ensureWindow(_currentChapter);
+    _prefetchedChapters.remove(chapterIndex);
+    await _ensureWindow(chapterIndex);
   }
 }
 
@@ -494,11 +610,12 @@ class _ContinuousChapterPageState extends State<_ContinuousChapterPage> {
             pageNumber: widget.pageIndex + 1,
           );
         }
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 140),
+        return KeyedSubtree(
+          key: ValueKey(
+            '${ContinuousImageReader.pageContentKeyPrefix}${widget.chapterIndex}-${widget.pageIndex}',
+          ),
           child: Image.memory(
             bytes,
-            key: ValueKey(bytes.length),
             width: double.infinity,
             fit: BoxFit.fitWidth,
             gaplessPlayback: true,
@@ -725,12 +842,14 @@ class _ImageReaderChrome extends StatelessWidget {
                           onTap: onTableOfContents!,
                         ),
                       _ChromeButton(
+                        key: ContinuousImageReader.modeButtonKey,
                         palette: palette,
                         icon: Icons.swap_horiz_rounded,
                         label: context.l10n.imageReaderDirectionTitle,
                         onTap: onMode,
                       ),
                       _ChromeButton(
+                        key: ContinuousImageReader.settingsButtonKey,
                         palette: palette,
                         icon: Icons.tune_rounded,
                         label: context.l10n.imageReaderSettings,
@@ -750,6 +869,7 @@ class _ImageReaderChrome extends StatelessWidget {
 
 class _ChromeButton extends StatelessWidget {
   const _ChromeButton({
+    super.key,
     required this.palette,
     required this.icon,
     required this.label,
@@ -911,6 +1031,7 @@ class _PageErrorState extends StatelessWidget {
 
 class _EmptyChapter extends StatelessWidget {
   const _EmptyChapter({
+    super.key,
     required this.palette,
     required this.message,
     required this.onRetry,

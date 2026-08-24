@@ -349,6 +349,7 @@ void main() {
       ]''',
     });
     ReplaceRuleService.instance.resetForTesting();
+    final client = _ReplacementBookSourceClient();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -363,7 +364,7 @@ void main() {
             description: '',
             categories: [],
           ),
-          client: _ReplacementBookSourceClient(),
+          client: client,
           initialTheme: ReaderThemes.day,
         ),
       ),
@@ -375,6 +376,8 @@ void main() {
     await _pumpUntilFound(tester, cleanedBody);
     expect(cleanedBody, findsWidgets);
     expect(find.textContaining('广告内容', findRichText: true), findsNothing);
+    expect(client.requestedChapterTitles, isNotEmpty);
+    expect(client.requestedChapterTitles, everyElement('[广告] 第一章'));
   });
 
   testWidgets('restores the last source chapter on reopen', (tester) async {
@@ -1811,6 +1814,8 @@ class _FakeBookSourceClient extends BookSourceClient {
 }
 
 class _ReplacementBookSourceClient extends BookSourceClient {
+  final List<String?> requestedChapterTitles = <String?>[];
+
   @override
   Future<List<BookSourceChapter>> getChapters(
     RegisteredBookSource source,
@@ -1826,13 +1831,16 @@ class _ReplacementBookSourceClient extends BookSourceClient {
     required String bookId,
     required String chapterId,
     Map<String, String> sourceVariables = const {},
-  }) async => BookSourceChapterContent(
-    bookId: bookId,
-    chapterId: chapterId,
-    title: '[广告] 第一章',
-    content: '正文开头\n广告内容\n正文结尾',
-    contentType: 'text/plain',
-  );
+  }) async {
+    requestedChapterTitles.add(sourceVariables['chapterTitle']);
+    return BookSourceChapterContent(
+      bookId: bookId,
+      chapterId: chapterId,
+      title: '[广告] 第一章',
+      content: '正文开头\n广告内容\n正文结尾',
+      contentType: 'text/plain',
+    );
+  }
 }
 
 class _LongFakeBookSourceClient extends _FakeBookSourceClient {

@@ -125,6 +125,12 @@ class BookSourceChapterCache {
     required bool staleWhileRevalidate,
     required Future<BookSourceChapterContent> Function() loader,
   }) async {
+    if (_looksLikeLegacyImageCache(cached.value)) {
+      // Versions before 2.6.1 persisted image chapter HTML without its parsed
+      // image metadata. Do not keep presenting those entries as zero-page
+      // chapters for up to 12 hours; repair them from the source immediately.
+      return _loadContent(key, loader);
+    }
     if (DateTime.now().difference(cached.cachedAt) < refreshAfter) {
       return cached.value;
     }
@@ -142,6 +148,15 @@ class BookSourceChapterCache {
     } catch (_) {
       // Previously read content remains usable while the source is offline.
     }
+  }
+
+  bool _looksLikeLegacyImageCache(BookSourceChapterContent content) {
+    if (content.images.isNotEmpty) return false;
+    final html = content.content.toLowerCase();
+    return RegExp(r'<(?:img|amp-img|source)\b').hasMatch(html) &&
+        RegExp(
+          r'''(?:src|data-src|data-original|data-original-src|data-lazy|data-lazy-src|data-url|data-image|data-srcset|srcset)\s*=''',
+        ).hasMatch(html);
   }
 
   Future<BookSourceChapterContent> _loadContent(

@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'replace_rule_executor.dart';
+import 'replace_rule_semantics.dart';
 
 class ReplaceRule {
   const ReplaceRule({
@@ -149,15 +153,58 @@ class ReplaceRuleService extends ChangeNotifier {
   List<ReplaceRule> _rules = const [];
   bool _loaded = false;
   Future<void>? _loading;
+  int _revision = 0;
+  String? _rulesSignatureCache;
+  ReplaceRuleExecutor _executor = ReplaceRuleExecutor();
+  final List<ReplaceRuleDiagnostic> _recentDiagnostics =
+      <ReplaceRuleDiagnostic>[];
+  StreamSubscription<ReplaceRuleDiagnostic>? _diagnosticSubscription;
 
   List<ReplaceRule> get rules => _rules;
   bool get isLoaded => _loaded;
+  int get revision => _revision;
+  String get rulesSignature => _rulesSignatureCache ??= _buildRulesSignature();
+
+  String _buildRulesSignature() {
+    final payload = enabledRules
+        .map(
+          (rule) => jsonEncode(<Object?>[
+            rule.id,
+            rule.pattern,
+            rule.replacement,
+            rule.scope,
+            rule.excludeScope,
+            rule.isRegex,
+            rule.scopeTitle,
+            rule.scopeContent,
+            rule.order,
+          ]),
+        )
+        .join('\u0000');
+    return 'replace-rules-v2:${sha1.convert(utf8.encode(payload))}';
+  }
+
+  List<ReplaceRuleDiagnostic> get recentDiagnostics =>
+      List<ReplaceRuleDiagnostic>.unmodifiable(_recentDiagnostics);
   List<ReplaceRule> get enabledRules =>
       _rules.where((rule) => rule.enabled).toList(growable: false);
 
   Future<void> load() {
     if (_loaded) return Future.value();
+    _listenToExecutorDiagnostics();
     return _loading ??= _loadInternal();
+  }
+
+  void _listenToExecutorDiagnostics() {
+    _diagnosticSubscription ??= _executor.diagnostics.listen((diagnostic) {
+      _recentDiagnostics.add(diagnostic);
+      if (_recentDiagnostics.length > 32) _recentDiagnostics.removeAt(0);
+      debugPrint(
+        'replacement rule ${diagnostic.kind.name}: '
+        '${diagnostic.ruleName ?? diagnostic.ruleId ?? 'unknown'} '
+        '${diagnostic.detail}',
+      );
+    });
   }
 
   Future<void> _loadInternal() async {
@@ -185,6 +232,8 @@ class ReplaceRuleService extends ChangeNotifier {
       _rules = const [];
     } finally {
       _loaded = true;
+      _revision++;
+      _rulesSignatureCache = null;
       _loading = null;
       notifyListeners();
     }
@@ -211,6 +260,8 @@ class ReplaceRuleService extends ChangeNotifier {
     );
     _rules = normalized;
     _loaded = true;
+    _revision++;
+    _rulesSignatureCache = null;
     notifyListeners();
   }
 
@@ -249,7 +300,7 @@ class ReplaceRuleService extends ChangeNotifier {
     }
     if (rule.isRegex) {
       try {
-        _compileReplacePattern(rule.pattern);
+        compileReplaceRulePattern(rule.pattern);
       } on FormatException catch (error) {
         throw ReplaceRuleValidationException(
           ReplaceRuleValidationKind.invalidRegex,
@@ -282,6 +333,167 @@ class ReplaceRuleService extends ChangeNotifier {
     return merged;
   }
 
+  Future<ReplaceRuleExecutionResult> applyBatchAsync(
+    List<String> inputs, {
+    required String bookTitle,
+    String? sourceName,
+    bool title = false,
+    bool preserveNonEmpty = true,
+  }) async {
+    await load();
+    final signature = rulesSignature;
+    final executionRules = enabledRules
+        .map(_executionRule)
+        .where(
+          (rule) =>
+              (title ? rule.scopeTitle : rule.scopeContent) &&
+              replaceRuleMatchesScope(rule, bookTitle, sourceName),
+        )
+        .toList(growable: false);
+    if (executionRules.isEmpty || inputs.isEmpty) {
+      return ReplaceRuleExecutionResult(values: List<String>.from(inputs));
+    }
+    // Literal-only pipelines have deterministic linear behavior and are
+    // cheaper to execute directly than to copy chapter/catalog strings through
+    // an isolate. Every regex pipeline still uses the killable worker below.
+    if (executionRules.every((rule) => !rule.isRegex)) {
+      final prepared = executionRules.map(PreparedReplaceRule.new).toList();
+      final outputLimit = replaceRuleOutputCharacterLimit(inputs);
+      final values = <String>[];
+      final diagnostics = <ReplaceRuleDiagnostic>[];
+      var degraded = false;
+      for (final input in inputs) {
+        var output = input;
+        for (final rule in prepared) {
+          output = rule.apply(output);
+          if (output.length > outputLimit) {
+            output = input;
+            diagnostics.add(
+              ReplaceRuleDiagnostic(
+                kind: ReplaceRuleDiagnosticKind.outputLimit,
+                rulesSignature: signature,
+                ruleId: rule.source.id,
+                ruleName: rule.source.name,
+                ruleFingerprint: rule.source.fingerprint,
+                detail: 'Replacement output exceeded the safety limit.',
+              ),
+            );
+            degraded = true;
+            break;
+          }
+        }
+        if (preserveNonEmpty &&
+            input.trim().isNotEmpty &&
+            output.trim().isEmpty) {
+          output = input;
+          diagnostics.add(
+            ReplaceRuleDiagnostic(
+              kind: ReplaceRuleDiagnosticKind.emptyOutput,
+              rulesSignature: signature,
+              detail:
+                  'Replacement rules removed all readable text; original retained.',
+            ),
+          );
+          degraded = true;
+        }
+        values.add(output);
+      }
+      return ReplaceRuleExecutionResult(
+        values: values,
+        diagnostics: diagnostics,
+        degraded: degraded,
+      );
+    }
+    final executedValues = <String>[];
+    final executedDiagnostics = <ReplaceRuleDiagnostic>[];
+    final skippedRuleIds = <String>{};
+    var executedDegraded = false;
+    for (final batchInputs in _replaceRuleInputBatches(inputs)) {
+      final batchResult = await _executor.applyBatch(
+        ReplaceRuleExecutionBatch(
+          values: batchInputs,
+          rules: executionRules,
+          rulesSignature: signature,
+          bookTitle: bookTitle,
+          sourceName: sourceName,
+          target: title ? ReplaceRuleTarget.title : ReplaceRuleTarget.content,
+        ),
+      );
+      executedValues.addAll(batchResult.values);
+      executedDiagnostics.addAll(batchResult.diagnostics);
+      skippedRuleIds.addAll(batchResult.skippedRuleIds);
+      executedDegraded = executedDegraded || batchResult.degraded;
+    }
+    final result = ReplaceRuleExecutionResult(
+      values: executedValues,
+      diagnostics: executedDiagnostics,
+      skippedRuleIds: skippedRuleIds.toList(growable: false),
+      degraded: executedDegraded,
+    );
+    if (!preserveNonEmpty) return result;
+    final values = <String>[];
+    final diagnostics = <ReplaceRuleDiagnostic>[...result.diagnostics];
+    var degraded = result.degraded;
+    for (var index = 0; index < inputs.length; index++) {
+      final original = inputs[index];
+      final cleaned = result.values[index];
+      if (original.trim().isNotEmpty && cleaned.trim().isEmpty) {
+        values.add(original);
+        diagnostics.add(
+          ReplaceRuleDiagnostic(
+            kind: ReplaceRuleDiagnosticKind.emptyOutput,
+            rulesSignature: signature,
+            detail:
+                'Replacement rules removed all readable text; original retained.',
+          ),
+        );
+        degraded = true;
+      } else {
+        values.add(cleaned);
+      }
+    }
+    return ReplaceRuleExecutionResult(
+      values: values,
+      diagnostics: diagnostics,
+      skippedRuleIds: result.skippedRuleIds,
+      degraded: degraded,
+    );
+  }
+
+  Iterable<List<String>> _replaceRuleInputBatches(List<String> inputs) sync* {
+    const maximumBatchCharacters = 512 * 1024;
+    var batch = <String>[];
+    var characters = 0;
+    for (final input in inputs) {
+      if (batch.isNotEmpty &&
+          characters + input.length > maximumBatchCharacters) {
+        yield batch;
+        batch = <String>[];
+        characters = 0;
+      }
+      batch.add(input);
+      characters += input.length;
+    }
+    if (batch.isNotEmpty) yield batch;
+  }
+
+  Future<String> applyAsync(
+    String input, {
+    required String bookTitle,
+    String? sourceName,
+    bool title = false,
+    bool preserveNonEmpty = true,
+  }) async {
+    final result = await applyBatchAsync(
+      <String>[input],
+      bookTitle: bookTitle,
+      sourceName: sourceName,
+      title: title,
+      preserveNonEmpty: preserveNonEmpty,
+    );
+    return result.values.single;
+  }
+
   String apply(
     String input, {
     required String bookTitle,
@@ -311,8 +523,8 @@ class ReplaceRuleService extends ChangeNotifier {
       try {
         if (rule.isRegex) {
           output = output.replaceAllMapped(
-            _compileReplacePattern(rule.pattern),
-            (match) => _expandReplacement(rule.replacement, match),
+            compileReplaceRulePattern(rule.pattern),
+            (match) => expandReplaceRuleReplacement(rule.replacement, match),
           );
         } else {
           output = output.replaceAll(rule.pattern, rule.replacement);
@@ -334,14 +546,6 @@ class ReplaceRuleService extends ChangeNotifier {
         .any(haystack.contains);
     if (contains(rule.excludeScope)) return false;
     return rule.scope.trim().isEmpty || contains(rule.scope);
-  }
-
-  String _expandReplacement(String replacement, Match match) {
-    return replacement.replaceAllMapped(RegExp(r'\$(\d+)'), (token) {
-      final index = int.tryParse(token.group(1) ?? '');
-      if (index == null || index > match.groupCount) return token.group(0)!;
-      return match.group(index) ?? '';
-    });
   }
 
   static List<ReplaceRule> decodeImport(String text) {
@@ -376,66 +580,33 @@ class ReplaceRuleService extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  ReplaceRuleExecutionRule _executionRule(ReplaceRule rule) =>
+      ReplaceRuleExecutionRule(
+        id: rule.id,
+        name: rule.name,
+        pattern: rule.pattern,
+        replacement: rule.replacement,
+        group: rule.group,
+        scope: rule.scope,
+        excludeScope: rule.excludeScope,
+        enabled: rule.enabled,
+        isRegex: rule.isRegex,
+        scopeTitle: rule.scopeTitle,
+        scopeContent: rule.scopeContent,
+        order: rule.order,
+      );
+
   @visibleForTesting
   void resetForTesting() {
     _rules = const [];
     _loaded = false;
     _loading = null;
+    _revision = 0;
+    _rulesSignatureCache = null;
+    _recentDiagnostics.clear();
+    unawaited(_diagnosticSubscription?.cancel());
+    _diagnosticSubscription = null;
+    unawaited(_executor.dispose());
+    _executor = ReplaceRuleExecutor();
   }
-}
-
-final RegExp _inlineFlags = RegExp(r'\(\?([ims]+)\)');
-
-RegExp _compileReplacePattern(String pattern) {
-  var source = pattern;
-  var caseSensitive = true;
-  var multiLine = false;
-  var dotAll = false;
-  // Legado/JVM sources commonly place flags at the beginning or after an
-  // alternation. Dart takes these options on the RegExp constructor instead.
-  source = source.replaceAllMapped(_inlineFlags, (match) {
-    final flags = match.group(1)!;
-    if (flags.contains('i')) caseSensitive = false;
-    if (flags.contains('m')) multiLine = true;
-    if (flags.contains('s')) dotAll = true;
-    return '';
-  });
-  // Java's horizontal whitespace class has no Dart spelling. Keep newlines
-  // out so line-oriented cleanup rules retain their source boundaries.
-  source = _replaceHorizontalWhitespace(source);
-  return RegExp(
-    source,
-    caseSensitive: caseSensitive,
-    multiLine: multiLine,
-    dotAll: dotAll,
-  );
-}
-
-String _replaceHorizontalWhitespace(String source) {
-  final output = StringBuffer();
-  var inClass = false;
-  for (var index = 0; index < source.length; index++) {
-    final character = source[index];
-    if (character == r'\' && index + 1 < source.length) {
-      final escaped = source[index + 1];
-      if (escaped == 'h') {
-        output.write(inClass ? r'\t ' : r'(?:\t| )');
-        index++;
-        continue;
-      }
-      if (escaped == 'H') {
-        output.write(inClass ? r'\s\S' : r'[\s\S]');
-        index++;
-        continue;
-      }
-      output.write(character);
-      output.write(escaped);
-      index++;
-      continue;
-    }
-    if (character == '[') inClass = true;
-    if (character == ']' && inClass) inClass = false;
-    output.write(character);
-  }
-  return output.toString();
 }

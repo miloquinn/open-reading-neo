@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import 'sync_clock.dart';
-import 'sync_models.dart';
 
 class SyncOperation {
   const SyncOperation({
@@ -192,8 +191,3 @@ String _canonicalJson(Object? value) {
   }
   throw ArgumentError('Unsupported canonical JSON value: ${value.runtimeType}');
 }
-
-WebDavSyncFailure corruptBatchFailure(Object error) => WebDavSyncFailure(
-  WebDavSyncErrorCode.corruptRemoteData,
-  'A remote metadata batch is invalid and was not applied.',
-);

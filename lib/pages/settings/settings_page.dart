@@ -131,7 +131,6 @@ class _SettingsPageState extends State<SettingsPage> {
     unawaited(_refreshCacheUsage());
     _loadSettings();
     _attachSettingsController(widget.controller);
-    // 状态栏设置现在由_SettingsPageWrapper处理
   }
 
   @override
@@ -189,12 +188,6 @@ class _SettingsPageState extends State<SettingsPage> {
     widget.controller?.removeListener(_handleSupportRevealRequest);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 状态栏设置现在由_SettingsPageWrapper处理，这里保持简洁
   }
 
   Future<void> _loadSettings() async {

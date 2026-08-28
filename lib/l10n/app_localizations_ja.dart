@@ -1605,9 +1605,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get themeBlue => 'オーシャンブルー';
 
   @override
-  String get themePurple => 'ミスティックパープル';
-
-  @override
   String get themeGreen => 'フォレストグリーン';
 
   @override
@@ -1848,9 +1845,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get readerPdfLinuxUnsupported => 'Linux では PDF の閲覧にまだ対応していません';
-
-  @override
-  String get bootstrapDataServiceFailed => 'データシステムの初期化に失敗しました';
 
   @override
   String get bootstrapImageManagerFailed => '画像マネージャーの初期化に失敗しました';
@@ -4317,50 +4311,6 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get readerAiMemorySummaryHeading => '【書籍の記憶サマリー】';
-
-  @override
-  String get readerAiReadingAdviceHeading => '【ユーザー向けの読書アドバイス】';
-
-  @override
-  String get readerAiIndexedSnippetsHeading => '【インデックス命中断片】';
-
-  @override
-  String get readerAiLocalFallbackIntro =>
-      'オンライン AI Key が未設定のため、ローカルの記憶とインデックスに基づいて回答します：';
-
-  @override
-  String get readerAiRelatedContentHeading => '【関連コンテンツ】';
-
-  @override
-  String get readerAiNoRelatedContent => '【関連コンテンツ】利用可能な断片が見つかりませんでした。';
-
-  @override
-  String get readerAiRelatedContentLocationHeading => '【関連コンテンツの位置】';
-
-  @override
-  String readerAiSnippetLocation(
-    String chapterId,
-    int startOffset,
-    int endOffset,
-  ) {
-    return '- 位置：$chapterId ($startOffset-$endOffset)';
-  }
-
-  @override
-  String get readerAiReadingSuggestionHeading => '【読み方のヒント】';
-
-  @override
-  String get readerAiNextStepHeading => '【次のステップ】';
-
-  @override
-  String get readerAiNextStepReadSnippet => '1) 上の命中した断片を先に読んでください。';
-
-  @override
-  String get readerAiNextStepAskFollowUp =>
-      '2) 「なぜ/どうやって/例えば」でもう一度質問すると、インデックスで引き続き特定します。';
-
-  @override
   String get ttsSystemDefault => 'システム標準';
 
   @override
@@ -4442,15 +4392,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get accentDeepOrange => 'フレイムオレンジ';
-
-  @override
-  String get glassPresetClear => 'クリアモード';
-
-  @override
-  String get glassPresetStandard => 'スタンダードモード';
-
-  @override
-  String get glassPresetDreamy => 'ドリーミーモード';
 
   @override
   String get agreementV2HeroTitle => '読書を、自分の端末の中に。';

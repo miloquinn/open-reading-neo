@@ -9,7 +9,6 @@ import 'package:crypto/crypto.dart';
 import 'package:epubx/epubx.dart' hide Image;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;

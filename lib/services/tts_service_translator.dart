@@ -29,9 +29,3 @@ String translateTtsError(
       return errorCode;
   }
 }
-
-/// Translate the TTS voice label, falling back to "System default"
-/// when no voice title is available.
-String ttsVoiceLabel(BuildContext context, String? voiceTitle) {
-  return voiceTitle ?? context.l10n.ttsSystemDefault;
-}

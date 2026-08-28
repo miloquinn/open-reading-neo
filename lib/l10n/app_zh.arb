@@ -1170,10 +1170,6 @@
   "@themeBlue": {
     "description": "蓝色主题"
   },
-  "themePurple": "神秘紫",
-  "@themePurple": {
-    "description": "紫色主题"
-  },
   "themeGreen": "森林绿",
   "@themeGreen": {
     "description": "绿色主题"
@@ -1389,7 +1385,6 @@
   "imageReaderBackgroundGray": "灰色",
   "imageReaderBackgroundWhite": "白色",
   "readerPdfLinuxUnsupported": "Linux 平台暂不支持 PDF 阅读",
-  "bootstrapDataServiceFailed": "数据系统初始化失败",
   "bootstrapImageManagerFailed": "图片管理器初始化失败",
   "homeFocusCompleted": "{minutes} 分钟专注已完成，做得很好。",
   "homeDailyReadingGoal": "每日阅读目标",
@@ -2213,25 +2208,6 @@
         "chars": {"type": "int"}
     }
   },
-  "readerAiMemorySummaryHeading": "【本书记忆摘要】",
-  "readerAiReadingAdviceHeading": "【针对用户的阅读建议】",
-  "readerAiIndexedSnippetsHeading": "【索引命中片段】",
-  "readerAiLocalFallbackIntro": "当前未配置在线 AI Key，先基于本地记忆和索引给你一个答案：",
-  "readerAiRelatedContentHeading": "【相关内容】",
-  "readerAiNoRelatedContent": "【相关内容】暂未命中可用片段。",
-  "readerAiRelatedContentLocationHeading": "【相关内容定位】",
-  "readerAiSnippetLocation": "- 位置：{chapterId} ({startOffset}-{endOffset})",
-  "@readerAiSnippetLocation": {
-    "placeholders": {
-        "chapterId": {"type": "String"},
-        "startOffset": {"type": "int"},
-        "endOffset": {"type": "int"}
-    }
-  },
-  "readerAiReadingSuggestionHeading": "【建议怎么读】",
-  "readerAiNextStepHeading": "【下一步】",
-  "readerAiNextStepReadSnippet": "1) 先读上面命中的片段。",
-  "readerAiNextStepAskFollowUp": "2) 用\"为什么/如何/例子\"再追问一次，我会继续按索引定位。",
   "ttsSystemDefault": "系统默认",
   "ttsUnavailable": "系统 TTS 不可用",
   "ttsUnsupportedLanguage": "系统不支持语言: {language}",
@@ -2264,9 +2240,6 @@
   "accentNeutralGrey": "简约灰",
   "accentIndigo": "深邃蓝",
   "accentDeepOrange": "火焰橙",
-  "glassPresetClear": "清晰模式",
-  "glassPresetStandard": "标准模式",
-  "glassPresetDreamy": "朦胧模式",
   "agreementV2HeroTitle": "把阅读，留在自己的设备里。",
   "agreementV2HeroBody": "开元阅读是一款开源、跨平台、本地优先的电子书阅读工具。它提供阅读能力，但不提供、托管或审核你导入的书籍。",
   "agreementV2LocalTitle": "本地优先",

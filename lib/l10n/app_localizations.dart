@@ -3036,12 +3036,6 @@ abstract class AppLocalizations {
   /// **'Ocean Blue'**
   String get themeBlue;
 
-  /// Purple theme name
-  ///
-  /// In en, this message translates to:
-  /// **'Mystic Purple'**
-  String get themePurple;
-
   /// Green theme name
   ///
   /// In en, this message translates to:
@@ -3503,12 +3497,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PDF reading isn\'t available on Linux yet.'**
   String get readerPdfLinuxUnsupported;
-
-  /// Startup error when the data/cache services fail to initialize
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to initialize the data system'**
-  String get bootstrapDataServiceFailed;
 
   /// Startup error when the book image manager fails to initialize
   ///
@@ -7868,82 +7856,6 @@ abstract class AppLocalizations {
   /// **'AI (mock): You asked \"{question}\".\n\nI have read the current page ({chars} characters). You can continue asking.'**
   String readerAiMockChatResponse(String question, int chars);
 
-  /// Heading written into the AI response buffer for the book memory summary section
-  ///
-  /// In en, this message translates to:
-  /// **'[Book memory summary]'**
-  String get readerAiMemorySummaryHeading;
-
-  /// Heading written into the AI response buffer for the reading advice section
-  ///
-  /// In en, this message translates to:
-  /// **'[Reading advice for you]'**
-  String get readerAiReadingAdviceHeading;
-
-  /// Heading written into the AI response buffer for indexed snippet hits
-  ///
-  /// In en, this message translates to:
-  /// **'[Indexed hit snippets]'**
-  String get readerAiIndexedSnippetsHeading;
-
-  /// Intro line shown when no online AI key is configured and a local fallback answer is given
-  ///
-  /// In en, this message translates to:
-  /// **'No online AI Key configured, answering based on local memory and index:'**
-  String get readerAiLocalFallbackIntro;
-
-  /// Heading for the related content section in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'[Related content]'**
-  String get readerAiRelatedContentHeading;
-
-  /// Shown when the local fallback has no related snippets and no summary
-  ///
-  /// In en, this message translates to:
-  /// **'[Related content] No usable snippets hit.'**
-  String get readerAiNoRelatedContent;
-
-  /// Heading for the snippet location list in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'[Related content location]'**
-  String get readerAiRelatedContentLocationHeading;
-
-  /// A single snippet location line in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'- Location: {chapterId} ({startOffset}-{endOffset})'**
-  String readerAiSnippetLocation(
-    String chapterId,
-    int startOffset,
-    int endOffset,
-  );
-
-  /// Heading for the reading suggestion section in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'[How to read]'**
-  String get readerAiReadingSuggestionHeading;
-
-  /// Heading for the next-step section in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'[Next step]'**
-  String get readerAiNextStepHeading;
-
-  /// First next-step instruction in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'1) Read the hit snippet above first.'**
-  String get readerAiNextStepReadSnippet;
-
-  /// Second next-step instruction in the local fallback response
-  ///
-  /// In en, this message translates to:
-  /// **'2) Ask again with \"why/how/example\" and I will continue locating by index.'**
-  String get readerAiNextStepAskFollowUp;
-
   /// Fallback label for the current TTS voice when no voice is selected
   ///
   /// In en, this message translates to:
@@ -8105,24 +8017,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Flame Orange'**
   String get accentDeepOrange;
-
-  /// Glass effect preset name: clear mode (higher opacity, less blur)
-  ///
-  /// In en, this message translates to:
-  /// **'Clear mode'**
-  String get glassPresetClear;
-
-  /// Glass effect preset name: standard mode (default blur and opacity)
-  ///
-  /// In en, this message translates to:
-  /// **'Standard mode'**
-  String get glassPresetStandard;
-
-  /// Glass effect preset name: dreamy mode (lower opacity, more blur)
-  ///
-  /// In en, this message translates to:
-  /// **'Dreamy mode'**
-  String get glassPresetDreamy;
 
   /// User agreement V2 hero title
   ///

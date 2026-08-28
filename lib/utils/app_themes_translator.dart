@@ -4,28 +4,6 @@
 import 'package:flutter/widgets.dart';
 import '../utils/localization_extension.dart';
 
-/// 翻译应用主题 displayName code 为用户可见名称。
-/// 'blue' -> 'Ocean Blue' / '海洋蓝' / etc.
-String themeDisplayName(BuildContext context, String displayNameCode) {
-  final l10n = context.l10n;
-  switch (displayNameCode) {
-    case 'blue':
-      return l10n.themeBlue;
-    case 'purple':
-      return l10n.themePurple;
-    case 'green':
-      return l10n.themeGreen;
-    case 'orange':
-      return l10n.themeOrange;
-    case 'red':
-      return l10n.themeRed;
-    case 'custom':
-      return l10n.themeCustom;
-    default:
-      return displayNameCode; // fallback to raw code
-  }
-}
-
 /// 翻译强调色 code 为用户可见名称。
 String accentColorDisplayName(BuildContext context, String code) {
   final l10n = context.l10n;
@@ -74,20 +52,5 @@ String accentColorDisplayName(BuildContext context, String code) {
       return l10n.themeCustom;
     default:
       return code;
-  }
-}
-
-/// 翻译 GlassPreset name code 为用户可见名称。
-String glassPresetDisplayName(BuildContext context, String nameCode) {
-  final l10n = context.l10n;
-  switch (nameCode) {
-    case 'clear':
-      return l10n.glassPresetClear;
-    case 'standard':
-      return l10n.glassPresetStandard;
-    case 'dreamy':
-      return l10n.glassPresetDreamy;
-    default:
-      return nameCode;
   }
 }

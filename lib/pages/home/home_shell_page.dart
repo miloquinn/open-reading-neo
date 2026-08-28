@@ -56,7 +56,6 @@ part 'parts/home_shell_layout_part.dart';
 ///
 /// 3) _buildPageWrapper 是关键路由：
 ///    - 首页 -> HomeMobileDashboardPage
-///    - 设置页 -> HomeSettingsPageWrapper
 ///    - 其他页 -> HomeGenericPageWrapper
 ///
 /// 4) 这个文件优先保证“结构稳定”：

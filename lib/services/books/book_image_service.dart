@@ -298,21 +298,6 @@ class BookImageManager {
   }
 }
 
-/// 图片显示样式
-enum ImageDisplayStyle {
-  /// 自动缩放（保持比例）
-  auto,
-
-  /// 填充宽度
-  fullWidth,
-
-  /// 独占一页
-  fullPage,
-
-  /// 嵌入文字中
-  inline,
-}
-
 /// 图片信息
 class BookImage {
   final String key; // 唯一标识

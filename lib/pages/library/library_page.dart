@@ -21,8 +21,7 @@ import 'package:xxread/pages/export/reading_data_export_dialog.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/book_sources/book_source_change_page.dart';
-import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
-import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_reader_factory.dart';
 import 'package:xxread/pages/settings/sync/book_file_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/ai/ai_preprocess_task_controller.dart';
@@ -185,21 +184,12 @@ class _LibraryPageState extends State<LibraryPage> {
       if (!mounted) return;
       if (fullBook.isOnline) {
         try {
-          final binding = _sourceShelfService.bindingFrom(fullBook);
-          final reader = isOnlineComicSource(binding.source, binding.book)
-              ? OnlineComicReaderPage(
-                  source: binding.source,
-                  book: binding.book,
-                  shelfService: _sourceShelfService,
-                  initialTheme: initialTheme,
-                )
-              : BookSourceReaderPage(
-                  source: binding.source,
-                  book: binding.book,
-                  replaceRuleService: context.read<ReplaceRuleService>(),
-                  shelfService: _sourceShelfService,
-                  initialTheme: initialTheme,
-                );
+          final reader = buildOnlineReader(
+            shelfBook: fullBook,
+            shelfService: _sourceShelfService,
+            replaceRuleService: context.read<ReplaceRuleService>(),
+            initialTheme: initialTheme,
+          );
           final route = BookOpenTransition.createRoute<void>(
             reader,
             animation: animation,

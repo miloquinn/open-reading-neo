@@ -22,8 +22,7 @@ import 'pages/home/home_shell_page.dart';
 import 'pages/reader/book_reader_launcher.dart';
 import 'pages/library/import_book/import_book_page.dart';
 import 'pages/legal/user_agreement_page.dart';
-import 'pages/reader/book_source/book_source_reader_page.dart';
-import 'pages/reader/book_source/online_comic_reader_page.dart';
+import 'pages/reader/book_source/online_reader_factory.dart';
 import 'pages/book_sources/source_verification_page.dart';
 import 'services/books/book_services.dart';
 import 'services/books/book_format_support.dart';
@@ -32,7 +31,8 @@ import 'services/reading/reading_resume_service.dart';
 import 'services/reader/replace_rule_service.dart';
 import 'services/core/app_update_download_service.dart';
 import 'services/core/background_download_notifier.dart';
-import 'services/core/core_services.dart';
+import 'services/core/app_settings_service.dart';
+import 'services/core/theme_notifier.dart';
 import 'services/core/display_refresh_rate_controller.dart';
 import 'services/library/download_task_controller.dart';
 import 'services/sync/webdav_sync_controller.dart';
@@ -383,18 +383,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     });
     _syncIncomingBookReadiness();
 
-    // 初始化缓存与应用状态服务
-    try {
-      await DataCacheService().initialize();
-      await AppStateService().initialize();
-    } catch (e) {
-      debugPrint('数据服务初始化失败: $e');
-      if (mounted) {
-        setState(() => _bootstrapError = _BootstrapError.dataService);
-      }
-      return;
-    }
-
     // 浏览器没有 path_provider 的文件系统目录。Web 端的图片与书籍
     // 持久化需要单独的浏览器存储实现，不应让本地文件系统的初始化
     // 阻塞整个 Web 应用启动。
@@ -536,33 +524,23 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
         final client = BookSourceClient();
         final shelfService = BookSourceShelfService(client: client);
         try {
-          final binding = shelfService.bindingFrom(book);
-          final reader = isOnlineComicSource(binding.source, binding.book)
-              ? OnlineComicReaderPage(
-                  source: binding.source,
-                  book: binding.book,
-                  client: client,
-                  shelfService: shelfService,
-                )
-              : BookSourceReaderPage(
-                  source: binding.source,
-                  book: binding.book,
-                  replaceRuleService: provider.Provider.of<ReplaceRuleService>(
-                    context,
-                    listen: false,
-                  ),
-                  client: client,
-                  shelfService: shelfService,
-                );
+          final reader = buildOnlineReader(
+            shelfBook: book,
+            replaceRuleService: provider.Provider.of<ReplaceRuleService>(
+              context,
+              listen: false,
+            ),
+            client: client,
+            shelfService: shelfService,
+          );
           final route = BookOpenTransition.createRoute<void>(
             reader,
             waitForReaderReady: true,
           );
           await BookOpenTransition.push<void>(context, route);
-        } catch (_) {
+        } finally {
           shelfService.close();
           client.close();
-          rethrow;
         }
       } else {
         await BookReaderLauncher.openBook(context, book);
@@ -688,13 +666,9 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 8),
               Text(
-                switch (_bootstrapError) {
-                  _BootstrapError.dataService =>
-                    context.l10n.bootstrapDataServiceFailed,
-                  _BootstrapError.imageManager =>
-                    context.l10n.bootstrapImageManagerFailed,
-                  null => context.l10n.unknownError,
-                },
+                _bootstrapError == _BootstrapError.imageManager
+                    ? context.l10n.bootstrapImageManagerFailed
+                    : context.l10n.unknownError,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -849,4 +823,4 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
 }
 
 /// 启动初始化失败的类型，文案在 build 时按当前语言解析。
-enum _BootstrapError { dataService, imageManager }
+enum _BootstrapError { imageManager }

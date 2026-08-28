@@ -3,7 +3,7 @@ import 'package:xxread/core/reader/reader_text_layout.dart';
 import 'package:xxread/services/books/book_format_support.dart';
 
 void main() {
-  test('all readable flowing-text formats normalize paragraph boundaries', () {
+  test('formats with structural block gaps normalize paragraph boundaries', () {
     for (final format in <String>[
       'txt',
       'epub',
@@ -14,10 +14,6 @@ void main() {
       'htm',
       'xhtml',
       'fb2',
-      'rtf',
-      'docx',
-      'md',
-      'markdown',
     ]) {
       expect(
         BookFormatRegistry.normalizesParagraphBreaks(format),
@@ -27,8 +23,18 @@ void main() {
     }
   });
 
-  test('dedicated and unsupported formats preserve their source breaks', () {
-    for (final format in <String>['pdf', 'cbz', 'cbr', 'doc', 'unknown']) {
+  test('author-owned and non-text formats preserve their source breaks', () {
+    for (final format in <String>[
+      'md',
+      'markdown',
+      'rtf',
+      'docx',
+      'pdf',
+      'cbz',
+      'cbr',
+      'doc',
+      'unknown',
+    ]) {
       expect(
         BookFormatRegistry.normalizesParagraphBreaks(format),
         isFalse,
@@ -37,27 +43,32 @@ void main() {
     }
   });
 
-  test('Kindle parser block gaps follow paragraph spacing 0, 1, and 2', () {
+  test('Kindle block gaps follow paragraph spacing 0, 1, and 2', () {
     const source = '第一段\n\n第二段';
-    for (final entry in const <int, String>{
-      0: '第一段\n第二段',
-      1: '第一段\n\n第二段',
-      2: '第一段\n\n\n第二段',
-    }.entries) {
-      final layout = ReaderTextLayout.build(
-        source,
-        paragraphSpacing: entry.key,
-        normalizeParagraphBreaks: BookFormatRegistry.normalizesParagraphBreaks(
-          'azw3',
-        ),
-      );
+    for (final format in <String>['mobi', 'azw', 'azw3']) {
+      for (final entry in const <int, String>{
+        0: '第一段\n第二段',
+        1: '第一段\n\n第二段',
+        2: '第一段\n\n\n第二段',
+      }.entries) {
+        final layout = ReaderTextLayout.build(
+          source,
+          paragraphSpacing: entry.key,
+          normalizeParagraphBreaks:
+              BookFormatRegistry.normalizesParagraphBreaks(format),
+        );
 
-      expect(layout.text, entry.value);
-      expect(layout.sourceOffsetForDisplayOffset(0), 0);
-      expect(
-        layout.sourceOffsetForDisplayOffset(layout.text.length),
-        source.length,
-      );
+        expect(
+          layout.text,
+          entry.value,
+          reason: '$format spacing=${entry.key}',
+        );
+        expect(layout.sourceOffsetForDisplayOffset(0), 0);
+        expect(
+          layout.sourceOffsetForDisplayOffset(layout.text.length),
+          source.length,
+        );
+      }
     }
   });
 }

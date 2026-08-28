@@ -317,12 +317,11 @@ class BookFormatRegistry {
   /// Whether parser/source-owned blank rows should be projected through the
   /// reader's paragraph-spacing setting.
   ///
-  /// Every currently readable flowing-text adapter emits structural paragraph
-  /// boundaries as line-break runs before entering the shared paginator. Keep
-  /// this capability beside the format pipeline registry so newly added text
-  /// formats cannot silently miss the same normalization (as Kindle once did).
+  /// This is deliberately independent from [targetsUnifiedTextLayout]: formats
+  /// such as Markdown, RTF and DOCX may carry author-owned blank rows, while
+  /// EPUB/Kindle/HTML/FB2 adapters synthesize double breaks for block elements.
   static bool normalizesParagraphBreaks(String extension) =>
-      targetsUnifiedTextLayout(extension);
+      specForExtension(extension)?.normalizesParagraphBreaks ?? false;
 
   /// Chooses the reader surface from the same registry used by import.
   static BookReaderDestination readerDestinationFor(String extension) {

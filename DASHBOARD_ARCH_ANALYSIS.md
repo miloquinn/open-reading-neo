@@ -20,7 +20,7 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 - Responsive switch via LayoutHelper.getNavigationType(context): NavigationType.rail (wide) vs NavigationType.bottom (phone).
 - Wide layout (home_shell_layout_part.dart, a "part of"): NavigationRail in glass/M3 panel + content. Rail extended on tablet/desktop, brand header, per-page top actions.
 - Mobile: PageView per tab inside RepaintBoundary (allowImplicitScrolling for prefetch), floating glass "pill" bottom nav, top glass bar overlay, library multi-select delete bar swaps in place of the nav.
-- Wrappers (lib/pages/home/widgets/home_page_wrappers.dart): HomeGenericPageWrapper (PageStyleHelper.backgroundGradient), HomeSettingsPageWrapper (system UI + HomeMobileTopBar), HomeTabFocusScope + HomeTabFocusGate (InheritedWidget + ExcludeFocus to stop kept-alive tab TextFields from stealing focus and dragging the PageView), HomeKeepAlivePageWrapper (AutomaticKeepAliveClientMixin).
+- Wrappers (lib/pages/home/widgets/home_page_wrappers.dart): HomeGenericPageWrapper (PageStyleHelper.backgroundGradient), HomeTabFocusScope + HomeTabFocusGate (InheritedWidget + ExcludeFocus to stop kept-alive tab TextFields from stealing focus and dragging the PageView), HomeKeepAlivePageWrapper (AutomaticKeepAliveClientMixin).
 - NavigationContext (InheritedWidget) broadcasts useRailNavigation.
 - HomeMobileTopBar + HomeMobileChromeMetrics / dimension helpers (home_mobile_chrome.dart) with constants (floating nav height 56) and HomeMobileSystemInsetsStabilizer (locks bottom inset during book-open transition).
 - HomeDashboardPage (home_dashboard_page.dart) is a marker delegating to HomeMobileDashboardPage (993 lines, "continue reading/reading cadence/recently read") via _HomePalette.fromTheme; rail path reuses the same mobile dashboard via _resolveRailPage.
@@ -90,12 +90,10 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 - ReaderHttpAIService implements ConfigurableAIService (Dio-backed). MockAIService for tests.
 - Config UI: lib/pages/settings/ai_settings_page.dart (1173 lines) with AiSettingsPage (_buildCard, _buildPreprocessSwitch, _buildAiModelRow(_AiQuickModel), _buildAddAiModelRow). Preprocess toggle uses aiPreprocessBooksPrefsKey.
 
-### Reading service (lib/services/ai/global_ai_reading_service.dart + _translator)
-- GlobalAIReadingService (singleton .instance) = local knowledge base persisted under ai_knowledge/books/<sanitizedId>/ with memory.json + index.json.
+### Reading service (lib/services/ai/global_ai_reading_service.dart)
+- GlobalAIReadingService persists preprocessed summaries under ai_knowledge/books/<sanitizedId>/memory.json.
   - saveBookSummary writes preprocess Markdown into memory.json.summary.
-  - findRelevantSnippets does local keyword scoring (CN/EN tokenization with stop-word lists).
-  - buildInjectedContext and buildLocalFallbackAnswer emit placeholder tokens ([[readerAiMemorySummaryHeading]], [[snippetLocation:{chapter}:{start}:{end}]]) localized later by localizeAiResponseBuffer (global_ai_reading_translator.dart).
-  - appendConversationMemory keeps last 20 Q&As (memory.json.qaMemory).
+  - loadBookSummary supplies that summary to the AI page's book context.
   - scheduleImportedBookAnalysis auto-enqueues preprocess after import.
 - Chat UI: lib/pages/ai/ai_page.dart (AiPageController, _AiChatEntry, _buildBookContext, _buildFloatingInputBar, _AiChatBubble); history lib/pages/ai/ai_history_page.dart + services/ai/ai_chat_history_store.dart.
 
@@ -107,14 +105,13 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 ### AI strengths
 1. Clean provider/protocol abstraction with a large preset catalog; custom OpenAI-compatible endpoints.
 2. Excellent "job/CPU conscious" design: interactive-first coordinator + faceted preprocess merge (fan-in, chunk limits, sampling) avoiding model context overflow.
-3. Placeholder-token i18n for AI output decouples templates from l10n; rich AIServiceException.
-4. On-disk per-book knowledge base + local retrieval fallback.
+3. Rich AIServiceException keeps protocol/service errors structured for UI translation.
+4. On-disk per-book summaries preserve reusable AI preprocessing results.
 
 ### AI weaknesses
 1. ReaderHttpAIService + ai_service.dart is one 1463-line file mixing config, presets, protocol adapters, and request logic.
 2. Hardcoded Chinese in service/prompt strings (flagged in l10n README "待迁移").
-3. Dead compat: ensureKnowledgeForParsedBook stub and legacy ParsedBook reference ("parsers removed").
-4. Local retrieval is naive regex tokenization, not embeddings/BM25.
+3. The summary store remains tied to local filesystem persistence and requires a separate Web strategy.
 
 ## 4. Account system (lib/services/account/)
 
@@ -176,7 +173,7 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 - Generated lib/l10n/app_localizations.dart + _en/_zh/_ja files: AppLocalizations.supportedLocales = [Locale(en), Locale(ja), Locale(zh), Locale(zh,TW)]; delegates combine app + Global Material/Cupertino/Widgets.
 - Locale selection: AppSettingsNotifier persists app_locale/legacy; setLocaleCode -> _parseLocale ("system" -> null, else Locale(lang[,country]) from "xx-YY"); passed to MaterialApp.locale.
 - Constrained use: context.l10n extension (lib/utils/localization_extension.dart, 9 lines) = AppLocalizations.of(context); l10n README documents key conventions (camelCase prefix per page/feature), placeholder types, and bans hardcoding user-facing strings in widgets/services (use enums/keys translated in UI).
-- Also localized: localizeAiResponseBuffer for AI tokens; ChangelogService locale cascade; tts_service_translator.dart and app_themes_translator.dart translate model display names.
+- Also localized: ChangelogService locale cascade; tts_service_translator.dart translates TTS errors; app_themes_translator.dart translates accent-color names.
 
 ### l10n strengths
 1. Clean disciplined gen-l10n flow with untranslated-messages report and documented key conventions.
@@ -186,7 +183,7 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 
 ### l10n weaknesses
 1. Generated app_localizations*.dart checked in (gen-l10n norm, adds noise).
-2. Several service/model layers still contain hardcoded Chinese (l10n README "待迁移" list): book_import_service.dart, enhanced_txt_import_service.dart, reader_core/ai/ai_service.dart, services/ai/global_ai_reading_service.dart, models/book_note.dart, utils/app_themes.dart (theme display names), plus account purchase exceptions.
+2. Several service/model layers still contain hardcoded Chinese (l10n README "待迁移" list): book_import_service.dart, enhanced_txt_import_service.dart, reader_core/ai/ai_service.dart, utils/app_themes.dart (theme display names), plus account purchase exceptions.
 3. zh_TW/ja lines equal en counts partly because en carries @metadata; parity enforced via untranslated report but not auto-blocked.
 4. Enforcement depends on l10n_untranslated.json being empty (gitignored), so drift is possible.
 
@@ -198,13 +195,13 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 ## Cross-cutting weaknesses
 - Very large files: home_shell(+901-line part), settings_page, ai_settings_page (1173), account_page/security_part/membership_part (800-924), reader_settings_controls (1367), reader_navigation_sheet (1161), ai_service (1463) - hard to navigate/test in isolation.
 - Documentation drift: DESIGN.md documents the WebDAV/sync + book-source grouping workstreams and asks to reuse "existing theme/Material 3"; it does not cover glass system, ui_style enum, reader-theme model, AI/account/update subsystems.
-- Incomplete i18n in service/model layers + leftover dead/compat code (ParsedBook stub, old controller session methods).
+- Incomplete i18n in service/model layers and remaining old controller session methods.
 - Monolithic part files and magic-type branches tie shell/layout/navigation to concrete page types, reducing extensibility.
 
 ## Quick file map (path -> key classes)
 - Shell/nav: lib/main.dart (ThemeNotifier, XxReadApp, RestartableApp); lib/pages/home_* (HomeShellPage, HomeMobileDashboardPage, HomeBounceNavigationItem, HomePageWrappers, LayoutHelper).
 - Theme/glass: lib/utils/app_themes.dart (AppThemes/AppTheme), reader_themes.dart (ReaderThemes/ReaderThemePalette), ui_style.dart (UiStyleThemeExtension), glass_config.dart (GlassEffectConfig/GlassEffectHelper/GlassPreset), progressive_blur.dart; lib/widgets/glass_top_bar.dart (GlassTopBar), floating_subpage_scaffold.dart, side_toast.dart (showSideToast, SideToastKind).
-- AI: lib/reader_core/ai/ai_service.dart (ReaderHttpAIService, AIService, ConfigurableAIService, AIProviderSettings, AIModelPresets) + ai_error_translator.dart; lib/services/ai/ (GlobalAIReadingService, AiRequestCoordinator, BookPreprocessService, AiPreprocessTaskController, AiChatHistoryStore, GlobalAIReadingTranslator).
+- AI: lib/reader_core/ai/ai_service.dart (ReaderHttpAIService, AIService, ConfigurableAIService, AIProviderSettings, AIModelPresets) + ai_error_translator.dart; lib/services/ai/ (GlobalAIReadingService, AiRequestCoordinator, BookPreprocessService, AiPreprocessTaskController, AiChatHistoryStore).
 - Account: lib/services/account/ (MemberAccountController, MemberAccountApiClient, SecureMemberTokenStore, AccountAvatarCache, ApplePremiumPurchaseService, AccountAuthCallbackBridge, AccountSummaryCache, AvatarImageProcessor, account_models, account.dart); UI lib/pages/account/*.
 - Updates/fonts: lib/services/core/ (UpdateCheckService, AppUpdateDownloadService*, BackgroundDownloadNotifier*, OnlineFontService*, CustomFontService*, ChangelogService, ReaderThemeBackgroundService*, AppSettingsService, DisplayRefreshRateController); lib/widgets/update_check_gate.dart.
 - TTS/read-aloud: lib/services/tts_service.dart (TtsService, TtsVoiceOption); lib/services/reader_aloud_service.dart (ReaderAloudService, ReaderAloudEngineType{system,cloud}, OpenAiCompatibleReaderAloudCloudClient, ReaderAloudCloudAudioCache, AudioplayersReaderAloudBytesPlayer).

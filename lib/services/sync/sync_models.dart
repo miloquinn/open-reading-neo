@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 enum WebDavSyncStatus {
   unconfigured,
   idle,
@@ -298,5 +296,3 @@ class BookFileTransferProgress {
   double get fraction =>
       totalBytes <= 0 ? 0 : (transferredBytes / totalBytes).clamp(0, 1);
 }
-
-String encodeSyncJson(Object? value) => jsonEncode(value);

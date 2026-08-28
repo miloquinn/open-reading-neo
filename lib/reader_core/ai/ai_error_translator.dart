@@ -8,39 +8,6 @@ import 'package:flutter/widgets.dart';
 import '../../utils/localization_extension.dart';
 import 'ai_service.dart';
 
-/// Translate an AI validation error code to user-visible text.
-///
-/// Codes returned by [validateAIProviderSettings]:
-/// - `api_key_required`, `model_required`, `base_url_invalid`
-/// - `temp_error_minimax`, `temp_error_out_of_range`
-/// - `model_mismatch_claude`, `model_mismatch_gemini`,
-///   `model_mismatch_glm`, `model_mismatch_minimax`
-String translateAiValidationError(BuildContext context, String code) {
-  final l10n = context.l10n;
-  switch (code) {
-    case 'api_key_required':
-      return l10n.settingsAiApiKeyRequired;
-    case 'model_required':
-      return l10n.settingsAiModelRequired;
-    case 'base_url_invalid':
-      return l10n.settingsAiBaseUrlInvalid;
-    case 'temp_error_minimax':
-      return l10n.settingsAiTempErrorMinimax;
-    case 'temp_error_out_of_range':
-      return l10n.settingsAiTempErrorOutOfRange;
-    case 'model_mismatch_claude':
-      return l10n.settingsAiModelMismatchClaude;
-    case 'model_mismatch_gemini':
-      return l10n.settingsAiModelMismatchGemini;
-    case 'model_mismatch_glm':
-      return l10n.settingsAiModelMismatchGlm;
-    case 'model_mismatch_minimax':
-      return l10n.settingsAiModelMismatchMinimax;
-    default:
-      return code;
-  }
-}
-
 /// Format a raw HTTP status code string for the `{status}` placeholder
 /// that expects either an empty string or `'(code)'`.
 String _formatStatusParen(String? status) {

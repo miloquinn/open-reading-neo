@@ -110,4 +110,123 @@ void main() {
 
     expect(readerPageIndexWithinItem(position, 4), 2);
   });
+
+  test('center refinement keeps the estimate when no cells are mounted', () {
+    expect(
+      readerPartIndexAtViewportCenter(
+        estimatedIndex: 3,
+        itemCount: 5,
+        renderBoxAt: (_) => null,
+        viewportCenterY: 400,
+      ),
+      3,
+    );
+  });
+
+  test('source offset helpers fall back without rendered text', () {
+    expect(
+      readerSourceOffsetAtViewportCenter(
+        paragraph: null,
+        text: 'text',
+        fallbackOffset: 42,
+        sourceOffsetForTextOffset: (offset) => offset,
+        viewportCenterY: 400,
+      ),
+      42,
+    );
+    expect(
+      readerCaretDyForSourceOffset(
+        paragraph: null,
+        text: 'text',
+        sourceOffset: 42,
+        textOffsetForSourceOffset: (offset) => offset,
+      ),
+      isNull,
+    );
+  });
+
+  testWidgets('mounted paragraph helpers preserve text/source mapping', (
+    tester,
+  ) async {
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: SizedBox(
+            width: 180,
+            child: KeyedSubtree(
+              key: key,
+              child: const Text('alpha beta gamma'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final paragraph = readerParagraphForKey(key)!;
+    final globalTop = paragraph.localToGlobal(Offset.zero).dy;
+    final centerY = globalTop + paragraph.size.height / 2;
+    final expectedTextOffset = paragraph
+        .getPositionForOffset(
+          Offset(paragraph.size.width / 2, paragraph.size.height / 2),
+        )
+        .offset;
+
+    expect(
+      readerSourceOffsetAtViewportCenter(
+        paragraph: paragraph,
+        text: 'alpha beta gamma',
+        fallbackOffset: 100,
+        sourceOffsetForTextOffset: (offset) => 100 + offset,
+        viewportCenterY: centerY,
+      ),
+      100 + expectedTextOffset,
+    );
+    expect(
+      readerCaretDyForSourceOffset(
+        paragraph: paragraph,
+        text: 'alpha beta gamma',
+        sourceOffset: 100 + expectedTextOffset,
+        textOffsetForSourceOffset: (offset) => offset - 100,
+      ),
+      paragraph
+          .getOffsetForCaret(
+            TextPosition(offset: expectedTextOffset),
+            Rect.zero,
+          )
+          .dy,
+    );
+  });
+
+  testWidgets('mounted page cells refine the viewport-center page', (
+    tester,
+  ) async {
+    final keys = List.generate(3, (_) => GlobalKey());
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Column(
+            children: [
+              for (final key in keys)
+                SizedBox(key: key, width: 100, height: 100),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      readerPartIndexAtViewportCenter(
+        estimatedIndex: 0,
+        itemCount: keys.length,
+        renderBoxAt: (index) =>
+            keys[index].currentContext!.findRenderObject()! as RenderBox,
+        viewportCenterY: 150,
+      ),
+      1,
+    );
+  });
 }

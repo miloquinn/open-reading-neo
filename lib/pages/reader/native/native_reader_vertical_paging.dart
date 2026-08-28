@@ -72,30 +72,19 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       _visibleChapters[nextChapter],
       _verticalViewportSize,
     );
-    var nextPage = readerPageIndexWithinItem(primary, parts.length);
-    var closestDistance = double.infinity;
     final viewportCenter = MediaQuery.sizeOf(context).height / 2;
-    for (var index = 0; index < parts.length; index++) {
-      final renderObject = _continuousPartKey(
-        _visibleChapters[nextChapter].id,
-        index,
-      ).currentContext?.findRenderObject();
-      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
-      final top = renderObject.localToGlobal(Offset.zero).dy;
-      final bottom = top + renderObject.size.height;
-      if (top <= viewportCenter && bottom > viewportCenter) {
-        nextPage = index;
-        break;
-      }
-      final distance = math.min(
-        (top - viewportCenter).abs(),
-        (bottom - viewportCenter).abs(),
-      );
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        nextPage = index;
-      }
-    }
+    final nextPage = readerPartIndexAtViewportCenter(
+      estimatedIndex: readerPageIndexWithinItem(primary, parts.length),
+      itemCount: parts.length,
+      renderBoxAt: (index) {
+        final renderObject = _continuousPartKey(
+          _visibleChapters[nextChapter].id,
+          index,
+        ).currentContext?.findRenderObject();
+        return renderObject is RenderBox ? renderObject : null;
+      },
+      viewportCenterY: viewportCenter,
+    );
     final movedForward =
         nextChapter > _chapterIndex ||
         (nextChapter == _chapterIndex && nextPage > _pageIndex);
@@ -130,40 +119,20 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     );
   }
 
-  RenderParagraph? _continuousParagraph(String chapterId, int partIndex) {
-    final root = _continuousPartKey(chapterId, partIndex).currentContext;
-    if (root == null) return null;
-    RenderParagraph? result;
-    void visit(Element element) {
-      if (result != null) return;
-      final renderObject = element.renderObject;
-      if (renderObject is RenderParagraph) {
-        result = renderObject;
-        return;
-      }
-      element.visitChildElements(visit);
-    }
-
-    root.visitChildElements(visit);
-    return result;
-  }
-
   int _continuousOffsetAtViewportCenter(
     _NativeChapter chapter,
     _ContinuousReaderPart part,
     int partIndex,
   ) {
-    final paragraph = _continuousParagraph(chapter.id, partIndex);
-    if (paragraph == null || !paragraph.hasSize || part.content.text.isEmpty) {
-      return part.content.startOffset;
-    }
-    final center = Offset(
-      paragraph.size.width / 2,
-      MediaQuery.sizeOf(context).height / 2 -
-          paragraph.localToGlobal(Offset.zero).dy,
+    return readerSourceOffsetAtViewportCenter(
+      paragraph: readerParagraphForKey(
+        _continuousPartKey(chapter.id, partIndex),
+      ),
+      text: part.content.text,
+      fallbackOffset: part.content.startOffset,
+      sourceOffsetForTextOffset: part.content.sourceOffsetForTextOffset,
+      viewportCenterY: MediaQuery.sizeOf(context).height / 2,
     );
-    final textPosition = paragraph.getPositionForOffset(center);
-    return part.content.sourceOffsetForTextOffset(textPosition.offset);
   }
 
   double? _continuousCaretOffset(
@@ -172,14 +141,14 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     int partIndex,
     int sourceOffset,
   ) {
-    final paragraph = _continuousParagraph(chapter.id, partIndex);
-    if (paragraph == null || !paragraph.hasSize || part.content.text.isEmpty) {
-      return null;
-    }
-    final textOffset = part.content.textOffsetForSourceOffset(sourceOffset);
-    return paragraph
-        .getOffsetForCaret(TextPosition(offset: textOffset), Rect.zero)
-        .dy;
+    return readerCaretDyForSourceOffset(
+      paragraph: readerParagraphForKey(
+        _continuousPartKey(chapter.id, partIndex),
+      ),
+      text: part.content.text,
+      sourceOffset: sourceOffset,
+      textOffsetForSourceOffset: part.content.textOffsetForSourceOffset,
+    );
   }
 
   Future<void> _scrollContinuousAnchorIntoView(

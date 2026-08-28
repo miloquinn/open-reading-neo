@@ -557,7 +557,6 @@
   "readerNoBookmarksHint": "閱讀時點擊右上角的書籤按鈕，即可儲存目前位置。",
   "readerBookmarkRequiresShelf": "加入書架後才能儲存書籤",
   "themeBlue": "海洋藍",
-  "themePurple": "神秘紫",
   "themeGreen": "森林綠",
   "themeOrange": "活力橙",
   "themeRed": "熱情紅",
@@ -656,7 +655,6 @@
   "imageReaderBackgroundGray": "灰色",
   "imageReaderBackgroundWhite": "白色",
   "readerPdfLinuxUnsupported": "Linux 平台暫不支援 PDF 閱讀",
-  "bootstrapDataServiceFailed": "資料系統初始化失敗",
   "bootstrapImageManagerFailed": "圖片管理器初始化失敗",
   "homeFocusCompleted": "{minutes} 分鐘專注已完成，做得很好。",
   "@homeFocusCompleted": {
@@ -1936,25 +1934,6 @@
         "chars": {"type": "int"}
     }
   },
-  "readerAiMemorySummaryHeading": "【本書記憶摘要】",
-  "readerAiReadingAdviceHeading": "【針對使用者的閱讀建議】",
-  "readerAiIndexedSnippetsHeading": "【索引命中片段】",
-  "readerAiLocalFallbackIntro": "目前未設定線上 AI Key，先基於本機記憶和索引給你一個答案：",
-  "readerAiRelatedContentHeading": "【相關內容】",
-  "readerAiNoRelatedContent": "【相關內容】暫未命中可用片段。",
-  "readerAiRelatedContentLocationHeading": "【相關內容定位】",
-  "readerAiSnippetLocation": "- 位置：{chapterId} ({startOffset}-{endOffset})",
-  "@readerAiSnippetLocation": {
-    "placeholders": {
-        "chapterId": {"type": "String"},
-        "startOffset": {"type": "int"},
-        "endOffset": {"type": "int"}
-    }
-  },
-  "readerAiReadingSuggestionHeading": "【建議怎麼讀】",
-  "readerAiNextStepHeading": "【下一步】",
-  "readerAiNextStepReadSnippet": "1) 先讀上面命中的片段。",
-  "readerAiNextStepAskFollowUp": "2) 用「為什麼/如何/例子」再追問一次，我會繼續按索引定位。",
   "ttsSystemDefault": "系統預設",
   "ttsUnavailable": "系統 TTS 不可用",
   "ttsUnsupportedLanguage": "系統不支援語言: {language}",
@@ -1987,9 +1966,6 @@
   "accentNeutralGrey": "簡約灰",
   "accentIndigo": "深邃藍",
   "accentDeepOrange": "火焰橙",
-  "glassPresetClear": "清晰模式",
-  "glassPresetStandard": "標準模式",
-  "glassPresetDreamy": "朦朧模式",
   "agreementV2HeroTitle": "把閱讀，留在自己的裝置裡。",
   "agreementV2HeroBody": "開元閱讀是一款開源、跨平台、本機優先的電子書閱讀工具。它提供閱讀能力，但不提供、代管或審核你匯入的書籍。",
   "agreementV2LocalTitle": "本機優先",

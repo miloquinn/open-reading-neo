@@ -13,6 +13,8 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/home/home_mobile_dashboard_page.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_reader_factory.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
@@ -245,8 +247,8 @@ void main() {
     final replaceRules = ReplaceRuleService();
     addTearDown(replaceRules.close);
 
-    final reader = HomeMobileDashboardPage.buildOnlineReader(
-      book: book,
+    final reader = buildOnlineReader(
+      shelfBook: book,
       client: client,
       shelfService: shelfService,
       replaceRuleService: replaceRules,
@@ -302,13 +304,102 @@ void main() {
     addTearDown(replaceRules.close);
 
     expect(
-      () => HomeMobileDashboardPage.buildOnlineReader(
-        book: broken,
+      () => buildOnlineReader(
+        shelfBook: broken,
         client: client,
         shelfService: shelfService,
         replaceRuleService: replaceRules,
       ),
       throwsA(isA<OnlineShelfBookBindingException>()),
+    );
+  });
+
+  test('在线阅读工厂支持显式漫画绑定', () {
+    final source = RegisteredBookSource(
+      id: 'comic.source',
+      name: '漫画源',
+      description: '',
+      manifestUrl: Uri.parse('https://example.org/source.json'),
+      apiBaseUrl: Uri.parse('https://example.org/api/'),
+      protocolVersion: '1.0',
+      languages: const ['zh-CN'],
+      capabilities: const {'catalog', 'content'},
+      enabled: true,
+      addedAt: DateTime.utc(2026, 7, 23),
+    );
+    const sourceBook = BookSourceBook(
+      id: 'comic-book',
+      title: '在线漫画',
+      author: '测试作者',
+      description: '',
+      categories: [],
+      type: 64,
+    );
+    final replaceRules = ReplaceRuleService();
+    addTearDown(replaceRules.close);
+
+    final reader = buildOnlineReader(
+      source: source,
+      sourceBook: sourceBook,
+      replaceRuleService: replaceRules,
+    );
+
+    expect(reader, isA<OnlineComicReaderPage>());
+  });
+
+  test('在线阅读工厂拒绝不完整或冲突的输入', () {
+    final source = RegisteredBookSource(
+      id: 'test.source',
+      name: '测试书源',
+      description: '',
+      manifestUrl: Uri.parse('https://example.org/source.json'),
+      apiBaseUrl: Uri.parse('https://example.org/api/'),
+      protocolVersion: '1.0',
+      languages: const ['zh-CN'],
+      capabilities: const {'content'},
+      enabled: true,
+      addedAt: DateTime.utc(2026, 7, 23),
+    );
+    const sourceBook = BookSourceBook(
+      id: 'book',
+      title: '书',
+      author: '',
+      description: '',
+      categories: [],
+    );
+    final shelfBook = Book(
+      title: '书',
+      author: '',
+      filePath: '',
+      format: 'source',
+      storageType: 'online',
+    );
+    final replaceRules = ReplaceRuleService();
+    addTearDown(replaceRules.close);
+
+    expect(
+      () => buildOnlineReader(replaceRuleService: replaceRules),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildOnlineReader(source: source, replaceRuleService: replaceRules),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildOnlineReader(
+        shelfBook: shelfBook,
+        replaceRuleService: replaceRules,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildOnlineReader(
+        shelfBook: shelfBook,
+        source: source,
+        sourceBook: sourceBook,
+        replaceRuleService: replaceRules,
+      ),
+      throwsArgumentError,
     );
   });
 }

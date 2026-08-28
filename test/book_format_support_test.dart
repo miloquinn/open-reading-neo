@@ -37,7 +37,10 @@ void main() {
     expect(BookFormatRegistry.normalizesParagraphBreaks('azw'), isTrue);
     expect(BookFormatRegistry.normalizesParagraphBreaks('AZW3'), isTrue);
     expect(BookFormatRegistry.normalizesParagraphBreaks('html'), isTrue);
-    expect(BookFormatRegistry.normalizesParagraphBreaks('docx'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('fb2'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('md'), isFalse);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('rtf'), isFalse);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('docx'), isFalse);
     expect(BookFormatRegistry.normalizesParagraphBreaks('pdf'), isFalse);
     expect(BookFormatRegistry.normalizesParagraphBreaks('cbz'), isFalse);
   });

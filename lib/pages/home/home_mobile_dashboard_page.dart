@@ -12,8 +12,7 @@ import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/pages/reader/book_reader_launcher.dart';
 import 'package:xxread/models/book.dart';
-import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
-import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
+import 'package:xxread/pages/reader/book_source/online_reader_factory.dart';
 import 'package:xxread/pages/reading_stats/detailed_stats_page.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/library/library_event_bus_service.dart';
@@ -115,34 +114,6 @@ class HomeMobileDashboardPage extends StatefulWidget {
   final BookSourceClient Function()? clientFactory;
   final BookSourceShelfService Function(BookSourceClient client)?
   shelfServiceFactory;
-
-  @visibleForTesting
-  static Widget buildOnlineReader({
-    required Book book,
-    required BookSourceClient client,
-    required BookSourceShelfService shelfService,
-    required ReplaceRuleService replaceRuleService,
-    ReaderThemePalette? initialTheme,
-  }) {
-    final binding = shelfService.bindingFrom(book);
-    if (isOnlineComicSource(binding.source, binding.book)) {
-      return OnlineComicReaderPage(
-        source: binding.source,
-        book: binding.book,
-        client: client,
-        shelfService: shelfService,
-        initialTheme: initialTheme,
-      );
-    }
-    return BookSourceReaderPage(
-      source: binding.source,
-      book: binding.book,
-      replaceRuleService: replaceRuleService,
-      client: client,
-      shelfService: shelfService,
-      initialTheme: initialTheme,
-    );
-  }
 
   @override
   State<HomeMobileDashboardPage> createState() =>
@@ -354,8 +325,8 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
 
       if (fullBook.isOnline) {
         try {
-          final reader = HomeMobileDashboardPage.buildOnlineReader(
-            book: fullBook,
+          final reader = buildOnlineReader(
+            shelfBook: fullBook,
             client: _sourceClient,
             shelfService: _sourceShelfService,
             replaceRuleService: context.read<ReplaceRuleService>(),

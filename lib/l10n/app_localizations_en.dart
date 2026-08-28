@@ -1651,9 +1651,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeBlue => 'Ocean Blue';
 
   @override
-  String get themePurple => 'Mystic Purple';
-
-  @override
   String get themeGreen => 'Forest Green';
 
   @override
@@ -1902,10 +1899,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerPdfLinuxUnsupported =>
       'PDF reading isn\'t available on Linux yet.';
-
-  @override
-  String get bootstrapDataServiceFailed =>
-      'Failed to initialize the data system';
 
   @override
   String get bootstrapImageManagerFailed =>
@@ -4484,53 +4477,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get readerAiMemorySummaryHeading => '[Book memory summary]';
-
-  @override
-  String get readerAiReadingAdviceHeading => '[Reading advice for you]';
-
-  @override
-  String get readerAiIndexedSnippetsHeading => '[Indexed hit snippets]';
-
-  @override
-  String get readerAiLocalFallbackIntro =>
-      'No online AI Key configured, answering based on local memory and index:';
-
-  @override
-  String get readerAiRelatedContentHeading => '[Related content]';
-
-  @override
-  String get readerAiNoRelatedContent =>
-      '[Related content] No usable snippets hit.';
-
-  @override
-  String get readerAiRelatedContentLocationHeading =>
-      '[Related content location]';
-
-  @override
-  String readerAiSnippetLocation(
-    String chapterId,
-    int startOffset,
-    int endOffset,
-  ) {
-    return '- Location: $chapterId ($startOffset-$endOffset)';
-  }
-
-  @override
-  String get readerAiReadingSuggestionHeading => '[How to read]';
-
-  @override
-  String get readerAiNextStepHeading => '[Next step]';
-
-  @override
-  String get readerAiNextStepReadSnippet =>
-      '1) Read the hit snippet above first.';
-
-  @override
-  String get readerAiNextStepAskFollowUp =>
-      '2) Ask again with \"why/how/example\" and I will continue locating by index.';
-
-  @override
   String get ttsSystemDefault => 'System default';
 
   @override
@@ -4615,15 +4561,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accentDeepOrange => 'Flame Orange';
-
-  @override
-  String get glassPresetClear => 'Clear mode';
-
-  @override
-  String get glassPresetStandard => 'Standard mode';
-
-  @override
-  String get glassPresetDreamy => 'Dreamy mode';
 
   @override
   String get agreementV2HeroTitle => 'Keep reading on your own device.';

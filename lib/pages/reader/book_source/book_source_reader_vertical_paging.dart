@@ -20,40 +20,19 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
   GlobalKey _verticalPartKey(int chapterIndex, int partIndex) =>
       _verticalPartKeys.putIfAbsent('$chapterIndex:$partIndex', GlobalKey.new);
 
-  RenderParagraph? _verticalParagraph(int chapterIndex, int partIndex) {
-    final root = _verticalPartKey(chapterIndex, partIndex).currentContext;
-    if (root == null) return null;
-    RenderParagraph? result;
-    void visit(Element element) {
-      if (result != null) return;
-      final renderObject = element.renderObject;
-      if (renderObject is RenderParagraph) {
-        result = renderObject;
-        return;
-      }
-      element.visitChildElements(visit);
-    }
-
-    root.visitChildElements(visit);
-    return result;
-  }
-
   int _verticalOffsetAtViewportCenter(
     int chapterIndex,
     int partIndex,
     BookSourceTextPage page,
   ) {
-    final paragraph = _verticalParagraph(chapterIndex, partIndex);
-    if (paragraph == null || !paragraph.hasSize || page.text.isEmpty) {
-      return page.startOffset;
-    }
-    final center = Offset(
-      paragraph.size.width / 2,
-      MediaQuery.sizeOf(context).height / 2 -
-          paragraph.localToGlobal(Offset.zero).dy,
-    );
-    return page.sourceOffsetForTextOffset(
-      paragraph.getPositionForOffset(center).offset,
+    return readerSourceOffsetAtViewportCenter(
+      paragraph: readerParagraphForKey(
+        _verticalPartKey(chapterIndex, partIndex),
+      ),
+      text: page.text,
+      fallbackOffset: page.startOffset,
+      sourceOffsetForTextOffset: page.sourceOffsetForTextOffset,
+      viewportCenterY: MediaQuery.sizeOf(context).height / 2,
     );
   }
 
@@ -63,16 +42,14 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     BookSourceTextPage page,
     int sourceOffset,
   ) {
-    final paragraph = _verticalParagraph(chapterIndex, partIndex);
-    if (paragraph == null || !paragraph.hasSize || page.text.isEmpty) {
-      return null;
-    }
-    return paragraph
-        .getOffsetForCaret(
-          TextPosition(offset: page.textOffsetForSourceOffset(sourceOffset)),
-          Rect.zero,
-        )
-        .dy;
+    return readerCaretDyForSourceOffset(
+      paragraph: readerParagraphForKey(
+        _verticalPartKey(chapterIndex, partIndex),
+      ),
+      text: page.text,
+      sourceOffset: sourceOffset,
+      textOffsetForSourceOffset: page.textOffsetForSourceOffset,
+    );
   }
 
   List<BookSourceTextPage> _continuousTextParts(
@@ -282,30 +259,19 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
       content,
       _verticalViewportSize,
     );
-    var nextPage = readerPageIndexWithinItem(primary, layout.pages.length);
-    var closestDistance = double.infinity;
     final viewportCenter = MediaQuery.sizeOf(context).height / 2;
-    for (var index = 0; index < layout.pages.length; index++) {
-      final renderObject = _verticalPartKey(
-        nextChapter,
-        index,
-      ).currentContext?.findRenderObject();
-      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
-      final top = renderObject.localToGlobal(Offset.zero).dy;
-      final bottom = top + renderObject.size.height;
-      if (top <= viewportCenter && bottom > viewportCenter) {
-        nextPage = index;
-        break;
-      }
-      final distance = math.min(
-        (top - viewportCenter).abs(),
-        (bottom - viewportCenter).abs(),
-      );
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        nextPage = index;
-      }
-    }
+    final nextPage = readerPartIndexAtViewportCenter(
+      estimatedIndex: readerPageIndexWithinItem(primary, layout.pages.length),
+      itemCount: layout.pages.length,
+      renderBoxAt: (index) {
+        final renderObject = _verticalPartKey(
+          nextChapter,
+          index,
+        ).currentContext?.findRenderObject();
+        return renderObject is RenderBox ? renderObject : null;
+      },
+      viewportCenterY: viewportCenter,
+    );
     final movedForward =
         nextChapter > _chapterIndex ||
         (nextChapter == _chapterIndex && nextPage > _verticalPageIndex);

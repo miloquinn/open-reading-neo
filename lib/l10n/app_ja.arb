@@ -557,7 +557,6 @@
   "readerNoBookmarksHint": "右上のブックマークボタンをタップして現在位置を保存できます。",
   "readerBookmarkRequiresShelf": "ブックマークを保存するには本棚に追加してください",
   "themeBlue": "オーシャンブルー",
-  "themePurple": "ミスティックパープル",
   "themeGreen": "フォレストグリーン",
   "themeOrange": "ビビッドオレンジ",
   "themeRed": "パッションレッド",
@@ -656,7 +655,6 @@
   "imageReaderBackgroundGray": "グレー",
   "imageReaderBackgroundWhite": "白",
   "readerPdfLinuxUnsupported": "Linux では PDF の閲覧にまだ対応していません",
-  "bootstrapDataServiceFailed": "データシステムの初期化に失敗しました",
   "bootstrapImageManagerFailed": "画像マネージャーの初期化に失敗しました",
   "homeFocusCompleted": "{minutes} 分の集中セッションが完了しました。おつかれさまです！",
   "@homeFocusCompleted": {
@@ -1936,25 +1934,6 @@
         "chars": {"type": "int"}
     }
   },
-  "readerAiMemorySummaryHeading": "【書籍の記憶サマリー】",
-  "readerAiReadingAdviceHeading": "【ユーザー向けの読書アドバイス】",
-  "readerAiIndexedSnippetsHeading": "【インデックス命中断片】",
-  "readerAiLocalFallbackIntro": "オンライン AI Key が未設定のため、ローカルの記憶とインデックスに基づいて回答します：",
-  "readerAiRelatedContentHeading": "【関連コンテンツ】",
-  "readerAiNoRelatedContent": "【関連コンテンツ】利用可能な断片が見つかりませんでした。",
-  "readerAiRelatedContentLocationHeading": "【関連コンテンツの位置】",
-  "readerAiSnippetLocation": "- 位置：{chapterId} ({startOffset}-{endOffset})",
-  "@readerAiSnippetLocation": {
-    "placeholders": {
-        "chapterId": {"type": "String"},
-        "startOffset": {"type": "int"},
-        "endOffset": {"type": "int"}
-    }
-  },
-  "readerAiReadingSuggestionHeading": "【読み方のヒント】",
-  "readerAiNextStepHeading": "【次のステップ】",
-  "readerAiNextStepReadSnippet": "1) 上の命中した断片を先に読んでください。",
-  "readerAiNextStepAskFollowUp": "2) 「なぜ/どうやって/例えば」でもう一度質問すると、インデックスで引き続き特定します。",
   "ttsSystemDefault": "システム標準",
   "ttsUnavailable": "システム TTS は利用できません",
   "ttsUnsupportedLanguage": "システムが対応していない言語です: {language}",
@@ -1987,9 +1966,6 @@
   "accentNeutralGrey": "ミニマルグレー",
   "accentIndigo": "ディープインディゴ",
   "accentDeepOrange": "フレイムオレンジ",
-  "glassPresetClear": "クリアモード",
-  "glassPresetStandard": "スタンダードモード",
-  "glassPresetDreamy": "ドリーミーモード",
   "agreementV2HeroTitle": "読書を、自分の端末の中に。",
   "agreementV2HeroBody": "OpenReading はオープンソース・クロスプラットフォーム・ローカルファーストの電子書籍リーダーです。読書のための機能を提供しますが、あなたが取り込んだ書籍を提供・ホスティング・審査することはありません。",
   "agreementV2LocalTitle": "ローカルファースト",

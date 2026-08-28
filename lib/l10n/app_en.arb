@@ -1170,10 +1170,6 @@
   "@themeBlue": {
     "description": "Blue theme name"
   },
-  "themePurple": "Mystic Purple",
-  "@themePurple": {
-    "description": "Purple theme name"
-  },
   "themeGreen": "Forest Green",
   "@themeGreen": {
     "description": "Green theme name"
@@ -1496,10 +1492,6 @@
   "readerPdfLinuxUnsupported": "PDF reading isn't available on Linux yet.",
   "@readerPdfLinuxUnsupported": {
     "description": "Toast shown when opening a PDF on Linux, where the PDF engine has no implementation"
-  },
-  "bootstrapDataServiceFailed": "Failed to initialize the data system",
-  "@bootstrapDataServiceFailed": {
-    "description": "Startup error when the data/cache services fail to initialize"
   },
   "bootstrapImageManagerFailed": "Failed to initialize the image manager",
   "@bootstrapImageManagerFailed": {
@@ -4002,59 +3994,6 @@
         "chars": {"type": "int"}
     }
   },
-  "readerAiMemorySummaryHeading": "[Book memory summary]",
-  "@readerAiMemorySummaryHeading": {
-    "description": "Heading written into the AI response buffer for the book memory summary section"
-  },
-  "readerAiReadingAdviceHeading": "[Reading advice for you]",
-  "@readerAiReadingAdviceHeading": {
-    "description": "Heading written into the AI response buffer for the reading advice section"
-  },
-  "readerAiIndexedSnippetsHeading": "[Indexed hit snippets]",
-  "@readerAiIndexedSnippetsHeading": {
-    "description": "Heading written into the AI response buffer for indexed snippet hits"
-  },
-  "readerAiLocalFallbackIntro": "No online AI Key configured, answering based on local memory and index:",
-  "@readerAiLocalFallbackIntro": {
-    "description": "Intro line shown when no online AI key is configured and a local fallback answer is given"
-  },
-  "readerAiRelatedContentHeading": "[Related content]",
-  "@readerAiRelatedContentHeading": {
-    "description": "Heading for the related content section in the local fallback response"
-  },
-  "readerAiNoRelatedContent": "[Related content] No usable snippets hit.",
-  "@readerAiNoRelatedContent": {
-    "description": "Shown when the local fallback has no related snippets and no summary"
-  },
-  "readerAiRelatedContentLocationHeading": "[Related content location]",
-  "@readerAiRelatedContentLocationHeading": {
-    "description": "Heading for the snippet location list in the local fallback response"
-  },
-  "readerAiSnippetLocation": "- Location: {chapterId} ({startOffset}-{endOffset})",
-  "@readerAiSnippetLocation": {
-    "description": "A single snippet location line in the local fallback response",
-    "placeholders": {
-        "chapterId": {"type": "String"},
-        "startOffset": {"type": "int"},
-        "endOffset": {"type": "int"}
-    }
-  },
-  "readerAiReadingSuggestionHeading": "[How to read]",
-  "@readerAiReadingSuggestionHeading": {
-    "description": "Heading for the reading suggestion section in the local fallback response"
-  },
-  "readerAiNextStepHeading": "[Next step]",
-  "@readerAiNextStepHeading": {
-    "description": "Heading for the next-step section in the local fallback response"
-  },
-  "readerAiNextStepReadSnippet": "1) Read the hit snippet above first.",
-  "@readerAiNextStepReadSnippet": {
-    "description": "First next-step instruction in the local fallback response"
-  },
-  "readerAiNextStepAskFollowUp": "2) Ask again with \"why/how/example\" and I will continue locating by index.",
-  "@readerAiNextStepAskFollowUp": {
-    "description": "Second next-step instruction in the local fallback response"
-  },
   "ttsSystemDefault": "System default",
   "@ttsSystemDefault": {
     "description": "Fallback label for the current TTS voice when no voice is selected"
@@ -4165,18 +4104,6 @@
   "accentDeepOrange": "Flame Orange",
   "@accentDeepOrange": {
     "description": "Accent color display name: flame orange"
-  },
-  "glassPresetClear": "Clear mode",
-  "@glassPresetClear": {
-    "description": "Glass effect preset name: clear mode (higher opacity, less blur)"
-  },
-  "glassPresetStandard": "Standard mode",
-  "@glassPresetStandard": {
-    "description": "Glass effect preset name: standard mode (default blur and opacity)"
-  },
-  "glassPresetDreamy": "Dreamy mode",
-  "@glassPresetDreamy": {
-    "description": "Glass effect preset name: dreamy mode (lower opacity, more blur)"
   },
   "agreementV2HeroTitle": "Keep reading on your own device.",
   "@agreementV2HeroTitle": {

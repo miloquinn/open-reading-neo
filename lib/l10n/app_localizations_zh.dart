@@ -1585,9 +1585,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeBlue => '海洋蓝';
 
   @override
-  String get themePurple => '神秘紫';
-
-  @override
   String get themeGreen => '森林绿';
 
   @override
@@ -1825,9 +1822,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerPdfLinuxUnsupported => 'Linux 平台暂不支持 PDF 阅读';
-
-  @override
-  String get bootstrapDataServiceFailed => '数据系统初始化失败';
 
   @override
   String get bootstrapImageManagerFailed => '图片管理器初始化失败';
@@ -4263,48 +4257,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get readerAiMemorySummaryHeading => '【本书记忆摘要】';
-
-  @override
-  String get readerAiReadingAdviceHeading => '【针对用户的阅读建议】';
-
-  @override
-  String get readerAiIndexedSnippetsHeading => '【索引命中片段】';
-
-  @override
-  String get readerAiLocalFallbackIntro => '当前未配置在线 AI Key，先基于本地记忆和索引给你一个答案：';
-
-  @override
-  String get readerAiRelatedContentHeading => '【相关内容】';
-
-  @override
-  String get readerAiNoRelatedContent => '【相关内容】暂未命中可用片段。';
-
-  @override
-  String get readerAiRelatedContentLocationHeading => '【相关内容定位】';
-
-  @override
-  String readerAiSnippetLocation(
-    String chapterId,
-    int startOffset,
-    int endOffset,
-  ) {
-    return '- 位置：$chapterId ($startOffset-$endOffset)';
-  }
-
-  @override
-  String get readerAiReadingSuggestionHeading => '【建议怎么读】';
-
-  @override
-  String get readerAiNextStepHeading => '【下一步】';
-
-  @override
-  String get readerAiNextStepReadSnippet => '1) 先读上面命中的片段。';
-
-  @override
-  String get readerAiNextStepAskFollowUp => '2) 用\"为什么/如何/例子\"再追问一次，我会继续按索引定位。';
-
-  @override
   String get ttsSystemDefault => '系统默认';
 
   @override
@@ -4386,15 +4338,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accentDeepOrange => '火焰橙';
-
-  @override
-  String get glassPresetClear => '清晰模式';
-
-  @override
-  String get glassPresetStandard => '标准模式';
-
-  @override
-  String get glassPresetDreamy => '朦胧模式';
 
   @override
   String get agreementV2HeroTitle => '把阅读，留在自己的设备里。';
@@ -7047,9 +6990,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get themeBlue => '海洋藍';
 
   @override
-  String get themePurple => '神秘紫';
-
-  @override
   String get themeGreen => '森林綠';
 
   @override
@@ -7287,9 +7227,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readerPdfLinuxUnsupported => 'Linux 平台暫不支援 PDF 閱讀';
-
-  @override
-  String get bootstrapDataServiceFailed => '資料系統初始化失敗';
 
   @override
   String get bootstrapImageManagerFailed => '圖片管理器初始化失敗';
@@ -9725,48 +9662,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get readerAiMemorySummaryHeading => '【本書記憶摘要】';
-
-  @override
-  String get readerAiReadingAdviceHeading => '【針對使用者的閱讀建議】';
-
-  @override
-  String get readerAiIndexedSnippetsHeading => '【索引命中片段】';
-
-  @override
-  String get readerAiLocalFallbackIntro => '目前未設定線上 AI Key，先基於本機記憶和索引給你一個答案：';
-
-  @override
-  String get readerAiRelatedContentHeading => '【相關內容】';
-
-  @override
-  String get readerAiNoRelatedContent => '【相關內容】暫未命中可用片段。';
-
-  @override
-  String get readerAiRelatedContentLocationHeading => '【相關內容定位】';
-
-  @override
-  String readerAiSnippetLocation(
-    String chapterId,
-    int startOffset,
-    int endOffset,
-  ) {
-    return '- 位置：$chapterId ($startOffset-$endOffset)';
-  }
-
-  @override
-  String get readerAiReadingSuggestionHeading => '【建議怎麼讀】';
-
-  @override
-  String get readerAiNextStepHeading => '【下一步】';
-
-  @override
-  String get readerAiNextStepReadSnippet => '1) 先讀上面命中的片段。';
-
-  @override
-  String get readerAiNextStepAskFollowUp => '2) 用「為什麼/如何/例子」再追問一次，我會繼續按索引定位。';
-
-  @override
   String get ttsSystemDefault => '系統預設';
 
   @override
@@ -9848,15 +9743,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accentDeepOrange => '火焰橙';
-
-  @override
-  String get glassPresetClear => '清晰模式';
-
-  @override
-  String get glassPresetStandard => '標準模式';
-
-  @override
-  String get glassPresetDreamy => '朦朧模式';
 
   @override
   String get agreementV2HeroTitle => '把閱讀，留在自己的裝置裡。';

@@ -2,13 +2,8 @@
 // 技术要点：Flutter UI。
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'package:xxread/models/home_navigation_destination.dart';
 import 'package:xxread/utils/page_style_helper.dart';
-import 'package:xxread/utils/system_ui_helper.dart';
-
-import 'home_mobile_top_bar.dart';
 
 /// 通用背景包装器：给普通页面加统一首页背景。
 class HomeGenericPageWrapper extends StatelessWidget {
@@ -23,72 +18,6 @@ class HomeGenericPageWrapper extends StatelessWidget {
         gradient: PageStyleHelper.backgroundGradient(context),
       ),
       child: child,
-    );
-  }
-}
-
-/// 设置页专用包装器：负责系统栏样式和顶栏叠加。
-class HomeSettingsPageWrapper extends StatefulWidget {
-  final Widget child;
-  final String topBarTitle;
-
-  const HomeSettingsPageWrapper({
-    super.key,
-    required this.child,
-    required this.topBarTitle,
-  });
-
-  @override
-  State<HomeSettingsPageWrapper> createState() =>
-      _HomeSettingsPageWrapperState();
-}
-
-class _HomeSettingsPageWrapperState extends State<HomeSettingsPageWrapper> {
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _applySettingsPageSystemUI();
-  }
-
-  bool _shouldApplySystemUI() {
-    final route = ModalRoute.of(context);
-    return route?.isCurrent ?? true;
-  }
-
-  void _applySettingsPageSystemUI() {
-    if (!_shouldApplySystemUI()) {
-      return;
-    }
-
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-    final overlayStyle = SystemUiHelper.overlayStyleForBrightness(
-      Theme.of(context).brightness,
-    );
-    Future.microtask(() {
-      if (!mounted) return;
-      SystemChrome.setSystemUIOverlayStyle(overlayStyle);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _shouldApplySystemUI()) {
-        _applySettingsPageSystemUI();
-      }
-    });
-
-    return Stack(
-      children: [
-        widget.child,
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: HomeMobileTopBar(title: widget.topBarTitle),
-        ),
-      ],
     );
   }
 }

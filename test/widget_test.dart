@@ -13,7 +13,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart' as provider;
 
 import 'package:xxread/main.dart';
+import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/services/core/core_services.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/services/tts_service.dart';
 
 void main() {
@@ -24,6 +26,8 @@ void main() {
         providers: [
           provider.ChangeNotifierProvider(create: (_) => ThemeNotifier()),
           provider.ChangeNotifierProvider(create: (_) => AppSettingsNotifier()),
+          provider.ChangeNotifierProvider(create: (_) => ReplaceRuleService()),
+          provider.ChangeNotifierProvider(create: (_) => AiChatHistoryStore()),
           provider.ChangeNotifierProvider(create: (_) => TtsService()),
         ],
         child: const XxReadApp(),

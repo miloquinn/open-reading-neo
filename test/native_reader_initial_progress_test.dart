@@ -18,12 +18,22 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
 import 'package:xxread/services/books/book_dao.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory databaseDirectory;
+  late ReplaceRuleService replaceRuleService;
+
+  setUp(() {
+    replaceRuleService = ReplaceRuleService();
+  });
+
+  tearDown(() async {
+    await replaceRuleService.close();
+  });
 
   setUpAll(() async {
     sqfliteFfiInit();
@@ -64,6 +74,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'EPUB initial progress fixture',
                 filePath: epub.path,
@@ -142,6 +153,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'EPUB continuous progress fixture',
                 filePath: epub.path,
@@ -234,7 +246,12 @@ void main() {
 
       Future<PageController> openReader(Book book) async {
         navigatorKey.currentState!.push(
-          MaterialPageRoute<void>(builder: (_) => NativeReaderPage(book: book)),
+          MaterialPageRoute<void>(
+            builder: (_) => NativeReaderPage(
+              book: book,
+              replaceRuleService: replaceRuleService,
+            ),
+          ),
         );
         await tester.pump();
         await tester.runAsync(() async {

@@ -1,14 +1,22 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:xxread/services/reader/replace_rule_executor.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 
 void main() {
-  final service = ReplaceRuleService.instance;
+  late ReplaceRuleService service;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    service.resetForTesting();
+    service = ReplaceRuleService();
+  });
+
+  tearDown(() async {
+    service.dispose();
+    await service.close();
   });
 
   test('applies enabled regex rules in order and supports deletion', () {
@@ -190,14 +198,105 @@ void main() {
     ]);
     await service.saveAll(merged);
 
-    service.resetForTesting();
-    await service.load();
-    expect(service.rules, hasLength(2));
-    expect(service.rules.first.id, 'different-id');
-    expect(service.rules.first.replacement, 'clean');
-    expect(service.rules.first.order, 0);
-    expect(service.rules.last.order, 1);
+    final reloadedService = ReplaceRuleService();
+    await reloadedService.load();
+    expect(reloadedService.rules, hasLength(2));
+    expect(reloadedService.rules.first.id, 'different-id');
+    expect(reloadedService.rules.first.replacement, 'clean');
+    expect(reloadedService.rules.first.order, 0);
+    expect(reloadedService.rules.last.order, 1);
+    reloadedService.dispose();
+    await reloadedService.close();
   });
+
+  test('keeps state isolated between service instances', () async {
+    final otherService = ReplaceRuleService();
+    await service.load();
+    await otherService.load();
+
+    await service.saveAll(const [
+      ReplaceRule(
+        id: 'local',
+        name: 'local',
+        pattern: 'ad',
+        replacement: '',
+        isRegex: false,
+      ),
+    ]);
+
+    expect(service.rules.map((rule) => rule.id), ['local']);
+    expect(otherService.rules, isEmpty);
+    otherService.dispose();
+    await otherService.close();
+  });
+
+  test('closes an injected executor exactly once', () async {
+    final executor = _TrackingReplaceRuleExecutor();
+    final disposableService = ReplaceRuleService(executor: executor);
+
+    await disposableService.close();
+    await disposableService.close();
+
+    expect(executor.disposeCalls, 1);
+    expect(disposableService.load, throwsStateError);
+  });
+
+  testWidgets('provider disposal closes its owned service', (tester) async {
+    final executor = _TrackingReplaceRuleExecutor();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ReplaceRuleService>(
+        create: (_) => ReplaceRuleService(executor: executor),
+        child: Builder(
+          builder: (context) {
+            context.read<ReplaceRuleService>();
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(executor.disposeCalls, 1);
+  });
+
+  test(
+    'does not notify when an in-flight load finishes after dispose',
+    () async {
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      final loading = service.load();
+      service.dispose();
+      await loading;
+
+      expect(notifications, 0);
+    },
+  );
+
+  test(
+    'does not notify when an in-flight save finishes after dispose',
+    () async {
+      await service.load();
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      final saving = service.saveAll(const [
+        ReplaceRule(
+          id: 'pending',
+          name: 'pending',
+          pattern: 'ad',
+          replacement: '',
+          isRegex: false,
+        ),
+      ]);
+      service.dispose();
+      await saving;
+
+      expect(notifications, 0);
+    },
+  );
 
   test('rejects invalid regular expressions', () {
     expect(
@@ -266,4 +365,14 @@ void main() {
       contains('emptyOutput'),
     );
   });
+}
+
+class _TrackingReplaceRuleExecutor extends ReplaceRuleExecutor {
+  var disposeCalls = 0;
+
+  @override
+  Future<void> dispose() async {
+    disposeCalls++;
+    await super.dispose();
+  }
 }

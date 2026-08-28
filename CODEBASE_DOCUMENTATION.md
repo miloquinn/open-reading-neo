@@ -5,14 +5,14 @@
 
 ## 当前主链路
 
-开元阅读的核心阅读入口是 `NativeReaderService`，阅读页面是 `NativeReaderPage`。
+开元阅读的本地书籍入口是 `BookReaderLauncher`，文字阅读页面是 `NativeReaderPage`。
 书籍内容经本地解析后进入 Flutter 原生排版和分页流程。字号、行距、边距或视口变化会
 形成新的布局签名，并通过阅读锚点恢复位置。
 
 ```text
 首页 / 书库
     ↓
-NativeReaderService
+BookReaderLauncher
     ↓
 NativeReaderPage
     ├── 章节解析与懒加载
@@ -27,7 +27,7 @@ NativeReaderPage
 1. `lib/main.dart`：应用启动与全局服务初始化。
 2. `lib/pages/home/home_shell_page.dart`：主导航和页面装配。
 3. `lib/pages/library/library_page.dart`：本地书库与打开书籍入口。
-4. `lib/core/reader/native_reader_service.dart`：阅读路由边界。
+4. `lib/pages/reader/book_reader_launcher.dart`：阅读路由与页面编排边界。
 5. `lib/pages/reader/native/native_reader_page.dart`：原生阅读、分页和交互实现。
 6. `lib/core/reader/canonical_locator.dart`：稳定阅读定位模型。
 7. `lib/services/books/`：导入、数据库、图片、笔记与进度。
@@ -39,7 +39,7 @@ NativeReaderPage
 
 ### `lib/core/`
 
-放置跨页面共享的核心模型与阅读入口。阅读定位模型把内容位置和屏幕排版位置分开，避免
+放置跨页面共享的核心模型和纯阅读能力。阅读定位模型把内容位置和屏幕排版位置分开，避免
 字号、边距或设备变化后只能依赖旧页码。
 
 ### `lib/pages/`

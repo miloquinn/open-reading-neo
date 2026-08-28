@@ -15,6 +15,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
 import 'package:xxread/services/books/pagination_cache_dao.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
 void main() {
@@ -26,6 +27,7 @@ void main() {
   late PaginationCacheDao cacheDao;
   late File bookFile;
   late Book book;
+  late ReplaceRuleService replaceRuleService;
 
   setUpAll(() async {
     sqfliteFfiInit();
@@ -41,6 +43,7 @@ void main() {
   });
 
   setUp(() async {
+    replaceRuleService = ReplaceRuleService();
     fixtureDirectory = Directory.systemTemp.createTempSync(
       'open-reading-pagination-fixture-',
     );
@@ -73,6 +76,7 @@ void main() {
   });
 
   tearDown(() async {
+    await replaceRuleService.close();
     await database.close();
     fixtureDirectory.deleteSync(recursive: true);
   });
@@ -96,6 +100,7 @@ void main() {
       final firstMisses = <int>[];
       await _openReader(
         tester,
+        replaceRuleService: replaceRuleService,
         book: book,
         cacheDao: cacheDao,
         misses: firstMisses,
@@ -107,6 +112,7 @@ void main() {
       final secondMisses = <int>[];
       await _openReader(
         tester,
+        replaceRuleService: replaceRuleService,
         book: book,
         cacheDao: cacheDao,
         misses: secondMisses,
@@ -122,6 +128,7 @@ void main() {
       final changedLayoutMisses = <int>[];
       await _openReader(
         tester,
+        replaceRuleService: replaceRuleService,
         book: book,
         cacheDao: cacheDao,
         misses: changedLayoutMisses,
@@ -138,6 +145,7 @@ void main() {
       final corruptPayloadMisses = <int>[];
       await _openReader(
         tester,
+        replaceRuleService: replaceRuleService,
         book: book,
         cacheDao: cacheDao,
         misses: corruptPayloadMisses,
@@ -169,6 +177,7 @@ void main() {
     final firstMisses = <int>[];
     await _openReader(
       tester,
+      replaceRuleService: replaceRuleService,
       book: epubBook,
       cacheDao: cacheDao,
       misses: firstMisses,
@@ -180,6 +189,7 @@ void main() {
     final secondMisses = <int>[];
     await _openReader(
       tester,
+      replaceRuleService: replaceRuleService,
       book: epubBook,
       cacheDao: cacheDao,
       misses: secondMisses,
@@ -193,6 +203,7 @@ void main() {
 
 Future<void> _openReader(
   WidgetTester tester, {
+  required ReplaceRuleService replaceRuleService,
   required Book book,
   required PaginationCacheDao cacheDao,
   required List<int> misses,
@@ -203,6 +214,7 @@ Future<void> _openReader(
       supportedLocales: AppLocalizations.supportedLocales,
       home: NativeReaderPage(
         book: book,
+        replaceRuleService: replaceRuleService,
         paginationCacheDao: cacheDao,
         usePaginationMemoryCache: false,
         onPaginationCacheMiss: misses.add,

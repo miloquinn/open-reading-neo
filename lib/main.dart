@@ -17,9 +17,9 @@ import 'book_sources/services/book_source_client.dart';
 import 'book_sources/services/book_source_registry.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
 import 'book_sources/source_engine/source_interaction_coordinator.dart';
-import 'core/reader/native_reader_service.dart';
 import 'models/book.dart';
 import 'pages/home/home_shell_page.dart';
+import 'pages/reader/book_reader_launcher.dart';
 import 'pages/library/import_book/import_book_page.dart';
 import 'pages/legal/user_agreement_page.dart';
 import 'pages/reader/book_source/book_source_reader_page.dart';
@@ -27,7 +27,9 @@ import 'pages/reader/book_source/online_comic_reader_page.dart';
 import 'pages/book_sources/source_verification_page.dart';
 import 'services/books/book_services.dart';
 import 'services/books/book_format_support.dart';
+import 'services/ai/ai_chat_history_store.dart';
 import 'services/reading/reading_resume_service.dart';
+import 'services/reader/replace_rule_service.dart';
 import 'services/core/app_update_download_service.dart';
 import 'services/core/background_download_notifier.dart';
 import 'services/core/core_services.dart';
@@ -98,6 +100,10 @@ void main(List<String> arguments) async {
         providers: [
           provider.ChangeNotifierProvider(create: (_) => ThemeNotifier()),
           provider.ChangeNotifierProvider(create: (_) => AppSettingsNotifier()),
+          provider.ChangeNotifierProvider(
+            create: (_) => ReplaceRuleService()..load(),
+          ),
+          provider.ChangeNotifierProvider(create: (_) => AiChatHistoryStore()),
           provider.ChangeNotifierProvider(create: (_) => TtsService()),
           provider.ChangeNotifierProxyProvider<TtsService, ReaderAloudService>(
             create: (context) => ReaderAloudService(
@@ -302,11 +308,7 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     }
     // Wait for repair and successful route insertion, but do not hold the
     // incoming-request FIFO until the reader is closed.
-    await NativeReaderService.openBook(
-      context,
-      book,
-      waitForReaderClose: false,
-    );
+    await BookReaderLauncher.openBook(context, book, waitForReaderClose: false);
   }
 
   Future<void> _openIncomingImportQueue(List<BookImportSource> sources) async {
@@ -493,7 +495,7 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     if (book == null || !mounted || _navigatorKey.currentContext == null) {
       return;
     }
-    await NativeReaderService.openBook(_navigatorKey.currentContext!, book);
+    await BookReaderLauncher.openBook(_navigatorKey.currentContext!, book);
   }
 
   /// 启动后自动回到上次阅读。
@@ -545,6 +547,10 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
               : BookSourceReaderPage(
                   source: binding.source,
                   book: binding.book,
+                  replaceRuleService: provider.Provider.of<ReplaceRuleService>(
+                    context,
+                    listen: false,
+                  ),
                   client: client,
                   shelfService: shelfService,
                 );
@@ -559,7 +565,7 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
           rethrow;
         }
       } else {
-        await NativeReaderService.openBook(context, book);
+        await BookReaderLauncher.openBook(context, book);
       }
     } catch (error) {
       // 自动恢复失败不打扰用户，停留首页即可。
@@ -651,6 +657,10 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     // 已同意协议，显示主页面
     return UpdateCheckGate(
       child: HomeShellPage(
+        aiChatHistoryStore: provider.Provider.of<AiChatHistoryStore>(
+          context,
+          listen: false,
+        ),
         showFirstHomeSupport: _showFirstHomeSupportAfterAgreement,
       ),
     );

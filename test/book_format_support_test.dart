@@ -30,6 +30,25 @@ void main() {
     expect(BookFormatRegistry.targetsUnifiedTextLayout('cbz'), isFalse);
   });
 
+  test('阅读器入口由格式注册表统一路由', () {
+    expect(
+      BookFormatRegistry.readerDestinationFor('epub'),
+      BookReaderDestination.text,
+    );
+    expect(
+      BookFormatRegistry.readerDestinationFor('pdf'),
+      BookReaderDestination.pdf,
+    );
+    expect(
+      BookFormatRegistry.readerDestinationFor('cb7'),
+      BookReaderDestination.comic,
+    );
+    expect(
+      BookFormatRegistry.readerDestinationFor('doc'),
+      BookReaderDestination.unsupported,
+    );
+  });
+
   test('当前已具备正文阅读管线的格式', () {
     expect(BookFormatRegistry.hasReadableTextPipeline('txt'), isTrue);
     expect(BookFormatRegistry.hasReadableTextPipeline('epub'), isTrue);

@@ -2,7 +2,7 @@
 // 技术要点：pdfx PdfDocument 打开文档；页渲染严格串行（Android 平台
 // 不允许并行渲染，见 pdfx PdfPage.close 文档）；按屏幕像素密度选择
 // 渲染分辨率，LRU 页缓存；UI 骨架复用 paged_image_reader.dart；
-// 进度写回 currentPage。pdfx 无 Linux 实现，入口在 NativeReaderService 拦截。
+// 进度写回 currentPage。pdfx 无 Linux 实现，入口在 BookReaderLauncher 拦截。
 // 格式能力矩阵见 docs/book-format-support.md
 
 import 'dart:async';
@@ -32,7 +32,7 @@ class PdfReaderPage extends StatefulWidget {
   final Book book;
   final ReaderThemePalette initialTheme;
 
-  /// 与 [NativeReaderService.openBook] 相同的封面展开转场入口。
+  /// 与 [BookReaderLauncher.openBook] 相同的封面展开转场入口。
   static Future<void> open(
     BuildContext context,
     Book book, {

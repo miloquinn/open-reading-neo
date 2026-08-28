@@ -175,12 +175,11 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
                   content,
                   fallbackTitle: _sourceChapterTitle(index),
                 );
-          _readableChapterText[index] = await ReplaceRuleService.instance
-              .applyAsync(
-                readable,
-                bookTitle: widget.book.title,
-                sourceName: widget.source.name,
-              );
+          _readableChapterText[index] = await _replaceRules.applyAsync(
+            readable,
+            bookTitle: widget.book.title,
+            sourceName: widget.source.name,
+          );
           while (_readableChapterText.length >
               _bookSourceReadableChapterTextLimit) {
             _readableChapterText.remove(_readableChapterText.keys.first);

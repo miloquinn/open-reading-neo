@@ -32,12 +32,13 @@ void main() {
   const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
   late Directory temporaryDirectory;
   late File bookFile;
+  late ReplaceRuleService replaceRuleService;
 
   setUp(() {
+    replaceRuleService = ReplaceRuleService();
     SharedPreferences.setMockInitialValues({
       ReaderSettingsStore.pageModeKey: ReaderPageMode.instantPage.name,
     });
-    ReplaceRuleService.instance.resetForTesting();
     temporaryDirectory = Directory.systemTemp.createTempSync(
       'open-reading-txt-title-page-',
     );
@@ -64,7 +65,8 @@ void main() {
     );
   });
 
-  tearDown(() {
+  tearDown(() async {
+    await replaceRuleService.close();
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(fullscreenChannel, null);
@@ -106,7 +108,8 @@ void main() {
         }
       ]''',
     });
-    ReplaceRuleService.instance.resetForTesting();
+    await replaceRuleService.close();
+    replaceRuleService = ReplaceRuleService();
     await tester.binding.setSurfaceSize(const Size(400, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -115,6 +118,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: NativeReaderPage(
+          replaceRuleService: replaceRuleService,
           book: Book(
             title: '测试书',
             filePath: bookFile.path,
@@ -149,6 +153,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: NativeReaderPage(
+          replaceRuleService: replaceRuleService,
           book: Book(
             title: '测试书',
             filePath: bookFile.path,
@@ -204,6 +209,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: NativeReaderPage(
+          replaceRuleService: replaceRuleService,
           initialTheme: ReaderThemes.night,
           book: Book(
             title: 'Broken EPUB',
@@ -259,6 +265,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: NativeReaderPage(
+          replaceRuleService: replaceRuleService,
           book: Book(
             title: '测试书',
             filePath: bookFile.path,
@@ -313,6 +320,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: NativeReaderPage(
+          replaceRuleService: replaceRuleService,
           initialTheme: ReaderThemes.pureBlack,
           book: Book(
             title: 'Dark opening',
@@ -378,6 +386,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: 'Font restoration',
               filePath: bookFile.path,
@@ -436,6 +445,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: 'Vertical title test',
               filePath: bookFile.path,
@@ -504,6 +514,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: '目录远跳测试',
               filePath: bookFile.path,
@@ -636,6 +647,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: 'TXT 水平分页回归',
               filePath: bookFile.path,
@@ -752,6 +764,7 @@ void main() {
     navigatorKey.currentState!.push<void>(
       BookOpenTransition.createRoute<void>(
         NativeReaderPage(
+          replaceRuleService: replaceRuleService,
           book: Book(
             title: 'Transition test',
             filePath: bookFile.path,

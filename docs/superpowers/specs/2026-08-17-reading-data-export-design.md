@@ -50,7 +50,7 @@
 - `BookExportService` 的领域语义是“书籍文件副本”，不应扩展为阅读数据导出服务。
 - Android 现有后端可直接将文件写入 Downloads；iOS 已能通过系统文档导出；Windows、macOS、Linux 使用保存文件选择器。阅读数据后端可沿用这些平台能力，但 Android 不会弹出系统分享面板。
 - Web 后端当前返回 unsupported，首版继续明确标注不支持。
-- `formatBookNoteShareText(...)` 只生成单条纯文本，当前没有接入导出流程，也不是 Markdown 导出实现；项目也没有已接线的系统文件分享插件。
+- 旧的单条笔记纯文本 formatter 从未接入导出流程，现已删除；Markdown/CSV 导出应直接建立在版本化导出 DTO 上。项目仍没有已接线的系统文件分享插件。
 - 系统 Open With / Share to App 的入站扩展目前只接收 TXT、EPUB，这与本功能的出站保存无直接关系；未来增加“分享导出文件”时需要单独实现出站 URI 和临时文件生命周期，不能复用入站扩展。
 - iOS Share Extension 是否实际进入发行 Archive 仍需发布产物验证，但不阻塞 P0 的系统文档保存能力。
 

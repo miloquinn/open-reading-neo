@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_transitions.dart';
@@ -68,6 +70,7 @@ class SourcedBookActions {
         : BookSourceReaderPage(
             source: result.source,
             book: result.book,
+            replaceRuleService: context.read<ReplaceRuleService>(),
             client: client,
             shelfService: shelfService,
           );

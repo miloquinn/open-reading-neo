@@ -3,49 +3,26 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:xxread/models/book.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/pages/reader/comic/comic_reader_page.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
 import 'package:xxread/pages/reader/pdf/pdf_reader_page.dart';
+import 'package:xxread/services/books/book_format_support.dart';
 import 'package:xxread/services/books/book_storage_repair_service.dart';
 import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_transitions.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
-class NativeReaderService {
-  NativeReaderService._();
-
-  static const _supportedFormats = <String>{
-    'epub',
-    'txt',
-    'html',
-    'htm',
-    'xhtml',
-    'md',
-    'markdown',
-    'fb2',
-    'rtf',
-    'docx',
-  };
-
-  /// kindle_unpack 依赖 dart:io，Web 端只有安全桩，不放行。
-  static const _kindleFormats = <String>{'mobi', 'azw', 'azw3'};
-
-  /// 漫画容器统一进 ComicReaderPage；真实容器在打开时按文件头识别，
-  /// 真 RAR/7z 由阅读页展示本地化的「转 CBZ」提示。
-  static const _comicFormats = <String>{'cbz', 'cbt', 'cbr', 'cb7'};
-
-  static bool _canOpenFormat(String format) {
-    if (_supportedFormats.contains(format)) return true;
-    if (!kIsWeb && _kindleFormats.contains(format)) return true;
-    return false;
-  }
+class BookReaderLauncher {
+  BookReaderLauncher._();
 
   static Future<void> openBook(
     BuildContext context,
@@ -98,7 +75,9 @@ class NativeReaderService {
       return;
     }
     final format = repaired.format.toLowerCase();
-    if (_comicFormats.contains(format)) {
+    final formatSpec = BookFormatRegistry.specForExtension(format);
+    final destination = BookFormatRegistry.readerDestinationFor(format);
+    if (destination == BookReaderDestination.comic) {
       final resolvedInitialTheme = await initialThemeFuture;
       if (!context.mounted) return;
       await ComicReaderPage.open(
@@ -112,7 +91,7 @@ class NativeReaderService {
       );
       return;
     }
-    if (format == 'pdf') {
+    if (destination == BookReaderDestination.pdf) {
       if (!context.mounted) return;
       // pdfx 没有 Linux 实现（Android/iOS/macOS/Windows/Web 可用）。
       if (!kIsWeb && Platform.isLinux) {
@@ -136,7 +115,9 @@ class NativeReaderService {
       );
       return;
     }
-    if (!_canOpenFormat(format)) {
+    // kindle_unpack depends on dart:io; Web only has the safe parser stub.
+    if (destination != BookReaderDestination.text ||
+        (kIsWeb && formatSpec?.id == 'kindle')) {
       if (context.mounted) {
         showSideToast(
           context,
@@ -153,7 +134,11 @@ class NativeReaderService {
     final resolvedInitialTheme = await initialThemeFuture;
     if (!context.mounted) return;
     final route = BookOpenTransition.createRoute<void>(
-      NativeReaderPage(book: repaired, initialTheme: resolvedInitialTheme),
+      NativeReaderPage(
+        book: repaired,
+        replaceRuleService: context.read<ReplaceRuleService>(),
+        initialTheme: resolvedInitialTheme,
+      ),
       animation: animation,
       libraryAnimation: libraryAnimation,
       animationPace: animationPace,

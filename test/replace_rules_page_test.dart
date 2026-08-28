@@ -6,13 +6,16 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/settings/replace_rules_page.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 
+late ReplaceRuleService _service;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    ReplaceRuleService.instance.resetForTesting();
+    _service = ReplaceRuleService();
   });
+  tearDown(() => _service.close());
 
   testWidgets(
     'rule editor keeps its handle and actions inside the usable screen',
@@ -24,11 +27,11 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        const MaterialApp(
-          locale: Locale('zh'),
+        MaterialApp(
+          locale: const Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: ReplaceRulesPage(),
+          home: ReplaceRulesPage(service: _service),
         ),
       );
       await tester.pumpAndSettle();
@@ -63,11 +66,11 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        locale: Locale('zh'),
+      MaterialApp(
+        locale: const Locale('zh'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: ReplaceRulesPage(),
+        home: ReplaceRulesPage(service: _service),
       ),
     );
     await tester.pumpAndSettle();
@@ -89,5 +92,38 @@ void main() {
     expect(find.text('导入规则'), findsOneWidget);
     expect(find.text('导出规则'), findsOneWidget);
     expect(find.byType(BackdropFilter), findsWidgets);
+  });
+
+  testWidgets('deletes rules from the injected service instance', (
+    tester,
+  ) async {
+    await _service.saveAll(const [
+      ReplaceRule(
+        id: 'injected-rule',
+        name: 'Injected rule',
+        pattern: 'ad',
+        replacement: '',
+        isRegex: false,
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ReplaceRulesPage(service: _service),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('injected-rule')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('replace-rule-editor-delete')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '删除'));
+    await tester.pumpAndSettle();
+
+    expect(_service.rules, isEmpty);
+    expect(find.byKey(const ValueKey('injected-rule')), findsNothing);
   });
 }

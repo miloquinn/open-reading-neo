@@ -93,7 +93,7 @@ bytes → 编码探测 → 章节规则切章 → NativeTextPaginator → 阅读
 - **导入**：`_extractMobiMetadata` 走 `parseKindleMetadata`，取 EXTH 真实书名/作者/简介/语言/ISBN/主题与内嵌封面；DRM 只影响正文，元数据/封面仍可用。Kindle 文件全量读取（EXTH 封面在文件尾部，禁止 10MB 截断）。
 - **阅读**：`native_reader_page` 的 `_parseKindleChapters`（compute isolate）→ KF8 skeleton 分段成章 / MOBI7 按 `<mbp:pagebreak>` 切章 → `recindex`/`kindle:embed` 图片引用重写（`rewriteKindleImageRefs`）→ 与 EPUB 共用 `_chapterMapFromHtmlDocument`（样式块 + 内嵌图片）→ 统一分页。
 - **DRM**：抛 `KindleDrmException` → 阅读器展示本地化提示（`readerKindleDrmProtected`）。
-- **Web**：`kindle_unpack` 依赖 dart:io，Web 端为安全桩，`NativeReaderService` 不放行。
+- **Web**：`kindle_unpack` 依赖 dart:io，Web 端为安全桩，`BookReaderLauncher` 不放行。
 - 解析器文件：`kindle_book_parser{,_types,_io,_stub}.dart`。
 
 ### 3.4 ZIP / RAR（容器，必须支持）

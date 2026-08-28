@@ -7,9 +7,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:provider/provider.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
-import 'package:xxread/core/reader/native_reader_service.dart';
+import 'package:xxread/pages/reader/book_reader_launcher.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
@@ -17,6 +18,7 @@ import 'package:xxread/pages/reading_stats/detailed_stats_page.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/library/library_event_bus_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
@@ -119,6 +121,7 @@ class HomeMobileDashboardPage extends StatefulWidget {
     required Book book,
     required BookSourceClient client,
     required BookSourceShelfService shelfService,
+    required ReplaceRuleService replaceRuleService,
     ReaderThemePalette? initialTheme,
   }) {
     final binding = shelfService.bindingFrom(book);
@@ -134,6 +137,7 @@ class HomeMobileDashboardPage extends StatefulWidget {
     return BookSourceReaderPage(
       source: binding.source,
       book: binding.book,
+      replaceRuleService: replaceRuleService,
       client: client,
       shelfService: shelfService,
       initialTheme: initialTheme,
@@ -354,6 +358,7 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
             book: fullBook,
             client: _sourceClient,
             shelfService: _sourceShelfService,
+            replaceRuleService: context.read<ReplaceRuleService>(),
             initialTheme: initialTheme,
           );
           final route = BookOpenTransition.createRoute<void>(
@@ -374,7 +379,7 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
           }
         }
       } else {
-        await NativeReaderService.openBook(
+        await BookReaderLauncher.openBook(
           context,
           fullBook,
           initialTheme: initialTheme,

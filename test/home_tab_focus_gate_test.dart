@@ -10,6 +10,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/home_navigation_destination.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/home/widgets/home_page_wrappers.dart';
+import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/utils/ui_style.dart';
 
@@ -62,6 +63,8 @@ void main() {
   });
 
   testWidgets('首页壳层为每个 tab 装配焦点闸门且仅当前 tab 可聚焦', (tester) async {
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.binding.setSurfaceSize(const Size(412, 915));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -81,12 +84,12 @@ void main() {
               UiStyleThemeExtension(style: AppUiStyle.material3),
             ],
           ),
-          home: const MediaQuery(
-            data: MediaQueryData(
+          home: MediaQuery(
+            data: const MediaQueryData(
               size: Size(412, 915),
               viewPadding: EdgeInsets.only(top: 24, bottom: 24),
             ),
-            child: HomeShellPage(),
+            child: HomeShellPage(aiChatHistoryStore: historyStore),
           ),
         ),
       ),

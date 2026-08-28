@@ -31,7 +31,7 @@ extension _BookSourceReaderPaginationRendering on _BookSourceReaderPageState {
       extra:
           '${_readerSafeArea.paginationSignature}:'
           '${_readerFontProfile.cacheSignature}:'
-          '${ReplaceRuleService.instance.rulesSignature}',
+          '${_replaceRules.rulesSignature}',
     ).cacheKey('book-source-line-v6');
     final cached = _pagedLayouts[chapterIndex];
     if (cached?.fingerprint == key) return cached!;

@@ -1415,9 +1415,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noteTypeNote => '笔记';
 
   @override
-  String get noteTypeUnknown => '未知';
-
-  @override
   String get bookFormatTXT => 'TXT';
 
   @override
@@ -1850,13 +1847,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeTodayGlance => '今日速览';
 
   @override
-  String get homeTodayReadingPlan => '今日阅读计划';
-
-  @override
   String get homeViewAll => '查看全部';
-
-  @override
-  String get homeSyncingReadingPlan => '正在同步你的阅读计划';
 
   @override
   String get homeGoalDoneSuggestReview => '今日目标已完成，建议做一次阅读复盘';
@@ -4359,80 +4350,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookUntitled => '未命名';
-
-  @override
-  String get homePlanTaskCompleteDailyGoal => '完成今日目标';
-
-  @override
-  String homePlanTaskReadMinutes(int minutes) {
-    return '阅读 $minutes 分钟';
-  }
-
-  @override
-  String get homePlanTaskCompleteFocusReading => '完成专注阅读';
-
-  @override
-  String homePlanTaskFocusSession(int minutes) {
-    return '至少 1 次 $minutes 分钟专注会话';
-  }
-
-  @override
-  String get homePlanTaskKeepRhythm => '保持节奏';
-
-  @override
-  String get homePlanTaskWeekAchievedDays => '本周达标天数 ≥ 5 天';
-
-  @override
-  String get noteColorLightBlue => '浅蓝色';
-
-  @override
-  String get noteColorRed => '红色';
-
-  @override
-  String get noteColorGreen => '绿色';
-
-  @override
-  String get noteColorPurple => '紫色';
-
-  @override
-  String get noteColorGold => '金色';
-
-  @override
-  String get noteColorOrange => '橙色';
-
-  @override
-  String get noteColorYellow => '黄色';
-
-  @override
-  String get noteColorDarkGreen => '深绿色';
-
-  @override
-  String get noteColorCustom => '自定义';
-
-  @override
-  String noteShareBookHeader(String title, String author) {
-    return '📖 《$title》- $author';
-  }
-
-  @override
-  String noteShareNoteLabel(String note) {
-    return '💭 笔记：$note';
-  }
-
-  @override
-  String noteShareChapterLabel(String chapter) {
-    return '📍 $chapter';
-  }
-
-  @override
-  String noteSharePageLabel(int page) {
-    return '📄 第$page页';
-  }
-
-  @override
-  String noteShareHashtags(String type) {
-    return '#读书笔记 #$type';
-  }
 
   @override
   String get accentPurple => '优雅紫';
@@ -6960,9 +6877,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get noteTypeNote => '筆記';
 
   @override
-  String get noteTypeUnknown => '未知';
-
-  @override
   String get bookFormatTXT => 'TXT';
 
   @override
@@ -7395,13 +7309,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get homeTodayGlance => '今日速覽';
 
   @override
-  String get homeTodayReadingPlan => '今日閱讀計畫';
-
-  @override
   String get homeViewAll => '檢視全部';
-
-  @override
-  String get homeSyncingReadingPlan => '正在同步你的閱讀計畫';
 
   @override
   String get homeGoalDoneSuggestReview => '今日目標已完成，建議做一次閱讀回顧';
@@ -9904,80 +9812,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get bookUntitled => '未命名';
-
-  @override
-  String get homePlanTaskCompleteDailyGoal => '完成今日目標';
-
-  @override
-  String homePlanTaskReadMinutes(int minutes) {
-    return '閱讀 $minutes 分鐘';
-  }
-
-  @override
-  String get homePlanTaskCompleteFocusReading => '完成專注閱讀';
-
-  @override
-  String homePlanTaskFocusSession(int minutes) {
-    return '至少 1 次 $minutes 分鐘專注工作階段';
-  }
-
-  @override
-  String get homePlanTaskKeepRhythm => '保持節奏';
-
-  @override
-  String get homePlanTaskWeekAchievedDays => '本週達標天數 ≥ 5 天';
-
-  @override
-  String get noteColorLightBlue => '淺藍色';
-
-  @override
-  String get noteColorRed => '紅色';
-
-  @override
-  String get noteColorGreen => '綠色';
-
-  @override
-  String get noteColorPurple => '紫色';
-
-  @override
-  String get noteColorGold => '金色';
-
-  @override
-  String get noteColorOrange => '橙色';
-
-  @override
-  String get noteColorYellow => '黃色';
-
-  @override
-  String get noteColorDarkGreen => '深綠色';
-
-  @override
-  String get noteColorCustom => '自訂';
-
-  @override
-  String noteShareBookHeader(String title, String author) {
-    return '📖 《$title》- $author';
-  }
-
-  @override
-  String noteShareNoteLabel(String note) {
-    return '💭 筆記：$note';
-  }
-
-  @override
-  String noteShareChapterLabel(String chapter) {
-    return '📍 $chapter';
-  }
-
-  @override
-  String noteSharePageLabel(int page) {
-    return '📄 第$page頁';
-  }
-
-  @override
-  String noteShareHashtags(String type) {
-    return '#讀書筆記 #$type';
-  }
 
   @override
   String get accentPurple => '優雅紫';

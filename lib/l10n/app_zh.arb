@@ -972,10 +972,6 @@
   "@noteTypeNote": {
     "description": "笔记类型"
   },
-  "noteTypeUnknown": "未知",
-  "@noteTypeUnknown": {
-    "description": "未知类型"
-  },
   "bookFormatTXT": "TXT",
   "@bookFormatTXT": {
     "description": "TXT书籍格式"
@@ -1399,9 +1395,7 @@
   "homeDailyReadingGoal": "每日阅读目标",
   "homeAiAdviceSection": "AI 阅读建议",
   "homeTodayGlance": "今日速览",
-  "homeTodayReadingPlan": "今日阅读计划",
   "homeViewAll": "查看全部",
-  "homeSyncingReadingPlan": "正在同步你的阅读计划",
   "homeGoalDoneSuggestReview": "今日目标已完成，建议做一次阅读复盘",
   "homeRemainingToGoal": "还差 {minutes} 分钟即可完成今日目标",
   "homePickBookHint": "从书架选一本想继续的书，先完成 1 个专注番茄。",
@@ -2258,62 +2252,6 @@
   "importUnknownTitle": "未知标题",
   "importUnknownAuthor": "未知作者",
   "bookUntitled": "未命名",
-  "homePlanTaskCompleteDailyGoal": "完成今日目标",
-  "homePlanTaskReadMinutes": "阅读 {minutes} 分钟",
-  "@homePlanTaskReadMinutes": {
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskCompleteFocusReading": "完成专注阅读",
-  "homePlanTaskFocusSession": "至少 1 次 {minutes} 分钟专注会话",
-  "@homePlanTaskFocusSession": {
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskKeepRhythm": "保持节奏",
-  "homePlanTaskWeekAchievedDays": "本周达标天数 ≥ 5 天",
-  "noteColorLightBlue": "浅蓝色",
-  "noteColorRed": "红色",
-  "noteColorGreen": "绿色",
-  "noteColorPurple": "紫色",
-  "noteColorGold": "金色",
-  "noteColorOrange": "橙色",
-  "noteColorYellow": "黄色",
-  "noteColorDarkGreen": "深绿色",
-  "noteColorCustom": "自定义",
-  "noteShareBookHeader": "📖 《{title}》- {author}",
-  "@noteShareBookHeader": {
-    "placeholders": {
-        "title": {"type": "String"},
-        "author": {"type": "String"}
-    }
-  },
-  "noteShareNoteLabel": "💭 笔记：{note}",
-  "@noteShareNoteLabel": {
-    "placeholders": {
-        "note": {"type": "String"}
-    }
-  },
-  "noteShareChapterLabel": "📍 {chapter}",
-  "@noteShareChapterLabel": {
-    "placeholders": {
-        "chapter": {"type": "String"}
-    }
-  },
-  "noteSharePageLabel": "📄 第{page}页",
-  "@noteSharePageLabel": {
-    "placeholders": {
-        "page": {"type": "int"}
-    }
-  },
-  "noteShareHashtags": "#读书笔记 #{type}",
-  "@noteShareHashtags": {
-    "placeholders": {
-        "type": {"type": "String"}
-    }
-  },
   "accentPurple": "优雅紫",
   "accentPink": "樱花粉",
   "accentCyan": "清新青",

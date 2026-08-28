@@ -14,10 +14,16 @@ import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 
+late ReplaceRuleService _replaceRules;
+
 void main() {
+  setUp(() => _replaceRules = ReplaceRuleService());
+  tearDown(() => _replaceRules.close());
+
   testWidgets('opens a source chapter in horizontal slide mode', (
     tester,
   ) async {
@@ -524,6 +530,7 @@ Widget _testApp({
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    replaceRuleService: _replaceRules,
     source: RegisteredBookSource(
       id: 'page-mode-source',
       name: '测试书源',

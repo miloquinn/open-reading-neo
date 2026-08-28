@@ -28,15 +28,18 @@ import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 import 'package:xxread/widgets/reader_top_information_bar.dart';
 
+late ReplaceRuleService _replaceRules;
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    ReplaceRuleService.instance.resetForTesting();
+    _replaceRules = ReplaceRuleService();
     GlassEffectConfig.setDisableAllGlassEffects(false);
   });
 
-  tearDown(() {
+  tearDown(() async {
     GlassEffectConfig.setDisableAllGlassEffects(false);
+    await _replaceRules.close();
   });
 
   testWidgets(
@@ -50,6 +53,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
               id: 'book-1',
@@ -89,6 +93,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -124,6 +129,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
               id: 'book-1',
@@ -175,6 +181,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -207,6 +214,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -287,7 +295,12 @@ void main() {
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: BookSourceReaderPage(source: source, book: book, client: client),
+        home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
+          source: source,
+          book: book,
+          client: client,
+        ),
       ),
     );
     await _pumpUntilFound(tester, find.text('第一章'));
@@ -348,7 +361,6 @@ void main() {
         }
       ]''',
     });
-    ReplaceRuleService.instance.resetForTesting();
     final client = _ReplacementBookSourceClient();
 
     await tester.pumpWidget(
@@ -356,6 +368,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -407,6 +420,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: source,
           book: book,
           client: client,
@@ -442,6 +456,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: source,
           book: book,
           client: _FakeBookSourceClient(),
@@ -515,6 +530,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
               id: 'book-1',
@@ -563,6 +579,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -603,6 +620,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
               id: 'book-1',
@@ -660,6 +678,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
                 id: 'book-1',
@@ -962,6 +981,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
                 id: 'book-1',
@@ -1087,6 +1107,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
                 id: 'book-1',
@@ -1358,6 +1379,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -1395,6 +1417,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
             id: 'book-1',
@@ -1438,6 +1461,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
               id: 'book-1',
@@ -1512,6 +1536,7 @@ Widget _buildTabletSourceReader(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    replaceRuleService: _replaceRules,
     source: _testSource(),
     book: const BookSourceBook(
       id: 'book-1',

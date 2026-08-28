@@ -1478,9 +1478,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteTypeNote => 'Note';
 
   @override
-  String get noteTypeUnknown => 'Unknown';
-
-  @override
   String get bookFormatTXT => 'TXT';
 
   @override
@@ -1929,13 +1926,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeTodayGlance => 'Today at a Glance';
 
   @override
-  String get homeTodayReadingPlan => 'Today\'s Reading Plan';
-
-  @override
   String get homeViewAll => 'View All';
-
-  @override
-  String get homeSyncingReadingPlan => 'Syncing your reading plan';
 
   @override
   String get homeGoalDoneSuggestReview =>
@@ -4588,80 +4579,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookUntitled => 'Untitled';
-
-  @override
-  String get homePlanTaskCompleteDailyGoal => 'Complete today\'s goal';
-
-  @override
-  String homePlanTaskReadMinutes(int minutes) {
-    return 'Read $minutes minutes';
-  }
-
-  @override
-  String get homePlanTaskCompleteFocusReading => 'Complete focus reading';
-
-  @override
-  String homePlanTaskFocusSession(int minutes) {
-    return 'At least 1 focus session of $minutes minutes';
-  }
-
-  @override
-  String get homePlanTaskKeepRhythm => 'Keep the rhythm';
-
-  @override
-  String get homePlanTaskWeekAchievedDays => 'Weekly achieved days ≥ 5';
-
-  @override
-  String get noteColorLightBlue => 'Light Blue';
-
-  @override
-  String get noteColorRed => 'Red';
-
-  @override
-  String get noteColorGreen => 'Green';
-
-  @override
-  String get noteColorPurple => 'Purple';
-
-  @override
-  String get noteColorGold => 'Gold';
-
-  @override
-  String get noteColorOrange => 'Orange';
-
-  @override
-  String get noteColorYellow => 'Yellow';
-
-  @override
-  String get noteColorDarkGreen => 'Dark Green';
-
-  @override
-  String get noteColorCustom => 'Custom';
-
-  @override
-  String noteShareBookHeader(String title, String author) {
-    return '📖 《$title》 - $author';
-  }
-
-  @override
-  String noteShareNoteLabel(String note) {
-    return '💭 Note: $note';
-  }
-
-  @override
-  String noteShareChapterLabel(String chapter) {
-    return '📍 $chapter';
-  }
-
-  @override
-  String noteSharePageLabel(int page) {
-    return '📄 Page $page';
-  }
-
-  @override
-  String noteShareHashtags(String type) {
-    return '#BookNotes #$type';
-  }
 
   @override
   String get accentPurple => 'Elegant Purple';

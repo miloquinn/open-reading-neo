@@ -8,9 +8,15 @@ import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
+late ReplaceRuleService _replaceRules;
+
 void main() {
+  setUp(() => _replaceRules = ReplaceRuleService());
+  tearDown(() => _replaceRules.close());
+
   testWidgets('previous-chapter slide preview exposes the whole chapter', (
     tester,
   ) async {
@@ -116,6 +122,7 @@ Widget _buildReader(_AdjacentPreviewClient client) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    replaceRuleService: _replaceRules,
     source: RegisteredBookSource(
       id: 'preview-source',
       name: 'Preview source',

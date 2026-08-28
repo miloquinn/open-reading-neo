@@ -37,8 +37,8 @@ Both readers ultimately share two rendering substrates:
 **PagedImageReader (shared skeleton):** `PageView.builder` + `InteractiveViewer` zoom (double-tap/pinch; zooming disables swiping via `_zoomed`), volume-key paging, RTL tap-zone mirroring, per-book direction/background persistence, jump dialog, progress slider. See constructor 28-58, state 64-88, preload + `onPageChanged` 121-133, paging 156-208, build 363-399, zoom 701-793.
 
 ### 1.5 Linux unsupported logic (pdfx has no Linux implementation)
-- `lib/core/reader/native_reader_service.dart` `NativeReaderService.openBook` (50): in the `if (format == 'pdf')` dispatch (115): `if (!kIsWeb && Platform.isLinux)` -> `showSideToast(..., context.l10n.readerPdfLinuxUnsupported, kind: SideToastKind.warning)` and **returns without opening** (116-125); otherwise `PdfReaderPage.open(context, repaired, ...)` (126-137).
-- Header docs: `pdf_reader_page.dart` line 5; `native_reader_service.dart` line 117; `lib/services/books/book_format_support.dart` lines 112-120.
+- `lib/pages/reader/book_reader_launcher.dart` 的 `BookReaderLauncher.openBook` 根据 `BookFormatRegistry` 路由格式；PDF 在 Linux 上展示 `readerPdfLinuxUnsupported` 并直接返回，其他支持平台进入 `PdfReaderPage.open(...)`。
+- 格式能力以 `lib/services/books/book_format_support.dart` 为单一事实来源。
 
 ---
 

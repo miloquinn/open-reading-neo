@@ -482,7 +482,6 @@
   "noteTypeHighlight": "ハイライト",
   "noteTypeUnderline": "下線",
   "noteTypeNote": "メモ",
-  "noteTypeUnknown": "不明",
   "bookFormatTXT": "TXT",
   "bookFormatEPUB": "EPUB",
   "bookFormatPDF": "PDF",
@@ -670,9 +669,7 @@
   "homeDailyReadingGoal": "1 日の読書目標",
   "homeAiAdviceSection": "AI 読書アドバイス",
   "homeTodayGlance": "今日のまとめ",
-  "homeTodayReadingPlan": "今日の読書プラン",
   "homeViewAll": "すべて見る",
-  "homeSyncingReadingPlan": "読書プランを同期しています",
   "homeGoalDoneSuggestReview": "今日の目標を達成しました。読書のふり返りはいかがですか",
   "homeRemainingToGoal": "今日の目標まであと {minutes} 分",
   "@homeRemainingToGoal": {
@@ -1978,62 +1975,6 @@
   "importUnknownTitle": "不明なタイトル",
   "importUnknownAuthor": "不明な著者",
   "bookUntitled": "無題",
-  "homePlanTaskCompleteDailyGoal": "今日の目標を達成",
-  "homePlanTaskReadMinutes": "{minutes} 分読む",
-  "@homePlanTaskReadMinutes": {
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskCompleteFocusReading": "集中読書を完了する",
-  "homePlanTaskFocusSession": "最低1回 {minutes} 分の集中セッション",
-  "@homePlanTaskFocusSession": {
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskKeepRhythm": "リズムを保つ",
-  "homePlanTaskWeekAchievedDays": "週の達成日数 ≥ 5",
-  "noteColorLightBlue": "ライトブルー",
-  "noteColorRed": "レッド",
-  "noteColorGreen": "グリーン",
-  "noteColorPurple": "パープル",
-  "noteColorGold": "ゴールド",
-  "noteColorOrange": "オレンジ",
-  "noteColorYellow": "イエロー",
-  "noteColorDarkGreen": "ダークグリーン",
-  "noteColorCustom": "カスタム",
-  "noteShareBookHeader": "📖 『{title}』 - {author}",
-  "@noteShareBookHeader": {
-    "placeholders": {
-        "title": {"type": "String"},
-        "author": {"type": "String"}
-    }
-  },
-  "noteShareNoteLabel": "💭 メモ：{note}",
-  "@noteShareNoteLabel": {
-    "placeholders": {
-        "note": {"type": "String"}
-    }
-  },
-  "noteShareChapterLabel": "📍 {chapter}",
-  "@noteShareChapterLabel": {
-    "placeholders": {
-        "chapter": {"type": "String"}
-    }
-  },
-  "noteSharePageLabel": "📄 {page}ページ",
-  "@noteSharePageLabel": {
-    "placeholders": {
-        "page": {"type": "int"}
-    }
-  },
-  "noteShareHashtags": "#読書メモ #{type}",
-  "@noteShareHashtags": {
-    "placeholders": {
-        "type": {"type": "String"}
-    }
-  },
   "accentPurple": "エレガントパープル",
   "accentPink": "チェリーピンク",
   "accentCyan": "フレッシュシアン",

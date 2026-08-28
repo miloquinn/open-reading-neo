@@ -1,5 +1,5 @@
 // 文件说明：问AI 对话历史存储，供 AI 页面查看与删除历史会话。
-// 技术要点：SharedPreferences JSON、ChangeNotifier 单例、容量上限裁剪。
+// 技术要点：SharedPreferences JSON、ChangeNotifier、容量上限裁剪。
 
 import 'dart:convert';
 
@@ -10,8 +10,9 @@ class AiChatHistoryMessage {
   const AiChatHistoryMessage({
     required this.role,
     required this.text,
+    String? content,
     required this.at,
-  });
+  }) : content = content ?? text;
 
   /// `user` 或 `assistant`。
   final String role;
@@ -19,11 +20,15 @@ class AiChatHistoryMessage {
   /// 界面上展示的文本（助手消息为原始 Markdown）。
   final String text;
 
+  /// 发送给模型的完整内容；旧数据缺失时使用 [text]。
+  final String content;
+
   final DateTime at;
 
   Map<String, dynamic> toJson() => {
     'role': role,
     'text': text,
+    'content': content,
     'at': at.toUtc().toIso8601String(),
   };
 
@@ -32,10 +37,14 @@ class AiChatHistoryMessage {
     final role = json['role'];
     final text = json['text'];
     if (role is! String || text is! String) return null;
-    final at = DateTime.tryParse(json['at'] as String? ?? '');
+    final rawContent = json['content'];
+    if (rawContent != null && rawContent is! String) return null;
+    final rawAt = json['at'];
+    final at = rawAt is String ? DateTime.tryParse(rawAt) : null;
     return AiChatHistoryMessage(
       role: role,
       text: text,
+      content: rawContent as String?,
       at: (at ?? DateTime.now()).toLocal(),
     );
   }
@@ -84,8 +93,14 @@ class AiChatHistorySession {
     if (json is! Map<String, dynamic>) return null;
     final id = json['id'];
     if (id is! String || id.isEmpty) return null;
-    final createdAt = DateTime.tryParse(json['createdAt'] as String? ?? '');
-    final updatedAt = DateTime.tryParse(json['updatedAt'] as String? ?? '');
+    final rawCreatedAt = json['createdAt'];
+    final rawUpdatedAt = json['updatedAt'];
+    final createdAt = rawCreatedAt is String
+        ? DateTime.tryParse(rawCreatedAt)
+        : null;
+    final updatedAt = rawUpdatedAt is String
+        ? DateTime.tryParse(rawUpdatedAt)
+        : null;
     final messages = <AiChatHistoryMessage>[];
     final rawMessages = json['messages'];
     if (rawMessages is List) {
@@ -95,10 +110,11 @@ class AiChatHistorySession {
       }
     }
     if (messages.isEmpty) return null;
+    final rawBookTitle = json['bookTitle'];
     final bookId = json['bookId'];
     return AiChatHistorySession(
       id: id,
-      bookTitle: json['bookTitle'] as String? ?? '',
+      bookTitle: rawBookTitle is String ? rawBookTitle : '',
       bookId: bookId is String && bookId.isNotEmpty ? bookId : null,
       createdAt: (createdAt ?? DateTime.now()).toLocal(),
       updatedAt: (updatedAt ?? createdAt ?? DateTime.now()).toLocal(),
@@ -107,13 +123,9 @@ class AiChatHistorySession {
   }
 }
 
-/// 全局问AI 历史存储：会话按最近更新排序，超出上限时裁掉最旧的会话。
+/// 问AI 历史存储：会话按最近更新排序，超出上限时裁掉最旧的会话。
 class AiChatHistoryStore extends ChangeNotifier {
-  AiChatHistoryStore._();
-
-  static final AiChatHistoryStore _instance = AiChatHistoryStore._();
-
-  factory AiChatHistoryStore() => _instance;
+  AiChatHistoryStore();
 
   static const String _prefsKey = 'reader_ai_chat_history_v1';
   static const int maxSessions = 100;
@@ -121,26 +133,25 @@ class AiChatHistoryStore extends ChangeNotifier {
   List<AiChatHistorySession> _sessions = const [];
   bool _loaded = false;
   Future<void>? _loading;
+  bool _disposed = false;
 
-  /// 仅供测试：清空内存态，让下一次 ensureLoaded 重新从持久层读取。
-  @visibleForTesting
-  void debugResetForTest() {
-    _sessions = const [];
-    _loaded = false;
-    _loading = null;
+  void _throwIfDisposed() {
+    if (_disposed) {
+      throw StateError('AiChatHistoryStore has been disposed');
+    }
   }
-
-  bool get isLoaded => _loaded;
 
   /// 最近更新在前的会话列表。
   List<AiChatHistorySession> get sessions => _sessions;
 
   Future<void> ensureLoaded() {
+    _throwIfDisposed();
     if (_loaded) return Future.value();
     return _loading ??= _load();
   }
 
   Future<void> _load() async {
+    var loadedSessions = const <AiChatHistorySession>[];
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_prefsKey);
@@ -155,19 +166,20 @@ class AiChatHistoryStore extends ChangeNotifier {
         }
       }
       sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      _sessions = List<AiChatHistorySession>.unmodifiable(sessions);
+      loadedSessions = List<AiChatHistorySession>.unmodifiable(sessions);
     } catch (error) {
       debugPrint('load ai chat history failed: $error');
-      _sessions = const [];
-    } finally {
-      _loaded = true;
-      _loading = null;
-      notifyListeners();
     }
+    if (_disposed) return;
+    _sessions = loadedSessions;
+    _loaded = true;
+    _loading = null;
+    notifyListeners();
   }
 
   Future<void> upsertSession(AiChatHistorySession session) async {
     await ensureLoaded();
+    _throwIfDisposed();
     final next = _sessions
         .where((existing) => existing.id != session.id)
         .toList();
@@ -182,6 +194,7 @@ class AiChatHistoryStore extends ChangeNotifier {
 
   Future<void> deleteSession(String id) async {
     await ensureLoaded();
+    _throwIfDisposed();
     final next = _sessions.where((session) => session.id != id).toList();
     if (next.length == _sessions.length) return;
     _sessions = List<AiChatHistorySession>.unmodifiable(next);
@@ -191,6 +204,7 @@ class AiChatHistoryStore extends ChangeNotifier {
 
   Future<void> clearAll() async {
     await ensureLoaded();
+    _throwIfDisposed();
     if (_sessions.isEmpty) return;
     _sessions = const [];
     notifyListeners();
@@ -209,5 +223,13 @@ class AiChatHistoryStore extends ChangeNotifier {
     } catch (error) {
       debugPrint('persist ai chat history failed: $error');
     }
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _loading = null;
+    super.dispose();
   }
 }

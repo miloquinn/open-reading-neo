@@ -15,7 +15,7 @@ import 'package:provider/provider.dart';
 import 'package:xxread/book_sources/services/book_source_change_service.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
-import 'package:xxread/core/reader/native_reader_service.dart';
+import 'package:xxread/pages/reader/book_reader_launcher.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/export/reading_data_export_dialog.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
@@ -31,6 +31,7 @@ import 'package:xxread/services/books/book_text_extraction_service.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/library/library_services.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/glass_config.dart';
@@ -195,6 +196,7 @@ class _LibraryPageState extends State<LibraryPage> {
               : BookSourceReaderPage(
                   source: binding.source,
                   book: binding.book,
+                  replaceRuleService: context.read<ReplaceRuleService>(),
                   shelfService: _sourceShelfService,
                   initialTheme: initialTheme,
                 );
@@ -217,7 +219,7 @@ class _LibraryPageState extends State<LibraryPage> {
           }
         }
       } else {
-        await NativeReaderService.openBook(
+        await BookReaderLauncher.openBook(
           context,
           fullBook,
           animation: animation,

@@ -27,6 +27,7 @@ import 'package:xxread/pages/settings/replace_rules_page.dart';
 import 'package:xxread/pages/settings/sync/webdav_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/core/core_services.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/app_themes.dart';
@@ -42,14 +43,12 @@ import 'package:xxread/widgets/accent_color_picker_sheet.dart';
 import 'package:xxread/widgets/contributors_view.dart';
 import 'package:xxread/widgets/developer_support_card.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
-import 'package:xxread/widgets/restartable_app.dart';
 import 'package:xxread/widgets/settings_account_card.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/update_check_gate.dart';
 
 import 'custom_fonts_page.dart';
 
-part 'parts/settings_cover_actions_part.dart';
 part 'parts/settings_community_marks_part.dart';
 part 'parts/settings_appearance_part.dart';
 part 'parts/settings_about_part.dart';
@@ -657,9 +656,12 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _openReplaceRules() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ReplaceRulesPage()));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ReplaceRulesPage(service: context.read<ReplaceRuleService>()),
+      ),
+    );
   }
 
   Widget _buildSwitchSetting({

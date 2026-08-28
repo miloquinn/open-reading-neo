@@ -41,6 +41,9 @@ enum BookReaderPipeline {
   none,
 }
 
+/// Presentation destination selected after a local book passes validation.
+enum BookReaderDestination { text, pdf, comic, unsupported }
+
 /// 单一格式描述。
 class BookFormatSpec {
   const BookFormatSpec({
@@ -85,6 +88,8 @@ class BookFormatSpec {
 /// 差异只在进口：TXT 直接切章，EPUB/FB2/… 先抽纯文本，ZIP/RAR 先解压再分流。
 class BookFormatRegistry {
   BookFormatRegistry._();
+
+  static const _comicReaderFormatIds = <String>{'cbz', 'cbt', 'cbr', 'cb7'};
 
   static const List<BookFormatSpec> all = <BookFormatSpec>[
     BookFormatSpec(
@@ -297,6 +302,20 @@ class BookFormatRegistry {
     if (spec == null) return false;
     return spec.pipeline == BookReaderPipeline.plainTextChapters ||
         spec.pipeline == BookReaderPipeline.structuredToPlainText;
+  }
+
+  /// Chooses the reader surface from the same registry used by import.
+  static BookReaderDestination readerDestinationFor(String extension) {
+    final spec = specForExtension(extension);
+    if (spec == null) return BookReaderDestination.unsupported;
+    if (spec.id == 'pdf') return BookReaderDestination.pdf;
+    if (_comicReaderFormatIds.contains(spec.id)) {
+      return BookReaderDestination.comic;
+    }
+    if (targetsUnifiedTextLayout(extension)) {
+      return BookReaderDestination.text;
+    }
+    return BookReaderDestination.unsupported;
   }
 
   /// 当前能力是否已达到可读正文（完整或转文本后）。

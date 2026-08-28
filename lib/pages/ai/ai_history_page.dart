@@ -17,19 +17,29 @@ String _formatSessionTime(BuildContext context, DateTime time) {
 /// 历史会话列表：按最近更新排列，左滑删除，右上角清空；
 /// 点击会话以 Navigator 结果返回，由 AI 页载入并继续对话。
 class AiHistoryPage extends StatefulWidget {
-  const AiHistoryPage({super.key});
+  const AiHistoryPage({super.key, required this.store});
+
+  final AiChatHistoryStore store;
 
   @override
   State<AiHistoryPage> createState() => _AiHistoryPageState();
 }
 
 class _AiHistoryPageState extends State<AiHistoryPage> {
-  final AiChatHistoryStore _store = AiChatHistoryStore();
+  AiChatHistoryStore get _store => widget.store;
 
   @override
   void initState() {
     super.initState();
     unawaited(_store.ensureLoaded());
+  }
+
+  @override
+  void didUpdateWidget(covariant AiHistoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.store != widget.store) {
+      unawaited(_store.ensureLoaded());
+    }
   }
 
   Future<void> _confirmClearAll() async {

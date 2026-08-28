@@ -1435,9 +1435,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get noteTypeNote => 'メモ';
 
   @override
-  String get noteTypeUnknown => '不明';
-
-  @override
   String get bookFormatTXT => 'TXT';
 
   @override
@@ -1873,13 +1870,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get homeTodayGlance => '今日のまとめ';
 
   @override
-  String get homeTodayReadingPlan => '今日の読書プラン';
-
-  @override
   String get homeViewAll => 'すべて見る';
-
-  @override
-  String get homeSyncingReadingPlan => '読書プランを同期しています';
 
   @override
   String get homeGoalDoneSuggestReview => '今日の目標を達成しました。読書のふり返りはいかがですか';
@@ -4415,80 +4406,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get bookUntitled => '無題';
-
-  @override
-  String get homePlanTaskCompleteDailyGoal => '今日の目標を達成';
-
-  @override
-  String homePlanTaskReadMinutes(int minutes) {
-    return '$minutes 分読む';
-  }
-
-  @override
-  String get homePlanTaskCompleteFocusReading => '集中読書を完了する';
-
-  @override
-  String homePlanTaskFocusSession(int minutes) {
-    return '最低1回 $minutes 分の集中セッション';
-  }
-
-  @override
-  String get homePlanTaskKeepRhythm => 'リズムを保つ';
-
-  @override
-  String get homePlanTaskWeekAchievedDays => '週の達成日数 ≥ 5';
-
-  @override
-  String get noteColorLightBlue => 'ライトブルー';
-
-  @override
-  String get noteColorRed => 'レッド';
-
-  @override
-  String get noteColorGreen => 'グリーン';
-
-  @override
-  String get noteColorPurple => 'パープル';
-
-  @override
-  String get noteColorGold => 'ゴールド';
-
-  @override
-  String get noteColorOrange => 'オレンジ';
-
-  @override
-  String get noteColorYellow => 'イエロー';
-
-  @override
-  String get noteColorDarkGreen => 'ダークグリーン';
-
-  @override
-  String get noteColorCustom => 'カスタム';
-
-  @override
-  String noteShareBookHeader(String title, String author) {
-    return '📖 『$title』 - $author';
-  }
-
-  @override
-  String noteShareNoteLabel(String note) {
-    return '💭 メモ：$note';
-  }
-
-  @override
-  String noteShareChapterLabel(String chapter) {
-    return '📍 $chapter';
-  }
-
-  @override
-  String noteSharePageLabel(int page) {
-    return '📄 $pageページ';
-  }
-
-  @override
-  String noteShareHashtags(String type) {
-    return '#読書メモ #$type';
-  }
 
   @override
   String get accentPurple => 'エレガントパープル';

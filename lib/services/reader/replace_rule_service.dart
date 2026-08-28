@@ -143,8 +143,9 @@ int? _jsonInt(Object? value) => switch (value) {
 };
 
 class ReplaceRuleService extends ChangeNotifier {
-  ReplaceRuleService._();
-  static final ReplaceRuleService instance = ReplaceRuleService._();
+  ReplaceRuleService({ReplaceRuleExecutor? executor})
+    : _executor = executor ?? ReplaceRuleExecutor();
+
   static const preferenceKey = 'reader_replace_rules_v1';
   static const maxRules = 5000;
   static const maxPatternLength = 20000;
@@ -155,10 +156,13 @@ class ReplaceRuleService extends ChangeNotifier {
   Future<void>? _loading;
   int _revision = 0;
   String? _rulesSignatureCache;
-  ReplaceRuleExecutor _executor = ReplaceRuleExecutor();
+  final ReplaceRuleExecutor _executor;
   final List<ReplaceRuleDiagnostic> _recentDiagnostics =
       <ReplaceRuleDiagnostic>[];
   StreamSubscription<ReplaceRuleDiagnostic>? _diagnosticSubscription;
+  Future<void>? _closing;
+  bool _closed = false;
+  bool _notifierDisposed = false;
 
   List<ReplaceRule> get rules => _rules;
   bool get isLoaded => _loaded;
@@ -190,6 +194,7 @@ class ReplaceRuleService extends ChangeNotifier {
       _rules.where((rule) => rule.enabled).toList(growable: false);
 
   Future<void> load() {
+    _ensureOpen();
     if (_loaded) return Future.value();
     _listenToExecutorDiagnostics();
     return _loading ??= _loadInternal();
@@ -197,6 +202,7 @@ class ReplaceRuleService extends ChangeNotifier {
 
   void _listenToExecutorDiagnostics() {
     _diagnosticSubscription ??= _executor.diagnostics.listen((diagnostic) {
+      if (_closed) return;
       _recentDiagnostics.add(diagnostic);
       if (_recentDiagnostics.length > 32) _recentDiagnostics.removeAt(0);
       debugPrint(
@@ -208,13 +214,15 @@ class ReplaceRuleService extends ChangeNotifier {
   }
 
   Future<void> _loadInternal() async {
+    var loadedRules = const <ReplaceRule>[];
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (_closed) return;
       final raw = prefs.getString(preferenceKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
         if (decoded is List) {
-          _rules =
+          loadedRules =
               decoded
                   .whereType<Map>()
                   .map(
@@ -229,17 +237,20 @@ class ReplaceRuleService extends ChangeNotifier {
       }
     } catch (error) {
       debugPrint('replace rules load failed: $error');
-      _rules = const [];
     } finally {
-      _loaded = true;
-      _revision++;
-      _rulesSignatureCache = null;
       _loading = null;
-      notifyListeners();
+      if (!_closed) {
+        _rules = loadedRules;
+        _loaded = true;
+        _revision++;
+        _rulesSignatureCache = null;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> saveAll(List<ReplaceRule> rules) async {
+    _ensureOpen();
     if (rules.length > maxRules) {
       throw const ReplaceRuleValidationException(
         ReplaceRuleValidationKind.tooManyRules,
@@ -258,6 +269,7 @@ class ReplaceRuleService extends ChangeNotifier {
       preferenceKey,
       jsonEncode(normalized.map((rule) => rule.toJson()).toList()),
     );
+    if (_closed) return;
     _rules = normalized;
     _loaded = true;
     _revision++;
@@ -596,17 +608,35 @@ class ReplaceRuleService extends ChangeNotifier {
         order: rule.order,
       );
 
-  @visibleForTesting
-  void resetForTesting() {
-    _rules = const [];
-    _loaded = false;
-    _loading = null;
-    _revision = 0;
-    _rulesSignatureCache = null;
-    _recentDiagnostics.clear();
-    unawaited(_diagnosticSubscription?.cancel());
+  void _ensureOpen() {
+    if (_closed) {
+      throw StateError('ReplaceRuleService is closed.');
+    }
+  }
+
+  Future<void> close() {
+    if (!_notifierDisposed) dispose();
+    return _closing!;
+  }
+
+  Future<void> _closeResources(
+    StreamSubscription<ReplaceRuleDiagnostic>? subscription,
+  ) async {
+    try {
+      await subscription?.cancel();
+    } finally {
+      await _executor.dispose();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_notifierDisposed) return;
+    _notifierDisposed = true;
+    _closed = true;
+    final subscription = _diagnosticSubscription;
     _diagnosticSubscription = null;
-    unawaited(_executor.dispose());
-    _executor = ReplaceRuleExecutor();
+    _closing = _closeResources(subscription);
+    super.dispose();
   }
 }

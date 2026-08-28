@@ -50,7 +50,6 @@ extension _NativeReaderPersistentPaginationCache on _NativeReaderPageState {
       debugPrintStack(stackTrace: stackTrace);
     }
   }
-
 }
 
 Uint8List _encodeNativePagination(List<_ReaderPageData> pages) {

@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/core/reader/reader_safe_area.dart';
+import 'package:xxread/core/reader/reader_system_ui.dart';
 import 'package:xxread/core/reader/reader_vertical_paging.dart';
+import 'package:xxread/widgets/reader_vertical_paging_surface.dart';
 
 void main() {
   test('viewport chrome reserves fixed title and status slots', () {
@@ -48,6 +50,38 @@ void main() {
     expect(metrics.contentTop, 28);
     // 底部页码条照常保留。
     expect(metrics.contentBottom, 26);
+  });
+
+  test('top bar style maps to one shared viewport chrome policy', () {
+    const safeArea = ReaderSafeAreaMetrics(
+      viewPadding: EdgeInsets.only(top: 24, bottom: 24),
+      topMargin: 4,
+      bottomMargin: 0,
+    );
+
+    final reader = readerViewportChromeForTopBar(
+      safeArea: safeArea,
+      topBarStyle: ReaderTopBarStyle.reader,
+    );
+    final system = readerViewportChromeForTopBar(
+      safeArea: safeArea,
+      topBarStyle: ReaderTopBarStyle.system,
+    );
+    final floating = readerViewportChromeForTopBar(
+      safeArea: safeArea,
+      topBarStyle: ReaderTopBarStyle.floating,
+    );
+    final hidden = readerViewportChromeForTopBar(
+      safeArea: safeArea,
+      topBarStyle: ReaderTopBarStyle.hidden,
+    );
+
+    expect(reader.contentTop, 56);
+    expect(system.contentTop, 28);
+    expect(floating.contentTop, 28);
+    expect(floating.contentBottom, 26);
+    expect(hidden.contentTop, 0);
+    expect(hidden.contentBottom, 0);
   });
 
   test('primary visible item follows the viewport center', () {

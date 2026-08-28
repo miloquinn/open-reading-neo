@@ -11,14 +11,16 @@ import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 class ReplaceRulesPage extends StatefulWidget {
-  const ReplaceRulesPage({super.key});
+  const ReplaceRulesPage({super.key, required this.service});
+
+  final ReplaceRuleService service;
 
   @override
   State<ReplaceRulesPage> createState() => _ReplaceRulesPageState();
 }
 
 class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
-  final _service = ReplaceRuleService.instance;
+  late final ReplaceRuleService _service = widget.service;
   final _searchController = TextEditingController();
   String _query = '';
 
@@ -59,7 +61,7 @@ class _ReplaceRulesPageState extends State<ReplaceRulesPage> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       constraints: const BoxConstraints(maxWidth: 640),
-      builder: (_) => _ReplaceRuleEditor(rule: rule),
+      builder: (_) => _ReplaceRuleEditor(service: _service, rule: rule),
     );
     if (result == null) return;
     try {
@@ -416,7 +418,9 @@ class _EmptyRules extends StatelessWidget {
 }
 
 class _ReplaceRuleEditor extends StatefulWidget {
-  const _ReplaceRuleEditor({this.rule});
+  const _ReplaceRuleEditor({required this.service, this.rule});
+
+  final ReplaceRuleService service;
   final ReplaceRule? rule;
 
   @override
@@ -529,7 +533,7 @@ class _ReplaceRuleEditorState extends State<_ReplaceRuleEditor> {
       return;
     }
     try {
-      await ReplaceRuleService.instance.remove(widget.rule!.id);
+      await widget.service.remove(widget.rule!.id);
       if (mounted) Navigator.of(context).pop();
     } catch (error) {
       if (mounted) {

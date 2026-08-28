@@ -13,10 +13,21 @@ import 'package:xxread/core/reader/reader_layout.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 
 void main() {
+  late ReplaceRuleService replaceRuleService;
+
+  setUp(() {
+    replaceRuleService = ReplaceRuleService();
+  });
+
+  tearDown(() async {
+    await replaceRuleService.close();
+  });
+
   test('reader font overrides EPUB font except for the platform default', () {
     expect(
       resolveNativeReaderFontFamily(
@@ -64,6 +75,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'EPUB image precache fixture',
                 filePath: epub.path,
@@ -124,6 +136,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'EPUB transition fixture',
                 filePath: epub.path,
@@ -274,6 +287,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: 'EPUB image front matter fixture',
               filePath: epub.path,
@@ -372,6 +386,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'EPUB warming tail fixture',
                 filePath: epub.path,
@@ -459,6 +474,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: 'EPUB backward window fixture',
               filePath: epub.path,
@@ -616,6 +632,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'EPUB curl boundary fixture',
                 filePath: epub.path,

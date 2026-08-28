@@ -176,7 +176,7 @@ XxReadApp._buildHome: bootstrap-error page -> loading page -> UserAgreementPage 
 - Generated lib/l10n/app_localizations.dart + _en/_zh/_ja files: AppLocalizations.supportedLocales = [Locale(en), Locale(ja), Locale(zh), Locale(zh,TW)]; delegates combine app + Global Material/Cupertino/Widgets.
 - Locale selection: AppSettingsNotifier persists app_locale/legacy; setLocaleCode -> _parseLocale ("system" -> null, else Locale(lang[,country]) from "xx-YY"); passed to MaterialApp.locale.
 - Constrained use: context.l10n extension (lib/utils/localization_extension.dart, 9 lines) = AppLocalizations.of(context); l10n README documents key conventions (camelCase prefix per page/feature), placeholder types, and bans hardcoding user-facing strings in widgets/services (use enums/keys translated in UI).
-- Also localized: localizeAiResponseBuffer for AI tokens; ChangelogService locale cascade; tts_service_translator.dart, app_themes_translator.dart, reading_plan_translator.dart translate model display names.
+- Also localized: localizeAiResponseBuffer for AI tokens; ChangelogService locale cascade; tts_service_translator.dart and app_themes_translator.dart translate model display names.
 
 ### l10n strengths
 1. Clean disciplined gen-l10n flow with untranslated-messages report and documented key conventions.

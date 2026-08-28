@@ -215,6 +215,6 @@ extension _NativeReaderPageCache on _NativeReaderPageState {
         '${_pageMode == NativePageMode.verticalScroll ? _verticalChrome.paginationSignature : _readerSafeArea.paginationSignature}:'
         '${_readerFontProfile.cacheSignature}:'
         '${widget.book.format.toLowerCase() == 'txt' ? _txtChapterTitlePageEnabled : true}:'
-        '${ReplaceRuleService.instance.rulesSignature}',
+        '${_replaceRules.rulesSignature}',
   ).cacheKey('native-line-v9');
 }

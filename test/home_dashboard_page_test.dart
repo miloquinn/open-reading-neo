@@ -14,6 +14,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/home/home_mobile_dashboard_page.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/services/books/book_services.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/utils/reader_themes.dart';
 
@@ -241,11 +242,14 @@ void main() {
     );
     final client = BookSourceClient();
     final shelfService = BookSourceShelfService(client: client);
+    final replaceRules = ReplaceRuleService();
+    addTearDown(replaceRules.close);
 
     final reader = HomeMobileDashboardPage.buildOnlineReader(
       book: book,
       client: client,
       shelfService: shelfService,
+      replaceRuleService: replaceRules,
       initialTheme: ReaderThemes.pureBlack,
     );
 
@@ -290,16 +294,19 @@ void main() {
     );
     final client = BookSourceClient();
     final shelfService = BookSourceShelfService(client: client);
+    final replaceRules = ReplaceRuleService();
     addTearDown(() {
       shelfService.close();
       client.close();
     });
+    addTearDown(replaceRules.close);
 
     expect(
       () => HomeMobileDashboardPage.buildOnlineReader(
         book: broken,
         client: client,
         shelfService: shelfService,
+        replaceRuleService: replaceRules,
       ),
       throwsA(isA<OnlineShelfBookBindingException>()),
     );

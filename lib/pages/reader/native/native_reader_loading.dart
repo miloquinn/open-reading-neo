@@ -2,7 +2,7 @@ part of 'native_reader_page.dart';
 
 extension _NativeReaderLoading on _NativeReaderPageState {
   String get _navigationReplacementCacheKey =>
-      '$_bookCacheKey:${ReplaceRuleService.instance.rulesSignature}';
+      '$_bookCacheKey:${_replaceRules.rulesSignature}';
 
   void _initializeReaderDependencies() {
     if (_readerDependenciesInitialized) return;
@@ -46,13 +46,13 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     Future<List<_NativeChapter>> chaptersFuture,
   ) async {
     await _paginationCacheLoadFuture;
-    await ReplaceRuleService.instance.load();
+    await _replaceRules.load();
     final chapters = await chaptersFuture;
     if (chapters.isEmpty) return chapters;
     for (final chapter in chapters) {
       chapter.configureReplacement(widget.book.title);
     }
-    final replacementService = ReplaceRuleService.instance;
+    final replacementService = _replaceRules;
     for (final chapter in chapters) {
       chapter.prepareReplacementRevision(replacementService.revision);
     }
@@ -103,7 +103,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     List<ReaderNavigationChapter> navigation,
   ) async {
     if (navigation.isEmpty) return const <ReaderNavigationChapter>[];
-    final cleaned = await ReplaceRuleService.instance.applyBatchAsync(
+    final cleaned = await _replaceRules.applyBatchAsync(
       navigation.map((entry) => entry.title).toList(growable: false),
       bookTitle: widget.book.title,
       title: true,
@@ -148,7 +148,8 @@ extension _NativeReaderLoading on _NativeReaderPageState {
       await _loadEpubChapterBatch(epubChapters);
     }
     await Future.wait<void>([
-      for (final index in indexes) chapters[index].prepareReplacementAsync(),
+      for (final index in indexes)
+        chapters[index].prepareReplacementAsync(_replaceRules),
     ]);
     final retainedChapterIndex = retainAroundCurrentChapter
         ? _chapterIndex.clamp(0, chapters.length - 1)
@@ -222,7 +223,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
 
   Future<List<_NativeChapter>> _loadBook() async {
     final l10n = context.l10n;
-    await ReplaceRuleService.instance.load();
+    await _replaceRules.load();
     final format = widget.book.format.toLowerCase();
     final webBytes = kIsWeb
         ? await WebBookFileStore().read(widget.book.filePath)

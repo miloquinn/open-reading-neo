@@ -101,6 +101,7 @@ typedef BookSourcePageMode = ReaderPageMode;
 class BookSourceReaderPage extends StatefulWidget {
   final RegisteredBookSource source;
   final BookSourceBook book;
+  final ReplaceRuleService replaceRuleService;
   final BookSourceClient? client;
   final BookSourceReadingProgressStore progressStore;
   final BookSourceShelfService? shelfService;
@@ -114,6 +115,7 @@ class BookSourceReaderPage extends StatefulWidget {
     super.key,
     required this.source,
     required this.book,
+    required this.replaceRuleService,
     this.client,
     this.progressStore = const BookSourceReadingProgressStore(),
     this.shelfService,
@@ -130,6 +132,7 @@ class BookSourceReaderPage extends StatefulWidget {
 
 class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     with WidgetsBindingObserver {
+  late final ReplaceRuleService _replaceRules = widget.replaceRuleService;
   late final bool _ownsClient = widget.client == null;
   late final BookSourceClient _client =
       widget.client ?? (widget.clientFactory ?? BookSourceClient.new)();
@@ -354,7 +357,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   @override
   void initState() {
     super.initState();
-    unawaited(ReplaceRuleService.instance.load());
+    unawaited(_replaceRules.load());
     _showOpeningLoader = widget.initialTheme == null;
     if (!_showOpeningLoader) {
       _openingLoaderTimer = Timer(_bookSourceOpeningLoaderDelay, () {

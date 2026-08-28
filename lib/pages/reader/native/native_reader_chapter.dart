@@ -100,17 +100,18 @@ class _NativeChapter {
     _replacedTitle = cleaned.trim().isEmpty ? _title : cleaned;
   }
 
-  Future<void> prepareReplacementAsync() {
+  Future<void> prepareReplacementAsync(ReplaceRuleService service) {
     if (_rulesApplied) return Future<void>.value();
-    return _replacementLoad ??= _prepareReplacementAsync().whenComplete(() {
-      _replacementLoad = null;
-    });
+    return _replacementLoad ??= _prepareReplacementAsync(service).whenComplete(
+      () {
+        _replacementLoad = null;
+      },
+    );
   }
 
-  Future<void> _prepareReplacementAsync() async {
+  Future<void> _prepareReplacementAsync(ReplaceRuleService service) async {
     await loadTextAsync();
     if (_rulesApplied) return;
-    final service = ReplaceRuleService.instance;
     final raw = _plainText ?? _loadedText ?? '';
     final sourceBlocks = _blocks ?? _loadedBlocks;
     if (sourceBlocks == null ||
@@ -121,7 +122,7 @@ class _NativeChapter {
       );
       _replacedBlocks = <_NativeBlock>[_NativeBlock.text(_replacedText!)];
     } else {
-      final result = await _replaceRichContentAsync(raw, sourceBlocks);
+      final result = await _replaceRichContentAsync(raw, sourceBlocks, service);
       _replacedText = result.text;
       _replacedBlocks = result.blocks;
     }
@@ -131,6 +132,7 @@ class _NativeChapter {
   Future<({String text, List<_NativeBlock> blocks})> _replaceRichContentAsync(
     String raw,
     List<_NativeBlock> sourceBlocks,
+    ReplaceRuleService service,
   ) async {
     final segments = <String>[];
     final templates = <_NativeBlock?>[];
@@ -169,7 +171,7 @@ class _NativeChapter {
     if (textSegments.isEmpty) {
       return (text: raw, blocks: List<_NativeBlock>.from(sourceBlocks));
     }
-    final cleaned = await ReplaceRuleService.instance.applyBatchAsync(
+    final cleaned = await service.applyBatchAsync(
       textSegments,
       bookTitle: replaceBookTitle,
       preserveNonEmpty: false,

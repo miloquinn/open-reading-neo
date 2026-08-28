@@ -405,6 +405,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
         builder: (_) => BookSourceReaderPage(
           source: result.source,
           book: result.book,
+          replaceRuleService: _replaceRules,
           client: _client,
           progressStore: widget.progressStore,
           shelfService: _shelfService,

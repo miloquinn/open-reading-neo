@@ -972,10 +972,6 @@
   "@noteTypeNote": {
     "description": "Note type"
   },
-  "noteTypeUnknown": "Unknown",
-  "@noteTypeUnknown": {
-    "description": "Unknown note type"
-  },
   "bookFormatTXT": "TXT",
   "@bookFormatTXT": {
     "description": "TXT book format"
@@ -1530,17 +1526,9 @@
   "@homeTodayGlance": {
     "description": "Section label for the today summary row"
   },
-  "homeTodayReadingPlan": "Today's Reading Plan",
-  "@homeTodayReadingPlan": {
-    "description": "Header of the daily reading plan section"
-  },
   "homeViewAll": "View All",
   "@homeViewAll": {
     "description": "Action to open the full detailed stats page"
-  },
-  "homeSyncingReadingPlan": "Syncing your reading plan",
-  "@homeSyncingReadingPlan": {
-    "description": "Hero card title while the reading plan is loading"
   },
   "homeGoalDoneSuggestReview": "Today's goal is complete — consider a reading review",
   "@homeGoalDoneSuggestReview": {
@@ -4129,108 +4117,6 @@
   "bookUntitled": "Untitled",
   "@bookUntitled": {
     "description": "Fallback title used when a book has no title"
-  },
-  "homePlanTaskCompleteDailyGoal": "Complete today's goal",
-  "@homePlanTaskCompleteDailyGoal": {
-    "description": "Reading plan task title for completing the daily reading goal"
-  },
-  "homePlanTaskReadMinutes": "Read {minutes} minutes",
-  "@homePlanTaskReadMinutes": {
-    "description": "Reading plan task detail for reading a number of minutes",
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskCompleteFocusReading": "Complete focus reading",
-  "@homePlanTaskCompleteFocusReading": {
-    "description": "Reading plan task title for completing a focus reading session"
-  },
-  "homePlanTaskFocusSession": "At least 1 focus session of {minutes} minutes",
-  "@homePlanTaskFocusSession": {
-    "description": "Reading plan task detail for completing a focus session",
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskKeepRhythm": "Keep the rhythm",
-  "@homePlanTaskKeepRhythm": {
-    "description": "Reading plan task title for maintaining the weekly reading rhythm"
-  },
-  "homePlanTaskWeekAchievedDays": "Weekly achieved days ≥ 5",
-  "@homePlanTaskWeekAchievedDays": {
-    "description": "Reading plan task detail for the weekly achieved-days target"
-  },
-  "noteColorLightBlue": "Light Blue",
-  "@noteColorLightBlue": {
-    "description": "Note highlight color name: light blue"
-  },
-  "noteColorRed": "Red",
-  "@noteColorRed": {
-    "description": "Note highlight color name: red"
-  },
-  "noteColorGreen": "Green",
-  "@noteColorGreen": {
-    "description": "Note highlight color name: green"
-  },
-  "noteColorPurple": "Purple",
-  "@noteColorPurple": {
-    "description": "Note highlight color name: purple"
-  },
-  "noteColorGold": "Gold",
-  "@noteColorGold": {
-    "description": "Note highlight color name: gold"
-  },
-  "noteColorOrange": "Orange",
-  "@noteColorOrange": {
-    "description": "Note highlight color name: orange"
-  },
-  "noteColorYellow": "Yellow",
-  "@noteColorYellow": {
-    "description": "Note highlight color name: yellow"
-  },
-  "noteColorDarkGreen": "Dark Green",
-  "@noteColorDarkGreen": {
-    "description": "Note highlight color name: dark green"
-  },
-  "noteColorCustom": "Custom",
-  "@noteColorCustom": {
-    "description": "Note highlight color name: custom color"
-  },
-  "noteShareBookHeader": "📖 《{title}》 - {author}",
-  "@noteShareBookHeader": {
-    "description": "Share text header line with book title and author",
-    "placeholders": {
-        "title": {"type": "String"},
-        "author": {"type": "String"}
-    }
-  },
-  "noteShareNoteLabel": "💭 Note: {note}",
-  "@noteShareNoteLabel": {
-    "description": "Share text line for the reader's note",
-    "placeholders": {
-        "note": {"type": "String"}
-    }
-  },
-  "noteShareChapterLabel": "📍 {chapter}",
-  "@noteShareChapterLabel": {
-    "description": "Share text line for the chapter name",
-    "placeholders": {
-        "chapter": {"type": "String"}
-    }
-  },
-  "noteSharePageLabel": "📄 Page {page}",
-  "@noteSharePageLabel": {
-    "description": "Share text line for the page number",
-    "placeholders": {
-        "page": {"type": "int"}
-    }
-  },
-  "noteShareHashtags": "#BookNotes #{type}",
-  "@noteShareHashtags": {
-    "description": "Share text hashtags line with the note type name",
-    "placeholders": {
-        "type": {"type": "String"}
-    }
   },
   "accentPurple": "Elegant Purple",
   "@accentPurple": {

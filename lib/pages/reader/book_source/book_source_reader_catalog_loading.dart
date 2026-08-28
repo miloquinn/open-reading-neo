@@ -7,7 +7,7 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
       _error = null;
     });
     try {
-      await ReplaceRuleService.instance.load();
+      await _replaceRules.load();
       final results = await Future.wait<Object?>([
         _client.getChapters(
           widget.source,
@@ -103,7 +103,7 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
     List<BookSourceChapter> chapters,
   ) async {
     if (chapters.isEmpty) return const <BookSourceChapter>[];
-    final cleaned = await ReplaceRuleService.instance.applyBatchAsync(
+    final cleaned = await _replaceRules.applyBatchAsync(
       chapters.map((chapter) => chapter.title).toList(growable: false),
       bookTitle: widget.book.title,
       sourceName: widget.source.name,

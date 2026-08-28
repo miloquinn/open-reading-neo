@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/home/widgets/home_mobile_top_bar.dart';
+import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/ui_style.dart';
@@ -12,6 +13,8 @@ void main() {
   testWidgets('mobile home shell leaves the status bar to its custom top bar', (
     tester,
   ) async {
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.binding.setSurfaceSize(const Size(412, 915));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -31,12 +34,12 @@ void main() {
               UiStyleThemeExtension(style: AppUiStyle.material3),
             ],
           ),
-          home: const MediaQuery(
-            data: MediaQueryData(
+          home: MediaQuery(
+            data: const MediaQueryData(
               size: Size(412, 915),
               viewPadding: EdgeInsets.only(top: 24, bottom: 24),
             ),
-            child: HomeShellPage(),
+            child: HomeShellPage(aiChatHistoryStore: historyStore),
           ),
         ),
       ),
@@ -53,6 +56,8 @@ void main() {
   testWidgets('book route hides and restores the floating navigation', (
     tester,
   ) async {
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.binding.setSurfaceSize(const Size(412, 915));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -72,12 +77,12 @@ void main() {
               UiStyleThemeExtension(style: AppUiStyle.material3),
             ],
           ),
-          home: const MediaQuery(
-            data: MediaQueryData(
+          home: MediaQuery(
+            data: const MediaQueryData(
               size: Size(412, 915),
               viewPadding: EdgeInsets.only(top: 24, bottom: 24),
             ),
-            child: HomeShellPage(),
+            child: HomeShellPage(aiChatHistoryStore: historyStore),
           ),
         ),
       ),
@@ -133,6 +138,8 @@ void main() {
   testWidgets('reader back gesture inset changes do not move floating nav', (
     tester,
   ) async {
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.binding.setSurfaceSize(const Size(412, 915));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final mediaQuery = ValueNotifier(
@@ -163,7 +170,7 @@ void main() {
             valueListenable: mediaQuery,
             builder: (context, data, child) =>
                 MediaQuery(data: data, child: child!),
-            child: const HomeShellPage(),
+            child: HomeShellPage(aiChatHistoryStore: historyStore),
           ),
         ),
       ),

@@ -21,6 +21,7 @@ import 'package:xxread/pages/library/download_tasks_page.dart';
 import 'package:xxread/pages/settings/settings_page.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/core/first_home_support_intro_service.dart';
+import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/glass_config.dart';
@@ -84,8 +85,13 @@ class NavigationContext extends InheritedWidget {
 }
 
 class HomeShellPage extends StatefulWidget {
-  const HomeShellPage({super.key, this.showFirstHomeSupport = false});
+  const HomeShellPage({
+    super.key,
+    required this.aiChatHistoryStore,
+    this.showFirstHomeSupport = false,
+  });
 
+  final AiChatHistoryStore aiChatHistoryStore;
   final bool showFirstHomeSupport;
 
   @override
@@ -201,7 +207,10 @@ class _HomeShellPageState extends State<HomeShellPage> {
         icon: Icons.auto_awesome_outlined,
         selectedIcon: Icons.auto_awesome,
         label: l10n.navAi,
-        page: AiPage(controller: _aiPageController),
+        page: AiPage(
+          controller: _aiPageController,
+          historyStore: widget.aiChatHistoryStore,
+        ),
       ),
       HomeNavigationDestination.settings: HomeNavigationItem(
         destination: HomeNavigationDestination.settings,

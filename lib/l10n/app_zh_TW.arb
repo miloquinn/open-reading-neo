@@ -482,7 +482,6 @@
   "noteTypeHighlight": "螢光標記",
   "noteTypeUnderline": "底線",
   "noteTypeNote": "筆記",
-  "noteTypeUnknown": "未知",
   "bookFormatTXT": "TXT",
   "bookFormatEPUB": "EPUB",
   "bookFormatPDF": "PDF",
@@ -670,9 +669,7 @@
   "homeDailyReadingGoal": "每日閱讀目標",
   "homeAiAdviceSection": "AI 閱讀建議",
   "homeTodayGlance": "今日速覽",
-  "homeTodayReadingPlan": "今日閱讀計畫",
   "homeViewAll": "檢視全部",
-  "homeSyncingReadingPlan": "正在同步你的閱讀計畫",
   "homeGoalDoneSuggestReview": "今日目標已完成，建議做一次閱讀回顧",
   "homeRemainingToGoal": "還差 {minutes} 分鐘即可完成今日目標",
   "@homeRemainingToGoal": {
@@ -1978,62 +1975,6 @@
   "importUnknownTitle": "不明標題",
   "importUnknownAuthor": "不明作者",
   "bookUntitled": "未命名",
-  "homePlanTaskCompleteDailyGoal": "完成今日目標",
-  "homePlanTaskReadMinutes": "閱讀 {minutes} 分鐘",
-  "@homePlanTaskReadMinutes": {
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskCompleteFocusReading": "完成專注閱讀",
-  "homePlanTaskFocusSession": "至少 1 次 {minutes} 分鐘專注工作階段",
-  "@homePlanTaskFocusSession": {
-    "placeholders": {
-        "minutes": {"type": "int"}
-    }
-  },
-  "homePlanTaskKeepRhythm": "保持節奏",
-  "homePlanTaskWeekAchievedDays": "本週達標天數 ≥ 5 天",
-  "noteColorLightBlue": "淺藍色",
-  "noteColorRed": "紅色",
-  "noteColorGreen": "綠色",
-  "noteColorPurple": "紫色",
-  "noteColorGold": "金色",
-  "noteColorOrange": "橙色",
-  "noteColorYellow": "黃色",
-  "noteColorDarkGreen": "深綠色",
-  "noteColorCustom": "自訂",
-  "noteShareBookHeader": "📖 《{title}》- {author}",
-  "@noteShareBookHeader": {
-    "placeholders": {
-        "title": {"type": "String"},
-        "author": {"type": "String"}
-    }
-  },
-  "noteShareNoteLabel": "💭 筆記：{note}",
-  "@noteShareNoteLabel": {
-    "placeholders": {
-        "note": {"type": "String"}
-    }
-  },
-  "noteShareChapterLabel": "📍 {chapter}",
-  "@noteShareChapterLabel": {
-    "placeholders": {
-        "chapter": {"type": "String"}
-    }
-  },
-  "noteSharePageLabel": "📄 第{page}頁",
-  "@noteSharePageLabel": {
-    "placeholders": {
-        "page": {"type": "int"}
-    }
-  },
-  "noteShareHashtags": "#讀書筆記 #{type}",
-  "@noteShareHashtags": {
-    "placeholders": {
-        "type": {"type": "String"}
-    }
-  },
   "accentPurple": "優雅紫",
   "accentPink": "櫻花粉",
   "accentCyan": "清新青",

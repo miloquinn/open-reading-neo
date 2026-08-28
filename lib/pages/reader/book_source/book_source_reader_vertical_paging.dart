@@ -2,32 +2,19 @@ part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
   ReaderViewportChromeMetrics get _verticalChrome =>
-      ReaderViewportChromeMetrics(
+      readerViewportChromeForTopBar(
         safeArea: _readerSafeArea,
-        immersive: _topBarStyle == ReaderTopBarStyle.hidden,
-        reservesTitle: _topBarStyle == ReaderTopBarStyle.reader,
+        topBarStyle: _topBarStyle,
       );
 
   double _verticalPageExtentFor(Size viewport) =>
       _verticalChrome.contentHeight(viewport.height);
 
-  Widget _buildVerticalReadingWindow(Widget child) {
-    final chrome = _verticalChrome;
-    return Padding(
-      key: const ValueKey('book-source-vertical-reading-window'),
-      padding: EdgeInsets.only(
-        top: chrome.contentTop,
-        bottom: chrome.contentBottom,
-      ),
-      child: ClipRect(child: child),
-    );
-  }
-
-  ReaderVisibleItemPosition _readerPosition(ItemPosition position) =>
-      ReaderVisibleItemPosition(
-        index: position.index,
-        leadingEdge: position.itemLeadingEdge,
-        trailingEdge: position.itemTrailingEdge,
+  Widget _buildVerticalReadingWindow(Widget child) =>
+      ReaderVerticalReadingWindow(
+        windowKey: const ValueKey('book-source-vertical-reading-window'),
+        metrics: _verticalChrome,
+        child: child,
       );
 
   GlobalKey _verticalPartKey(int chapterIndex, int partIndex) =>
@@ -142,7 +129,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
       textDirection: direction,
       extra:
           '${chrome.paginationSignature}:${_readerFontProfile.cacheSignature}:'
-          '${ReplaceRuleService.instance.rulesSignature}',
+          '${_replaceRules.rulesSignature}',
     ).cacheKey('book-source-vertical-v3');
     final cached = _verticalLayouts[chapterIndex];
     if (cached?.fingerprint == fingerprint) return cached!;
@@ -245,7 +232,9 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     final layout = _verticalLayouts[_chapterIndex];
     if (layout == null || layout.pages.isEmpty) return;
     final primary = pickPrimaryReaderItem(
-      _verticalPagePositionsListener.itemPositions.value.map(_readerPosition),
+      _verticalPagePositionsListener.itemPositions.value.map(
+        readerVisibleItemPositionFromItemPosition,
+      ),
     );
     if (primary == null) return;
     final nextPage = primary.index.clamp(0, layout.pages.length - 1);
@@ -278,7 +267,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     }
     final primary = pickPrimaryReaderItem(
       _verticalChapterPositionsListener.itemPositions.value.map(
-        _readerPosition,
+        readerVisibleItemPositionFromItemPosition,
       ),
     );
     if (primary == null) return;

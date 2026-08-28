@@ -24,16 +24,20 @@ import 'package:xxread/utils/ui_style.dart';
 import 'package:xxread/widgets/release_notes_markdown.dart';
 
 class _AiChatEntry {
-  _AiChatEntry({required this.role, required this.text}) : at = DateTime.now();
+  _AiChatEntry({required this.role, required this.text, String? content})
+    : content = content ?? text,
+      at = DateTime.now();
 
   _AiChatEntry.restored({
     required this.role,
     required this.text,
+    required this.content,
     required this.at,
   });
 
   final String role;
   final String text;
+  final String content;
   final DateTime at;
 }
 
@@ -51,8 +55,14 @@ class AiPageController {
 
 /// AI 页：悬浮导航直达的对话界面。
 class AiPage extends StatefulWidget {
-  const AiPage({super.key, this.controller, this.aiService});
+  const AiPage({
+    super.key,
+    required this.historyStore,
+    this.controller,
+    this.aiService,
+  });
 
+  final AiChatHistoryStore historyStore;
   final AiPageController? controller;
   final ConfigurableAIService? aiService;
 
@@ -65,7 +75,7 @@ class _AiPageState extends State<AiPage> {
       widget.aiService ?? ReaderHttpAIService();
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final AiChatHistoryStore _historyStore = AiChatHistoryStore();
+  late final AiChatHistoryStore _historyStore = widget.historyStore;
   final List<_AiChatEntry> _entries = [];
 
   bool _configured = false;
@@ -112,7 +122,7 @@ class _AiPageState extends State<AiPage> {
   Future<void> _openHistory() async {
     final session = await Navigator.of(context).push<AiChatHistorySession>(
       MaterialPageRoute<AiChatHistorySession>(
-        builder: (_) => const AiHistoryPage(),
+        builder: (_) => AiHistoryPage(store: _historyStore),
       ),
     );
     if (session == null || !mounted || _sending) return;
@@ -129,6 +139,7 @@ class _AiPageState extends State<AiPage> {
             (message) => _AiChatEntry.restored(
               role: message.role,
               text: message.text,
+              content: message.content,
               at: message.at,
             ),
           ),
@@ -349,7 +360,9 @@ class _AiPageState extends State<AiPage> {
     _scrollToBottomSoon();
     try {
       final history = _entries
-          .map((entry) => AIChatMessage(role: entry.role, content: entry.text))
+          .map(
+            (entry) => AIChatMessage(role: entry.role, content: entry.content),
+          )
           .toList(growable: false);
       // 交互式请求登记到协调器：后台预处理会让行，对话不排队。
       final answer = await AiRequestCoordinator().runInteractive(
@@ -368,6 +381,7 @@ class _AiPageState extends State<AiPage> {
           _AiChatEntry(
             role: 'assistant',
             text: translateMockAiResponse(context, answer),
+            content: answer,
           ),
         );
         _sending = false;
@@ -406,6 +420,7 @@ class _AiPageState extends State<AiPage> {
             AiChatHistoryMessage(
               role: entry.role,
               text: entry.text,
+              content: entry.content,
               at: entry.at,
             ),
         ],

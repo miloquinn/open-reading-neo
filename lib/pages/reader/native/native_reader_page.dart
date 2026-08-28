@@ -196,6 +196,7 @@ class NativeReaderPage extends StatefulWidget {
   const NativeReaderPage({
     super.key,
     required this.book,
+    required this.replaceRuleService,
     this.initialTheme,
     @visibleForTesting this.onPaginationCacheMiss,
     @visibleForTesting this.paginationCacheDao,
@@ -204,6 +205,7 @@ class NativeReaderPage extends StatefulWidget {
   });
 
   final Book book;
+  final ReplaceRuleService replaceRuleService;
   final ReaderThemePalette? initialTheme;
   final ValueChanged<int>? onPaginationCacheMiss;
   final PaginationCacheDao? paginationCacheDao;
@@ -216,6 +218,7 @@ class NativeReaderPage extends StatefulWidget {
 
 class _NativeReaderPageState extends State<NativeReaderPage>
     with WidgetsBindingObserver {
+  late final ReplaceRuleService _replaceRules = widget.replaceRuleService;
   late Future<List<_NativeChapter>> _chaptersFuture;
   PageController? _pageController;
   int _pageControllerGeneration = 0;
@@ -363,7 +366,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   @override
   void initState() {
     super.initState();
-    unawaited(ReplaceRuleService.instance.load());
+    unawaited(_replaceRules.load());
     _showOpeningLoader = widget.initialTheme == null;
     if (!_showOpeningLoader) {
       _openingLoaderTimer = Timer(_openingLoaderDelay, () {

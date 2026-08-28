@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/reader/reader_annotation.dart';
@@ -52,45 +53,49 @@ Future<void> showReaderAiPanelSheet({
   String bookTitle = '',
   ReaderAiSelectionContext? selection,
   ConfigurableAIService? aiService,
-}) => showModalBottomSheet<void>(
-  context: context,
-  useSafeArea: true,
-  isScrollControlled: true,
-  enableDrag: true,
-  showDragHandle: true,
-  backgroundColor: palette.controlBar,
-  constraints: const BoxConstraints(maxWidth: 720),
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-  ),
-  clipBehavior: Clip.antiAlias,
-  builder: (sheetContext) {
-    final media = MediaQuery.of(sheetContext);
-    final height = math.min(
-      media.size.height * 0.72,
-      math.max(280.0, media.size.height - media.viewInsets.bottom - 96),
-    );
-    return Theme(
-      data: themeData,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-        child: SizedBox(
-          height: height,
-          child: ReaderAiPanel(
-            palette: palette,
-            meta: meta,
-            pageText: pageText,
-            bookTitle: bookTitle,
-            selection: selection,
-            aiService: aiService ?? ReaderHttpAIService(),
+}) {
+  final historyStore = context.read<AiChatHistoryStore>();
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    enableDrag: true,
+    showDragHandle: true,
+    backgroundColor: palette.controlBar,
+    constraints: const BoxConstraints(maxWidth: 720),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    builder: (sheetContext) {
+      final media = MediaQuery.of(sheetContext);
+      final height = math.min(
+        media.size.height * 0.72,
+        math.max(280.0, media.size.height - media.viewInsets.bottom - 96),
+      );
+      return Theme(
+        data: themeData,
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: SizedBox(
+            height: height,
+            child: ReaderAiPanel(
+              palette: palette,
+              meta: meta,
+              pageText: pageText,
+              bookTitle: bookTitle,
+              selection: selection,
+              aiService: aiService ?? ReaderHttpAIService(),
+              historyStore: historyStore,
+            ),
           ),
         ),
-      ),
-    );
-  },
-);
+      );
+    },
+  );
+}
 
 class ReaderAiPanel extends StatefulWidget {
   const ReaderAiPanel({
@@ -99,6 +104,7 @@ class ReaderAiPanel extends StatefulWidget {
     required this.meta,
     required this.pageText,
     required this.aiService,
+    required this.historyStore,
     this.bookTitle = '',
     this.selection,
   });
@@ -108,6 +114,7 @@ class ReaderAiPanel extends StatefulWidget {
   final String pageText;
   final String bookTitle;
   final ConfigurableAIService aiService;
+  final AiChatHistoryStore historyStore;
   final ReaderAiSelectionContext? selection;
 
   @override
@@ -138,7 +145,6 @@ class _ReaderAiPanelState extends State<ReaderAiPanel> {
   final ScrollController _scrollController = ScrollController();
   final List<_ReaderAiChatEntry> _entries = [];
 
-  final AiChatHistoryStore _historyStore = AiChatHistoryStore();
   bool _configured = false;
   bool _configChecked = false;
   bool _sending = false;
@@ -264,12 +270,14 @@ class _ReaderAiPanelState extends State<ReaderAiPanel> {
   Future<void> _persistHistory() async {
     if (_entries.isEmpty) return;
     final now = DateTime.now();
+    final bookId = widget.meta.bookId.trim();
     _sessionId ??= now.microsecondsSinceEpoch.toString();
     _sessionCreatedAt ??= _entries.first.at;
-    await _historyStore.upsertSession(
+    await widget.historyStore.upsertSession(
       AiChatHistorySession(
         id: _sessionId!,
         bookTitle: widget.bookTitle,
+        bookId: bookId.isEmpty ? null : bookId,
         createdAt: _sessionCreatedAt!,
         updatedAt: now,
         messages: [
@@ -277,6 +285,7 @@ class _ReaderAiPanelState extends State<ReaderAiPanel> {
             AiChatHistoryMessage(
               role: entry.role,
               text: entry.display,
+              content: entry.content,
               at: entry.at,
             ),
         ],

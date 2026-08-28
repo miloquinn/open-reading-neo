@@ -208,7 +208,7 @@ class BookNote {
     {'type': 'note', 'icon': Icons.note_alt},
   ];
 
-  /// 获取颜色 code（稳定标识，UI 层通过 `bookNoteColorName` 翻译为显示文案）
+  /// 获取颜色 code（稳定标识）
   static String getColorName(String colorHex) {
     switch (colorHex.toUpperCase()) {
       case '66CCFF':
@@ -232,7 +232,7 @@ class BookNote {
     }
   }
 
-  /// 获取类型 code（稳定标识，UI 层通过 `bookNoteTypeName` 翻译为显示文案）
+  /// 获取类型 code（稳定标识）
   static String getTypeName(String type) {
     switch (type) {
       case 'highlight':
@@ -273,7 +273,7 @@ class BookNote {
   /// 转换为导出格式
   ///
   /// `type`/`color` 均为稳定 code（type code 与颜色 hex），不含本地化显示文案；
-  /// 如需展示给用户，UI 层应通过 `bookNoteTypeName` / `bookNoteColorName` 翻译。
+  /// UI 层可按当前语境把稳定 code 映射为显示文案。
   Map<String, dynamic> toExportMap() {
     return {
       'content': content,

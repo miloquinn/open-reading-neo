@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
+import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_ai_panel.dart';
 
@@ -60,8 +62,14 @@ Widget _wrapPanel(ReaderAiPanel panel) => MaterialApp(
 void main() {
   const meta = AIRequestMeta(bookId: '1', chapterId: 'chapter-1', pageIndex: 2);
 
+  setUp(() {
+    SharedPreferences.setMockInitialValues(const {});
+  });
+
   testWidgets('sends a typed question and renders the answer', (tester) async {
     final service = _FakeAiService(configured: true, answer: '这是模型的解释。');
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.pumpWidget(
       _wrapPanel(
         ReaderAiPanel(
@@ -69,6 +77,7 @@ void main() {
           meta: meta,
           pageText: '当前页正文',
           aiService: service,
+          historyStore: historyStore,
         ),
       ),
     );
@@ -88,12 +97,18 @@ void main() {
     expect(service.lastHistory!.single.content, '这一段讲了什么？');
     expect(service.lastPageText, '当前页正文');
     expect(service.lastMeta?.chapterId, 'chapter-1');
+    expect(historyStore.sessions, hasLength(1));
+    expect(historyStore.sessions.single.messages, hasLength(2));
+    expect(historyStore.sessions.single.firstQuestion, '这一段讲了什么？');
+    expect(historyStore.sessions.single.messages.first.content, '这一段讲了什么？');
   });
 
   testWidgets('shows the setup hint and disables sending when unconfigured', (
     tester,
   ) async {
     final service = _FakeAiService(configured: false);
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.pumpWidget(
       _wrapPanel(
         ReaderAiPanel(
@@ -101,6 +116,7 @@ void main() {
           meta: meta,
           pageText: '当前页正文',
           aiService: service,
+          historyStore: historyStore,
         ),
       ),
     );
@@ -119,6 +135,8 @@ void main() {
       configured: true,
       answer: '## 摘要\n\n- **要点**一\n- 要点二',
     );
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.pumpWidget(
       _wrapPanel(
         ReaderAiPanel(
@@ -126,6 +144,7 @@ void main() {
           meta: meta,
           pageText: '当前页正文',
           aiService: service,
+          historyStore: historyStore,
         ),
       ),
     );
@@ -150,6 +169,8 @@ void main() {
 
   testWidgets('auto-asks about the seeded selection', (tester) async {
     final service = _FakeAiService(configured: true, answer: '选中内容的解释。');
+    final historyStore = AiChatHistoryStore();
+    addTearDown(historyStore.dispose);
     await tester.pumpWidget(
       _wrapPanel(
         ReaderAiPanel(
@@ -157,6 +178,7 @@ void main() {
           meta: meta,
           pageText: '上文 选中文字 下文',
           aiService: service,
+          historyStore: historyStore,
           selection: const ReaderAiSelectionContext(
             selectedText: '选中文字',
             contextBefore: '上文',
@@ -173,5 +195,15 @@ void main() {
     expect(service.lastHistory!.single.content, contains('选中文字'));
     expect(service.lastHistory!.single.content, contains('上文'));
     expect(service.lastHistory!.single.content, contains('下文'));
+    expect(historyStore.sessions, hasLength(1));
+    final session = historyStore.sessions.single;
+    expect(session.bookId, meta.bookId);
+    expect(session.messages, hasLength(2));
+    final savedQuestion = session.messages.first;
+    expect(savedQuestion.text, contains('解释这段选中内容'));
+    expect(savedQuestion.text, contains('选中文字'));
+    expect(savedQuestion.content, contains('选中文字'));
+    expect(savedQuestion.content, contains('上文'));
+    expect(savedQuestion.content, contains('下文'));
   });
 }

@@ -22,7 +22,7 @@ class ComicReaderPage extends StatelessWidget {
   final Book book;
   final ReaderThemePalette initialTheme;
 
-  /// 与 [NativeReaderService.openBook] 相同的封面展开转场入口。
+  /// 与 [BookReaderLauncher.openBook] 相同的封面展开转场入口。
   static Future<void> open(
     BuildContext context,
     Book book, {

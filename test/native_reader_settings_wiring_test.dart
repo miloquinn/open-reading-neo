@@ -12,17 +12,20 @@ import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 import 'package:xxread/widgets/reader_top_information_bar.dart';
 
 void main() {
   late File bookFile;
+  late ReplaceRuleService replaceRuleService;
   const fullscreenChannel = MethodChannel('com.niki.xxread/fullscreen');
   const readerKeysChannel = MethodChannel('com.niki.xxread/reader_keys');
   const readerStatusChannel = MethodChannel('com.niki.xxread/reader_status');
 
   setUp(() {
+    replaceRuleService = ReplaceRuleService();
     SharedPreferences.setMockInitialValues({
       ReaderSettingsStore.pageModeKey: ReaderPageMode.pageCurl.name,
       ReaderSettingsStore.firstLineIndentKey: 3,
@@ -42,7 +45,8 @@ void main() {
     );
   });
 
-  tearDown(() {
+  tearDown(() async {
+    await replaceRuleService.close();
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(fullscreenChannel, null);
@@ -61,6 +65,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'Settings test',
                 filePath: bookFile.path,
@@ -184,6 +189,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'Vertical paging test',
                 filePath: verticalBook.path,
@@ -302,6 +308,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
             book: Book(
               title: 'Native tap animation',
               filePath: horizontalBook.path,
@@ -369,6 +376,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'Native instant tap',
                 filePath: horizontalBook.path,
@@ -426,7 +434,9 @@ void main() {
       '</body></html>',
     );
     try {
-      await tester.pumpWidget(_buildTabletNativeReader(tabletBook));
+      await tester.pumpWidget(
+        _buildTabletNativeReader(tabletBook, replaceRuleService),
+      );
       await tester.runAsync(() async {
         for (var attempt = 0; attempt < 30; attempt++) {
           await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -544,7 +554,9 @@ void main() {
       '</body></html>',
     );
     try {
-      await tester.pumpWidget(_buildTabletNativeReader(tabletBook));
+      await tester.pumpWidget(
+        _buildTabletNativeReader(tabletBook, replaceRuleService),
+      );
       await tester.runAsync(() async {
         for (var attempt = 0; attempt < 30; attempt++) {
           await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -588,6 +600,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: NativeReaderPage(
+              replaceRuleService: replaceRuleService,
               book: Book(
                 title: 'Tablet parity',
                 filePath: parityBook.path,
@@ -630,10 +643,14 @@ void main() {
   );
 }
 
-Widget _buildTabletNativeReader(File tabletBook) => MaterialApp(
+Widget _buildTabletNativeReader(
+  File tabletBook,
+  ReplaceRuleService replaceRuleService,
+) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: NativeReaderPage(
+    replaceRuleService: replaceRuleService,
     book: Book(
       title: 'Tablet spread',
       filePath: tabletBook.path,

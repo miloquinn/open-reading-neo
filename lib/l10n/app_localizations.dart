@@ -2712,12 +2712,6 @@ abstract class AppLocalizations {
   /// **'Note'**
   String get noteTypeNote;
 
-  /// Unknown note type
-  ///
-  /// In en, this message translates to:
-  /// **'Unknown'**
-  String get noteTypeUnknown;
-
   /// TXT book format
   ///
   /// In en, this message translates to:
@@ -3546,23 +3540,11 @@ abstract class AppLocalizations {
   /// **'Today at a Glance'**
   String get homeTodayGlance;
 
-  /// Header of the daily reading plan section
-  ///
-  /// In en, this message translates to:
-  /// **'Today\'s Reading Plan'**
-  String get homeTodayReadingPlan;
-
   /// Action to open the full detailed stats page
   ///
   /// In en, this message translates to:
   /// **'View All'**
   String get homeViewAll;
-
-  /// Hero card title while the reading plan is loading
-  ///
-  /// In en, this message translates to:
-  /// **'Syncing your reading plan'**
-  String get homeSyncingReadingPlan;
 
   /// Hero card title when today's reading goal is done
   ///
@@ -8051,126 +8033,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Untitled'**
   String get bookUntitled;
-
-  /// Reading plan task title for completing the daily reading goal
-  ///
-  /// In en, this message translates to:
-  /// **'Complete today\'s goal'**
-  String get homePlanTaskCompleteDailyGoal;
-
-  /// Reading plan task detail for reading a number of minutes
-  ///
-  /// In en, this message translates to:
-  /// **'Read {minutes} minutes'**
-  String homePlanTaskReadMinutes(int minutes);
-
-  /// Reading plan task title for completing a focus reading session
-  ///
-  /// In en, this message translates to:
-  /// **'Complete focus reading'**
-  String get homePlanTaskCompleteFocusReading;
-
-  /// Reading plan task detail for completing a focus session
-  ///
-  /// In en, this message translates to:
-  /// **'At least 1 focus session of {minutes} minutes'**
-  String homePlanTaskFocusSession(int minutes);
-
-  /// Reading plan task title for maintaining the weekly reading rhythm
-  ///
-  /// In en, this message translates to:
-  /// **'Keep the rhythm'**
-  String get homePlanTaskKeepRhythm;
-
-  /// Reading plan task detail for the weekly achieved-days target
-  ///
-  /// In en, this message translates to:
-  /// **'Weekly achieved days ≥ 5'**
-  String get homePlanTaskWeekAchievedDays;
-
-  /// Note highlight color name: light blue
-  ///
-  /// In en, this message translates to:
-  /// **'Light Blue'**
-  String get noteColorLightBlue;
-
-  /// Note highlight color name: red
-  ///
-  /// In en, this message translates to:
-  /// **'Red'**
-  String get noteColorRed;
-
-  /// Note highlight color name: green
-  ///
-  /// In en, this message translates to:
-  /// **'Green'**
-  String get noteColorGreen;
-
-  /// Note highlight color name: purple
-  ///
-  /// In en, this message translates to:
-  /// **'Purple'**
-  String get noteColorPurple;
-
-  /// Note highlight color name: gold
-  ///
-  /// In en, this message translates to:
-  /// **'Gold'**
-  String get noteColorGold;
-
-  /// Note highlight color name: orange
-  ///
-  /// In en, this message translates to:
-  /// **'Orange'**
-  String get noteColorOrange;
-
-  /// Note highlight color name: yellow
-  ///
-  /// In en, this message translates to:
-  /// **'Yellow'**
-  String get noteColorYellow;
-
-  /// Note highlight color name: dark green
-  ///
-  /// In en, this message translates to:
-  /// **'Dark Green'**
-  String get noteColorDarkGreen;
-
-  /// Note highlight color name: custom color
-  ///
-  /// In en, this message translates to:
-  /// **'Custom'**
-  String get noteColorCustom;
-
-  /// Share text header line with book title and author
-  ///
-  /// In en, this message translates to:
-  /// **'📖 《{title}》 - {author}'**
-  String noteShareBookHeader(String title, String author);
-
-  /// Share text line for the reader's note
-  ///
-  /// In en, this message translates to:
-  /// **'💭 Note: {note}'**
-  String noteShareNoteLabel(String note);
-
-  /// Share text line for the chapter name
-  ///
-  /// In en, this message translates to:
-  /// **'📍 {chapter}'**
-  String noteShareChapterLabel(String chapter);
-
-  /// Share text line for the page number
-  ///
-  /// In en, this message translates to:
-  /// **'📄 Page {page}'**
-  String noteSharePageLabel(int page);
-
-  /// Share text hashtags line with the note type name
-  ///
-  /// In en, this message translates to:
-  /// **'#BookNotes #{type}'**
-  String noteShareHashtags(String type);
 
   /// Accent color display name: elegant purple
   ///

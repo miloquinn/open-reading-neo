@@ -139,7 +139,7 @@ BookReaderTransitionOrigin
 
 ### 7.2 首页入口
 
-首页打开方法负责传入 `home` 入口语义，不复制路由动画代码。本地阅读仍通过 `NativeReaderService`，在线阅读仍通过 `BookSourceReaderPage`。
+首页打开方法负责传入 `home` 入口语义，不复制路由动画代码。本地阅读仍通过 `BookReaderLauncher`，在线阅读仍通过 `BookSourceReaderPage`。
 
 ### 7.3 发现页详情
 

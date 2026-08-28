@@ -2,32 +2,19 @@ part of 'native_reader_page.dart';
 
 extension _NativeReaderVerticalPaging on _NativeReaderPageState {
   ReaderViewportChromeMetrics get _verticalChrome =>
-      ReaderViewportChromeMetrics(
+      readerViewportChromeForTopBar(
         safeArea: _readerSafeArea,
-        immersive: _topBarStyle == ReaderTopBarStyle.hidden,
-        reservesTitle: _topBarStyle == ReaderTopBarStyle.reader,
+        topBarStyle: _topBarStyle,
       );
 
   double _verticalPageExtentFor(Size viewport) =>
       _verticalChrome.contentHeight(viewport.height);
 
-  Widget _buildVerticalReadingWindow(Widget child) {
-    final chrome = _verticalChrome;
-    return Padding(
-      key: const ValueKey('native-vertical-reading-window'),
-      padding: EdgeInsets.only(
-        top: chrome.contentTop,
-        bottom: chrome.contentBottom,
-      ),
-      child: ClipRect(child: child),
-    );
-  }
-
-  ReaderVisibleItemPosition _readerPosition(ItemPosition position) =>
-      ReaderVisibleItemPosition(
-        index: position.index,
-        leadingEdge: position.itemLeadingEdge,
-        trailingEdge: position.itemTrailingEdge,
+  Widget _buildVerticalReadingWindow(Widget child) =>
+      ReaderVerticalReadingWindow(
+        windowKey: const ValueKey('native-vertical-reading-window'),
+        metrics: _verticalChrome,
+        child: child,
       );
 
   GlobalKey _continuousPartKey(String chapterId, int partIndex) =>
@@ -41,7 +28,9 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       return;
     }
     final primary = pickPrimaryReaderItem(
-      _verticalPagePositionsListener.itemPositions.value.map(_readerPosition),
+      _verticalPagePositionsListener.itemPositions.value.map(
+        readerVisibleItemPositionFromItemPosition,
+      ),
     );
     if (primary == null) return;
     final nextPage = primary.index.clamp(0, _visibleContinuousParts.length - 1);
@@ -74,7 +63,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     }
     final primary = pickPrimaryReaderItem(
       _verticalChapterPositionsListener.itemPositions.value.map(
-        _readerPosition,
+        readerVisibleItemPositionFromItemPosition,
       ),
     );
     if (primary == null) return;

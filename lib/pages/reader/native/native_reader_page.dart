@@ -51,6 +51,7 @@ import 'package:xxread/pages/export/reading_data_export_dialog.dart';
 import 'package:xxread/pages/settings/font_selection_sheet.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/books/book_dao.dart';
+import 'package:xxread/services/books/book_format_support.dart';
 import 'package:xxread/services/books/book_note_dao.dart';
 import 'package:xxread/services/books/bookmark_dao.dart';
 import 'package:xxread/services/books/enhanced_txt_import_service.dart';

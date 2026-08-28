@@ -30,6 +30,18 @@ void main() {
     expect(BookFormatRegistry.targetsUnifiedTextLayout('cbz'), isFalse);
   });
 
+  test('流式文字格式统一由用户段距覆盖解析器空白行', () {
+    expect(BookFormatRegistry.normalizesParagraphBreaks('TXT'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('.epub'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('mobi'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('azw'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('AZW3'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('html'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('docx'), isTrue);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('pdf'), isFalse);
+    expect(BookFormatRegistry.normalizesParagraphBreaks('cbz'), isFalse);
+  });
+
   test('阅读器入口由格式注册表统一路由', () {
     expect(
       BookFormatRegistry.readerDestinationFor('epub'),

@@ -171,7 +171,5 @@ List<_ReaderPageData> _paginateChapter(
   return pages;
 }
 
-bool _normalizesParagraphBreaks(String format) {
-  final normalized = format.toLowerCase();
-  return normalized == 'txt' || normalized == 'epub';
-}
+bool _normalizesParagraphBreaks(String format) =>
+    BookFormatRegistry.normalizesParagraphBreaks(format);

@@ -216,5 +216,5 @@ extension _NativeReaderPageCache on _NativeReaderPageState {
         '${_readerFontProfile.cacheSignature}:'
         '${widget.book.format.toLowerCase() == 'txt' ? _txtChapterTitlePageEnabled : true}:'
         '${_replaceRules.rulesSignature}',
-  ).cacheKey('native-line-v9');
+  ).cacheKey('native-line-v10');
 }

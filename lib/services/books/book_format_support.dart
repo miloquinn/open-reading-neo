@@ -53,6 +53,7 @@ class BookFormatSpec {
     required this.capability,
     required this.pipeline,
     required this.acceptInFilePicker,
+    this.normalizesParagraphBreaks = false,
     this.notes = '',
     this.lightinkNote = '',
   });
@@ -69,6 +70,10 @@ class BookFormatSpec {
 
   /// 是否出现在系统文件选择器允许列表中。
   final bool acceptInFilePicker;
+
+  /// Parser/source-owned blank rows represent structural paragraph boundaries
+  /// and should be rebuilt from the reader's paragraph-spacing preference.
+  final bool normalizesParagraphBreaks;
 
   final String notes;
 
@@ -99,6 +104,7 @@ class BookFormatRegistry {
       capability: BookFormatCapability.fullReader,
       pipeline: BookReaderPipeline.plainTextChapters,
       acceptInFilePicker: true,
+      normalizesParagraphBreaks: true,
       notes: '编码探测 + 章节规则 + NativeTextPaginator。',
       lightinkNote: 'TxtImporter → ChapterRules → TxtLayout（完整主路径）。',
     ),
@@ -109,6 +115,7 @@ class BookFormatRegistry {
       capability: BookFormatCapability.convertThenLayout,
       pipeline: BookReaderPipeline.structuredToPlainText,
       acceptInFilePicker: true,
+      normalizesParagraphBreaks: true,
       notes: 'epubx 解析；章节文本进入统一分页。非 WebView 排版。',
       lightinkNote:
           'EpubImporter → EpubParser → HtmlParser 抽文本 → 同一 TxtLayout。',
@@ -132,6 +139,7 @@ class BookFormatRegistry {
       capability: BookFormatCapability.convertThenLayout,
       pipeline: BookReaderPipeline.structuredToPlainText,
       acceptInFilePicker: true,
+      normalizesParagraphBreaks: true,
       notes:
           'kindle_unpack 解析（KF8 skeleton 分段 / MOBI7 按 pagebreak 切章），'
           'XHTML 走 EPUB 同款章节转换；DRM 书籍仅元数据与封面，正文提示不可读。'
@@ -145,6 +153,7 @@ class BookFormatRegistry {
       capability: BookFormatCapability.convertThenLayout,
       pipeline: BookReaderPipeline.structuredToPlainText,
       acceptInFilePicker: true,
+      normalizesParagraphBreaks: true,
       notes: 'section 切章 + XML 抽文本 → 统一分页（Lightink 未做，OR 扩展）。',
       lightinkNote: '未支持。',
     ),
@@ -185,6 +194,7 @@ class BookFormatRegistry {
       capability: BookFormatCapability.convertThenLayout,
       pipeline: BookReaderPipeline.structuredToPlainText,
       acceptInFilePicker: true,
+      normalizesParagraphBreaks: true,
       notes: '按标题切章 → 统一分页。',
       lightinkNote: '未支持。',
     ),
@@ -303,6 +313,16 @@ class BookFormatRegistry {
     return spec.pipeline == BookReaderPipeline.plainTextChapters ||
         spec.pipeline == BookReaderPipeline.structuredToPlainText;
   }
+
+  /// Whether parser/source-owned blank rows should be projected through the
+  /// reader's paragraph-spacing setting.
+  ///
+  /// Every currently readable flowing-text adapter emits structural paragraph
+  /// boundaries as line-break runs before entering the shared paginator. Keep
+  /// this capability beside the format pipeline registry so newly added text
+  /// formats cannot silently miss the same normalization (as Kindle once did).
+  static bool normalizesParagraphBreaks(String extension) =>
+      targetsUnifiedTextLayout(extension);
 
   /// Chooses the reader surface from the same registry used by import.
   static BookReaderDestination readerDestinationFor(String extension) {

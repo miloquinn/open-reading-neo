@@ -42,7 +42,7 @@ dependencies:
 
   # 电子书格式支持
   epubx: ^4.0.0
-  pdfx: ^2.9.2
+  pdfx: ^2.11.0
   archive: ^3.6.1
   kindle_unpack: ^0.1.1
 
@@ -68,7 +68,7 @@ dependencies:
   flutter_tts: ^4.2.5
 
   # 网络请求（AI 与封面检索）
-  dio: ^5.10.0
+  dio: ^5.11.0
 
   # 高亮笔记
   uuid: ^4.6.0
@@ -80,8 +80,8 @@ dependencies:
   audioplayers: ^6.8.1
   pointycastle: ^4.0.0
   in_app_purchase: ^3.3.0
-  passkeys: ^2.22.0
-  sign_in_with_apple: ^8.1.0
+  passkeys: ^2.22.3
+  sign_in_with_apple: ^8.2.0
 
 dev_dependencies:
   flutter_test:

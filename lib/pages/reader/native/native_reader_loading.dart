@@ -8,10 +8,11 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     if (_readerDependenciesInitialized) return;
     final cacheKey = _bookCacheKey;
     _paginationCacheLoadFuture = _loadPersistedPaginationCache();
-    if (_isLargeTxtBook || !widget.usePaginationMemoryCache) {
-      // Large TXT books already retain their chapter text in memory. Keeping
-      // another static cache prevents that memory from being released after
-      // leaving the reader and can push Android into heavy GC or an OOM.
+    if (_shouldBypassReaderMemoryCaches) {
+      // Large books already retain substantial parsed chapter and image data
+      // in memory. Keeping that graph in the static reopen cache prevents it
+      // from being released after leaving the reader and can push Android into
+      // heavy GC or an OOM. Disk caches still cover indexed TXT and pagination.
       _pageCache = <String, List<_ReaderPageData>>{};
       _chaptersFuture = _prepareLoadedChapters(_loadBook());
       _readerDependenciesInitialized = true;

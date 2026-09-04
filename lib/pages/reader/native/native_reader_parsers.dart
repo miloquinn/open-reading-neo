@@ -3,7 +3,7 @@ part of 'native_reader_page.dart';
 Future<Map<String, dynamic>> _parseEpubChapters(Uint8List bytes) async {
   final epub = await EpubReader.readBook(bytes);
   final result = <Map<String, dynamic>>[];
-  final imagesByName = <String, String>{};
+  final imagesByName = <String, Uint8List>{};
 
   final imageEntries = epub.Content?.Images?.entries;
   if (imageEntries != null) {
@@ -11,7 +11,7 @@ Future<Map<String, dynamic>> _parseEpubChapters(Uint8List bytes) async {
       final content = entry.value.Content;
       if (content == null || content.isEmpty) continue;
       final name = path.basename(Uri.decodeFull(entry.key)).toLowerCase();
-      imagesByName[name] = base64Encode(content);
+      imagesByName[name] = Uint8List.fromList(content);
     }
   }
 
@@ -95,14 +95,14 @@ Map<String, String> _cssRulesFromSources(Iterable<String> sources) {
 /// 把单个 XHTML 文档转换为章节 map（plainText + 样式/图片 blocks）。
 ///
 /// EPUB 与 Kindle（MOBI/KF8）共用：两者正文都是 HTML，差异只在
-/// 图片命名与 CSS 来源，由调用方先行归一化（imagesByName 的值为
-/// base64 字符串，图片引用需已重写为可按 basename 命中的文件名）。
+/// 图片命名与 CSS 来源，由调用方先行归一化（图片引用需已重写为可按
+/// basename 命中的文件名）。
 Map<String, dynamic>? _chapterMapFromHtmlDocument({
   required String id,
   required String title,
   required int depth,
   required html_dom.Document document,
-  required Map<String, String> imagesByName,
+  required Map<String, Uint8List> imagesByName,
   required Map<String, String> cssRules,
 }) {
   final blocks = <Map<String, String>>[];
@@ -122,10 +122,9 @@ Map<String, dynamic>? _chapterMapFromHtmlDocument({
       final name = path
           .basename(Uri.decodeFull(src.split('?').first.split('#').first))
           .toLowerCase();
-      // 只存图片名，不把 base64 内容内联进每一个块：同一张图（例如页头
-      // logo）可能被数千个章节复用，内联会把它的编码内容复制数千份，
-      // 拖慢解析并在重建 _NativeBlock 时于主线程重复 base64 解码。真正的
-      // 内容由 [_richChaptersFromParsed] 按图片名解码一次、共享给所有引用。
+      // 只存图片名，不把内容内联进每一个块：同一张图（例如页头 logo）
+      // 可能被数千个章节复用。真正的字节由
+      // [_richChaptersFromParsed] 按图片名共享给所有引用。
       if (imagesByName.containsKey(name)) {
         blocks.add(<String, String>{
           'type': 'image',
@@ -227,9 +226,9 @@ Map<String, dynamic>? _chapterMapFromHtmlDocument({
 /// 章节转换。DRM 书籍抛 [KindleDrmException]。
 Future<Map<String, dynamic>> _parseKindleChapters(Uint8List bytes) async {
   final content = parseKindleContent(bytes);
-  final imagesByName = <String, String>{
+  final imagesByName = <String, Uint8List>{
     for (final entry in content.imagesByName.entries)
-      entry.key.toLowerCase(): base64Encode(entry.value),
+      entry.key.toLowerCase(): entry.value,
   };
   final cssRules = _cssRulesFromSources(content.cssParts);
 
@@ -529,26 +528,16 @@ class _ReaderBookLoadException implements Exception {
 }
 
 /// EPUB/Kindle 等富文本管线的解析结果（`{'chapters': [...], 'images': {name:
-/// base64}}`，见 [_parseEpubChapters]/[_parseKindleChapters]）→
+/// bytes}}`，见 [_parseEpubChapters]/[_parseKindleChapters]）→
 /// [_NativeChapter]（保留样式与图片块）。
 ///
-/// 每张图片的 base64 只在这里按名字解码一次并在所有引用它的章节间共享——
-/// 图片内容不会像章节文本那样逐块内联，避免一张被数千个章节复用的页头图
-/// 被重复解码数千次。
+/// 每张图片的字节在所有引用它的章节间共享。Uint8List 可以由 compute 的
+/// 临时 isolate 直接转移所有权，避免 Base64 的体积膨胀和往返编解码。
 List<_NativeChapter> _richChaptersFromParsed(Map<String, dynamic> parsed) {
-  final imagesByName = Map<String, String>.from(
+  final imagesByName = Map<String, Uint8List>.from(
     parsed['images'] as Map? ?? const {},
   );
-  final decodedImages = <String, Uint8List>{};
-  Uint8List? resolveImage(String name) {
-    final cached = decodedImages[name];
-    if (cached != null) return cached;
-    final encoded = imagesByName[name];
-    if (encoded == null) return null;
-    final decoded = base64Decode(encoded);
-    decodedImages[name] = decoded;
-    return decoded;
-  }
+  Uint8List? resolveImage(String name) => imagesByName[name];
 
   final chapters = parsed['chapters'] as List<dynamic>? ?? const [];
   return chapters

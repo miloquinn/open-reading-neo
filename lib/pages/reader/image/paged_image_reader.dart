@@ -17,10 +17,10 @@ import 'package:xxread/core/reader/reader_keep_screen_on.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/core/reader/reader_tap_zones.dart';
 import 'package:xxread/core/reader/reader_volume_key_controller.dart';
+import 'package:xxread/pages/reader/image/image_reader_chrome.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/reader_themes.dart';
-import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 import 'package:xxread/widgets/reader_theme_background.dart';
 
@@ -45,6 +45,9 @@ class PagedImageReader extends StatefulWidget {
     this.onReachedEnd,
     this.onReachedStart,
     this.onTableOfContents,
+    this.onDirectionChanged,
+    this.backgroundOverride,
+    this.onSettings,
   });
 
   final String title;
@@ -62,6 +65,10 @@ class PagedImageReader extends StatefulWidget {
   final VoidCallback? onReachedEnd;
   final VoidCallback? onReachedStart;
   final VoidCallback? onTableOfContents;
+  final Future<void> Function(ImageReaderDirection direction)?
+  onDirectionChanged;
+  final ImageReaderBackground? backgroundOverride;
+  final VoidCallback? onSettings;
 
   @override
   State<PagedImageReader> createState() => _PagedImageReaderState();
@@ -91,6 +98,7 @@ class _PagedImageReaderState extends State<PagedImageReader> {
   @override
   void initState() {
     super.initState();
+    _background = widget.backgroundOverride ?? ImageReaderBackground.black;
     _currentPage = widget.initialPage.clamp(0, widget.pageCount - 1);
     _pageController = PageController(initialPage: _currentPage);
     _verticalPositions.itemPositions.addListener(_handleVerticalPositions);
@@ -98,6 +106,15 @@ class _PagedImageReaderState extends State<PagedImageReader> {
     unawaited(_restoreSettings());
     unawaited(ReaderKeepScreenOnController.activate(this));
     unawaited(_activateVolumeKeys());
+  }
+
+  @override
+  void didUpdateWidget(covariant PagedImageReader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final background = widget.backgroundOverride;
+    if (background != null && background != oldWidget.backgroundOverride) {
+      _background = background;
+    }
   }
 
   @override
@@ -120,7 +137,8 @@ class _PagedImageReaderState extends State<PagedImageReader> {
             widget.settingsId,
             fallback: widget.defaultDirection,
           );
-    final background = await _settingsStore.loadBackground();
+    final background =
+        widget.backgroundOverride ?? await _settingsStore.loadBackground();
     if (!mounted) return;
     final directionChanged = _direction != direction;
     setState(() {
@@ -284,6 +302,11 @@ class _PagedImageReaderState extends State<PagedImageReader> {
 
   Future<void> _setDirection(ImageReaderDirection direction) async {
     if (_direction == direction) return;
+    final onDirectionChanged = widget.onDirectionChanged;
+    if (onDirectionChanged != null) {
+      await onDirectionChanged(direction);
+      return;
+    }
     setState(() => _direction = direction);
     if (direction == ImageReaderDirection.vertical) {
       _scheduleVerticalJump(_currentPage);
@@ -303,18 +326,6 @@ class _PagedImageReaderState extends State<PagedImageReader> {
   Future<void> _setBackground(ImageReaderBackground background) async {
     setState(() => _background = background);
     await _settingsStore.saveBackground(background);
-  }
-
-  Future<void> _showJumpDialog() async {
-    final target = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) => _JumpPageDialog(
-        pageCount: widget.pageCount,
-        initialPage: _currentPage + 1,
-      ),
-    );
-    if (target == null) return;
-    _goToPage(target - 1, animate: false);
   }
 
   Future<void> _showSettingsSheet() async {
@@ -497,277 +508,37 @@ class _PagedImageReaderState extends State<PagedImageReader> {
               ),
             ),
           ),
-          _buildChrome(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChrome(BuildContext context) {
-    final l10n = context.l10n;
-    final safeTop = MediaQuery.paddingOf(context).top + 10;
-    final safeBottom = MediaQuery.paddingOf(context).bottom + 16;
-    final pageCount = widget.pageCount;
-    return Positioned.fill(
-      child: IgnorePointer(
-        ignoring: !_chromeVisible,
-        child: Stack(
-          children: [
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: 20,
-              right: 20,
-              top: _chromeVisible ? safeTop : -100,
-              child: ReaderControlBar(
-                palette: _palette,
-                isTopBar: true,
-                child: SizedBox(
-                  height: 58,
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 7),
-                      ReaderControlIconButton(
-                        palette: _palette,
-                        onPressed: () {
-                          BookOpenTransition.beginExit();
-                          Navigator.of(context).maybePop();
-                        },
-                        tooltip: MaterialLocalizations.of(
-                          context,
-                        ).backButtonTooltip,
-                        icon: Icons.arrow_back_rounded,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          widget.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _palette.text,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: _showJumpDialog,
-                        borderRadius: BorderRadius.circular(99),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _palette.controlFill.withValues(alpha: 0.58),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            '${_currentPage + 1} / $pageCount',
-                            style: TextStyle(
-                              color: _palette.secondaryText,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 9),
-                    ],
-                  ),
-                ),
+          ImageReaderChrome(
+            palette: _palette,
+            visible: _chromeVisible,
+            title: widget.title,
+            pageIndex: _currentPage,
+            pageCount: widget.pageCount,
+            directionIcon: _vertical
+                ? Icons.swap_vert_rounded
+                : Icons.swap_horiz_rounded,
+            directionLabel: switch (_direction) {
+              ImageReaderDirection.vertical =>
+                context.l10n.imageReaderDirectionVertical,
+              ImageReaderDirection.ltr => context.l10n.imageReaderDirectionLtr,
+              ImageReaderDirection.rtl => context.l10n.imageReaderDirectionRtl,
+            },
+            onBack: () {
+              BookOpenTransition.beginExit();
+              Navigator.of(context).maybePop();
+            },
+            onPageSelected: (index) => _goToPage(index, animate: false),
+            onTableOfContents: widget.onTableOfContents,
+            onDirection: () => unawaited(
+              _setDirection(
+                _vertical
+                    ? ImageReaderDirection.ltr
+                    : ImageReaderDirection.vertical,
               ),
             ),
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: 22,
-              right: 22,
-              bottom: _chromeVisible ? safeBottom : -110,
-              child: ReaderControlBar(
-                palette: _palette,
-                isTopBar: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 7, 10, 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 6,
-                          ),
-                          overlayShape: const RoundSliderOverlayShape(
-                            overlayRadius: 14,
-                          ),
-                        ),
-                        child: Slider(
-                          value: (_currentPage + 1)
-                              .clamp(1, pageCount)
-                              .toDouble(),
-                          min: 1,
-                          max: pageCount.toDouble(),
-                          divisions: pageCount > 1 ? pageCount - 1 : null,
-                          onChanged: (value) =>
-                              _goToPage(value.round() - 1, animate: false),
-                        ),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          if (widget.onTableOfContents != null)
-                            _ChromeAction(
-                              palette: _palette,
-                              icon: Icons.format_list_bulleted_rounded,
-                              label: l10n.readerToolbarTOC,
-                              onTap: widget.onTableOfContents!,
-                            ),
-                          _ChromeAction(
-                            palette: _palette,
-                            icon: _vertical
-                                ? Icons.swap_vert_rounded
-                                : Icons.swap_horiz_rounded,
-                            label: switch (_direction) {
-                              ImageReaderDirection.vertical =>
-                                l10n.imageReaderDirectionVertical,
-                              ImageReaderDirection.ltr =>
-                                l10n.imageReaderDirectionLtr,
-                              ImageReaderDirection.rtl =>
-                                l10n.imageReaderDirectionRtl,
-                            },
-                            onTap: () => unawaited(
-                              _setDirection(
-                                _vertical
-                                    ? ImageReaderDirection.ltr
-                                    : ImageReaderDirection.vertical,
-                              ),
-                            ),
-                          ),
-                          _ChromeAction(
-                            palette: _palette,
-                            icon: Icons.numbers_rounded,
-                            label: l10n.imageReaderJumpToPage,
-                            onTap: _showJumpDialog,
-                          ),
-                          _ChromeAction(
-                            palette: _palette,
-                            icon: Icons.tune_rounded,
-                            label: l10n.imageReaderSettings,
-                            onTap: _showSettingsSheet,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 跳页对话框：自持输入控制器，随路由销毁一起释放，返回 1-based 页码。
-class _JumpPageDialog extends StatefulWidget {
-  const _JumpPageDialog({required this.pageCount, required this.initialPage});
-
-  final int pageCount;
-  final int initialPage;
-
-  @override
-  State<_JumpPageDialog> createState() => _JumpPageDialogState();
-}
-
-class _JumpPageDialogState extends State<_JumpPageDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: '${widget.initialPage}',
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return Theme(
-      data: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blueGrey,
-          brightness: Brightness.dark,
-        ),
-      ),
-      child: AlertDialog(
-        title: Text(l10n.imageReaderJumpToPage),
-        content: TextField(
-          controller: _controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(hintText: '1 - ${widget.pageCount}'),
-          onSubmitted: (value) =>
-              Navigator.of(context).pop(int.tryParse(value)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(int.tryParse(_controller.text)),
-            child: Text(l10n.confirm),
+            onSettings: widget.onSettings ?? _showSettingsSheet,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 底部操作项：图标 + 短标签，白色前景适配黑色控制栏。
-class _ChromeAction extends StatelessWidget {
-  const _ChromeAction({
-    required this.palette,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final ReaderThemePalette palette;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: palette.text, size: 22),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: palette.secondaryText,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

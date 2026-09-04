@@ -240,6 +240,52 @@ void main() {
     },
   );
 
+  test('memory pressure release preserves a pending disk write', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-chapter-memory-release-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final writeStarted = Completer<void>();
+    final allowWrite = Completer<void>();
+    addTearDown(() {
+      if (!allowWrite.isCompleted) allowWrite.complete();
+    });
+    final cache = BookSourceChapterCache(
+      cacheDirectory: directory,
+      beforeDiskWrite: () {
+        writeStarted.complete();
+        return allowWrite.future;
+      },
+    );
+
+    await cache.getOrLoad(
+      sourceId: 'source',
+      bookId: 'book',
+      chapterId: 'chapter',
+      loader: () async => const BookSourceChapterContent(
+        bookId: 'book',
+        chapterId: 'chapter',
+        title: '可恢复',
+        content: '磁盘正文',
+        contentType: 'text/plain',
+      ),
+    );
+    await writeStarted.future;
+    BookSourceChapterCache.releaseMemory();
+    allowWrite.complete();
+    await _waitForJsonContent(directory, '磁盘正文');
+
+    BookSourceChapterCache.clearMemory();
+    final restored = await BookSourceChapterCache(cacheDirectory: directory)
+        .getOrLoad(
+          sourceId: 'source',
+          bookId: 'book',
+          chapterId: 'chapter',
+          loader: () => throw StateError('pending disk write was cancelled'),
+        );
+    expect(restored.content, '磁盘正文');
+  });
+
   test(
     'deduplicates concurrent chapter requests and keeps a memory cache',
     () async {

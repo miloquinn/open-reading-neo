@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_import_models.dart';
@@ -161,6 +162,32 @@ void main() {
       await service.dispose();
     },
   );
+
+  test('accepts a CBZ from the system-open intake path', () async {
+    final archive = Archive()
+      ..addFile(ArchiveFile('001.jpg', 4, <int>[0xff, 0xd8, 0xff, 0xd9]));
+    final file = File('${sandbox.path}/comic.cbz');
+    await file.writeAsBytes(ZipEncoder().encode(archive)!);
+    final item = IncomingBookItem(
+      id: 'comic',
+      displayName: 'comic.cbz',
+      localPath: file.path,
+      mimeType: 'application/vnd.comicbook+zip',
+      sizeBytes: await file.length(),
+    );
+
+    final source = await IncomingBookMaterializer().prepare(
+      IncomingBookRequest(
+        requestId: 'comic',
+        action: IncomingBookAction.open,
+        items: <IncomingBookItem>[item],
+      ),
+      item,
+    );
+
+    expect(source.extension, 'cbz');
+    expect(source.kind, BookImportSourceKind.systemOpen);
+  });
 
   test(
     'reports partial native failures while importing valid shared files',

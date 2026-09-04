@@ -13,7 +13,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/home/home_mobile_dashboard_page.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
-import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
+import 'package:xxread/pages/reader/comic/comic_reader_page.dart';
 import 'package:xxread/pages/reader/book_source/online_reader_factory.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
@@ -344,7 +344,7 @@ void main() {
       replaceRuleService: replaceRules,
     );
 
-    expect(reader, isA<OnlineComicReaderPage>());
+    expect(reader, isA<ComicReaderPage>());
   });
 
   test('在线阅读工厂拒绝不完整或冲突的输入', () {

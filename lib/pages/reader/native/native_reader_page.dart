@@ -116,6 +116,7 @@ part 'native_reader_continuous_layout.dart';
 typedef NativePageMode = ReaderPageMode;
 
 const int _largeTxtFileThreshold = 2 * 1024 * 1024;
+const int _largeInMemoryBookCacheThreshold = 16 * 1024 * 1024;
 const int _txtChapterCacheVersion = 5;
 const double _imagePageGap = 10;
 const int _imagePageImageFlex = 5;
@@ -127,6 +128,15 @@ final Map<String, List<ReaderNavigationChapter>> _navigationMemoryCache = {};
 final Map<String, Map<String, List<_ReaderPageData>>> _paginationMemoryCache =
     {};
 final Map<String, Future<void>> _epubFontLoads = <String, Future<void>>{};
+
+/// Drops reopen-only reader caches when Android/iOS reports memory pressure.
+/// Active readers keep their loaded chapters through their State fields and
+/// can rebuild pagination entries on demand.
+void clearNativeReaderMemoryCaches() {
+  _bookMemoryCache.clear();
+  _navigationMemoryCache.clear();
+  _paginationMemoryCache.clear();
+}
 
 Future<void> _registerEpubFonts(Map<String, String> fonts) => Future.wait(
   fonts.entries.map((entry) {
@@ -587,6 +597,22 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     }
   }
 
+  bool get _shouldBypassReaderMemoryCaches {
+    if (kIsWeb || !widget.usePaginationMemoryCache) return true;
+    if (_isLargeTxtBook) return true;
+    final format = widget.book.format.toLowerCase();
+    // Local EPUBs use a small index plus a bounded lazy chapter window, so
+    // their source file size does not represent the retained object graph.
+    // Other native text formats are still parsed as one in-memory document.
+    if (format == 'epub' || format == 'txt') return false;
+    try {
+      return File(widget.book.filePath).lengthSync() >
+          _largeInMemoryBookCacheThreshold;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -662,6 +688,9 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         ? null
         : ((chapterIndex + chapterProgress) / chapterCount).clamp(0.0, 1.0);
     final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
+    // The serialized write can run after this State has been disposed. Resolve
+    // context-dependent font and locale data while the reader is still alive.
+    final layoutSignature = _layoutSignature;
     unawaited(
       ReadingResumeService.recordPosition(
         bookId: bookId,
@@ -674,7 +703,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         bookId,
         canonicalLocator,
         null,
-        _layoutSignature,
+        layoutSignature,
         chapterIndex,
         readingProgress: readingProgress,
       ),

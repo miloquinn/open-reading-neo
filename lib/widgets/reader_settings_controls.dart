@@ -897,27 +897,35 @@ class ReaderThemeStrip extends StatelessWidget {
     required this.labelFor,
     required this.onSelected,
     required this.onCustomThemeTap,
+    this.palettes,
+    this.showCustomAction = true,
+    this.cardWidth = 108,
+    this.spacing = 10,
   });
 
   final String selectedThemeId;
   final String Function(String themeId) labelFor;
   final ValueChanged<String> onSelected;
   final VoidCallback onCustomThemeTap;
+  final List<ReaderThemePalette>? palettes;
+  final bool showCustomAction;
+  final double cardWidth;
+  final double spacing;
 
   @override
   Widget build(BuildContext context) {
     final customThemes = ReaderThemes.customThemes;
-    final themes = ReaderThemes.orderedPalettes;
+    final themes = palettes ?? ReaderThemes.orderedPalettes;
     return SizedBox(
       height: 122,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 1),
         physics: const BouncingScrollPhysics(),
-        itemCount: themes.length + 1,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemCount: themes.length + (showCustomAction ? 1 : 0),
+        separatorBuilder: (_, _) => SizedBox(width: spacing),
         itemBuilder: (context, index) {
-          if (index == themes.length) {
+          if (showCustomAction && index == themes.length) {
             final colors = Theme.of(context).colorScheme;
             return SizedBox(
               width: 108,
@@ -1018,6 +1026,7 @@ class ReaderThemeStrip extends StatelessWidget {
               : customTheme.name.trim();
           return _ReaderThemeCard(
             key: ValueKey('reader-theme-${palette.id}'),
+            width: cardWidth,
             palette: palette,
             label: label,
             selected: selected,
@@ -1049,6 +1058,7 @@ class ReaderThemeStrip extends StatelessWidget {
 class _ReaderThemeCard extends StatelessWidget {
   const _ReaderThemeCard({
     super.key,
+    this.width = 108,
     required this.palette,
     required this.label,
     required this.selected,
@@ -1056,6 +1066,7 @@ class _ReaderThemeCard extends StatelessWidget {
     required this.onTap,
   });
 
+  final double width;
   final ReaderThemePalette palette;
   final String label;
   final bool selected;
@@ -1066,7 +1077,7 @@ class _ReaderThemeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cardRadius = BorderRadius.circular(18);
     return SizedBox(
-      width: 108,
+      width: width,
       child: Semantics(
         button: true,
         selected: selected,

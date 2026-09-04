@@ -175,6 +175,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   int _chapterIndex = 0;
   bool _loadingCatalog = true;
   bool _loadingContent = false;
+  int? _requestedChapterIndex;
   bool _controlsVisible = false;
   Object? _error;
   double _fontSize = 19;
@@ -438,6 +439,15 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
       unawaited(_saveProgress());
       unawaited(_flushReadingSession());
     }
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    _pagedLayoutWarmTimer?.cancel();
+    _pagedLayoutWarmTimer = null;
+    _pagedLayoutWarmTimerIndex = null;
+    _queuedPagedLayoutWarms.clear();
+    _trimChapterMemoryCaches(aggressive: true);
   }
 
   @override

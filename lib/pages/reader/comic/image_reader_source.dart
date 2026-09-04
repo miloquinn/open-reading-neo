@@ -26,7 +26,7 @@ class ImageReaderDocument {
 }
 
 /// One image-book session. Local archives and online sources adapt to this
-/// port; [ImageReaderHost] owns chapter/page state and chrome.
+/// port; the unified comic page owns chapter/page state and chrome.
 abstract class ImageReaderSource {
   String get bookTitle;
   ReaderThemePalette get theme;
@@ -67,6 +67,11 @@ abstract class ImageReaderSource {
   /// Keep only the requested chapter window in session memory. Persistent
   /// caches remain available when an evicted chapter becomes visible again.
   void retainChapterWindow(int firstChapterIndex, int lastChapterIndex) {}
+
+  /// Drop reconstructable session data while retaining the active chapter.
+  void handleMemoryPressure(int activeChapterIndex) {
+    retainChapterWindow(activeChapterIndex, activeChapterIndex);
+  }
 
   String pageTitle(ImageReaderDocument document, int chapterIndex) {
     final chapter = document.chapters[chapterIndex];

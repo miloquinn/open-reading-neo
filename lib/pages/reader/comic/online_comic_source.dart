@@ -42,6 +42,9 @@ class OnlineComicSource extends ImageReaderSource {
   BookSourceReadingProgress? _savedProgress;
   final Map<int, BookSourceChapterContent> _contentCache = {};
   final Map<int, Future<BookSourceChapterContent>> _contentLoads = {};
+  int _contentGeneration = 0;
+  int _retainedFirstChapter = 0;
+  int _retainedLastChapter = 0;
 
   @override
   String get bookTitle => book.title;
@@ -51,6 +54,9 @@ class OnlineComicSource extends ImageReaderSource {
 
   @override
   void dispose() {
+    _contentGeneration++;
+    _contentCache.clear();
+    _contentLoads.clear();
     if (_ownsClient) _client.close();
     super.dispose();
   }
@@ -109,6 +115,8 @@ class OnlineComicSource extends ImageReaderSource {
     final progress = _savedProgress;
     if (progress != null) {
       chapterIndex = progress.chapterIndex.clamp(0, _chapters.length - 1);
+      _retainedFirstChapter = (chapterIndex - 1).clamp(0, _chapters.length - 1);
+      _retainedLastChapter = (chapterIndex + 1).clamp(0, _chapters.length - 1);
       if (progress.chapterId == _chapters[chapterIndex].id) {
         final count = await loadChapterPageCount(chapterIndex);
         pageIndex = count <= 1
@@ -229,9 +237,19 @@ class OnlineComicSource extends ImageReaderSource {
 
   @override
   void retainChapterWindow(int firstChapterIndex, int lastChapterIndex) {
+    _retainedFirstChapter = firstChapterIndex;
+    _retainedLastChapter = lastChapterIndex;
     _contentCache.removeWhere(
       (index, _) => index < firstChapterIndex || index > lastChapterIndex,
     );
+  }
+
+  @override
+  void handleMemoryPressure(int activeChapterIndex) {
+    _contentGeneration++;
+    retainChapterWindow(activeChapterIndex, activeChapterIndex);
+    _contentLoads.clear();
+    _imageCache.clearMemory();
   }
 
   @override
@@ -270,7 +288,9 @@ class OnlineComicSource extends ImageReaderSource {
       'start chapterIndex=$index chapter=${_chapters[index].title} '
           'chapterId=${comicDebugTarget(_chapters[index].id)}',
     );
-    return _contentLoads[index] = _client
+    final generation = _contentGeneration;
+    late final Future<BookSourceChapterContent> future;
+    future = _client
         .getChapterContent(
           source,
           bookId: book.id,
@@ -279,8 +299,14 @@ class OnlineComicSource extends ImageReaderSource {
         )
         .then(
           (content) {
-            _contentCache[index] = content;
-            _contentLoads.remove(index);
+            if (generation == _contentGeneration &&
+                index >= _retainedFirstChapter &&
+                index <= _retainedLastChapter) {
+              _contentCache[index] = content;
+            }
+            if (identical(_contentLoads[index], future)) {
+              _contentLoads.remove(index);
+            }
             comicDebugLog(
               'content',
               'success chapterIndex=$index htmlChars=${content.content.length} '
@@ -289,7 +315,9 @@ class OnlineComicSource extends ImageReaderSource {
             return content;
           },
           onError: (Object error, StackTrace stack) {
-            _contentLoads.remove(index);
+            if (identical(_contentLoads[index], future)) {
+              _contentLoads.remove(index);
+            }
             comicDebugLog(
               'content',
               'failed chapterIndex=$index elapsedMs=${stopwatch.elapsedMilliseconds}',
@@ -299,6 +327,8 @@ class OnlineComicSource extends ImageReaderSource {
             Error.throwWithStackTrace(error, stack);
           },
         );
+    _contentLoads[index] = future;
+    return future;
   }
 }
 

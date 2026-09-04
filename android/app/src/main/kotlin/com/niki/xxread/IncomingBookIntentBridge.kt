@@ -41,11 +41,13 @@ class IncomingBookIntentBridge(
         private const val MANIFEST_NAME = "request.json"
         private const val MAX_MANIFEST_BYTES = 1024L * 1024L
         private val epubMimeMarker = "application/epub+zip".toByteArray(Charsets.US_ASCII)
-        private val supportedExtensions = setOf("txt", "epub", "pdf")
+        private val supportedExtensions = setOf("txt", "epub", "pdf", "cbz")
         private val extensionByMime = mapOf(
             "text/plain" to "txt",
             "application/epub+zip" to "epub",
             "application/pdf" to "pdf",
+            "application/vnd.comicbook+zip" to "cbz",
+            "application/x-cbz" to "cbz",
         )
     }
 
@@ -401,6 +403,20 @@ class IncomingBookIntentBridge(
                     throw IncomingBookException("format_content_mismatch")
                 }
             }
+            "cbz" -> {
+                val valid = runCatching {
+                    ZipFile(file).use { zip ->
+                        zip.entries().asSequence().any { entry ->
+                            if (entry.isDirectory) return@any false
+                            when (entry.name.substringAfterLast('.', "").lowercase()) {
+                                "jpg", "jpeg", "png", "webp", "gif", "bmp" -> true
+                                else -> false
+                            }
+                        }
+                    }
+                }.getOrDefault(false)
+                if (!valid) throw IncomingBookException("format_content_mismatch")
+            }
         }
     }
 
@@ -532,6 +548,7 @@ class IncomingBookIntentBridge(
         "txt" -> "text/plain"
         "epub" -> "application/epub+zip"
         "pdf" -> "application/pdf"
+        "cbz" -> "application/vnd.comicbook+zip"
         else -> "application/octet-stream"
     }
 

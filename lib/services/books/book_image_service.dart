@@ -14,7 +14,9 @@ import 'dart:convert';
 class BookImageManager {
   // 内存缓存 - 使用LRU策略
   final Map<String, ui.Image> _memoryCache = {};
+  final Map<String, int> _memoryCacheSizes = {};
   final List<String> _cacheKeys = [];
+  int _memoryCacheBytes = 0;
 
   // 图片尺寸缓存
   final Map<String, Size> _sizeCache = {};
@@ -24,6 +26,7 @@ class BookImageManager {
 
   // 最大内存缓存数量
   static const int maxMemoryCacheSize = 50;
+  static const int maxMemoryCacheBytes = 48 * 1024 * 1024;
 
   // 单例模式
   static final BookImageManager _instance = BookImageManager._internal();
@@ -196,7 +199,9 @@ class BookImageManager {
       image.dispose();
     }
     _memoryCache.clear();
+    _memoryCacheSizes.clear();
     _cacheKeys.clear();
+    _memoryCacheBytes = 0;
     _sizeCache.clear();
     debugPrint('🗑️ 内存缓存已清理');
   }
@@ -234,6 +239,7 @@ class BookImageManager {
 
     return {
       'memory_cached': _memoryCache.length,
+      'memory_bytes': _memoryCacheBytes,
       'disk_cached': await _getDiskFileCount(),
       'disk_size_mb': diskSizeMB,
       'size_cache': _sizeCache.length,
@@ -251,21 +257,26 @@ class BookImageManager {
 
   /// 添加到内存缓存（LRU策略）
   void _addToMemoryCache(String key, ui.Image image) {
-    // 如果已经存在，先移除
-    if (_memoryCache.containsKey(key)) {
-      _cacheKeys.remove(key);
-    }
+    final replaced = _memoryCache.remove(key);
+    if (replaced != null && !identical(replaced, image)) replaced.dispose();
+    _memoryCacheBytes -= _memoryCacheSizes.remove(key) ?? 0;
+    _cacheKeys.remove(key);
 
-    // 如果缓存已满，移除最旧的
-    if (_memoryCache.length >= maxMemoryCacheSize) {
-      final oldestKey = _cacheKeys.removeAt(0);
-      _memoryCache[oldestKey]?.dispose();
-      _memoryCache.remove(oldestKey);
-    }
-
-    // 添加新缓存
+    // Decoded image memory follows pixel dimensions rather than file size.
+    // Keep one oversized image usable, but evict all older images around it.
+    final imageBytes = image.width * image.height * 4;
     _memoryCache[key] = image;
+    _memoryCacheSizes[key] = imageBytes;
     _cacheKeys.add(key);
+    _memoryCacheBytes += imageBytes;
+    while (_memoryCache.length > 1 &&
+        (_memoryCache.length > maxMemoryCacheSize ||
+            _memoryCacheBytes > maxMemoryCacheBytes)) {
+      final oldestKey = _cacheKeys.removeAt(0);
+      final oldest = _memoryCache.remove(oldestKey);
+      _memoryCacheBytes -= _memoryCacheSizes.remove(oldestKey) ?? 0;
+      oldest?.dispose();
+    }
   }
 
   /// 生成文件名（使用MD5避免特殊字符）

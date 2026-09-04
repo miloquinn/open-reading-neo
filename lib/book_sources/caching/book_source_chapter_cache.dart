@@ -40,6 +40,13 @@ class BookSourceChapterCache {
 
   static void clearMemory() {
     _writeGeneration++;
+    releaseMemory();
+  }
+
+  /// Releases decoded chapter objects without cancelling pending disk writes.
+  /// Used for OS memory pressure; explicit cache deletion still uses
+  /// [clearMemory] so older writes cannot repopulate a user-cleared cache.
+  static void releaseMemory() {
     _memory.clear();
     _catalogMemory.clear();
   }

@@ -6,7 +6,8 @@ import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
-import 'package:xxread/pages/reader/book_source/online_comic_reader_page.dart';
+import 'package:xxread/pages/reader/comic/comic_reader_page.dart';
+import 'package:xxread/pages/reader/comic/online_comic_kind.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/reader_themes.dart';
 
@@ -45,12 +46,11 @@ Widget buildOnlineReader({
     resolvedBook = sourceBook!;
   }
   if (isOnlineComicSource(resolvedSource, resolvedBook)) {
-    return OnlineComicReaderPage(
+    return ComicReaderPage.online(
       source: resolvedSource,
       book: resolvedBook,
       client: client,
-      shelfService: shelfService,
-      initialTheme: initialTheme,
+      theme: initialTheme,
     );
   }
   return BookSourceReaderPage(

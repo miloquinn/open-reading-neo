@@ -17,6 +17,7 @@ class LocalComicSource extends ImageReaderSource {
   LocalComicSource({required this.book, required this.theme});
 
   static const int _pageCacheLimit = 8;
+  static const int _pageCacheByteLimit = 32 * 1024 * 1024;
 
   final Book book;
   @override
@@ -24,6 +25,8 @@ class LocalComicSource extends ImageReaderSource {
 
   final LinkedHashMap<int, Uint8List> _pageCache = LinkedHashMap();
   final Map<int, Future<Uint8List>> _pendingPages = {};
+  int _pageCacheBytes = 0;
+  int _cacheGeneration = 0;
   List<String> _pages = const [];
   Uint8List? _webBytes;
 
@@ -40,6 +43,10 @@ class LocalComicSource extends ImageReaderSource {
 
   @override
   void dispose() {
+    _cacheGeneration++;
+    _pageCache.clear();
+    _pageCacheBytes = 0;
+    _pendingPages.clear();
     unawaited(ReadingResumeService.markClosed(book.id));
     super.dispose();
   }
@@ -69,7 +76,9 @@ class LocalComicSource extends ImageReaderSource {
     }
     final pending = _pendingPages[pageIndex];
     if (pending != null) return pending;
-    final future = compute(extractComicPage, <String, dynamic>{
+    final generation = _cacheGeneration;
+    late final Future<Uint8List> future;
+    future = compute(extractComicPage, <String, dynamic>{
       if (kIsWeb) 'bytes': _webBytes else 'path': book.filePath,
       'ext': book.format,
       'name': _pages[pageIndex],
@@ -77,19 +86,39 @@ class LocalComicSource extends ImageReaderSource {
     _pendingPages[pageIndex] = future;
     future
         .then((bytes) {
+          if (generation != _cacheGeneration) return;
+          final replaced = _pageCache.remove(pageIndex);
+          if (replaced != null) _pageCacheBytes -= replaced.lengthInBytes;
           _pageCache[pageIndex] = bytes;
-          while (_pageCache.length > _pageCacheLimit) {
-            _pageCache.remove(_pageCache.keys.first);
+          _pageCacheBytes += bytes.lengthInBytes;
+          while (_pageCache.length > 1 &&
+              (_pageCache.length > _pageCacheLimit ||
+                  _pageCacheBytes > _pageCacheByteLimit)) {
+            final removed = _pageCache.remove(_pageCache.keys.first)!;
+            _pageCacheBytes -= removed.lengthInBytes;
           }
         })
-        .whenComplete(() => _pendingPages.remove(pageIndex));
+        .whenComplete(() {
+          if (identical(_pendingPages[pageIndex], future)) {
+            _pendingPages.remove(pageIndex);
+          }
+        });
     return future;
   }
 
   @override
   Future<void> invalidatePage(int chapterIndex, int pageIndex) async {
-    _pageCache.remove(pageIndex);
+    final removed = _pageCache.remove(pageIndex);
+    if (removed != null) _pageCacheBytes -= removed.lengthInBytes;
     _pendingPages.remove(pageIndex);
+  }
+
+  @override
+  void handleMemoryPressure(int activeChapterIndex) {
+    _cacheGeneration++;
+    _pageCache.clear();
+    _pageCacheBytes = 0;
+    _pendingPages.clear();
   }
 
   @override

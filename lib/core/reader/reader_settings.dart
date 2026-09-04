@@ -218,6 +218,11 @@ class ReaderSettingsStore {
     return prefs.getString(themeKey) ?? ReaderSettings.defaultThemeId;
   }
 
+  Future<void> saveThemeId(String themeId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(themeKey, themeId);
+  }
+
   Future<ReaderSettings> load({
     ReaderPageMode fallbackPageMode = ReaderSettings.defaultPageMode,
   }) async {

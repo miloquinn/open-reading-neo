@@ -316,6 +316,12 @@ void main() {
     await _pumpUntilFound(tester, firstBody);
     expect(firstBody, findsOneWidget);
 
+    // The active chapter must stay readable after the platform asks the app
+    // to discard reconstructable caches, and navigation must keep working.
+    tester.binding.handleMemoryPressure();
+    await tester.pump();
+    expect(firstBody, findsOneWidget);
+
     for (
       var attempt = 0;
       attempt < 4 && !client.requestedChapterIds.contains('chapter-2');

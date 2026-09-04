@@ -4,17 +4,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:xxread/services/books/book_format_support.dart';
 import 'package:xxread/services/books/book_import_limits.dart';
 import 'package:xxread/services/books/book_import_models.dart';
+import 'package:xxread/services/books/comic_book_parser.dart';
 import 'package:xxread/services/books/incoming_book_models.dart';
 
 class IncomingBookMaterializer {
   static const int maximumRequestItems = 10;
   static const int maximumBookBytes = maximumBookImportBytes;
   static const int maximumRequestBytes = 500 * 1024 * 1024;
-  static const Set<String> supportedIncomingExtensions = {'txt', 'epub'};
+  static Set<String> get supportedIncomingExtensions =>
+      BookFormatRegistry.pickerExtensions;
 
   Future<BookImportSource> prepare(
     IncomingBookRequest request,
@@ -88,6 +91,8 @@ class IncomingBookMaterializer {
       'txt' || 'md' || 'markdown' => mime == 'text/plain',
       'epub' => mime == 'application/epub+zip',
       'pdf' => mime == 'application/pdf',
+      'cbz' =>
+        mime == 'application/vnd.comicbook+zip' || mime == 'application/x-cbz',
       'html' ||
       'htm' ||
       'xhtml' => mime == 'text/html' || mime == 'application/xhtml+xml',
@@ -116,6 +121,31 @@ class IncomingBookMaterializer {
             (header[3] == 0x04 || header[3] == 0x06 || header[3] == 0x08);
         final marker = utf8.encode('application/epub+zip');
         if (!hasZipMagic || !_containsBytes(header, marker)) {
+          throw const IncomingBookFailure('content_mismatch');
+        }
+        return;
+      }
+      if (extension == 'cbz') {
+        final hasZipMagic =
+            header.length >= 4 &&
+            header[0] == 0x50 &&
+            header[1] == 0x4b &&
+            (header[2] == 0x03 || header[2] == 0x05 || header[2] == 0x07) &&
+            (header[3] == 0x04 || header[3] == 0x06 || header[3] == 0x08);
+        if (!hasZipMagic) {
+          throw const IncomingBookFailure('content_mismatch');
+        }
+        try {
+          final pages = await compute(indexComicPages, <String, dynamic>{
+            'path': file.path,
+            'ext': extension,
+          });
+          if (pages.isEmpty) {
+            throw const IncomingBookFailure('content_mismatch');
+          }
+        } on IncomingBookFailure {
+          rethrow;
+        } catch (_) {
           throw const IncomingBookFailure('content_mismatch');
         }
         return;

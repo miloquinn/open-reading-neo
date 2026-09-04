@@ -21,6 +21,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
     }
     _updateReaderState(() {
       _loadingContent = true;
+      _requestedChapterIndex = index;
       _error = null;
     });
     try {
@@ -35,6 +36,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
       if (!mounted || loadSerial != _chapterLoadSerial) return;
       _updateReaderState(() {
         _loadingContent = false;
+        _requestedChapterIndex = null;
         _error = error;
         _controlsVisible = true;
       });
@@ -70,6 +72,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
       _content = content;
       _prefetchedContent[index] = content;
       _loadingContent = false;
+      _requestedChapterIndex = null;
       _pageIndex = preparedPageIndex;
       _pageCount = preparedPageCount;
       _pageViewLeading = slideLeading;
@@ -81,6 +84,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
       _pendingSlideChapterIndex = null;
       _pendingSlideBoundaryViewIndex = null;
     });
+    _trimChapterMemoryCaches();
     _restartReaderAloudFromCurrentPageAfterManualTurn();
     if (_pageMode == BookSourcePageMode.horizontalSlide) {
       _replaceSlidePageController(
@@ -185,6 +189,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
             _readableChapterText.remove(_readableChapterText.keys.first);
           }
           _prefetchedContent[index] = content;
+          _trimChapterMemoryCaches();
           if (!mounted) {
             return content;
           }
@@ -214,6 +219,31 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
         });
     _continuousContentLoads[index] = future;
     return future;
+  }
+
+  void _trimChapterMemoryCaches({bool aggressive = false}) {
+    if (_chapters.isEmpty) return;
+    final center = _chapterIndex;
+    final requested = _requestedChapterIndex;
+    bool retain(int index) {
+      if (index == center || index == requested) return true;
+      if (aggressive) return false;
+      return index >= center - 1 && index <= center + 2;
+    }
+
+    _prefetchedContent.removeWhere((index, _) => !retain(index));
+    _readableChapterText.removeWhere((index, _) => !retain(index));
+    _pagedLayouts.removeWhere((index, _) => !retain(index));
+    _verticalLayouts.removeWhere((index, _) => !retain(index));
+    _warmedPagedLayoutIndexes.removeWhere((index) => !retain(index));
+    _queuedPagedLayoutWarms.removeWhere((index) => !retain(index));
+    _verticalPartKeys.removeWhere((key, _) {
+      final separator = key.indexOf(':');
+      final chapter = int.tryParse(
+        separator < 0 ? key : key.substring(0, separator),
+      );
+      return chapter != null && !retain(chapter);
+    });
   }
 
   void _schedulePagedLayoutWarm(int index) {

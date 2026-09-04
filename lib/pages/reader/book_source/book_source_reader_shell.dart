@@ -151,7 +151,7 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
     final images = content.images;
     if (images.isEmpty) return const SizedBox.shrink();
     // Mixed text/image books keep catalog ownership here. Dedicated comics
-    // go through ImageReaderHost; both land on the same PagedImageReader.
+    // go through ComicReaderPage; both use the same page renderer.
     return PagedImageReader(
       title: _chapters[_chapterIndex].title,
       pageCount: images.length,

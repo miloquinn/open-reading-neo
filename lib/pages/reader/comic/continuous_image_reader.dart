@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -8,6 +8,7 @@ import 'package:xxread/core/reader/reader_keep_screen_on.dart';
 import 'package:xxread/core/reader/reader_volume_key_controller.dart';
 import 'package:xxread/pages/reader/comic/comic_debug_log.dart';
 import 'package:xxread/pages/reader/comic/image_reader_source.dart';
+import 'package:xxread/pages/reader/image/image_reader_chrome.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/reader_themes.dart';
@@ -23,6 +24,7 @@ class ContinuousImageReader extends StatefulWidget {
     required this.onTableOfContents,
     required this.onSettings,
     required this.onChangeReadingMode,
+    this.palette,
   });
 
   final ImageReaderDocument document;
@@ -32,6 +34,7 @@ class ContinuousImageReader extends StatefulWidget {
   final VoidCallback? onTableOfContents;
   final VoidCallback onSettings;
   final VoidCallback onChangeReadingMode;
+  final ReaderThemePalette? palette;
 
   @visibleForTesting
   static const chapterBoundaryKeyPrefix = 'continuous-chapter-boundary-';
@@ -61,6 +64,8 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
   final Map<int, Future<int>> _countLoads = {};
   final Map<int, int> _counts = {};
   final Set<int> _prefetchedChapters = {};
+  final ValueNotifier<bool> _userScrolling = ValueNotifier(false);
+  final Map<({int chapterIndex, int pageIndex}), double> _pageAspectRatios = {};
 
   List<_ContinuousEntry> _entries = const [];
   late int _currentChapter = widget.initialChapterIndex;
@@ -72,7 +77,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
   bool _windowLoadInFlight = false;
   int? _pendingWindowChapter;
 
-  ReaderThemePalette get _palette => widget.source.theme;
+  ReaderThemePalette get _palette => widget.palette ?? widget.source.theme;
 
   @override
   void initState() {
@@ -88,6 +93,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
     unawaited(ReaderVolumeKeyController.deactivate(this));
     unawaited(ReaderKeepScreenOnController.deactivate(this));
     _positions.itemPositions.removeListener(_handlePositions);
+    _userScrolling.dispose();
     super.dispose();
   }
 
@@ -251,10 +257,15 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollStartNotification) {
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
       _scrolling = true;
+      _userScrolling.value = true;
     } else if (notification is ScrollEndNotification) {
-      _scrolling = false;
+      if (_scrolling) {
+        _scrolling = false;
+        _userScrolling.value = false;
+      }
       final pending = _pendingWindowChapter;
       if (pending != null && !_windowLoadInFlight) {
         _pendingWindowChapter = null;
@@ -406,6 +417,12 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
 
   void _previousPage() => _goToCurrentOffset(-1);
 
+  void _goToPage(int pageIndex) {
+    final target = _entryIndexFor(_currentChapter, pageIndex);
+    if (target < 0 || !_itemController.isAttached) return;
+    _itemController.jumpTo(index: target, alignment: 0);
+  }
+
   void _handleTap(Offset position, Size size) {
     if (_chromeVisible) {
       setState(() => _chromeVisible = false);
@@ -423,7 +440,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
     final pageCount = _counts[_currentChapter] ?? 0;
     final displayPage = pageCount > 0 ? _currentPage + 1 : 0;
     return ColoredBox(
-      color: Colors.black,
+      color: _palette.background,
       child: Stack(
         children: [
           Positioned.fill(
@@ -444,6 +461,7 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
                           itemPositionsListener: _positions,
                           itemCount: _entries.length,
                           padding: EdgeInsets.zero,
+                          addAutomaticKeepAlives: false,
                           itemBuilder: (context, index) {
                             final entry = _entries[index];
                             return switch (entry.kind) {
@@ -474,6 +492,19 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
                                 chapterIndex: entry.chapterIndex,
                                 pageIndex: entry.pageIndex,
                                 palette: _palette,
+                                userScrolling: _userScrolling,
+                                knownAspectRatio:
+                                    _pageAspectRatios[(
+                                      chapterIndex: entry.chapterIndex,
+                                      pageIndex: entry.pageIndex,
+                                    )],
+                                onAspectRatio: (aspectRatio) {
+                                  _pageAspectRatios[(
+                                        chapterIndex: entry.chapterIndex,
+                                        pageIndex: entry.pageIndex,
+                                      )] =
+                                      aspectRatio;
+                                },
                               ),
                             };
                           },
@@ -489,18 +520,23 @@ class _ContinuousImageReaderState extends State<ContinuousImageReader> {
             pageCount: pageCount,
             chapterTitle: widget.document.chapters[_currentChapter].title,
           ),
-          _ImageReaderChrome(
+          ImageReaderChrome(
             palette: _palette,
             visible: _chromeVisible,
             title: widget.document.chapters[_currentChapter].title,
-            page: displayPage,
+            pageIndex: _currentPage,
             pageCount: pageCount,
+            directionIcon: Icons.swap_vert_rounded,
+            directionLabel: context.l10n.imageReaderDirectionVertical,
             onBack: () {
               BookOpenTransition.beginExit();
               Navigator.of(context).maybePop();
             },
+            onPageSelected: _goToPage,
             onTableOfContents: widget.onTableOfContents,
-            onMode: widget.onChangeReadingMode,
+            directionKey: ContinuousImageReader.modeButtonKey,
+            settingsKey: ContinuousImageReader.settingsButtonKey,
+            onDirection: widget.onChangeReadingMode,
             onSettings: widget.onSettings,
           ),
         ],
@@ -567,68 +603,276 @@ class _ContinuousChapterPage extends StatefulWidget {
     required this.chapterIndex,
     required this.pageIndex,
     required this.palette,
+    required this.userScrolling,
+    required this.knownAspectRatio,
+    required this.onAspectRatio,
   });
 
   final ImageReaderSource source;
   final int chapterIndex;
   final int pageIndex;
   final ReaderThemePalette palette;
+  final ValueListenable<bool> userScrolling;
+  final double? knownAspectRatio;
+  final ValueChanged<double> onAspectRatio;
 
   @override
   State<_ContinuousChapterPage> createState() => _ContinuousChapterPageState();
 }
 
 class _ContinuousChapterPageState extends State<_ContinuousChapterPage> {
-  late Future<Uint8List> _bytes = widget.source.loadPage(
-    widget.chapterIndex,
-    widget.pageIndex,
-  );
+  Uint8List? _bytes;
+  MemoryImage? _provider;
+  Object? _error;
+  double? _aspectRatio;
+  bool _decoded = false;
+  bool _presented = false;
+  int _loadGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _aspectRatio = widget.knownAspectRatio;
+    widget.userScrolling.addListener(_handleScrollingChanged);
+    unawaited(_load());
+  }
+
+  @override
+  void didUpdateWidget(covariant _ContinuousChapterPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.userScrolling, widget.userScrolling)) {
+      oldWidget.userScrolling.removeListener(_handleScrollingChanged);
+      widget.userScrolling.addListener(_handleScrollingChanged);
+    }
+    if (!identical(oldWidget.source, widget.source) ||
+        oldWidget.chapterIndex != widget.chapterIndex ||
+        oldWidget.pageIndex != widget.pageIndex) {
+      _releaseProvider();
+      _aspectRatio = widget.knownAspectRatio;
+      _bytes = null;
+      _provider = null;
+      _error = null;
+      _decoded = false;
+      _presented = false;
+      unawaited(_load());
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadGeneration++;
+    widget.userScrolling.removeListener(_handleScrollingChanged);
+    _releaseProvider();
+    super.dispose();
+  }
+
+  void _handleScrollingChanged() {
+    if (widget.userScrolling.value || !_decoded || _presented || !mounted) {
+      return;
+    }
+    setState(() => _presented = true);
+  }
+
+  Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    try {
+      final bytes = await widget.source.loadPage(
+        widget.chapterIndex,
+        widget.pageIndex,
+      );
+      if (!mounted || generation != _loadGeneration) return;
+      _bytes = bytes;
+      _provider = MemoryImage(bytes);
+      final ratio =
+          _imageAspectRatio(bytes) ?? _aspectRatio ?? _defaultPageAspectRatio;
+      _aspectRatio = ratio;
+      widget.onAspectRatio(ratio);
+      _decoded = true;
+      if (!widget.userScrolling.value) {
+        setState(() => _presented = true);
+      }
+    } catch (error) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() => _error = error);
+    }
+  }
+
+  void _releaseProvider() {
+    _provider = null;
+    _bytes = null;
+  }
 
   Future<void> _retry() async {
+    _loadGeneration++;
     await widget.source.invalidatePage(widget.chapterIndex, widget.pageIndex);
     if (!mounted) return;
-    final next = widget.source.loadPage(widget.chapterIndex, widget.pageIndex);
-    setState(() => _bytes = next);
+    _releaseProvider();
+    if (!mounted) return;
+    setState(() {
+      _error = null;
+      _decoded = false;
+      _presented = false;
+    });
+    unawaited(_load());
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Uint8List>(
-      future: _bytes,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _PageErrorState(
+    final aspectRatio = _aspectRatio ?? _defaultPageAspectRatio;
+    if (_error != null) {
+      return _PageErrorState(
+        palette: widget.palette,
+        pageNumber: widget.pageIndex + 1,
+        onRetry: _retry,
+      );
+    }
+    final provider = _provider;
+    if (!_presented || provider == null || _bytes == null) {
+      return _PageLoadingPlaceholder(
+        palette: widget.palette,
+        pageNumber: widget.pageIndex + 1,
+        aspectRatio: aspectRatio,
+      );
+    }
+    return KeyedSubtree(
+      key: ValueKey(
+        '${ContinuousImageReader.pageContentKeyPrefix}${widget.chapterIndex}-${widget.pageIndex}',
+      ),
+      child: AspectRatio(
+        aspectRatio: aspectRatio,
+        child: Image(
+          image: provider,
+          width: double.infinity,
+          fit: BoxFit.fitWidth,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) => _PageErrorState(
             palette: widget.palette,
             pageNumber: widget.pageIndex + 1,
             onRetry: _retry,
-          );
-        }
-        final bytes = snapshot.data;
-        if (bytes == null) {
-          return _PageLoadingPlaceholder(
-            palette: widget.palette,
-            pageNumber: widget.pageIndex + 1,
-          );
-        }
-        return KeyedSubtree(
-          key: ValueKey(
-            '${ContinuousImageReader.pageContentKeyPrefix}${widget.chapterIndex}-${widget.pageIndex}',
           ),
-          child: Image.memory(
-            bytes,
-            width: double.infinity,
-            fit: BoxFit.fitWidth,
-            gaplessPlayback: true,
-            errorBuilder: (context, error, stackTrace) => _PageErrorState(
-              palette: widget.palette,
-              pageNumber: widget.pageIndex + 1,
-              onRetry: _retry,
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
+}
+
+const double _defaultPageAspectRatio = 1.0;
+
+double _safeAspectRatio(double value) {
+  if (!value.isFinite || value <= 0) return _defaultPageAspectRatio;
+  return value.clamp(0.02, 50.0);
+}
+
+double? _imageAspectRatio(Uint8List bytes) {
+  int u16be(int offset) => (bytes[offset] << 8) | bytes[offset + 1];
+  int u16le(int offset) => bytes[offset] | (bytes[offset + 1] << 8);
+  int u24le(int offset) =>
+      bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+  int u32be(int offset) =>
+      (bytes[offset] << 24) |
+      (bytes[offset + 1] << 16) |
+      (bytes[offset + 2] << 8) |
+      bytes[offset + 3];
+  int u32le(int offset) =>
+      bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24);
+  int i32le(int offset) {
+    final value = u32le(offset);
+    return value >= 0x80000000 ? value - 0x100000000 : value;
+  }
+
+  double? ratio(int width, int height) =>
+      width > 0 && height > 0 ? _safeAspectRatio(width / height) : null;
+
+  if (bytes.length >= 24 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4e &&
+      bytes[3] == 0x47) {
+    return ratio(u32be(16), u32be(20));
+  }
+  if (bytes.length >= 10 &&
+      bytes[0] == 0x47 &&
+      bytes[1] == 0x49 &&
+      bytes[2] == 0x46) {
+    return ratio(u16le(6), u16le(8));
+  }
+  if (bytes.length >= 26 && bytes[0] == 0x42 && bytes[1] == 0x4d) {
+    return ratio(i32le(18).abs(), i32le(22).abs());
+  }
+  if (bytes.length >= 30 &&
+      bytes[0] == 0x52 &&
+      bytes[1] == 0x49 &&
+      bytes[2] == 0x46 &&
+      bytes[3] == 0x46 &&
+      bytes[8] == 0x57 &&
+      bytes[9] == 0x45 &&
+      bytes[10] == 0x42 &&
+      bytes[11] == 0x50) {
+    if (bytes[12] == 0x56 &&
+        bytes[13] == 0x50 &&
+        bytes[14] == 0x38 &&
+        bytes[15] == 0x58) {
+      return ratio(u24le(24) + 1, u24le(27) + 1);
+    }
+    if (bytes[12] == 0x56 &&
+        bytes[13] == 0x50 &&
+        bytes[14] == 0x38 &&
+        bytes[15] == 0x4c &&
+        bytes[20] == 0x2f) {
+      final packed = u32le(21);
+      return ratio((packed & 0x3fff) + 1, ((packed >> 14) & 0x3fff) + 1);
+    }
+    if (bytes[12] == 0x56 &&
+        bytes[13] == 0x50 &&
+        bytes[14] == 0x38 &&
+        bytes[15] == 0x20 &&
+        bytes[23] == 0x9d &&
+        bytes[24] == 0x01 &&
+        bytes[25] == 0x2a) {
+      return ratio(u16le(26) & 0x3fff, u16le(28) & 0x3fff);
+    }
+  }
+  if (bytes.length >= 4 && bytes[0] == 0xff && bytes[1] == 0xd8) {
+    const sizeMarkers = <int>{
+      0xc0,
+      0xc1,
+      0xc2,
+      0xc3,
+      0xc5,
+      0xc6,
+      0xc7,
+      0xc9,
+      0xca,
+      0xcb,
+      0xcd,
+      0xce,
+      0xcf,
+    };
+    var offset = 2;
+    while (offset + 3 < bytes.length) {
+      while (offset < bytes.length && bytes[offset] != 0xff) {
+        offset++;
+      }
+      while (offset < bytes.length && bytes[offset] == 0xff) {
+        offset++;
+      }
+      if (offset >= bytes.length) break;
+      final marker = bytes[offset++];
+      if (marker == 0xd8 || marker == 0xd9 || marker == 0x01) continue;
+      if (marker >= 0xd0 && marker <= 0xd7) continue;
+      if (offset + 1 >= bytes.length) break;
+      final segmentLength = u16be(offset);
+      if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
+      if (sizeMarkers.contains(marker) && segmentLength >= 7) {
+        return ratio(u16be(offset + 5), u16be(offset + 3));
+      }
+      offset += segmentLength;
+    }
+  }
+  return null;
 }
 
 class _ChapterBoundary extends StatelessWidget {
@@ -644,7 +888,7 @@ class _ChapterBoundary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black,
+      color: palette.background,
       padding: const EdgeInsets.fromLTRB(24, 34, 24, 30),
       child: Column(
         children: [
@@ -728,188 +972,6 @@ class _ProgressPill extends StatelessWidget {
   }
 }
 
-class _ImageReaderChrome extends StatelessWidget {
-  const _ImageReaderChrome({
-    required this.palette,
-    required this.visible,
-    required this.title,
-    required this.page,
-    required this.pageCount,
-    required this.onBack,
-    required this.onTableOfContents,
-    required this.onMode,
-    required this.onSettings,
-  });
-
-  final ReaderThemePalette palette;
-  final bool visible;
-  final String title;
-  final int page;
-  final int pageCount;
-  final VoidCallback onBack;
-  final VoidCallback? onTableOfContents;
-  final VoidCallback onMode;
-  final VoidCallback onSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top + 10;
-    final bottom = MediaQuery.paddingOf(context).bottom + 16;
-    return Positioned.fill(
-      child: IgnorePointer(
-        ignoring: !visible,
-        child: Stack(
-          children: [
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: 20,
-              right: 20,
-              top: visible ? top : -100,
-              child: ReaderControlBar(
-                palette: palette,
-                isTopBar: true,
-                child: SizedBox(
-                  height: 58,
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 7),
-                      ReaderControlIconButton(
-                        palette: palette,
-                        onPressed: onBack,
-                        tooltip: MaterialLocalizations.of(
-                          context,
-                        ).backButtonTooltip,
-                        icon: Icons.arrow_back_rounded,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: palette.text,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 11,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: palette.controlFill.withValues(alpha: 0.58),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: Text(
-                          '$page / $pageCount',
-                          style: TextStyle(
-                            color: palette.secondaryText,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 9),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: 22,
-              right: 22,
-              bottom: visible ? bottom : -100,
-              child: ReaderControlBar(
-                palette: palette,
-                isTopBar: false,
-                child: SizedBox(
-                  height: 64,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      if (onTableOfContents != null)
-                        _ChromeButton(
-                          palette: palette,
-                          icon: Icons.format_list_bulleted_rounded,
-                          label: context.l10n.readerToolbarTOC,
-                          onTap: onTableOfContents!,
-                        ),
-                      _ChromeButton(
-                        key: ContinuousImageReader.modeButtonKey,
-                        palette: palette,
-                        icon: Icons.swap_horiz_rounded,
-                        label: context.l10n.imageReaderDirectionTitle,
-                        onTap: onMode,
-                      ),
-                      _ChromeButton(
-                        key: ContinuousImageReader.settingsButtonKey,
-                        palette: palette,
-                        icon: Icons.tune_rounded,
-                        label: context.l10n.imageReaderSettings,
-                        onTap: onSettings,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChromeButton extends StatelessWidget {
-  const _ChromeButton({
-    super.key,
-    required this.palette,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final ReaderThemePalette palette;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkResponse(
-      onTap: onTap,
-      radius: 32,
-      child: SizedBox(
-        width: 82,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 22, color: palette.text),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: palette.secondaryText,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ReaderLoadingState extends StatelessWidget {
   const _ReaderLoadingState({required this.palette, required this.label});
 
@@ -952,24 +1014,28 @@ class _PageLoadingPlaceholder extends StatelessWidget {
   const _PageLoadingPlaceholder({
     required this.palette,
     required this.pageNumber,
+    required this.aspectRatio,
   });
 
   final ReaderThemePalette palette;
   final int pageNumber;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 320,
-      color: Colors.black,
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: palette.secondaryText.withValues(alpha: 0.56),
-          semanticsLabel: '$pageNumber',
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: Container(
+        color: palette.background,
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: palette.secondaryText.withValues(alpha: 0.56),
+            semanticsLabel: '$pageNumber',
+          ),
         ),
       ),
     );
@@ -991,7 +1057,7 @@ class _PageErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 260,
-      color: Colors.black,
+      color: palette.background,
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1044,7 +1110,7 @@ class _EmptyChapter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black,
+      color: palette.background,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
       child: Column(
         children: [

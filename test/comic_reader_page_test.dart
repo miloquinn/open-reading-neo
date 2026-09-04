@@ -5,15 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/core/reader/paged_image_reader_settings.dart';
+import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/comic/continuous_image_reader.dart';
-import 'package:xxread/pages/reader/comic/image_reader_host.dart';
+import 'package:xxread/pages/reader/comic/comic_reader_page.dart';
 import 'package:xxread/pages/reader/comic/image_reader_source.dart';
 import 'package:xxread/pages/reader/comic/online_comic_kind.dart';
+import 'package:xxread/pages/reader/image/image_reader_chrome.dart';
 import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/utils/reader_themes.dart';
+import 'package:xxread/widgets/reader_control_chrome.dart';
 
 /// 1x1 transparent PNG that Image.memory can decode.
 final Uint8List _tinyPng = Uint8List.fromList(const <int>[
@@ -218,7 +221,7 @@ Future<void> _pumpHost(WidgetTester tester, ImageReaderSource source) async {
     MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: ImageReaderHost(source: source),
+      home: ComicReaderPage(source: source),
     ),
   );
   await tester.pumpAndSettle();
@@ -235,6 +238,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
+    ReaderThemes.resetSavedPaletteCacheForTesting();
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(fullscreenChannel, (_) async => null);
@@ -242,6 +246,7 @@ void main() {
   });
 
   tearDown(() {
+    ReaderThemes.resetSavedPaletteCacheForTesting();
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(fullscreenChannel, null);
@@ -317,7 +322,31 @@ void main() {
   });
 
   testWidgets(
-    'vertical reading mounts a three chapter window and preloads neighbors',
+    'memory pressure keeps only the active chapter on the same page',
+    (tester) async {
+      final source = _FakeImageSource(
+        chapters: const [
+          ImageReaderChapter(id: 'c1', title: 'One'),
+          ImageReaderChapter(id: 'c2', title: 'Two'),
+          ImageReaderChapter(id: 'c3', title: 'Three'),
+        ],
+        pagesByChapter: const {0: 1, 1: 2, 2: 1},
+        initialChapterIndex: 1,
+      );
+
+      await _pumpHost(tester, source);
+      tester.binding.handleMemoryPressure();
+      await tester.pump();
+
+      expect(source.retainedWindows.last, (first: 1, last: 1));
+      expect(find.byType(ComicReaderPage), findsOneWidget);
+      expect(find.byType(ContinuousImageReader), findsOneWidget);
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'vertical reading keeps a three chapter data window and preloads neighbors',
     (tester) async {
       final source = _FakeImageSource(
         chapters: const [
@@ -332,18 +361,6 @@ void main() {
       await _pumpHost(tester, source);
 
       expect(find.byType(ContinuousImageReader), findsOneWidget);
-      expect(
-        find.byKey(
-          const ValueKey('${ContinuousImageReader.chapterBoundaryKeyPrefix}1'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          const ValueKey('${ContinuousImageReader.chapterBoundaryKeyPrefix}2'),
-        ),
-        findsOneWidget,
-      );
       expect(source.pageCountLoads, 3);
       expect(source.retainedWindows.last, (first: 0, last: 2));
       expect(
@@ -359,6 +376,12 @@ void main() {
   testWidgets('a delayed image completion does not fight an active drag', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     final delayed = Completer<Uint8List>();
     final source = _FakeImageSource(
       chapters: const [ImageReaderChapter(id: 'c1', title: 'One')],
@@ -395,27 +418,33 @@ void main() {
     );
     final beforeDrag = tester.getTopLeft(pageOne).dy;
     final gesture = await tester.startGesture(const Offset(400, 500));
-    await gesture.moveBy(const Offset(0, -80));
+    await gesture.moveBy(const Offset(0, -160));
     await tester.pump();
     delayed.complete(_tallPng);
     await tester.pump();
-    await gesture.moveBy(const Offset(0, -120));
+    await gesture.moveBy(const Offset(0, -260));
     await tester.pump();
     final duringDrag = tester.getTopLeft(pageOne).dy;
-    expect(duringDrag, lessThan(beforeDrag - 150));
+    expect(duringDrag, lessThan(beforeDrag - 200));
+    await gesture.moveBy(const Offset(0, -300));
+    await tester.pump();
     await gesture.up();
     for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump(const Duration(milliseconds: 20));
     }
 
-    expect(find.text('1 / 3'), findsNothing);
-    expect(source.saved, isNotEmpty);
+    expect(
+      find.byKey(
+        const ValueKey('${ContinuousImageReader.pageContentKeyPrefix}0-0'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     await _unmount(tester);
   });
 
   testWidgets(
-    'opening continuous reading settings keeps the original reader UI',
+    'all directions use one chrome and switch through the unified reader',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(800, 900);
@@ -430,8 +459,18 @@ void main() {
 
       await _pumpHost(tester, source);
       expect(find.byType(ContinuousImageReader), findsOneWidget);
+      expect(find.byType(ImageReaderChrome), findsOneWidget);
+      final controlBars = tester.widgetList<ReaderControlBar>(
+        find.descendant(
+          of: find.byType(ImageReaderChrome),
+          matching: find.byType(ReaderControlBar),
+        ),
+      );
+      expect(controlBars, hasLength(2));
+      expect(controlBars.last.borderRadius, BorderRadius.circular(24));
+      expect(find.byType(Slider), findsOneWidget);
 
-      await tester.tapAt(const Offset(400, 300));
+      await tester.tapAt(const Offset(400, 450));
       await tester.pump(const Duration(milliseconds: 300));
       final button = tester.widget<Widget>(
         find.byKey(ContinuousImageReader.settingsButtonKey),
@@ -450,8 +489,15 @@ void main() {
         find.byKey(const ValueKey('continuous-reader-settings-sheet')),
         findsOneWidget,
       );
-      expect(find.text('Reading direction'), findsWidgets);
-      expect(find.text('Right to left (manga)'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('comic-reader-settings-tab-bar')),
+        findsOneWidget,
+      );
+      expect(find.text('Theme'), findsOneWidget);
+      expect(find.text('Paging'), findsOneWidget);
+      expect(find.text('Follow system'), findsOneWidget);
+      expect(find.text('Light Mode'), findsOneWidget);
+      expect(find.text('Dark Mode'), findsOneWidget);
       expect(find.byType(ContinuousImageReader), findsOneWidget);
       expect(find.byType(PagedImageReader), findsNothing);
       var prefs = await SharedPreferences.getInstance();
@@ -460,15 +506,66 @@ void main() {
         isNull,
       );
 
+      await tester.tap(find.text('Dark Mode'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ImageReaderChrome>(find.byType(ImageReaderChrome))
+            .palette,
+        ReaderThemes.pureBlack,
+      );
+      prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(ReaderSettingsStore.themeKey),
+        ReaderThemes.pureBlack.id,
+      );
+      expect(
+        prefs.getString(PagedImageReaderSettingsStore.backgroundKey),
+        ImageReaderBackground.black.name,
+      );
+
+      await tester.tap(find.text('Follow system'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ImageReaderChrome>(find.byType(ImageReaderChrome))
+            .palette
+            .id,
+        ReaderThemes.systemId,
+      );
+      prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(ReaderSettingsStore.themeKey),
+        ReaderThemes.systemId,
+      );
+
+      await tester.tap(find.text('Paging'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reading direction'), findsOneWidget);
+      expect(find.text('Right to left (manga)'), findsOneWidget);
+
       await tester.tap(find.text('Left to right'));
       await tester.pumpAndSettle();
       expect(find.byType(ContinuousImageReader), findsNothing);
       expect(find.byType(PagedImageReader), findsOneWidget);
+      expect(find.byType(ImageReaderChrome), findsOneWidget);
       prefs = await SharedPreferences.getInstance();
       expect(
         prefs.getString(PagedImageReaderSettingsStore.directionOverridesKey),
         contains('"fake-settings":"ltr"'),
       );
+
+      final directionTap = tester.widget<InkResponse>(
+        find.ancestor(
+          of: find.text('Left to right'),
+          matching: find.byType(InkResponse),
+        ),
+      );
+      directionTap.onTap!.call();
+      await tester.pumpAndSettle();
+      expect(find.byType(PagedImageReader), findsNothing);
+      expect(find.byType(ContinuousImageReader), findsOneWidget);
+      expect(find.byType(ImageReaderChrome), findsOneWidget);
       await _unmount(tester);
     },
   );

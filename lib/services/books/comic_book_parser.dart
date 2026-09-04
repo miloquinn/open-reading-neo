@@ -92,13 +92,21 @@ Archive _decodeComicArchive({
   String? filePath,
   Uint8List? bytes,
   String? extension,
+  List<InputFileStream>? openedStreams,
 }) {
-  Archive decodeZip() => bytes != null
-      ? ZipDecoder().decodeBytes(bytes)
-      : ZipDecoder().decodeBuffer(InputFileStream(filePath!));
-  Archive decodeTar() => bytes != null
-      ? TarDecoder().decodeBytes(bytes)
-      : TarDecoder().decodeBuffer(InputFileStream(filePath!));
+  Archive decodeZip() {
+    if (bytes != null) return ZipDecoder().decodeBytes(bytes);
+    final input = InputFileStream(filePath!);
+    openedStreams?.add(input);
+    return ZipDecoder().decodeBuffer(input);
+  }
+
+  Archive decodeTar() {
+    if (bytes != null) return TarDecoder().decodeBytes(bytes);
+    final input = InputFileStream(filePath!);
+    openedStreams?.add(input);
+    return TarDecoder().decodeBuffer(input);
+  }
 
   final header = bytes ?? _readFileHeader(filePath!);
   final container = detectComicContainer(header);
@@ -161,17 +169,25 @@ int compareComicEntries(String a, String b) {
 /// args：`path`（IO 文件路径）或 `bytes`（Web 内存字节）二选一；
 /// 可选 `ext` 为书籍声明扩展名，供无魔数容器兜底。
 List<String> indexComicPages(Map<String, dynamic> args) {
-  final archive = _decodeComicArchive(
-    filePath: args['path'] as String?,
-    bytes: args['bytes'] as Uint8List?,
-    extension: args['ext'] as String?,
-  );
-  final names = <String>[
-    for (final file in archive.files)
-      if (file.isFile && isComicPageEntry(file.name)) file.name,
-  ];
-  names.sort(compareComicEntries);
-  return names;
+  final openedStreams = <InputFileStream>[];
+  try {
+    final archive = _decodeComicArchive(
+      filePath: args['path'] as String?,
+      bytes: args['bytes'] as Uint8List?,
+      extension: args['ext'] as String?,
+      openedStreams: openedStreams,
+    );
+    final names = <String>[
+      for (final file in archive.files)
+        if (file.isFile && isComicPageEntry(file.name)) file.name,
+    ];
+    names.sort(compareComicEntries);
+    return names;
+  } finally {
+    for (final stream in openedStreams) {
+      stream.closeSync();
+    }
+  }
 }
 
 /// 按条目名 `name` 解压单页图片（compute 入口）。
@@ -179,17 +195,25 @@ List<String> indexComicPages(Map<String, dynamic> args) {
 /// 每次重解容器目录（开销远小于解压页本体），换取不在 isolate 间
 /// 反复拷贝整本压缩包。
 Uint8List extractComicPage(Map<String, dynamic> args) {
-  final archive = _decodeComicArchive(
-    filePath: args['path'] as String?,
-    bytes: args['bytes'] as Uint8List?,
-    extension: args['ext'] as String?,
-  );
-  final target = args['name'] as String;
-  for (final file in archive.files) {
-    if (file.isFile && file.name == target) {
-      final content = file.content as List<int>;
-      return content is Uint8List ? content : Uint8List.fromList(content);
+  final openedStreams = <InputFileStream>[];
+  try {
+    final archive = _decodeComicArchive(
+      filePath: args['path'] as String?,
+      bytes: args['bytes'] as Uint8List?,
+      extension: args['ext'] as String?,
+      openedStreams: openedStreams,
+    );
+    final target = args['name'] as String;
+    for (final file in archive.files) {
+      if (file.isFile && file.name == target) {
+        final content = file.content as List<int>;
+        return content is Uint8List ? content : Uint8List.fromList(content);
+      }
+    }
+    throw StateError('comic page not found: $target');
+  } finally {
+    for (final stream in openedStreams) {
+      stream.closeSync();
     }
   }
-  throw StateError('comic page not found: $target');
 }

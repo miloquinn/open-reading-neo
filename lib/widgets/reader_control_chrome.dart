@@ -314,15 +314,17 @@ class ReaderControlBar extends StatelessWidget {
     required this.palette,
     required this.isTopBar,
     required this.child,
+    this.borderRadius,
   });
 
   final ReaderThemePalette palette;
   final bool isTopBar;
   final Widget child;
+  final BorderRadius? borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(999);
+    final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(999);
     final blurEnabled = !GlassEffectConfig.shouldDisableBlur;
     // 不叠加预设，直接使用与悬浮导航栏/首页顶栏一致的标准玻璃参数
     final config = GlassEffectHelper.getReadingControlConfig(
@@ -346,7 +348,7 @@ class ReaderControlBar extends StatelessWidget {
         : cleanSurface;
     final panel = DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: borderRadius,
+        borderRadius: effectiveBorderRadius,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -383,7 +385,7 @@ class ReaderControlBar extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: borderRadius,
+        borderRadius: effectiveBorderRadius,
         boxShadow: [
           BoxShadow(
             color: blurEnabled
@@ -413,7 +415,7 @@ class ReaderControlBar extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: borderRadius,
+        borderRadius: effectiveBorderRadius,
         child: blurEnabled
             ? BackdropFilter(
                 filter: ImageFilter.blur(

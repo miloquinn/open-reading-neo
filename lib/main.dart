@@ -13,6 +13,9 @@ import 'package:provider/provider.dart' as provider;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'l10n/app_localizations.dart';
+import 'book_sources/caching/book_source_chapter_cache.dart';
+import 'book_sources/caching/book_source_response_cache.dart';
+import 'book_sources/caching/source_cover_cache.dart';
 import 'book_sources/services/book_source_client.dart';
 import 'book_sources/services/book_source_registry.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
@@ -20,6 +23,7 @@ import 'book_sources/source_engine/source_interaction_coordinator.dart';
 import 'models/book.dart';
 import 'pages/home/home_shell_page.dart';
 import 'pages/reader/book_reader_launcher.dart';
+import 'pages/reader/native/native_reader_page.dart';
 import 'pages/library/import_book/import_book_page.dart';
 import 'pages/legal/user_agreement_page.dart';
 import 'pages/reader/book_source/online_reader_factory.dart';
@@ -355,6 +359,23 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(_runAutomaticWebDavSyncIfNeeded());
     }
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    // Keep disk caches and user data intact. These are all reconstructable
+    // process-memory caches, so releasing them is safe even while a reader is
+    // open; the active page retains the content it is currently displaying.
+    clearNativeReaderMemoryCaches();
+    BookSourceChapterCache.releaseMemory();
+    BookSourceResponseCache.instance.clearMemory();
+    SourceCoverCache.instance.clearMemory();
+    SourceCoverCache.imagePageInstance.clearMemory();
+    AccountAvatarCache.instance.clearMemory();
+    BookImageManager().clearMemoryCache();
+    final imageCache = PaintingBinding.instance.imageCache;
+    imageCache.clear();
+    imageCache.clearLiveImages();
   }
 
   Future<void> _runAutomaticWebDavSyncIfNeeded() async {

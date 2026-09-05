@@ -603,6 +603,7 @@ void main() {
         find.byKey(const ValueKey('reader-auto-page-turn-resume')),
         findsOneWidget,
       );
+      await tester.pump(const Duration(milliseconds: 350));
       await tester.tap(
         find.byKey(const ValueKey('reader-auto-page-turn-resume')),
       );

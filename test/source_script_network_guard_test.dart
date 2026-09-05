@@ -12,9 +12,7 @@ void main() {
     });
 
     test('synthesizes a binding for a bare catch {}', () {
-      final result = guardNetworkCatchBlocks(
-        'try { x(); } catch { y = 1; }',
-      );
+      final result = guardNetworkCatchBlocks('try { x(); } catch { y = 1; }');
       expect(result, contains('catch (__orNetErr) {'));
       expect(result, contains('__orNetErr.message'));
       expect(result, contains('y = 1;'));

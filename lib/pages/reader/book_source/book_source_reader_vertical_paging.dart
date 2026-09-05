@@ -467,6 +467,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
           'source-vertical-pages:$_chapterIndex:${layout.fingerprint}',
         ),
         itemScrollController: _verticalPageScrollController,
+        scrollOffsetController: _verticalPageOffsetController,
         itemPositionsListener: _verticalPagePositionsListener,
         initialScrollIndex: _verticalPageIndex.clamp(
           0,

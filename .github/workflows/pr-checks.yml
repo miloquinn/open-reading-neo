@@ -73,9 +73,11 @@ jobs:
             find test -type f -name '*_test.dart' \
               ! -name 'book_source_management_page_test.dart' \
               ! -name 'book_source_reader_page_test.dart' \
+              ! -name 'book_source_discovery_page_test.dart' \
+              ! -name 'source_response_codec_test.dart' \
               -print0
           )
-          flutter test --coverage "${test_files[@]}"
+          flutter test --coverage --exclude-tags isolated-process "${test_files[@]}"
 
       - name: Run stateful reader tests in isolated processes
         shell: bash
@@ -133,6 +135,51 @@ jobs:
             flutter test test/book_source_reader_page_test.dart \
               --plain-name "$test_name"
           done
+
+          # Discovery tests use animated reveal controllers and shared source
+          # registries. Isolate each case so a pending animation or registry
+          # mutation cannot make later pumpAndSettle calls time out.
+          discovery_tests=(
+            'discover scope defaults to all and filters every section'
+            'latest aggregation interleaves sources and caps each contribution'
+            'pull to refresh invalidates cached responses before reloading'
+            'pull to refresh keeps content instead of showing another loader'
+            'discover layout preference is restored by a new controller'
+            'list layout expands one source and focuses the chosen channel'
+            'list layout ignores duplicate channel ids from a source'
+            'list layout searches sources and expands the first match'
+            'list category selection starts below the header and restores directory scroll'
+            'large source libraries start scoped and build source chips lazily'
+            'cross-source discovery uses bounded concurrency'
+            'request failures are not reported as unsupported capabilities'
+            'channel request failures stay visible and can be retried'
+            'an empty capable source shows an empty state'
+            'missing capabilities still show the unsupported state'
+            'large category sets use a searchable lazy picker'
+            'list layout lazily builds large expanded channel sets'
+            'discovery shelves are built lazily along the vertical viewport'
+            'details sheet keeps its drag handle below the top safe area'
+            'switching to shelf options smoothly shrinks the existing sheet'
+            'adding online stays in the details sheet for feedback then closes'
+            'an existing shelf book uses an information state without drop'
+            'a failed online add keeps the sheet open for retry'
+            'local download progress stays in the sheet and can continue'
+            'reading from the details sheet hands off to paper transition'
+          )
+          for test_name in "${discovery_tests[@]}"; do
+            flutter test test/book_source_discovery_page_test.dart \
+              --plain-name "$test_name"
+          done
+
+          # This discovery/search case inherits animated controllers from
+          # earlier cases in the same Dart VM. Its assertions are kept active
+          # in a fresh process, where it is deterministic.
+          flutter test test/book_source_search_page_test.dart \
+            --plain-name 'discover page selects a reading source, channel, and next page'
+
+          # The charset suite can remain pending in the broad coverage run;
+          # keep all five assertions active in a dedicated process.
+          flutter test test/source_response_codec_test.dart
 
       - name: Explain validation failures
         if: ${{ failure() }}

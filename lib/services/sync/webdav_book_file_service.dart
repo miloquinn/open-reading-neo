@@ -11,6 +11,7 @@ import '../books/book_import_service.dart';
 import '../core/database_service.dart';
 import 'adapters/metadata_sync_adapters.dart';
 import 'secure_sync_config.dart';
+import 'sync_dataset_catalog.dart';
 import 'sync_engine.dart';
 import 'sync_models.dart';
 import 'webdav_client.dart';
@@ -55,6 +56,13 @@ class WebDavBookFileService {
       throw const WebDavSyncFailure(
         WebDavSyncErrorCode.invalidConfiguration,
         'Online-source chapter caches are not uploaded as book files.',
+      );
+    }
+    if (SyncDatasetCatalog.hasPrivateSourceIdentity(book.sourceId) ||
+        SyncDatasetCatalog.hasPrivateSourceIdentity(book.sourceBookId)) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.invalidConfiguration,
+        'Books with private source identities stay on this device.',
       );
     }
     final source = File(book.filePath);

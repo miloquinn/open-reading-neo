@@ -6,6 +6,7 @@ import 'adapters/metadata_sync_adapters.dart';
 import 'secure_sync_config.dart';
 import 'sync_change_store.dart';
 import 'sync_clock.dart';
+import 'sync_dataset_catalog.dart';
 import 'sync_models.dart';
 import 'sync_protocol.dart';
 import 'webdav_client.dart';
@@ -121,7 +122,11 @@ class SyncEngine {
         onPhase?.call(WebDavSyncPhase.applyingRemote);
         final applied = await _changeStore.applyRemoteBatch(
           batch,
-          applyWinner: _adapters.apply,
+          validateWinner: _adapters.validate,
+          normalizeWinner: _adapters.normalizeRemoteWinner,
+          cleanupWinnerAliases: _adapters.cleanupRemoteWinnerAliases,
+          applyWinner: (txn, operation) =>
+              _adapters.apply(txn, operation, scope: scope),
         );
         downloaded += applied;
         conflicts += batch.operations.length - applied;
@@ -137,7 +142,7 @@ class SyncEngine {
     onPhase?.call(WebDavSyncPhase.uploadingLocal);
     var uploaded = 0;
     while (true) {
-      final published = await _publish(client, deviceId, clock);
+      final published = await _publish(client, deviceId, clock, scope);
       if (published == 0) break;
       uploaded += published;
     }
@@ -198,12 +203,46 @@ class SyncEngine {
     WebDavClient client,
     String deviceId,
     HybridLogicalClock clock,
+    WebDavSyncScope scope,
   ) async {
+    final enabledDatasets = SyncDatasetCatalog.enabledRemoteNames(scope);
     final pendingRaw = await _changeStore.getState('pending_batch');
     SyncBatch? batch;
     List<SyncRecord> records = const [];
     if (pendingRaw != null && pendingRaw.isNotEmpty) {
       batch = SyncBatch.decode(pendingRaw);
+      final containsUnauthorizedData = batch.operations.any(
+        (operation) => !SyncDatasetCatalog.isRecordPublishable(
+          dataset: operation.dataset,
+          recordId: operation.recordId,
+          entityKey: operation.entityKey,
+          payload: operation.payload,
+          scope: scope,
+        ),
+      );
+      if (containsUnauthorizedData) {
+        final sequenceName =
+            '${batch.sequence.toString().padLeft(12, '0')}.json';
+        final uploaded = await client.getText(
+          client.path(['devices', deviceId, 'changes', sequenceName]),
+          allowNotFound: true,
+        );
+        if (uploaded == null) {
+          // The batch was only staged locally. Rebuild it from the scope that
+          // is authorized now instead of uploading disabled sensitive data.
+          await _changeStore.setState('pending_batch', '');
+          return _publish(client, deviceId, clock, scope);
+        }
+        final uploadedBatch = SyncBatch.decode(uploaded);
+        if (uploadedBatch.sha256 != batch.sha256) {
+          throw const WebDavSyncFailure(
+            WebDavSyncErrorCode.conflict,
+            'The pending metadata batch conflicts with the remote device log.',
+          );
+        }
+        // The immutable batch already exists remotely. Completing its head is
+        // recovery of an authorized earlier upload, not a new disclosure.
+      }
       final dirty = await _changeStore.dirtyRecords();
       final ids = batch.operations
           .map(
@@ -219,7 +258,17 @@ class SyncEngine {
           )
           .toList(growable: false);
     } else {
-      final dirty = await _changeStore.dirtyRecords();
+      final dirty = (await _changeStore.dirtyRecords(datasets: enabledDatasets))
+          .where(
+            (record) => SyncDatasetCatalog.isRecordPublishable(
+              dataset: record.dataset,
+              recordId: record.recordId,
+              entityKey: record.entityKey,
+              payload: record.payload,
+              scope: scope,
+            ),
+          )
+          .toList(growable: false);
       if (dirty.isEmpty) return 0;
       final sequence =
           int.tryParse(await _changeStore.getState('local_sequence') ?? '') ??

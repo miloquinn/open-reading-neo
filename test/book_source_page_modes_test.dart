@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,6 +99,47 @@ void main() {
     await _pumpUntilFound(tester, find.byType(ScrollablePositionedList));
 
     expect(find.byType(ScrollablePositionedList), findsOneWidget);
+    final verticalList = tester.widget<ScrollablePositionedList>(
+      find.byType(ScrollablePositionedList),
+    );
+    double firstItemLeadingEdge() => verticalList
+        .itemPositionsNotifier!
+        .itemPositions
+        .value
+        .firstWhere((position) => position.index == 0)
+        .itemLeadingEdge;
+    final leadingEdgeBeforeKeyboard = firstItemLeadingEdge();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(firstItemLeadingEdge(), lessThan(leadingEdgeBeforeKeyboard));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('chapter-scoped vertical reader scrolls from the keyboard', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: ReaderPageMode.verticalScroll.name,
+      ReaderSettingsStore.scrollByChapterKey: true,
+    });
+
+    await tester.pumpWidget(_testApp());
+    await _pumpUntilFound(tester, find.byType(ScrollablePositionedList));
+
+    final verticalList = tester.widget<ScrollablePositionedList>(
+      find.byType(ScrollablePositionedList),
+    );
+    double firstItemLeadingEdge() => verticalList
+        .itemPositionsNotifier!
+        .itemPositions
+        .value
+        .firstWhere((position) => position.index == 0)
+        .itemLeadingEdge;
+    final leadingEdgeBeforeKeyboard = firstItemLeadingEdge();
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+
+    expect(firstItemLeadingEdge(), lessThan(leadingEdgeBeforeKeyboard));
     expect(tester.takeException(), isNull);
   });
 
@@ -354,6 +396,26 @@ void main() {
     await tester.tapAt(Offset(tapRect.left + 24, tapRect.center.dy));
     await tester.pumpAndSettle();
     expect(currentPage(), initialPage);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(currentPage(), initialPage + 1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(currentPage(), initialPage);
+
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(
+          find.byKey(const ValueKey('book-source-reader-desktop-input')),
+        ),
+        scrollDelta: const Offset(0, 80),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(currentPage(), initialPage + 1);
   });
 
   testWidgets('tap animation off switches a horizontal page immediately', (

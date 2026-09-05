@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -170,119 +171,141 @@ void main() {
     },
   );
 
-  testWidgets(
-    'native vertical reading uses continuous parts and fixed chrome',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      await tester.binding.setSurfaceSize(const Size(400, 800));
-      final verticalBook = File(
-        '${Directory.systemTemp.path}/open-reading-vertical-paging.html',
-      );
-      verticalBook.writeAsStringSync(bookFile.readAsStringSync());
-      SharedPreferences.setMockInitialValues({
-        ReaderSettingsStore.pageModeKey: ReaderPageMode.verticalScroll.name,
-        ReaderSettingsStore.scrollByChapterKey: false,
-      });
-      try {
-        await tester.pumpWidget(
-          MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: NativeReaderPage(
-              replaceRuleService: replaceRuleService,
-              book: Book(
-                title: 'Vertical paging test',
-                filePath: verticalBook.path,
-                format: 'html',
-                fileModifiedTime: verticalBook
-                    .lastModifiedSync()
-                    .millisecondsSinceEpoch,
-              ),
+  testWidgets('native vertical reading uses continuous parts and fixed chrome', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    final verticalBook = File(
+      '${Directory.systemTemp.path}/open-reading-vertical-paging.html',
+    );
+    verticalBook.writeAsStringSync(
+      '<!doctype html><html><body><h1>Vertical paging</h1>'
+      '${List.generate(120, (index) => '<p>Paragraph $index gives the native '
+          'reader enough vertical content for keyboard scrolling.</p>').join()}'
+      '</body></html>',
+    );
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: ReaderPageMode.verticalScroll.name,
+      ReaderSettingsStore.scrollByChapterKey: true,
+    });
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NativeReaderPage(
+            replaceRuleService: replaceRuleService,
+            book: Book(
+              title: 'Vertical paging test',
+              filePath: verticalBook.path,
+              format: 'html',
+              fileModifiedTime: verticalBook
+                  .lastModifiedSync()
+                  .millisecondsSinceEpoch,
             ),
           ),
-        );
-        await tester.runAsync(() async {
-          for (var attempt = 0; attempt < 30; attempt++) {
-            await Future<void>.delayed(const Duration(milliseconds: 50));
-            await tester.pump();
-            if (find.byType(ScrollablePositionedList).evaluate().isNotEmpty) {
-              return;
-            }
+        ),
+      );
+      await tester.runAsync(() async {
+        for (var attempt = 0; attempt < 30; attempt++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+          if (find.byType(ScrollablePositionedList).evaluate().isNotEmpty) {
+            return;
           }
-        });
-        await _pumpUntilFound(tester, find.byType(ScrollablePositionedList));
+        }
+      });
+      await _pumpUntilFound(tester, find.byType(ScrollablePositionedList));
 
-        expect(
-          find.byKey(const ValueKey('native-reader-viewport-title')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const ValueKey('native-reader-status')),
-          findsOneWidget,
-        );
-        final windowFinder = find.byKey(
-          const ValueKey('native-vertical-reading-window'),
-        );
-        final window = tester.widget<Padding>(windowFinder);
-        final windowPadding = window.padding.resolve(TextDirection.ltr);
-        final listRect = tester.getRect(find.byType(ScrollablePositionedList));
-        expect(windowPadding.vertical, greaterThan(0));
-        expect(listRect.top, closeTo(windowPadding.top, 0.1));
-        expect(listRect.bottom, closeTo(800 - windowPadding.bottom, 0.1));
+      expect(
+        find.byKey(const ValueKey('native-reader-viewport-title')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('native-reader-status')),
+        findsOneWidget,
+      );
+      final windowFinder = find.byKey(
+        const ValueKey('native-vertical-reading-window'),
+      );
+      final window = tester.widget<Padding>(windowFinder);
+      final windowPadding = window.padding.resolve(TextDirection.ltr);
+      final listRect = tester.getRect(find.byType(ScrollablePositionedList));
+      expect(windowPadding.vertical, greaterThan(0));
+      expect(listRect.top, closeTo(windowPadding.top, 0.1));
+      expect(listRect.bottom, closeTo(800 - windowPadding.bottom, 0.1));
 
-        final continuousParts = find.byWidgetPredicate(
-          (widget) =>
-              widget is Column &&
-              widget.key is ValueKey<String> &&
-              (widget.key! as ValueKey<String>).value.startsWith(
-                'native-vertical-part:',
-              ),
-        );
-        expect(continuousParts, findsWidgets);
-        expect(
-          tester.getSize(continuousParts.first).height,
-          isNot(listRect.height),
-        );
+      final continuousParts = find.byWidgetPredicate(
+        (widget) =>
+            widget is Column &&
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'native-vertical-part:',
+            ),
+      );
+      expect(continuousParts, findsWidgets);
+      expect(
+        tester.getSize(continuousParts.first).height,
+        isNot(listRect.height),
+      );
 
-        final surface = find.byKey(const ValueKey('native-reader-surface'));
-        final hiddenTop = tester.widget<AnimatedPositioned>(
-          find.byKey(const ValueKey('native-reader-top-controls')),
-        );
-        expect(hiddenTop.top, -130);
+      final verticalList = tester.widget<ScrollablePositionedList>(
+        find.byType(ScrollablePositionedList),
+      );
+      double firstItemLeadingEdge() => verticalList
+          .itemPositionsNotifier!
+          .itemPositions
+          .value
+          .firstWhere((position) => position.index == 0)
+          .itemLeadingEdge;
+      final leadingEdgeBeforeKeyboard = firstItemLeadingEdge();
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'reader-desktop-input',
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(firstItemLeadingEdge(), lessThan(leadingEdgeBeforeKeyboard));
 
-        final drag = await tester.startGesture(tester.getRect(surface).center);
-        await drag.moveBy(const Offset(0, -120));
-        await drag.up();
-        await tester.pump();
-        expect(
-          tester
-              .widget<AnimatedPositioned>(
-                find.byKey(const ValueKey('native-reader-top-controls')),
-              )
-              .top,
-          -130,
-        );
+      final surface = find.byKey(const ValueKey('native-reader-surface'));
+      final hiddenTop = tester.widget<AnimatedPositioned>(
+        find.byKey(const ValueKey('native-reader-top-controls')),
+      );
+      expect(hiddenTop.top, -130);
 
-        await tester.tapAt(tester.getRect(surface).center);
-        await tester.pump();
-        expect(
-          tester
-              .widget<AnimatedPositioned>(
-                find.byKey(const ValueKey('native-reader-top-controls')),
-              )
-              .top,
-          greaterThan(-130),
-        );
-        expect(tester.takeException(), isNull);
-      } finally {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-        await tester.binding.setSurfaceSize(null);
-        if (verticalBook.existsSync()) verticalBook.deleteSync();
-        debugDefaultTargetPlatformOverride = null;
-      }
-    },
-  );
+      final drag = await tester.startGesture(tester.getRect(surface).center);
+      await drag.moveBy(const Offset(0, -120));
+      await drag.up();
+      await tester.pump();
+      expect(
+        tester
+            .widget<AnimatedPositioned>(
+              find.byKey(const ValueKey('native-reader-top-controls')),
+            )
+            .top,
+        -130,
+      );
+
+      await tester.tapAt(tester.getRect(surface).center);
+      await tester.pump();
+      expect(
+        tester
+            .widget<AnimatedPositioned>(
+              find.byKey(const ValueKey('native-reader-top-controls')),
+            )
+            .top,
+        greaterThan(-130),
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await tester.binding.setSurfaceSize(null);
+      if (verticalBook.existsSync()) verticalBook.deleteSync();
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 
   testWidgets('native horizontal reader resolves a side tap before animating', (
     tester,
@@ -341,6 +364,22 @@ void main() {
       await tester.tapAt(const Offset(460, 400));
       await tester.pumpAndSettle();
 
+      expect(currentPage(), initialPage + 1);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(currentPage(), initialPage);
+
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: tester.getCenter(
+            find.byKey(const ValueKey('native-reader-desktop-input')),
+          ),
+          scrollDelta: const Offset(0, 80),
+          kind: PointerDeviceKind.mouse,
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(currentPage(), initialPage + 1);
       expect(tester.takeException(), isNull);
     } finally {

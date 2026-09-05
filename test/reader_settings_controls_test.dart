@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/core/reader/reader_system_ui.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
@@ -392,5 +393,86 @@ void main() {
         tester.getTopLeft(find.byKey(const ValueKey('reader-theme-day'))).dx,
       ),
     );
+  });
+
+  testWidgets('theme strip accepts mouse drag and vertical wheel scrolling', (
+    tester,
+  ) async {
+    ReaderThemes.setCustomThemes(const []);
+    ReaderThemes.setThemeOrder(const []);
+    final outerController = ScrollController();
+    addTearDown(outerController.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 320,
+              height: 240,
+              child: SingleChildScrollView(
+                controller: outerController,
+                child: Column(
+                  children: [
+                    ReaderThemeStrip(
+                      selectedThemeId: ReaderThemes.systemId,
+                      labelFor: (id) => id,
+                      onSelected: (_) {},
+                      onCustomThemeTap: () {},
+                    ),
+                    const SizedBox(height: 400),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final listView = tester.widget<ListView>(
+      find.descendant(
+        of: find.byType(ReaderThemeStrip),
+        matching: find.byType(ListView),
+      ),
+    );
+    final controller = listView.controller!;
+    expect(controller.offset, 0);
+
+    final stripCenter = tester.getCenter(find.byType(ReaderThemeStrip));
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: stripCenter,
+        scrollDelta: const Offset(0, 100),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    expect(controller.offset, greaterThan(0));
+    expect(outerController.offset, 0);
+
+    final offsetAfterWheel = controller.offset;
+    final mouse = await tester.startGesture(
+      stripCenter,
+      kind: PointerDeviceKind.mouse,
+    );
+    await mouse.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    await mouse.moveBy(const Offset(-100, 0));
+    await tester.pump();
+    await mouse.up();
+    await tester.pumpAndSettle();
+    expect(controller.offset, greaterThan(offsetAfterWheel));
+
+    controller.jumpTo(controller.position.maxScrollExtent);
+    await tester.pump();
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: stripCenter,
+        scrollDelta: const Offset(0, 100),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    expect(outerController.offset, greaterThan(0));
   });
 }

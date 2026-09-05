@@ -16,6 +16,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/book_sources/book_sources_page.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_widgets.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
+import 'package:xxread/services/reader/replace_rule_service.dart';
 
 void main() {
   setUp(() {
@@ -993,8 +994,11 @@ Widget _bookActionsHarness(
       categories: const [],
     ),
   );
-  return ChangeNotifierProvider(
-    create: (_) => DownloadTaskController(),
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => DownloadTaskController()),
+      ChangeNotifierProvider(create: (_) => ReplaceRuleService()),
+    ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

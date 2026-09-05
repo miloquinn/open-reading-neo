@@ -4800,7 +4800,28 @@ class AppLocalizationsJa extends AppLocalizations {
   String get webDavScopeBookmarks => 'しおり';
 
   @override
+  String get webDavScopeNotes => 'メモとハイライト';
+
+  @override
+  String get webDavScopeNotesHint =>
+      '引用文、メモ、手書きを含みます。WebDAV データはエンドツーエンド暗号化されません。';
+
+  @override
   String get webDavScopeReadingSessions => '読書統計';
+
+  @override
+  String get webDavScopeReaderSettings => 'リーダー設定';
+
+  @override
+  String get webDavScopeReaderSettingsHint =>
+      '文字組み、テーマ、ページめくり、タップ領域、画像リーダー設定を同期します。';
+
+  @override
+  String get webDavScopeReplaceRules => '置換ルール';
+
+  @override
+  String get webDavScopeReplaceRulesHint =>
+      'ルールのパターンと置換テキストを同期します。WebDAV データはエンドツーエンド暗号化されません。';
 
   @override
   String get webDavScopeBookFiles => '書籍ファイル';
@@ -4880,6 +4901,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get webDavErrorCorruptData => '一部のリモート同期データが破損しているため適用しませんでした。';
+
+  @override
+  String get webDavErrorLocalDataCorrupt =>
+      '端末の読書設定データが破損しています。リモートのバックアップを削除せずに同期を停止しました。';
 
   @override
   String get webDavErrorClockSkew => '端末と WebDAV サーバーの時刻差が大きすぎます。';

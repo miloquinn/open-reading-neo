@@ -663,6 +663,7 @@ void main() {
       expect(find.text('Channel Book 2'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
+    tags: 'isolated-process',
   );
 }
 

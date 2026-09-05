@@ -244,10 +244,12 @@ String? _dataUriSyntheticBody(String value, Map<String, dynamic> options) {
   final payload = value.substring(comma + 1);
   try {
     final bytes = metadata.contains(';base64')
-        ? base64Decode(payload.padRight(
-            payload.length + (4 - payload.length % 4) % 4,
-            '=',
-          ))
+        ? base64Decode(
+            payload.padRight(
+              payload.length + (4 - payload.length % 4) % 4,
+              '=',
+            ),
+          )
         : utf8.encode(Uri.decodeComponent(payload));
     final hex = StringBuffer();
     for (final byte in bytes) {

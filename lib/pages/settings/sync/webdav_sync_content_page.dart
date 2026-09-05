@@ -126,6 +126,15 @@ class _WebDavSyncContentPageState extends State<WebDavSyncContentPage> {
                             _updateScope(_scope.copyWith(bookmarks: value)),
                       ),
                       _ScopeSwitch(
+                        title: l10n.webDavScopeNotes,
+                        subtitle: l10n.webDavScopeNotesHint,
+                        icon: Icons.draw_outlined,
+                        value: _scope.notes,
+                        enabled: !_saving,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(notes: value)),
+                      ),
+                      _ScopeSwitch(
                         title: l10n.webDavScopeReadingSessions,
                         icon: Icons.bar_chart_rounded,
                         value: _scope.readingSessions,
@@ -133,6 +142,25 @@ class _WebDavSyncContentPageState extends State<WebDavSyncContentPage> {
                         onChanged: (value) => _updateScope(
                           _scope.copyWith(readingSessions: value),
                         ),
+                      ),
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeReaderSettings,
+                        subtitle: l10n.webDavScopeReaderSettingsHint,
+                        icon: Icons.text_fields_rounded,
+                        value: _scope.readerSettings,
+                        enabled: !_saving,
+                        onChanged: (value) => _updateScope(
+                          _scope.copyWith(readerSettings: value),
+                        ),
+                      ),
+                      _ScopeSwitch(
+                        title: l10n.webDavScopeReplaceRules,
+                        subtitle: l10n.webDavScopeReplaceRulesHint,
+                        icon: Icons.find_replace_rounded,
+                        value: _scope.replaceRules,
+                        enabled: !_saving,
+                        onChanged: (value) =>
+                            _updateScope(_scope.copyWith(replaceRules: value)),
                       ),
                       _ScopeSwitch(
                         title: l10n.webDavScopeBookFiles,

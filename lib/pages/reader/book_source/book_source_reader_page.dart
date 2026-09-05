@@ -62,6 +62,7 @@ import 'package:xxread/widgets/reader_aloud_panel.dart';
 import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_cover_page_turn.dart';
 import 'package:xxread/widgets/reader_chapter_title_page.dart';
+import 'package:xxread/widgets/reader_desktop_input.dart';
 import 'package:xxread/widgets/reader_navigation_sheet.dart';
 import 'package:xxread/widgets/reader_opening_loader.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
@@ -145,6 +146,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   PageController _pageController = PageController();
   final ItemScrollController _verticalPageScrollController =
       ItemScrollController();
+  final ScrollOffsetController _verticalPageOffsetController =
+      ScrollOffsetController();
   final ItemPositionsListener _verticalPagePositionsListener =
       ItemPositionsListener.create();
   final ItemScrollController _verticalChapterScrollController =

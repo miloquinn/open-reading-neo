@@ -255,10 +255,16 @@ class ReaderThemes {
     _savedPaletteLoad = null;
   }
 
-  @visibleForTesting
-  static void resetSavedPaletteCacheForTesting() {
+  /// Forces the next book-opening transition to resolve the persisted theme.
+  /// Used after a background sync changes the selected theme ID.
+  static void invalidateSavedPaletteCache() {
     _savedPaletteCache = null;
     _savedPaletteLoad = null;
+  }
+
+  @visibleForTesting
+  static void resetSavedPaletteCacheForTesting() {
+    invalidateSavedPaletteCache();
   }
 
   static void setCustomThemes(List<ReaderCustomTheme> themes) {

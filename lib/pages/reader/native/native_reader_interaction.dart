@@ -1,6 +1,53 @@
 part of 'native_reader_page.dart';
 
 extension _NativeReaderInteraction on _NativeReaderPageState {
+  void _handleDesktopNextPage() {
+    if (_annotationInteractionActive || _visiblePages.isEmpty) return;
+    if (_pageMode == NativePageMode.verticalScroll) {
+      unawaited(_scrollVerticalByViewport(forward: true));
+      return;
+    }
+    _nextPage(
+      _visiblePages,
+      _visibleChapterCount,
+      usesTwoPageLayout: _visibleUsesTwoPageLayout,
+      animate: _tapPageAnimationEnabled,
+    );
+  }
+
+  void _handleDesktopPreviousPage() {
+    if (_annotationInteractionActive || _visiblePages.isEmpty) return;
+    if (_pageMode == NativePageMode.verticalScroll) {
+      unawaited(_scrollVerticalByViewport(forward: false));
+      return;
+    }
+    _previousPage(
+      _visiblePages,
+      _visibleChapterCount,
+      usesTwoPageLayout: _visibleUsesTwoPageLayout,
+      animate: _tapPageAnimationEnabled,
+    );
+  }
+
+  Future<void> _scrollVerticalByViewport({required bool forward}) async {
+    final itemController = _scrollByChapter
+        ? _verticalPageScrollController
+        : _verticalChapterScrollController;
+    if (!itemController.isAttached || _verticalViewportSize.isEmpty) return;
+    _hideControlsForPageTurn();
+    final offsetController = _scrollByChapter
+        ? _verticalPageOffsetController
+        : _verticalChapterOffsetController;
+    final distance = math
+        .max(120, _verticalViewportSize.height * 0.86)
+        .toDouble();
+    await offsetController.animateScroll(
+      offset: forward ? distance : -distance,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   Future<void> _setChapter(
     int index,
     int chapterCount, {

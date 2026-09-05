@@ -124,7 +124,12 @@ void main(List<String> arguments) async {
             create: (_) => DownloadTaskController(),
           ),
           provider.ChangeNotifierProvider(
-            create: (_) => WebDavSyncController(),
+            create: (context) => WebDavSyncController(
+              replaceRuleService: provider.Provider.of<ReplaceRuleService>(
+                context,
+                listen: false,
+              ),
+            ),
           ),
           provider.ChangeNotifierProvider(
             create: (_) => MemberAccountController()..initialize(),

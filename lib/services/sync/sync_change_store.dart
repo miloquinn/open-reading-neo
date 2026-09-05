@@ -103,21 +103,75 @@ class SyncChangeStore {
     return rows.map(SyncRecord.fromMap).toList(growable: false);
   }
 
-  Future<List<SyncRecord>> dirtyRecords({int limit = 500}) async {
+  /// Removes local protocol records that must never be published, together
+  /// with their materialization markers. This does not mutate business data.
+  Future<void> forgetDirtyRecordsWithPrefix(
+    String dataset,
+    String prefix,
+  ) async {
     final db = await _db;
     final rows = await db.query(
       'sync_records',
-      where: 'dirty = 1',
+      columns: ['record_id'],
+      where: 'dataset = ? AND dirty = 1',
+      whereArgs: [dataset],
+    );
+    final recordIds = rows
+        .map((row) => row['record_id']! as String)
+        .where((recordId) => recordId.startsWith(prefix))
+        .toList(growable: false);
+    if (recordIds.isEmpty) return;
+    await db.transaction((txn) async {
+      for (final recordId in recordIds) {
+        await txn.delete(
+          'sync_records',
+          where: 'dataset = ? AND record_id = ?',
+          whereArgs: [dataset, recordId],
+        );
+        await txn.delete(
+          'sync_local_state',
+          where: 'key = ?',
+          whereArgs: ['locally_observed:$dataset:$recordId'],
+        );
+      }
+    });
+  }
+
+  Future<List<SyncRecord>> dirtyRecords({
+    int limit = 500,
+    Set<String>? datasets,
+  }) async {
+    if (datasets != null && datasets.isEmpty) return const [];
+    final db = await _db;
+    final orderedDatasets = datasets == null
+        ? null
+        : (datasets.toList()..sort());
+    final rows = await db.query(
+      'sync_records',
+      where: orderedDatasets == null
+          ? 'dirty = 1'
+          : 'dirty = 1 AND dataset IN '
+                '(${List.filled(orderedDatasets.length, '?').join(', ')})',
+      whereArgs: orderedDatasets,
       orderBy: 'dataset, record_id',
       limit: limit,
     );
     return rows.map(SyncRecord.fromMap).toList(growable: false);
   }
 
-  Future<int> pendingCount() async {
+  Future<int> pendingCount({Set<String>? datasets}) async {
+    if (datasets != null && datasets.isEmpty) return 0;
     final db = await _db;
+    final orderedDatasets = datasets == null
+        ? null
+        : (datasets.toList()..sort());
     final rows = await db.rawQuery(
-      'SELECT COUNT(*) AS count FROM sync_records WHERE dirty = 1',
+      orderedDatasets == null
+          ? 'SELECT COUNT(*) AS count FROM sync_records WHERE dirty = 1'
+          : 'SELECT COUNT(*) AS count FROM sync_records '
+                'WHERE dirty = 1 AND dataset IN '
+                '(${List.filled(orderedDatasets.length, '?').join(', ')})',
+      orderedDatasets,
     );
     return (rows.first['count'] as num).toInt();
   }
@@ -161,59 +215,141 @@ class SyncChangeStore {
           sha256OfCanonicalJson(currentPayload) ==
               sha256OfCanonicalJson(payload) &&
           (current['deleted'] == 1) == deleted) {
-        await setState('locally_observed:$dataset:$recordId', '1');
+        await db.insert('sync_local_state', {
+          'key': 'locally_observed:$dataset:$recordId',
+          'value': current['hlc']! as String,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         return;
       }
     }
+    final hlc = clock.tick().toString();
     await db.insert('sync_records', {
       'dataset': dataset,
       'record_id': recordId,
       'entity_key': entityKey,
       'payload_json': payloadJson,
-      'hlc': clock.tick().toString(),
+      'hlc': hlc,
       'deleted': deleted ? 1 : 0,
       'dirty': 1,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
-    await setState('locally_observed:$dataset:$recordId', '1');
+    await db.insert('sync_local_state', {
+      'key': 'locally_observed:$dataset:$recordId',
+      'value': hlc,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<int> applyRemoteBatch(
     SyncBatch batch, {
-    required Future<void> Function(Transaction txn, SyncOperation operation)
+    required Future<void> Function(SyncOperation operation) validateWinner,
+    required Future<bool> Function(Transaction txn, SyncOperation operation)
     applyWinner,
+    Future<SyncOperation> Function(Transaction txn, SyncOperation operation)?
+    normalizeWinner,
+    Future<void> Function(Transaction txn, SyncOperation operation)?
+    cleanupWinnerAliases,
   }) async {
     final db = await _db;
-    var applied = 0;
+    final winners = <SyncOperation>[];
     await db.transaction((txn) async {
+      final candidates = <String, SyncOperation>{};
+      final wireCandidates = <String, SyncOperation>{};
       for (final operation in batch.operations) {
-        final rows = await txn.query(
-          'sync_records',
-          where: 'dataset = ? AND record_id = ?',
-          whereArgs: [operation.dataset, operation.recordId],
-          limit: 1,
-        );
-        if (rows.isNotEmpty) {
-          final local = SyncRecord.fromMap(rows.first);
-          if (HybridLogicalTimestamp.parse(
-                local.hlc,
-              ).compareTo(HybridLogicalTimestamp.parse(operation.hlc)) >=
-              0) {
-            continue;
+        final key = '${operation.dataset}\u0000${operation.recordId}';
+        final earlierCandidate = wireCandidates[key];
+        SyncOperation? current = earlierCandidate;
+        if (current == null) {
+          final rows = await txn.query(
+            'sync_records',
+            where: 'dataset = ? AND record_id = ?',
+            whereArgs: [operation.dataset, operation.recordId],
+            limit: 1,
+          );
+          if (rows.isNotEmpty) {
+            current = SyncRecord.fromMap(rows.first).toOperation();
           }
         }
+        // Tombstones are allowed to omit their payload. Preserve the last
+        // known identity metadata so adapters can still locate the business
+        // row when applying a deletion.
+        var effectiveOperation = SyncOperation(
+          dataset: operation.dataset,
+          recordId: operation.recordId,
+          entityKey: operation.entityKey,
+          hlc: operation.hlc,
+          deleted: operation.deleted,
+          payload: operation.deleted && operation.payload == null
+              ? current?.payload
+              : operation.payload,
+        );
+        if (current == null ||
+            HybridLogicalTimestamp.parse(current.hlc).compareTo(
+                  HybridLogicalTimestamp.parse(effectiveOperation.hlc),
+                ) <
+                0) {
+          wireCandidates[key] = effectiveOperation;
+        }
+        if (normalizeWinner != null) {
+          effectiveOperation = await normalizeWinner(txn, effectiveOperation);
+        }
+        final normalizedKey =
+            '${effectiveOperation.dataset}\u0000${effectiveOperation.recordId}';
+        var normalizedCurrent = candidates[normalizedKey];
+        if (normalizedCurrent == null) {
+          final rows = await txn.query(
+            'sync_records',
+            where: 'dataset = ? AND record_id = ?',
+            whereArgs: [
+              effectiveOperation.dataset,
+              effectiveOperation.recordId,
+            ],
+            limit: 1,
+          );
+          if (rows.isNotEmpty) {
+            normalizedCurrent = SyncRecord.fromMap(rows.first).toOperation();
+          }
+        }
+        if (normalizedCurrent != null &&
+            HybridLogicalTimestamp.parse(normalizedCurrent.hlc).compareTo(
+                  HybridLogicalTimestamp.parse(effectiveOperation.hlc),
+                ) >=
+                0) {
+          continue;
+        }
+        candidates[normalizedKey] = effectiveOperation;
+      }
+
+      winners.addAll(candidates.values);
+      // Validation is side-effect free and covers the complete winning set.
+      // Any malformed operation aborts before mirror/cursor state changes.
+      for (final operation in winners) {
+        await validateWinner(operation);
+      }
+
+      for (final effectiveOperation in winners) {
         await txn.insert('sync_records', {
-          'dataset': operation.dataset,
-          'record_id': operation.recordId,
-          'entity_key': operation.entityKey,
-          'payload_json': operation.payload == null
+          'dataset': effectiveOperation.dataset,
+          'record_id': effectiveOperation.recordId,
+          'entity_key': effectiveOperation.entityKey,
+          'payload_json': effectiveOperation.payload == null
               ? null
-              : jsonEncode(operation.payload),
-          'hlc': operation.hlc,
-          'deleted': operation.deleted ? 1 : 0,
+              : jsonEncode(effectiveOperation.payload),
+          'hlc': effectiveOperation.hlc,
+          'deleted': effectiveOperation.deleted ? 1 : 0,
           'dirty': 0,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
-        await applyWinner(txn, operation);
-        applied++;
+        // Absence of this versioned marker is the durable materialization
+        // queue. It survives failures and scope changes without mixing
+        // non-transactional preference writes into the mirror transaction.
+        await txn.delete(
+          'sync_local_state',
+          where: 'key = ?',
+          whereArgs: [
+            'locally_observed:${effectiveOperation.dataset}:${effectiveOperation.recordId}',
+          ],
+        );
+        if (cleanupWinnerAliases != null) {
+          await cleanupWinnerAliases(txn, effectiveOperation);
+        }
       }
       await txn.insert('sync_device_cursors', {
         'remote_device_id': batch.deviceId,
@@ -221,7 +357,21 @@ class SyncChangeStore {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
-    return applied;
+
+    // Materialize after the mirror and cursor commit. Each operation is
+    // independently idempotent: a failed preference/database write leaves
+    // its marker absent and is retried before the next local scan.
+    for (final operation in winners) {
+      await db.transaction((txn) async {
+        final materialized = await applyWinner(txn, operation);
+        if (!materialized) return;
+        await txn.insert('sync_local_state', {
+          'key': 'locally_observed:${operation.dataset}:${operation.recordId}',
+          'value': operation.hlc,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      });
+    }
+    return winners.length;
   }
 
   Future<void> markUploaded(List<SyncRecord> records) async {

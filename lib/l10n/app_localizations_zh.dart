@@ -4741,7 +4741,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webDavScopeBookmarks => '书签';
 
   @override
+  String get webDavScopeNotes => '笔记与高亮';
+
+  @override
+  String get webDavScopeNotesHint => '包含划线原文、批注与手绘；WebDAV 数据未端到端加密。';
+
+  @override
   String get webDavScopeReadingSessions => '阅读统计';
+
+  @override
+  String get webDavScopeReaderSettings => '阅读器设置';
+
+  @override
+  String get webDavScopeReaderSettingsHint => '同步排版、主题、翻页、点击区域与图片阅读偏好。';
+
+  @override
+  String get webDavScopeReplaceRules => '替换规则';
+
+  @override
+  String get webDavScopeReplaceRulesHint => '同步规则表达式与替换文本；WebDAV 数据未端到端加密。';
 
   @override
   String get webDavScopeBookFiles => '书籍原文件';
@@ -4821,6 +4839,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get webDavErrorCorruptData => '部分远端同步数据已损坏，因此没有应用。';
+
+  @override
+  String get webDavErrorLocalDataCorrupt => '本机阅读设置数据已损坏。同步已停止，远端备份不会被删除。';
 
   @override
   String get webDavErrorClockSkew => '本机时间与 WebDAV 服务器相差过大。';
@@ -10146,7 +10167,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get webDavScopeBookmarks => '書籤';
 
   @override
+  String get webDavScopeNotes => '筆記與醒目提示';
+
+  @override
+  String get webDavScopeNotesHint => '包含引用原文、批註與手繪；WebDAV 資料未端對端加密。';
+
+  @override
   String get webDavScopeReadingSessions => '閱讀統計';
+
+  @override
+  String get webDavScopeReaderSettings => '閱讀器設定';
+
+  @override
+  String get webDavScopeReaderSettingsHint => '同步排版、主題、翻頁、點按區域與圖片閱讀偏好。';
+
+  @override
+  String get webDavScopeReplaceRules => '取代規則';
+
+  @override
+  String get webDavScopeReplaceRulesHint => '同步規則運算式與取代文字；WebDAV 資料未端對端加密。';
 
   @override
   String get webDavScopeBookFiles => '書籍原始檔';
@@ -10226,6 +10265,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get webDavErrorCorruptData => '部分遠端同步資料已損壞，因此未套用。';
+
+  @override
+  String get webDavErrorLocalDataCorrupt => '本機閱讀設定資料已損壞。同步已停止，遠端備份不會被刪除。';
 
   @override
   String get webDavErrorClockSkew => '本機時間與 WebDAV 伺服器相差過大。';

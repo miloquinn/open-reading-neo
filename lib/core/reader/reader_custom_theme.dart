@@ -76,6 +76,17 @@ class ReaderCustomTheme {
     'backgroundImageOpacity': backgroundImageOpacity,
   };
 
+  /// Portable WebDAV representation. The background image remains a local
+  /// resource until image blobs have their own explicit sync capability.
+  Map<String, Object?> toSyncMap() => <String, Object?>{
+    'id': id,
+    'name': name,
+    'background': background.toARGB32(),
+    'text': text.toARGB32(),
+    'controlBar': controlBar.toARGB32(),
+    'backgroundImageOpacity': backgroundImageOpacity,
+  };
+
   factory ReaderCustomTheme.fromMap(Map<String, Object?> map) {
     int colorValue(String key, Color fallback) {
       final value = map[key];
@@ -115,7 +126,8 @@ class ReaderCustomThemeStore {
     if (raw != null) {
       final decoded = _decodeList(raw);
       if (decoded != null) return decoded;
-      await prefs.remove(storageKey);
+      // Preserve the raw value so sync can distinguish corruption from an
+      // intentional empty theme library and avoid propagating mass deletes.
       return const [];
     }
 
@@ -132,9 +144,30 @@ class ReaderCustomThemeStore {
         'Discarding invalid legacy reader theme (${error.runtimeType}).',
       );
       debugPrintStack(stackTrace: stackTrace);
-      await prefs.remove(legacyStorageKey);
       return const [];
     }
+  }
+
+  /// Loads themes without repairing or deleting malformed preferences.
+  ///
+  /// Sync uses this strict path so a corrupt local cache cannot be mistaken
+  /// for an intentional empty collection and propagated as mass tombstones.
+  Future<List<ReaderCustomTheme>> loadAllForSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(storageKey);
+    if (raw != null) return _decodeListStrict(raw);
+
+    final legacyRaw = prefs.getString(legacyStorageKey);
+    if (legacyRaw == null || legacyRaw.isEmpty) return const [];
+    final decoded = jsonDecode(legacyRaw);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Legacy reader theme must be an object.');
+    }
+    final theme = ReaderCustomTheme.fromMap(decoded);
+    if (!ReaderCustomTheme.isCustomThemeId(theme.id)) {
+      throw const FormatException('Legacy reader theme has an invalid ID.');
+    }
+    return [theme];
   }
 
   Future<ReaderCustomTheme?> load() async {
@@ -194,11 +227,38 @@ class ReaderCustomThemeStore {
       }
       return result;
     } catch (error, stackTrace) {
-      debugPrint(
-        'Discarding invalid reader theme cache (${error.runtimeType}).',
-      );
+      debugPrint('Ignoring invalid reader theme cache (${error.runtimeType}).');
       debugPrintStack(stackTrace: stackTrace);
       return null;
     }
+  }
+
+  List<ReaderCustomTheme> _decodeListStrict(String raw) {
+    if (raw.isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List<Object?>) {
+      throw const FormatException('Reader theme root must be a list.');
+    }
+    final result = <ReaderCustomTheme>[];
+    final ids = <String>{};
+    for (final item in decoded) {
+      if (item is! Map<String, dynamic> ||
+          item['id'] is! String ||
+          item['name'] is! String ||
+          item['background'] is! int ||
+          item['text'] is! int ||
+          item['controlBar'] is! int ||
+          item['backgroundImageOpacity'] is! num) {
+        throw const FormatException('A reader theme is malformed.');
+      }
+      final theme = ReaderCustomTheme.fromMap(item);
+      if (!ReaderCustomTheme.isCustomThemeId(theme.id) || !ids.add(theme.id)) {
+        throw const FormatException(
+          'Reader theme IDs must be unique custom IDs.',
+        );
+      }
+      result.add(theme);
+    }
+    return result;
   }
 }

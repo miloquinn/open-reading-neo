@@ -37,7 +37,7 @@ void main() {
 
     expect(await const ReaderCustomThemeStore().load(), isNull);
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString(ReaderCustomThemeStore.storageKey), isNull);
+    expect(prefs.getString(ReaderCustomThemeStore.storageKey), '{broken');
   });
 
   test(

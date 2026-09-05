@@ -32,6 +32,7 @@ enum WebDavSyncErrorCode {
   tls,
   network,
   corruptRemoteData,
+  localDataCorrupt,
   clockSkew,
   secureStorage,
   unknown,
@@ -147,6 +148,8 @@ class WebDavSyncScope {
     this.bookmarks = true,
     this.notes = false,
     this.readingSessions = true,
+    this.readerSettings = true,
+    this.replaceRules = false,
     this.bookFiles = false,
   });
 
@@ -156,6 +159,8 @@ class WebDavSyncScope {
   final bool bookmarks;
   final bool notes;
   final bool readingSessions;
+  final bool readerSettings;
+  final bool replaceRules;
   final bool bookFiles;
 
   Map<String, Object?> toJson() => {
@@ -165,6 +170,8 @@ class WebDavSyncScope {
     'bookmarks': bookmarks,
     'notes': notes,
     'reading_sessions': readingSessions,
+    'reader_settings': readerSettings,
+    'replace_rules': replaceRules,
     'book_files': bookFiles,
   };
 
@@ -176,6 +183,8 @@ class WebDavSyncScope {
         bookmarks: json['bookmarks'] as bool? ?? true,
         notes: json['notes'] as bool? ?? false,
         readingSessions: json['reading_sessions'] as bool? ?? true,
+        readerSettings: json['reader_settings'] as bool? ?? true,
+        replaceRules: json['replace_rules'] as bool? ?? false,
         bookFiles: json['book_files'] as bool? ?? false,
       );
 
@@ -186,6 +195,8 @@ class WebDavSyncScope {
     bool? bookmarks,
     bool? notes,
     bool? readingSessions,
+    bool? readerSettings,
+    bool? replaceRules,
     bool? bookFiles,
   }) => WebDavSyncScope(
     bookSources: bookSources ?? this.bookSources,
@@ -194,6 +205,8 @@ class WebDavSyncScope {
     bookmarks: bookmarks ?? this.bookmarks,
     notes: notes ?? this.notes,
     readingSessions: readingSessions ?? this.readingSessions,
+    readerSettings: readerSettings ?? this.readerSettings,
+    replaceRules: replaceRules ?? this.replaceRules,
     bookFiles: bookFiles ?? this.bookFiles,
   );
 }

@@ -62,6 +62,16 @@ void main() {
 
     expect(find.text('书源'), findsOneWidget);
     expect(find.text('书架与在线书籍'), findsOneWidget);
+    expect(find.text('笔记与高亮'), findsOneWidget);
+    expect(find.text('阅读器设置'), findsOneWidget);
+    expect(find.text('替换规则'), findsOneWidget);
+    expect(find.textContaining('未端到端加密'), findsNWidgets(2));
+    final notesSwitch = find.widgetWithText(SwitchListTile, '笔记与高亮');
+    final readerSettingsSwitch = find.widgetWithText(SwitchListTile, '阅读器设置');
+    final replaceRulesSwitch = find.widgetWithText(SwitchListTile, '替换规则');
+    expect(tester.widget<SwitchListTile>(notesSwitch).value, isFalse);
+    expect(tester.widget<SwitchListTile>(readerSettingsSwitch).value, isTrue);
+    expect(tester.widget<SwitchListTile>(replaceRulesSwitch).value, isFalse);
     final progressSwitch = find.widgetWithText(SwitchListTile, '阅读进度');
     expect(progressSwitch, findsOneWidget);
     expect(tester.widget<SwitchListTile>(progressSwitch).value, isTrue);

@@ -165,8 +165,10 @@ void main() {
   testWidgets('image-only source chapters open in the paged image reader', (
     tester,
   ) async {
-    final directory = await Directory.systemTemp.createTemp('source-images-');
-    addTearDown(() => directory.delete(recursive: true));
+    final directory = Directory.systemTemp.createTempSync('source-images-');
+    addTearDown(() {
+      if (directory.existsSync()) directory.deleteSync(recursive: true);
+    });
     final requested = <Uri>[];
     final cache = SourceCoverCache(
       cacheDirectory: directory,
@@ -198,6 +200,12 @@ void main() {
     );
 
     await _pumpUntilFound(tester, find.byType(PagedImageReader));
+    await tester.runAsync(() async {
+      for (var attempt = 0; attempt < 100 && requested.isEmpty; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
+    await tester.pump();
 
     expect(find.byType(PagedImageReader), findsOneWidget);
     expect(requested, contains(Uri.parse('https://images.test/1.jpg')));

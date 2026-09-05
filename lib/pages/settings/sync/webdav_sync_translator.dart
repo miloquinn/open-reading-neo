@@ -30,6 +30,8 @@ String webDavSyncErrorText(BuildContext context, WebDavSyncErrorCode? code) {
       return context.l10n.webDavErrorRateLimited;
     case WebDavSyncErrorCode.corruptRemoteData:
       return context.l10n.webDavErrorCorruptData;
+    case WebDavSyncErrorCode.localDataCorrupt:
+      return context.l10n.webDavErrorLocalDataCorrupt;
     case WebDavSyncErrorCode.clockSkew:
       return context.l10n.webDavErrorClockSkew;
     case WebDavSyncErrorCode.secureStorage:

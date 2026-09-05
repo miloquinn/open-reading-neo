@@ -4978,7 +4978,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webDavScopeBookmarks => 'Bookmarks';
 
   @override
+  String get webDavScopeNotes => 'Notes and highlights';
+
+  @override
+  String get webDavScopeNotesHint =>
+      'Includes quoted text, notes, and ink. WebDAV data is not end-to-end encrypted.';
+
+  @override
   String get webDavScopeReadingSessions => 'Reading statistics';
+
+  @override
+  String get webDavScopeReaderSettings => 'Reader settings';
+
+  @override
+  String get webDavScopeReaderSettingsHint =>
+      'Sync typography, themes, page turns, tap zones, and image-reader preferences.';
+
+  @override
+  String get webDavScopeReplaceRules => 'Replacement rules';
+
+  @override
+  String get webDavScopeReplaceRulesHint =>
+      'Sync rule patterns and replacement text. WebDAV data is not end-to-end encrypted.';
 
   @override
   String get webDavScopeBookFiles => 'Book files';
@@ -5069,6 +5090,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get webDavErrorCorruptData =>
       'Some remote sync data is damaged and was not applied.';
+
+  @override
+  String get webDavErrorLocalDataCorrupt =>
+      'Local reading settings are damaged. Sync stopped without deleting the remote backup.';
 
   @override
   String get webDavErrorClockSkew =>

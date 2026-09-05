@@ -308,8 +308,8 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: ReaderTapObserver(
-                        key: const ValueKey('book-source-reader-tap-observer'),
+                      child: ReaderDesktopInput(
+                        key: const ValueKey('book-source-reader-desktop-input'),
                         enabled:
                             _readerFontReady &&
                             !_loadingCatalog &&
@@ -318,12 +318,31 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                             _chapters.isNotEmpty &&
                             _content != null &&
                             !_annotationInteractionActive,
-                        onTap: _handleReaderTap,
-                        child: Semantics(
-                          label: widget.book.title,
-                          child: KeyedSubtree(
-                            key: ValueKey('book-source-reader-$_bodyStateName'),
-                            child: _buildTransitionAwareBody(),
+                        turnPageOnPointerScroll:
+                            _pageMode != BookSourcePageMode.verticalScroll,
+                        onNext: _handleDesktopNextPage,
+                        onPrevious: _handleDesktopPreviousPage,
+                        child: ReaderTapObserver(
+                          key: const ValueKey(
+                            'book-source-reader-tap-observer',
+                          ),
+                          enabled:
+                              _readerFontReady &&
+                              !_loadingCatalog &&
+                              (!_loadingContent || _content != null) &&
+                              _error == null &&
+                              _chapters.isNotEmpty &&
+                              _content != null &&
+                              !_annotationInteractionActive,
+                          onTap: _handleReaderTap,
+                          child: Semantics(
+                            label: widget.book.title,
+                            child: KeyedSubtree(
+                              key: ValueKey(
+                                'book-source-reader-$_bodyStateName',
+                              ),
+                              child: _buildTransitionAwareBody(),
+                            ),
                           ),
                         ),
                       ),

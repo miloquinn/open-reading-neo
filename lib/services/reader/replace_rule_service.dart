@@ -277,6 +277,39 @@ class ReplaceRuleService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Applies a WebDAV snapshot without renumbering its cross-device order.
+  ///
+  /// Normal UI edits intentionally compact order values. During sync, records
+  /// arrive one at a time, so preserving their remote order until the whole
+  /// batch has landed prevents intermediate writes from reversing two rules.
+  Future<void> replaceFromSync(List<ReplaceRule> rules) async {
+    _ensureOpen();
+    if (rules.length > maxRules) {
+      throw const ReplaceRuleValidationException(
+        ReplaceRuleValidationKind.tooManyRules,
+      );
+    }
+    final ordered = List<ReplaceRule>.of(rules)
+      ..sort((a, b) {
+        final byOrder = a.order.compareTo(b.order);
+        return byOrder != 0 ? byOrder : a.id.compareTo(b.id);
+      });
+    for (final rule in ordered) {
+      validate(rule);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      preferenceKey,
+      jsonEncode(ordered.map((rule) => rule.toJson()).toList()),
+    );
+    if (_closed) return;
+    _rules = ordered;
+    _loaded = true;
+    _revision++;
+    _rulesSignatureCache = null;
+    notifyListeners();
+  }
+
   Future<void> upsert(ReplaceRule rule) async {
     final next = [..._rules];
     final index = next.indexWhere((item) => item.id == rule.id);

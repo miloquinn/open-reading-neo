@@ -332,43 +332,55 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                               child:
                                   BookOpenTransition.buildReaderContentReveal(
                                     context,
-                                    child: ReaderTapObserver(
+                                    child: ReaderDesktopInput(
                                       key: const ValueKey(
-                                        'native-reader-tap-observer',
+                                        'native-reader-desktop-input',
                                       ),
                                       enabled: !_annotationInteractionActive,
-                                      onTap: _handleReaderTap,
-                                      child: GestureDetector(
-                                        behavior: HitTestBehavior.translucent,
-                                        onHorizontalDragEnd:
-                                            _pageMode ==
-                                                    NativePageMode
-                                                        .horizontalSlide ||
-                                                _pageMode ==
-                                                    NativePageMode.coverSlide ||
-                                                _pageMode ==
-                                                    NativePageMode.pageCurl
-                                            ? null
-                                            : (details) =>
-                                                  _handleHorizontalSwipe(
-                                                    details,
-                                                    pages,
-                                                    chapters.length,
-                                                    usesTwoPageLayout,
-                                                  ),
-                                        child: _buildReaderContent(
-                                          chapters,
-                                          chapter,
-                                          pages,
-                                          bookPages,
-                                          usesTwoPageLayout,
-                                          _paginationFingerprintFor(
-                                            _chapterIndex,
-                                            paginationSize,
-                                            textDirection,
-                                            textScaler,
+                                      turnPageOnPointerScroll:
+                                          _pageMode !=
+                                          NativePageMode.verticalScroll,
+                                      onNext: _handleDesktopNextPage,
+                                      onPrevious: _handleDesktopPreviousPage,
+                                      child: ReaderTapObserver(
+                                        key: const ValueKey(
+                                          'native-reader-tap-observer',
+                                        ),
+                                        enabled: !_annotationInteractionActive,
+                                        onTap: _handleReaderTap,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.translucent,
+                                          onHorizontalDragEnd:
+                                              _pageMode ==
+                                                      NativePageMode
+                                                          .horizontalSlide ||
+                                                  _pageMode ==
+                                                      NativePageMode
+                                                          .coverSlide ||
+                                                  _pageMode ==
+                                                      NativePageMode.pageCurl
+                                              ? null
+                                              : (details) =>
+                                                    _handleHorizontalSwipe(
+                                                      details,
+                                                      pages,
+                                                      chapters.length,
+                                                      usesTwoPageLayout,
+                                                    ),
+                                          child: _buildReaderContent(
+                                            chapters,
+                                            chapter,
+                                            pages,
+                                            bookPages,
+                                            usesTwoPageLayout,
+                                            _paginationFingerprintFor(
+                                              _chapterIndex,
+                                              paginationSize,
+                                              textDirection,
+                                              textScaler,
+                                            ),
+                                            size,
                                           ),
-                                          size,
                                         ),
                                       ),
                                     ),

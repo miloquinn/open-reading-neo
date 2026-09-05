@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/reader/reader_layout.dart';
@@ -890,7 +891,7 @@ class ReaderSettingsDragHandle extends StatelessWidget {
   }
 }
 
-class ReaderThemeStrip extends StatelessWidget {
+class ReaderThemeStrip extends StatefulWidget {
   const ReaderThemeStrip({
     super.key,
     required this.selectedThemeId,
@@ -913,131 +914,180 @@ class ReaderThemeStrip extends StatelessWidget {
   final double spacing;
 
   @override
+  State<ReaderThemeStrip> createState() => _ReaderThemeStripState();
+}
+
+class _ReaderThemeStripState extends State<ReaderThemeStrip> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_scrollController.hasClients) return;
+    final delta = event.scrollDelta.dy.abs() >= event.scrollDelta.dx.abs()
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+    if (delta == 0) return;
+    final position = _scrollController.position;
+    final atLeadingBoundary =
+        delta < 0 && _scrollController.offset <= position.minScrollExtent + 0.5;
+    final atTrailingBoundary =
+        delta > 0 && _scrollController.offset >= position.maxScrollExtent - 0.5;
+    if (atLeadingBoundary || atTrailingBoundary) return;
+    final nextOffset = (_scrollController.offset + delta)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(nextOffset);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final customThemes = ReaderThemes.customThemes;
-    final themes = palettes ?? ReaderThemes.orderedPalettes;
+    final themes = widget.palettes ?? ReaderThemes.orderedPalettes;
+    final inheritedScrollBehavior = ScrollConfiguration.of(context);
     return SizedBox(
       height: 122,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 1),
-        physics: const BouncingScrollPhysics(),
-        itemCount: themes.length + (showCustomAction ? 1 : 0),
-        separatorBuilder: (_, _) => SizedBox(width: spacing),
-        itemBuilder: (context, index) {
-          if (showCustomAction && index == themes.length) {
-            final colors = Theme.of(context).colorScheme;
-            return SizedBox(
-              width: 108,
-              child: Semantics(
-                button: true,
-                label: labelFor(ReaderCustomTheme.legacyThemeId),
-                child: InkWell(
-                  key: const ValueKey('reader-custom-theme-card'),
-                  onTap: onCustomThemeTap,
-                  borderRadius: BorderRadius.circular(18),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
+      child: Listener(
+        onPointerSignal: _handlePointerSignal,
+        child: ScrollConfiguration(
+          behavior: inheritedScrollBehavior.copyWith(
+            dragDevices: {
+              ...inheritedScrollBehavior.dragDevices,
+              PointerDeviceKind.mouse,
+            },
+          ),
+          child: ListView.separated(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 1),
+            physics: const BouncingScrollPhysics(),
+            itemCount: themes.length + (widget.showCustomAction ? 1 : 0),
+            separatorBuilder: (_, _) => SizedBox(width: widget.spacing),
+            itemBuilder: (context, index) {
+              if (widget.showCustomAction && index == themes.length) {
+                final colors = Theme.of(context).colorScheme;
+                return SizedBox(
+                  width: 108,
+                  child: Semantics(
+                    button: true,
+                    label: widget.labelFor(ReaderCustomTheme.legacyThemeId),
+                    child: InkWell(
+                      key: const ValueKey('reader-custom-theme-card'),
+                      onTap: widget.onCustomThemeTap,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: colors.outlineVariant,
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: colors.outlineVariant,
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Container(
-                              width: 30,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                color: colors.surfaceContainerHighest,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: colors.outlineVariant,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.add_rounded,
-                                size: 20,
-                                color: colors.onSurface,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (customThemes.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.primaryContainer,
-                                  borderRadius: BorderRadius.circular(99),
-                                ),
-                                child: Text(
-                                  '${customThemes.length}',
-                                  style: TextStyle(
-                                    color: colors.onPrimaryContainer,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
+                            Row(
+                              children: [
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: colors.surfaceContainerHighest,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: colors.outlineVariant,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.add_rounded,
+                                    size: 20,
+                                    color: colors.onSurface,
                                   ),
                                 ),
+                                const Spacer(),
+                                if (customThemes.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.primaryContainer,
+                                      borderRadius: BorderRadius.circular(99),
+                                    ),
+                                    child: Text(
+                                      '${customThemes.length}',
+                                      style: TextStyle(
+                                        color: colors.onPrimaryContainer,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const Spacer(),
+                            Text(
+                              customThemes.isEmpty ? 'Aa +' : 'Aa ···',
+                              style: TextStyle(
+                                color: colors.onSurface,
+                                fontSize: 19,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
                               ),
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              widget.labelFor(ReaderCustomTheme.legacyThemeId),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: colors.onSurface,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ],
                         ),
-                        const Spacer(),
-                        Text(
-                          customThemes.isEmpty ? 'Aa +' : 'Aa ···',
-                          style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 19,
-                            height: 1,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          labelFor(ReaderCustomTheme.legacyThemeId),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          }
-          final palette = themes[index];
-          final customTheme = ReaderThemes.customThemeById(palette.id);
-          final selected = palette.id == selectedThemeId;
-          final label = customTheme == null || customTheme.name.trim().isEmpty
-              ? labelFor(palette.id)
-              : customTheme.name.trim();
-          return _ReaderThemeCard(
-            key: ValueKey('reader-theme-${palette.id}'),
-            width: cardWidth,
-            palette: palette,
-            label: label,
-            selected: selected,
-            icon: customTheme == null
-                ? _iconFor(palette.id)
-                : customTheme.hasBackgroundImage
-                ? Icons.image_rounded
-                : Icons.palette_rounded,
-            onTap: () => onSelected(palette.id),
-          );
-        },
+                );
+              }
+              final palette = themes[index];
+              final customTheme = ReaderThemes.customThemeById(palette.id);
+              final selected = palette.id == widget.selectedThemeId;
+              final label =
+                  customTheme == null || customTheme.name.trim().isEmpty
+                  ? widget.labelFor(palette.id)
+                  : customTheme.name.trim();
+              return _ReaderThemeCard(
+                key: ValueKey('reader-theme-${palette.id}'),
+                width: widget.cardWidth,
+                palette: palette,
+                label: label,
+                selected: selected,
+                icon: customTheme == null
+                    ? _iconFor(palette.id)
+                    : customTheme.hasBackgroundImage
+                    ? Icons.image_rounded
+                    : Icons.palette_rounded,
+                onTap: () => widget.onSelected(palette.id),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

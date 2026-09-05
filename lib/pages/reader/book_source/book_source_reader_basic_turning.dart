@@ -1,6 +1,43 @@
 part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
+  void _handleDesktopNextPage() {
+    if (_annotationInteractionActive) return;
+    if (_pageMode == BookSourcePageMode.verticalScroll) {
+      unawaited(_scrollVerticalByViewport(forward: true));
+      return;
+    }
+    unawaited(_turnFromTap(forward: true));
+  }
+
+  void _handleDesktopPreviousPage() {
+    if (_annotationInteractionActive) return;
+    if (_pageMode == BookSourcePageMode.verticalScroll) {
+      unawaited(_scrollVerticalByViewport(forward: false));
+      return;
+    }
+    unawaited(_turnFromTap(forward: false));
+  }
+
+  Future<void> _scrollVerticalByViewport({required bool forward}) async {
+    final itemController = _scrollByChapter
+        ? _verticalPageScrollController
+        : _verticalChapterScrollController;
+    if (!itemController.isAttached || _verticalViewportSize.isEmpty) return;
+    _hideControlsForPageTurn();
+    final offsetController = _scrollByChapter
+        ? _verticalPageOffsetController
+        : _verticalChapterOffsetController;
+    final distance = math
+        .max(120, _verticalViewportSize.height * 0.86)
+        .toDouble();
+    await offsetController.animateScroll(
+      offset: forward ? distance : -distance,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   void _handleTapZoneAction(ReaderTapZoneAction action) {
     if (_annotationInteractionActive) return;
     switch (action) {

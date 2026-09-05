@@ -29,7 +29,10 @@ void main() {
           'https://books.test/chapter/1':
               '<article id="content"><p>正文</p></article>',
         });
-        final session = SourceDebugSession(_htmlSource(), runtime: SourceRuntime(transport: transport));
+        final session = SourceDebugSession(
+          _htmlSource(),
+          runtime: SourceRuntime(transport: transport),
+        );
         addTearDown(session.dispose);
         final events = <SourceDebugEvent>[];
         session.events.listen(events.add);
@@ -86,7 +89,10 @@ void main() {
         'https://books.test/chapter/1':
             '<article id="content"><p>正文</p></article>',
       });
-      final session = SourceDebugSession(_htmlSource(), runtime: SourceRuntime(transport: transport));
+      final session = SourceDebugSession(
+        _htmlSource(),
+        runtime: SourceRuntime(transport: transport),
+      );
       addTearDown(session.dispose);
       final events = <SourceDebugEvent>[];
       session.events.listen(events.add);
@@ -96,37 +102,42 @@ void main() {
 
       expect(events.where((e) => e.stage == 'search'), isEmpty);
       expect(
-        events.where((e) => e.kind == SourceDebugEventKind.stageSuccess).map(
-          (e) => e.stage,
-        ),
+        events
+            .where((e) => e.kind == SourceDebugEventKind.stageSuccess)
+            .map((e) => e.stage),
         ['info', 'toc', 'content'],
       );
     });
 
-    test('a failing stage stops the chain and is reported as an error', () async {
-      final transport = _FakeTransport({
-        'https://books.test/book/1': '''
+    test(
+      'a failing stage stops the chain and is reported as an error',
+      () async {
+        final transport = _FakeTransport({
+          'https://books.test/book/1': '''
           <h1>剑来</h1><p class="author">烽火</p>
           <a class="toc" href="/book/1/toc">目录</a>
         ''',
-        // No response registered for the toc page: the fake transport throws,
-        // which should surface as a failed 'toc' stage and stop the chain.
-      });
-      final session = SourceDebugSession(_htmlSource(), runtime: SourceRuntime(transport: transport));
-      addTearDown(session.dispose);
-      final events = <SourceDebugEvent>[];
-      session.events.listen(events.add);
+          // No response registered for the toc page: the fake transport throws,
+          // which should surface as a failed 'toc' stage and stop the chain.
+        });
+        final session = SourceDebugSession(
+          _htmlSource(),
+          runtime: SourceRuntime(transport: transport),
+        );
+        addTearDown(session.dispose);
+        final events = <SourceDebugEvent>[];
+        session.events.listen(events.add);
 
-      await session.run('https://books.test/book/1');
-      await Future<void>.delayed(Duration.zero);
+        await session.run('https://books.test/book/1');
+        await Future<void>.delayed(Duration.zero);
 
-      final tocFailure = events.firstWhere(
-        (e) =>
-            e.kind == SourceDebugEventKind.stageError && e.stage == 'toc',
-      );
-      expect(tocFailure.isError, isTrue);
-      expect(events.where((e) => e.stage == 'content'), isEmpty);
-    });
+        final tocFailure = events.firstWhere(
+          (e) => e.kind == SourceDebugEventKind.stageError && e.stage == 'toc',
+        );
+        expect(tocFailure.isError, isTrue);
+        expect(events.where((e) => e.stage == 'content'), isEmpty);
+      },
+    );
 
     test('run() is a no-op while a session is already running', () async {
       final transport = _FakeTransport({
@@ -140,7 +151,10 @@ void main() {
         'https://books.test/chapter/1':
             '<article id="content"><p>正文</p></article>',
       });
-      final session = SourceDebugSession(_htmlSource(), runtime: SourceRuntime(transport: transport));
+      final session = SourceDebugSession(
+        _htmlSource(),
+        runtime: SourceRuntime(transport: transport),
+      );
       addTearDown(session.dispose);
 
       final first = session.run('https://books.test/book/1');

@@ -67,10 +67,7 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 20));
       cancellation.cancel();
-      await expectLater(
-        future,
-        throwsA(isA<BookDownloadCancelledException>()),
-      );
+      await expectLater(future, throwsA(isA<BookDownloadCancelledException>()));
     });
 
     test('reset clears throttling state', () async {

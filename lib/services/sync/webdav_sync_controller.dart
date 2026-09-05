@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../models/book.dart';
 import '../library/library_event_bus_service.dart';
+import '../reader/replace_rule_service.dart';
 
+import 'adapters/metadata_sync_adapters.dart';
 import 'secure_sync_config.dart';
 import 'sync_change_store.dart';
 import 'sync_dataset_catalog.dart';
@@ -20,6 +22,7 @@ class WebDavSyncController extends ChangeNotifier {
     this._engine,
     WebDavClientFactory? clientFactory,
     WebDavBookFileService? bookFileService,
+    this._replaceRuleService,
   }) : _configStore = configStore ?? SecureSyncConfigStore(),
        _changeStore = changeStore ?? SyncChangeStore(),
        _clientFactory = clientFactory ?? WebDavClient.standard {
@@ -30,6 +33,7 @@ class WebDavSyncController extends ChangeNotifier {
   final SecureSyncConfigStore _configStore;
   final SyncChangeStore _changeStore;
   final WebDavClientFactory _clientFactory;
+  final ReplaceRuleService? _replaceRuleService;
   SyncEngine? _engine;
   late final WebDavBookFileService _bookFileService;
   Future<WebDavSyncRunResult>? _running;
@@ -97,7 +101,7 @@ class WebDavSyncController extends ChangeNotifier {
     _configuration = await _configStore.readConfiguration();
     _scope = SyncDatasetCatalog.normalizeScope(await _configStore.readScope());
     _newBookUploadPolicy = await _configStore.readNewBookUploadPolicy();
-    _pendingChanges = await _changeStore.pendingCount();
+    _pendingChanges = await _enabledPendingCount();
     final lastSuccess = await _changeStore.getState('last_successful_sync');
     _lastSuccessfulSync = lastSuccess == null
         ? null
@@ -189,6 +193,10 @@ class WebDavSyncController extends ChangeNotifier {
       final engine = _engine ??= SyncEngine(
         configStore: _configStore,
         changeStore: _changeStore,
+        adapters: MetadataSyncAdapters(
+          store: _changeStore,
+          replaceRuleService: _replaceRuleService,
+        ),
         clientFactory: _clientFactory,
       );
       final result = await engine.run(
@@ -204,7 +212,7 @@ class WebDavSyncController extends ChangeNotifier {
         'last_successful_sync',
         result.completedAt.toUtc().toIso8601String(),
       );
-      _pendingChanges = await _changeStore.pendingCount();
+      _pendingChanges = await _enabledPendingCount();
       await _refreshRemoteBooks();
       if (result.downloaded > 0) {
         LibraryEventBus().notifyLibraryChanged();
@@ -220,7 +228,7 @@ class WebDavSyncController extends ChangeNotifier {
         '${error.statusCode == null ? '' : ' (HTTP ${error.statusCode})'}',
       );
       _setFailure(error);
-      _pendingChanges = await _changeStore.pendingCount();
+      _pendingChanges = await _enabledPendingCount();
       _phase = WebDavSyncPhase.none;
       notifyListeners();
       rethrow;
@@ -259,8 +267,13 @@ class WebDavSyncController extends ChangeNotifier {
     final normalized = SyncDatasetCatalog.normalizeScope(scope);
     await _configStore.saveScope(normalized);
     _scope = normalized;
+    _pendingChanges = await _enabledPendingCount();
     notifyListeners();
   }
+
+  Future<int> _enabledPendingCount() => _changeStore.pendingCount(
+    datasets: SyncDatasetCatalog.enabledRemoteNames(_scope),
+  );
 
   Future<void> setNewBookUploadPolicy(WebDavNewBookUploadPolicy policy) async {
     await _configStore.saveNewBookUploadPolicy(policy);

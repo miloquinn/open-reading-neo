@@ -110,6 +110,32 @@ void main() {
   });
 
   test(
+    'upload rejects a downloaded book with a private source identity',
+    () async {
+      final service = WebDavBookFileService();
+
+      await expectLater(
+        service.upload(
+          Book(
+            title: 'Private source book',
+            filePath: '${temporaryDirectory.path}/private.epub',
+            format: 'epub',
+            sourceId: 'https://example.org/source?token=secret',
+            sourceBookId: 'book-1',
+          ),
+        ),
+        throwsA(
+          isA<WebDavSyncFailure>().having(
+            (failure) => failure.code,
+            'code',
+            WebDavSyncErrorCode.invalidConfiguration,
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
     'upload keeps the original book bytes and file name in WebDAV',
     () async {
       final bookBytes = [80, 75, 3, 4, 10, 20, 30, 40];

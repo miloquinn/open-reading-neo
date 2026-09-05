@@ -8738,11 +8738,47 @@ abstract class AppLocalizations {
   /// **'Bookmarks'**
   String get webDavScopeBookmarks;
 
+  /// Sync scope for reader notes and highlights
+  ///
+  /// In en, this message translates to:
+  /// **'Notes and highlights'**
+  String get webDavScopeNotes;
+
+  /// Privacy disclosure for syncing notes and highlights
+  ///
+  /// In en, this message translates to:
+  /// **'Includes quoted text, notes, and ink. WebDAV data is not end-to-end encrypted.'**
+  String get webDavScopeNotesHint;
+
   /// Sync scope for reading sessions
   ///
   /// In en, this message translates to:
   /// **'Reading statistics'**
   String get webDavScopeReadingSessions;
+
+  /// Sync scope for portable reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Reader settings'**
+  String get webDavScopeReaderSettings;
+
+  /// Description for the reader settings sync scope
+  ///
+  /// In en, this message translates to:
+  /// **'Sync typography, themes, page turns, tap zones, and image-reader preferences.'**
+  String get webDavScopeReaderSettingsHint;
+
+  /// Sync scope for user-authored replacement rules
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement rules'**
+  String get webDavScopeReplaceRules;
+
+  /// Privacy disclosure for replacement-rule sync
+  ///
+  /// In en, this message translates to:
+  /// **'Sync rule patterns and replacement text. WebDAV data is not end-to-end encrypted.'**
+  String get webDavScopeReplaceRulesHint;
 
   /// Sync scope for book files
   ///
@@ -8893,6 +8929,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Some remote sync data is damaged and was not applied.'**
   String get webDavErrorCorruptData;
+
+  /// WebDAV corrupt local reading data error
+  ///
+  /// In en, this message translates to:
+  /// **'Local reading settings are damaged. Sync stopped without deleting the remote backup.'**
+  String get webDavErrorLocalDataCorrupt;
 
   /// WebDAV clock skew error
   ///

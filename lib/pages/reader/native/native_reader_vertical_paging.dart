@@ -456,6 +456,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       child: ScrollablePositionedList.builder(
         key: ValueKey('native-vertical-pages:$_chapterIndex:$_layoutSignature'),
         itemScrollController: _verticalPageScrollController,
+        scrollOffsetController: _verticalPageOffsetController,
         itemPositionsListener: _verticalPagePositionsListener,
         initialScrollIndex: _pageIndex.clamp(0, parts.length - 1),
         minCacheExtent: _verticalPageExtentFor(viewport),

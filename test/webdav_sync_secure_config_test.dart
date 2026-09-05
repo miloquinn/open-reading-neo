@@ -102,6 +102,24 @@ void main() {
       );
     },
   );
+
+  test(
+    'legacy scope enables portable settings without exposing private data',
+    () async {
+      final preferences = _MemoryPreferences()
+        ..values['webdav_sync_scope_v1'] =
+            '{"books":true,"progress":true,"bookmarks":true}';
+      final store = SecureSyncConfigStore(
+        secretStorage: _MemorySecrets(),
+        preferences: preferences,
+      );
+
+      final scope = await store.readScope();
+      expect(scope.readerSettings, isTrue);
+      expect(scope.notes, isFalse);
+      expect(scope.replaceRules, isFalse);
+    },
+  );
 }
 
 class _MemorySecrets implements SyncSecretStorage {

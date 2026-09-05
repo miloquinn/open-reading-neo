@@ -85,7 +85,7 @@ void main() {
 
       var record = (await store.recordsForDataset('book_sources')).single;
       expect(record.entityKey, source.id);
-      expect(record.payload, source.toJson());
+      expect(record.payload, {...source.toJson(), 'sync_schema': 1});
       expect(record.deleted, isFalse);
 
       await store.markUploaded([record]);
@@ -129,6 +129,7 @@ void main() {
             ),
           ],
         ),
+        validateWinner: adapters.validate,
         applyWinner: adapters.apply,
       );
 
@@ -151,6 +152,7 @@ void main() {
             ),
           ],
         ),
+        validateWinner: adapters.validate,
         applyWinner: adapters.apply,
       );
 
@@ -196,6 +198,7 @@ void main() {
           ),
         ],
       ),
+      validateWinner: adapters.validate,
       applyWinner: adapters.apply,
     );
 
@@ -225,6 +228,7 @@ void main() {
           ),
         ],
       ),
+      validateWinner: adapters.validate,
       applyWinner: adapters.apply,
     );
     expect(await database.query('books'), isEmpty);
@@ -262,9 +266,128 @@ void main() {
 
       final record = (await store.recordsForDataset('books')).single;
       expect(record.payload!['storage_type'], 'online');
-      expect(record.payload!['source_json'], sourceJson);
+      expect(jsonDecode(record.payload!['source_json']! as String), {
+        ...source.toJson(),
+        'sync_schema': 1,
+      });
       expect(record.payload!['source_book_json'], sourceBookJson);
       expect(record.payload, isNot(contains('filePath')));
+    },
+  );
+
+  test(
+    'full metadata scan never stages source credentials or private identities',
+    () async {
+      const headerSecret = 'HEADER_SECRET_7e97';
+      const variableSecret = 'VARIABLE_SECRET_d542';
+      const identitySecret = 'IDENTITY_SECRET_a31c';
+      final privateSource = RegisteredBookSource(
+        id: 'private-reading-source',
+        name: 'Private source',
+        description: 'Local only',
+        manifestUrl: Uri.parse('https://private.example/source'),
+        apiBaseUrl: Uri.parse('https://private.example/api'),
+        protocolVersion: '1.0',
+        languages: const ['en'],
+        capabilities: const {'search', 'detail', 'catalog', 'content'},
+        enabled: true,
+        addedAt: DateTime.utc(2026, 9, 4),
+        sourceProtocol: BookSourceProtocolKind.readingSource,
+        sourceConfig: const {
+          'bookSourceUrl': 'https://private.example',
+          'bookSourceName': 'Private source',
+          'header': {'Authorization': 'Bearer $headerSecret'},
+          'loginUrl': 'https://private.example/login?token=$variableSecret',
+        },
+      );
+      await registry.upsert(_source());
+      await registry.upsert(privateSource);
+
+      final publicSourceJson = jsonEncode(_source().toJson());
+      await database.insert('books', {
+        'title': 'Public source book',
+        'author': 'Author',
+        'filePath': '',
+        'format': 'source',
+        'currentPage': 0,
+        'totalPages': 1,
+        'importDate': 1234,
+        'storage_type': 'online',
+        'source_id': _source().id,
+        'source_book_id': 'book-1',
+        'source_json': publicSourceJson,
+        'source_book_json': jsonEncode({
+          'id': 'book-1',
+          'title': 'Public source book',
+          'coverHeaders': {'Authorization': 'Bearer $headerSecret'},
+          'sourceVariables': {'token': variableSecret},
+        }),
+      });
+      await database.insert('books', {
+        'title': 'Private identity book',
+        'author': 'Author',
+        'filePath': '',
+        'format': 'source',
+        'currentPage': 0,
+        'totalPages': 1,
+        'importDate': 1235,
+        'storage_type': 'online',
+        'source_id': 'https://private.example/catalog?token=$identitySecret',
+        'source_book_id': 'book-2',
+        'source_json': jsonEncode(privateSource.toJson()),
+        'source_book_json': jsonEncode({
+          'id': 'book-2',
+          'title': 'Private identity book',
+          'sourceVariables': {'token': variableSecret},
+        }),
+      });
+      await store.recordLocal(
+        dataset: 'books',
+        recordId:
+            'source:https://private.example/catalog?token=$identitySecret:book-2',
+        entityKey:
+            'source:https://private.example/catalog?token=$identitySecret:book-2',
+        payload: const {'source_json': headerSecret},
+        deleted: false,
+        clock: HybridLogicalClock(deviceId: 'old', nowMillis: () => 500),
+      );
+
+      await adapters.scan(
+        const WebDavSyncScope(
+          bookmarks: false,
+          notes: false,
+          readingSessions: false,
+        ),
+        HybridLogicalClock(deviceId: 'local', nowMillis: () => 1000),
+      );
+
+      final encoded = jsonEncode(
+        (await store.dirtyRecords())
+            .map((record) => record.toOperation().toJson())
+            .toList(),
+      );
+      expect(encoded, isNot(contains(headerSecret)));
+      expect(encoded, isNot(contains(variableSecret)));
+      expect(encoded, isNot(contains(identitySecret)));
+      expect(encoded, isNot(contains('Authorization')));
+      expect(encoded, isNot(contains('coverHeaders')));
+      expect(encoded, isNot(contains('sourceVariables')));
+      final retainedPrivateConfig = (await registry.load())
+          .singleWhere((source) => source.id == privateSource.id)
+          .sourceConfig!;
+      expect(
+        (retainedPrivateConfig['header'] as Map)['Authorization'],
+        contains(headerSecret),
+      );
+      expect(retainedPrivateConfig['loginUrl'], contains(variableSecret));
+      expect(
+        (await database.query(
+          'books',
+          where: 'title = ?',
+          whereArgs: ['Public source book'],
+        )).single['source_book_json'],
+        contains(headerSecret),
+      );
     },
   );
 
@@ -302,6 +425,7 @@ void main() {
           ),
         ],
       ),
+      validateWinner: adapters.validate,
       applyWinner: adapters.apply,
     );
 
@@ -356,6 +480,7 @@ void main() {
             ),
           ],
         ),
+        validateWinner: adapters.validate,
         applyWinner: adapters.apply,
       );
 
@@ -386,6 +511,7 @@ void main() {
             ),
           ],
         ),
+        validateWinner: adapters.validate,
         applyWinner: adapters.apply,
       );
       expect(

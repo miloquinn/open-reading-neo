@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/scripting/source_script_crypto_api.dart';
 import 'package:xxread/book_sources/source_engine/scripting/source_script_encoding_api.dart';
 import 'package:xxread/book_sources/source_engine/scripting/source_script_engine.dart';
+import 'package:xxread/book_sources/source_engine/scripting/source_script_text_api.dart';
 
 void main() {
   late QuickJsSourceScriptEvaluator evaluator;
@@ -150,13 +152,25 @@ void main() {
     expect(evaluator.evaluate("java.base64Encode('a', 0)", context), 'YQ==\n');
   });
 
-  test('encoding byte hosts return plain lists across the JS bridge', () {
+  test('byte host APIs return plain lists across the JS bridge', () {
     const encoding = SourceScriptEncodingApi();
+    const crypto = SourceScriptCryptoApi();
+    const text = SourceScriptTextApi();
     final hostBytes = encoding.handle('base64DecodeBytes', const ['AQID']);
     for (final bytes in [
       encoding.handle('strToBytes', const ['abc', 'UTF-8']),
       encoding.handle('hexDecodeToBytes', const ['010203']),
       hostBytes,
+      text.handle('utf8Bytes', const ['abc']),
+      crypto.handle('digestBytes', const ['abc', 'SHA-256']),
+      crypto.handle('hmacBytes', const ['abc', 'HmacSHA256', 'key']),
+      crypto.handle('symmetricCrypto', [
+        'encryptBytes',
+        'AES/ECB/PKCS7Padding',
+        List<int>.filled(16, 0),
+        const <int>[],
+        const [1, 2, 3],
+      ]),
     ]) {
       expect(bytes, isA<List<int>>());
       expect(bytes, isNot(isA<Uint8List>()));

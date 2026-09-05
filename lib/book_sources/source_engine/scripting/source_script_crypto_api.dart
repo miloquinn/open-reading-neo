@@ -82,7 +82,8 @@ List<int> _digestBytes(List arguments) {
   final algorithm = arguments.length > 1
       ? '${arguments[1] ?? ''}'.toLowerCase().replaceAll('-', '')
       : 'sha256';
-  return _digestFor(algorithm, value)?.bytes ?? const [];
+  final digest = _digestFor(algorithm, value);
+  return digest == null ? const [] : List<int>.from(digest.bytes);
 }
 
 Digest? _digestFor(String algorithm, List<int> value) => switch (algorithm) {
@@ -107,7 +108,7 @@ List<int> _hmacBytes(List arguments) {
     'hmacsha512' || 'sha512' => Hmac(sha512, key).convert(data),
     _ => null,
   };
-  return digest?.bytes ?? const [];
+  return digest == null ? const [] : List<int>.from(digest.bytes);
 }
 
 List<int> _argumentBytes(List arguments) =>

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/registered_book_source.dart';
@@ -63,6 +65,8 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
   BookSourceMaintenanceState _state = const BookSourceMaintenanceState();
   bool _cancelRequested = false;
   bool _disposed = false;
+  Timer? _progressThrottleTimer;
+  BookSourceMaintenanceProgress? _pendingProgress;
 
   BookSourceMaintenanceState get state => _state;
 
@@ -105,20 +109,15 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
         targets,
         onProgress: (completed, total) {
           if (!_isCurrent(runId)) return;
-          _emit(
-            BookSourceMaintenanceState(
-              status: BookSourceMaintenanceStatus.running,
-              runId: runId,
-              progress: BookSourceMaintenanceProgress(
-                completed: completed,
-                total: total,
-              ),
-            ),
+          _reportProgress(
+            runId,
+            BookSourceMaintenanceProgress(completed: completed, total: total),
           );
         },
         isCancelled: () => _cancelRequested || !_isCurrent(runId),
       );
       if (!_isCurrent(runId)) return;
+      _clearPendingProgress();
       final fullyAvailable = <RegisteredBookSource>[];
       final needsAttention = <RegisteredBookSource>[];
       for (final source in updated) {
@@ -141,6 +140,7 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
       );
     } on Object catch (error) {
       if (!_isCurrent(runId)) return;
+      _clearPendingProgress();
       _emit(
         BookSourceMaintenanceState(
           status: BookSourceMaintenanceStatus.failed,
@@ -163,6 +163,37 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
   bool _isCurrent(int runId) =>
       !_disposed && _state.runId == runId && _state.isRunning;
 
+  void _reportProgress(int runId, BookSourceMaintenanceProgress progress) {
+    if (_progressThrottleTimer == null) {
+      _emitProgress(runId, progress);
+      _progressThrottleTimer = Timer(const Duration(milliseconds: 100), () {
+        _progressThrottleTimer = null;
+        final pending = _pendingProgress;
+        _pendingProgress = null;
+        if (pending != null) _emitProgress(runId, pending);
+      });
+      return;
+    }
+    _pendingProgress = progress;
+  }
+
+  void _emitProgress(int runId, BookSourceMaintenanceProgress progress) {
+    if (!_isCurrent(runId)) return;
+    _emit(
+      BookSourceMaintenanceState(
+        status: BookSourceMaintenanceStatus.running,
+        runId: runId,
+        progress: progress,
+      ),
+    );
+  }
+
+  void _clearPendingProgress() {
+    _progressThrottleTimer?.cancel();
+    _progressThrottleTimer = null;
+    _pendingProgress = null;
+  }
+
   void _emit(BookSourceMaintenanceState state) {
     if (_disposed) return;
     _state = state;
@@ -173,6 +204,7 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _cancelRequested = true;
+    _clearPendingProgress();
     super.dispose();
   }
 }

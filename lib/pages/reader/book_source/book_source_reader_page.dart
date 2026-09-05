@@ -19,6 +19,7 @@ import 'package:xxread/core/reader/canonical_locator.dart';
 import 'package:xxread/core/reader/platform_reader_aloud_media_session.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
 import 'package:xxread/core/reader/reader_annotation.dart';
+import 'package:xxread/core/reader/reader_auto_page_turn_controller.dart';
 import 'package:xxread/core/reader/reader_custom_theme.dart';
 import 'package:xxread/core/reader/reader_font_profile.dart';
 import 'package:xxread/core/reader/reader_leaf_status.dart';
@@ -59,6 +60,9 @@ import 'package:xxread/utils/system_ui_helper.dart';
 import 'package:xxread/widgets/reader_ai_panel.dart';
 import 'package:xxread/widgets/reader_annotated_text_page.dart';
 import 'package:xxread/widgets/reader_aloud_panel.dart';
+import 'package:xxread/widgets/reader_auto_page_turn_controls.dart';
+import 'package:xxread/widgets/reader_auto_scroll_surface.dart';
+import 'package:xxread/widgets/reader_sweep_page_turn.dart';
 import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_cover_page_turn.dart';
 import 'package:xxread/widgets/reader_chapter_title_page.dart';
@@ -89,6 +93,7 @@ part 'book_source_reader_chapter_loading.dart';
 part 'book_source_reader_navigation.dart';
 part 'book_source_reader_settings.dart';
 part 'book_source_reader_aloud_actions.dart';
+part 'book_source_reader_auto_page_turning.dart';
 part 'book_source_reader_shell.dart';
 
 const double _bookSourceSpreadGutter = 24;
@@ -264,6 +269,16 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
   bool _restartReaderAloudAfterManualPageTurn = false;
+  late final ReaderAutoPageTurnController _autoPageTurnController;
+  int _autoPageTurnStartRequest = 0;
+  bool _autoWholeBook = false;
+  bool _autoScrollRestoring = false;
+  bool _consumeAutoTap = false;
+  final Set<int> _autoPreparingChapters = {};
+  bool _autoRestoreCentered = false;
+  int _autoRetainThrough = 0;
+  bool get _effectiveScrollByChapter => _scrollByChapter && !_autoWholeBook;
+  bool _appLifecycleActive = true;
 
   ReaderThemePalette get _readerTheme =>
       _loadingCatalog && widget.initialTheme != null
@@ -360,6 +375,11 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   @override
   void initState() {
     super.initState();
+    _autoPageTurnController = ReaderAutoPageTurnController(
+      onAdvance: _advanceAutoPageTurn,
+    );
+    _autoPageTurnController.addListener(_onAutoPageTurnChanged);
+    unawaited(_autoPageTurnController.loadInterval());
     unawaited(_replaceRules.load());
     _showOpeningLoader = widget.initialTheme == null;
     if (!_showOpeningLoader) {
@@ -428,6 +448,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _appLifecycleActive = true;
       _startReadingSession();
       unawaited(ReaderKeepScreenOnController.reapply(this));
       if (_readerSystemUiApplied) unawaited(_applyReaderSystemUi());
@@ -438,7 +459,10 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     }
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
+      _appLifecycleActive = false;
+      _pauseAutoPageTurn();
       unawaited(_saveProgress());
       unawaited(_flushReadingSession());
     }
@@ -494,6 +518,9 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     _controlsTimer?.cancel();
     _pagedLayoutWarmTimer?.cancel();
     _readerAloudController?.removeListener(_onReaderAloudChanged);
+    _autoPageTurnStartRequest++;
+    _autoPageTurnController.removeListener(_onAutoPageTurnChanged);
+    _autoPageTurnController.dispose();
     _chapterLoadSerial++;
     unawaited(_saveProgress());
     unawaited(_flushReadingSession());

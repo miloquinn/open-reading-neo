@@ -92,6 +92,11 @@ devtools_options.yaml
 *.jks
 *.keystore
 *.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.xcarchive/
+*.xcresult/
 *.pfx
 *.ppk
 *.kdbx

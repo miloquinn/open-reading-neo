@@ -1,0 +1,26 @@
+{
+  "bundleId": "com.niki.xxread",
+  "version": "2.6.4",
+  "localizations": {
+    "zh-Hans": {
+      "name": "开元阅读",
+      "subtitle": "让阅读连接世界",
+      "description": "开元阅读是一款本地优先的电子书阅读器，帮助你整理自己的书籍、调整阅读体验，并记录阅读习惯。\n\n• 导入与整理：导入自己的 TXT、EPUB 等电子书，管理书库与阅读进度。\n• 专注阅读：调整字体、主题、行距与页面布局，选择适合自己的翻页方式。\n• 阅读记录：使用书签、划线与笔记，回顾阅读统计和目标。\n• 听书与存储：使用语音朗读，在支持的设备上访问文件与 iCloud 文稿。\n\n基础本地阅读无需注册账号。联网账号、第三方内容服务与 AI 功能需要网络连接；使用 AI 时，需要自行配置服务。应用不随包提供第三方书源目录或商业书籍，用户应仅导入或访问有权使用的内容。",
+      "keywords": "阅读器,电子书,EPUB,TXT,书库,书签,笔记,朗读,阅读统计",
+      "promotionalText": "把自己的书籍整理成随身书库，用合适的字体、主题和翻页方式，保持每天阅读的习惯。",
+      "supportUrl": "https://github.com/miloquinn/open-reading/issues",
+      "marketingUrl": "https://open.xxread.top/",
+      "privacyPolicyUrl": ""
+    },
+    "en-US": {
+      "name": "Open Reading",
+      "subtitle": "Your books, notes and progress",
+      "description": "Open Reading is a local-first ebook reader for organizing your own books, personalizing reading, and keeping track of your reading habits.\n\n• Import your own TXT, EPUB and other supported ebooks into a personal library.\n• Adjust fonts, themes, spacing and page layout, and choose your preferred page-turning style.\n• Keep bookmarks, highlights and notes, and review reading statistics and goals.\n• Use text-to-speech and access files and iCloud documents on supported devices.\n\nBasic local reading does not require an account. Account services, third-party content services and AI features require an internet connection. AI features require your own service configuration. The app does not bundle a third-party source directory or commercial books. Only import or access content you have the right to use.",
+      "keywords": "ebook,reader,epub,txt,books,library,bookmarks,notes,reading,text to speech",
+      "promotionalText": "Bring your own books into a personal library. Find a reading style that suits you and keep track of your progress.",
+      "supportUrl": "https://github.com/miloquinn/open-reading/issues",
+      "marketingUrl": "https://open.xxread.top/",
+      "privacyPolicyUrl": ""
+    }
+  }
+}

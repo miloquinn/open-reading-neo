@@ -1,3 +1,4 @@
+import 'txt_sync_storage_mode_control.dart';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -32,6 +33,7 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
   List<_LocalFileEntry> _synced = const [];
   bool _loading = true;
   bool _transferring = false;
+  bool _incrementalTxtUploads = false;
   bool _hasLegacyRemoteFiles = false;
   String? _currentTitle;
   double? _currentProgress;
@@ -124,19 +126,12 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
   List<String> get _visibleIds => switch (_tabController.index) {
     0 =>
       _pendingUpload
-          .where(
-            (item) =>
-                item.sizeBytes <= WebDavBookFileService.maxRecoverableFileBytes,
-          )
+          .where((item) => !_exceedsFileLimit(item.sizeBytes, item.book.format))
           .map((item) => item.bookUid)
           .toList(),
     1 =>
       _availableDownload
-          .where(
-            (item) =>
-                (item.sizeBytes ?? 0) <=
-                WebDavBookFileService.maxRecoverableFileBytes,
-          )
+          .where((item) => !_exceedsFileLimit(item.sizeBytes ?? 0, item.format))
           .map((item) => item.bookUid)
           .toList(),
     _ => const <String>[],
@@ -186,7 +181,7 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
             .where((item) => _selected.contains(item.bookUid))
             .toList();
         for (final item in items) {
-          if (item.sizeBytes > WebDavBookFileService.maxRecoverableFileBytes) {
+          if (_exceedsFileLimit(item.sizeBytes, item.book.format)) {
             continue;
           }
           setState(() {
@@ -195,6 +190,7 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
           });
           await sync.uploadBookFile(
             item.book,
+            incrementalTxt: _incrementalTxtUploads,
             onProgress: (progress) {
               if (mounted) setState(() => _currentProgress = progress.fraction);
             },
@@ -205,8 +201,7 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
             .where((item) => _selected.contains(item.bookUid))
             .toList();
         for (final item in items) {
-          if ((item.sizeBytes ?? 0) >
-              WebDavBookFileService.maxRecoverableFileBytes) {
+          if (_exceedsFileLimit(item.sizeBytes ?? 0, item.format)) {
             continue;
           }
           setState(() {
@@ -346,6 +341,23 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
                     onPolicyTap: _transferring || !sync.scope.bookFiles
                         ? null
                         : () => _pickNewBookPolicy(sync),
+                  ),
+                if (_tabController.index == 0)
+                  SwitchListTile.adaptive(
+                    title: Text(l10n.cloudSyncIncrementalMode),
+                    subtitle: Text(l10n.cloudSyncIncrementalDescription),
+                    value: _incrementalTxtUploads,
+                    onChanged: _transferring || !sync.scope.bookFiles
+                        ? null
+                        : (enabled) async {
+                            if (enabled &&
+                                !await confirmIncrementalTxtStorage(context)) {
+                              return;
+                            }
+                            if (mounted) {
+                              setState(() => _incrementalTxtUploads = enabled);
+                            }
+                          },
                   ),
                 Expanded(
                   child: TabBarView(
@@ -572,8 +584,7 @@ class _LocalFilesList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final item = items[index];
-        final tooLarge =
-            item.sizeBytes > WebDavBookFileService.maxRecoverableFileBytes;
+        final tooLarge = _exceedsFileLimit(item.sizeBytes, item.book.format);
         return _FileTile(
           title: item.book.title,
           subtitle: tooLarge
@@ -611,7 +622,7 @@ class _RemoteFilesList extends StatelessWidget {
       itemBuilder: (context, index) {
         final item = items[index];
         final size = item.sizeBytes ?? 0;
-        final tooLarge = size > WebDavBookFileService.maxRecoverableFileBytes;
+        final tooLarge = _exceedsFileLimit(size, item.format);
         return _FileTile(
           title: item.title,
           subtitle: tooLarge
@@ -710,3 +721,7 @@ String _formatBytes(int bytes) {
   }
   return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(2)} GB';
 }
+
+bool _exceedsFileLimit(int bytes, String format) =>
+    format.toLowerCase() != 'txt' &&
+    bytes > WebDavBookFileService.maxRecoverableFileBytes;

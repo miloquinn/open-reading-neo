@@ -136,6 +136,8 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     Bookmark bookmark,
     List<_NativeChapter> chapters,
   ) async {
+    if (!isTxtBookmarkLocatorResolved(bookmark.anchorKey)) return;
+    if (!_suppressProgressSyncEvents) _markReadingPositionChanged();
     final locatorRaw = bookmark.canonicalLocator;
     final locator = locatorRaw == null
         ? null
@@ -241,6 +243,9 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     BookNote annotation,
     List<_NativeChapter> chapters,
   ) {
+    if (!isTxtNoteLocatorResolved(annotation.toMap())) {
+      return Future<void>.value();
+    }
     final chapterId = readerAnnotationChapterId(annotation);
     var chapterIndex = chapterId == null
         ? -1
@@ -280,6 +285,7 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
   }
 
   Future<void> _showFullTextSearch({String initialQuery = ''}) async {
+    _pauseAutoPageTurn();
     _setReaderState(() => _controlsVisible = false);
     await showReaderSearchSheet(
       context,
@@ -318,6 +324,7 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     List<_NativeChapter> chapters, {
     String? currentAnchorKey,
   }) async {
+    _pauseAutoPageTurn();
     // Prepared once while the book is loading. Opening the sheet must not
     // allocate one navigation model per chapter on the interaction frame.
     final navigationChapters = _navigationChapters;
@@ -349,6 +356,13 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
                 _currentNavigationPosition(navigationCatalog, chapters),
             bookmarks: _bookmarks,
             annotations: _annotations,
+            isBookmarkNavigable: (bookmark) =>
+                isTxtBookmarkLocatorResolved(bookmark.anchorKey),
+            isAnnotationNavigable: (annotation) =>
+                isTxtNoteLocatorResolved(annotation.toMap()),
+            unavailableLocationLabel: TxtEditorCopy.of(
+              context,
+            ).locationUnavailable,
             currentAnchorKey: currentAnchorKey,
             onChapterSelected: (index) {
               Navigator.of(sheetContext).pop();

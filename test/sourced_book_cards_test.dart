@@ -52,6 +52,69 @@ void main() {
     await tester.tap(find.byType(SourcedBookListTile));
     expect(tapped, isTrue);
   });
+
+  testWidgets('editorial list tile uses a clean divider row', (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorSchemeSeed: Colors.indigo),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: SourcedBookListTile(
+            result: _result(description: '<p>Hello&nbsp;world</p>'),
+            editorial: true,
+            onTap: () => tapped = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('sourcedBookEditorialDivider')),
+      findsOneWidget,
+    );
+    expect(find.text('Author · Source'), findsOneWidget);
+    expect(find.text('Hello world'), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(GeneratedBookCover)),
+      const Size(78, 108),
+    );
+
+    await tester.tap(find.byType(SourcedBookListTile));
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('editorial cards fit narrow layouts with large text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(240, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.8)),
+          child: Scaffold(
+            body: SourcedBookCard(
+              result: _result(),
+              editorial: true,
+              width: 92,
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(SourcedBookCard)).width, 92);
+    expect(find.byType(GeneratedBookCover), findsOneWidget);
+  });
 }
 
 SourcedBook _result({String author = 'Author', String description = ''}) =>

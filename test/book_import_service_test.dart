@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/models/book.dart';
+import 'package:xxread/services/books/book_import_limits.dart';
 import 'package:xxread/services/books/book_import_models.dart';
 import 'package:xxread/services/books/book_import_service.dart';
 
@@ -99,6 +100,47 @@ void main() {
     expect(result.book.contentHash, md5.convert(bytes).toString());
     expect(await File(result.book.filePath).readAsBytes(), bytes);
   });
+
+  test(
+    '应用管理的原生 TXT 超过 500 MiB 时仍以流式哈希导入',
+    () async {
+      final sourceFile = File('${sandbox.path}/over-limit.txt');
+      final handle = await sourceFile.open(mode: FileMode.write);
+      await handle.writeString('书名：大型文本\n作者：测试作者\n');
+      await handle.truncate(maximumBookImportBytes + 1);
+      await handle.close();
+      final store = _MemoryBookImportStore();
+      final importer = _testImporter(store, documentsDirectory);
+
+      final result = await importer.importFile(_managedSource(sourceFile));
+
+      expect(result.outcome, BookImportOutcome.imported);
+      expect(result.book.filePath, sourceFile.path);
+      expect(result.book.contentHash, matches(RegExp(r'^[0-9a-f]{32}$')));
+      expect(await sourceFile.length(), maximumBookImportBytes + 1);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test('原生非 TXT 超过 500 MiB 时仍拒绝导入', () async {
+    final sourceFile = File('${sandbox.path}/over-limit.epub');
+    final handle = await sourceFile.open(mode: FileMode.write);
+    await handle.truncate(maximumBookImportBytes + 1);
+    await handle.close();
+    final store = _MemoryBookImportStore();
+    final importer = _testImporter(store, documentsDirectory);
+
+    await expectLater(
+      importer.importFile(_managedSource(sourceFile, extension: 'epub')),
+      throwsA(
+        isA<BookImportFailure>().having(
+          (failure) => failure.code,
+          'code',
+          'file_too_large',
+        ),
+      ),
+    );
+  });
 }
 
 BookImportService _testImporter(
@@ -140,15 +182,16 @@ BookImportSource _externalSource(File file) => BookImportSource(
   localPath: file.path,
 );
 
-BookImportSource _managedSource(File file) => BookImportSource(
-  id: file.path,
-  kind: BookImportSourceKind.iosSharedDocuments,
-  ownership: BookImportOwnership.managedInPlace,
-  displayName: file.uri.pathSegments.last,
-  extension: 'txt',
-  locator: file.path,
-  localPath: file.path,
-);
+BookImportSource _managedSource(File file, {String extension = 'txt'}) =>
+    BookImportSource(
+      id: file.path,
+      kind: BookImportSourceKind.iosSharedDocuments,
+      ownership: BookImportOwnership.managedInPlace,
+      displayName: file.uri.pathSegments.last,
+      extension: extension,
+      locator: file.path,
+      localPath: file.path,
+    );
 
 Future<List<File>> _filesUnder(Directory directory) async {
   if (!await directory.exists()) return const [];

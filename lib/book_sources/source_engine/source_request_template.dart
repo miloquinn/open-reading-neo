@@ -34,12 +34,12 @@ class SourceRequestTemplate {
   final String? body;
   final String? cookieJarKey;
 
-  /// Set when [url] is a `data:` URI carrying a `type` option, mirroring
-  /// Legado's `AnalyzeUrl.getStrResponseAwait` short-circuit: the request is
+  /// Set when [url] is a `data:` URI carrying a `type` option, mirroring the
+  /// compatible `AnalyzeUrl.getStrResponseAwait` short-circuit: the request is
   /// never sent over the network. The payload is decoded locally and
   /// hex-encoded (matching `HexUtil.encodeHexStr`) so rule scripts that
   /// expect this convention (commonly paired with `java.hexDecodeToString`)
-  /// see the same bytes a real Legado client would produce.
+  /// see the protocol-compatible byte representation.
   final String? syntheticBody;
 
   static SourceRequestTemplate parse(
@@ -113,18 +113,13 @@ class SourceRequestTemplate {
         'Unsupported reading source request method: $methodText.',
       ),
     };
+    // AnalyzeUrl serializes structured bodies and only consumes them for POST.
     final rawBody = options['body'];
-    if (rawBody != null && rawBody is! String) {
-      throw const BookSourceProtocolException(
-        'reading source request body must be text.',
-      );
-    }
-    // Legado's own AnalyzeUrl never reads `body` for GET/HEAD (only POST
-    // branches read it), so a source script that always attaches a `body`
-    // option regardless of method — a common defensive habit in jsLib
-    // request() helpers — is not an error there. Match that: drop the body
-    // instead of rejecting the request.
-    final body = method == SourceRequestMethod.post ? rawBody : null;
+    final String? body = method != SourceRequestMethod.post || rawBody == null
+        ? null
+        : rawBody is String
+        ? rawBody
+        : jsonEncode(rawBody);
 
     final headers = <String, String>{};
     for (final entry in sourceHeaders.entries) {
@@ -199,8 +194,10 @@ class SourceRequestTemplate {
     }
     if (method == SourceRequestMethod.post &&
         !headers.keys.any((name) => name.toLowerCase() == 'content-type')) {
-      headers['Content-Type'] =
-          'application/x-www-form-urlencoded; charset=$charset';
+      final contentType = _isJsonBody(body)
+          ? 'application/json'
+          : 'application/x-www-form-urlencoded';
+      headers['Content-Type'] = '$contentType; charset=$charset';
     }
     return SourceRequestTemplate(
       url: uri,
@@ -215,7 +212,7 @@ class SourceRequestTemplate {
           : options['webjs'] is String
           ? options['webjs'] as String
           : null,
-      body: body as String?,
+      body: body,
       cookieJarKey: cookieJarKey,
     );
   }
@@ -230,9 +227,9 @@ String resolveSourceRequestUrl(Uri baseUri, String value) {
   return '$resolved${value.substring(optionsStart)}';
 }
 
-/// Decodes a `data:` request target into the hex string Legado-compatible
-/// rule scripts expect, or returns null when [value] is not a `data:` URI
-/// carrying a non-blank `type` option (the signal real Legado uses to treat
+/// Decodes a `data:` request target into the protocol-compatible hex string
+/// that rule scripts expect, or returns null when [value] is not a `data:` URI
+/// carrying a non-blank `type` option (the compatibility signal used to treat
 /// the whole request as local bytes instead of a network fetch).
 String? _dataUriSyntheticBody(String value, Map<String, dynamic> options) {
   if (!value.startsWith('data:')) return null;
@@ -261,13 +258,21 @@ String? _dataUriSyntheticBody(String value, Map<String, dynamic> options) {
   }
 }
 
-int _requestOptionsStart(String value) {
-  RegExpMatch? last;
-  for (final match in RegExp(r',\s*\{').allMatches(value)) {
-    last = match;
-  }
-  return last?.start ?? -1;
+// The first delimiter starts the options object. Later `,{` sequences may
+// belong to nested body arrays or quoted values and must not split the URL.
+int _requestOptionsStart(String value) =>
+    _requestOptionsDelimiter.firstMatch(value)?.start ?? -1;
+
+bool _isJsonBody(String? body) {
+  if (body == null) return false;
+  final value = body.trim();
+  // Match AnalyzeUrl's isJson boundary without parsing an already serialized
+  // object a second time; malformed payloads remain the source's responsibility.
+  return (value.startsWith('{') && value.endsWith('}')) ||
+      (value.startsWith('[') && value.endsWith(']'));
 }
+
+final _requestOptionsDelimiter = RegExp(r',\s*\{');
 
 Object? _decodeOptions(String input) {
   try {

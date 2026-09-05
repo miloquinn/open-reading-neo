@@ -90,6 +90,9 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
       'items=${bookPages.length}',
     );
     if (page.isBlank) return;
+    if (page.chapterIndex == _chapterIndex && page.pageIndex == _pageIndex) {
+      return;
+    }
     final pageController = _pageController;
     final isActiveHorizontalTurn =
         _pageMode == NativePageMode.horizontalSlide &&

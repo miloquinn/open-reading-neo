@@ -6,6 +6,7 @@ import 'package:xxread/book_sources/source_engine/source_cookie_utils.dart';
 import 'source_script_contract.dart';
 import 'source_script_crypto_api.dart';
 import 'source_script_dom_api.dart';
+import 'source_script_encoding_api.dart';
 import 'source_script_state.dart';
 import 'source_script_text_api.dart';
 
@@ -14,6 +15,7 @@ class SourceScriptHostApi {
     : _dom = SourceScriptDomApi(selectors ?? const SourceRuleEngine());
 
   final SourceScriptDomApi _dom;
+  final _encoding = const SourceScriptEncodingApi();
   final SourceScriptCryptoApi _crypto = const SourceScriptCryptoApi();
   final SourceScriptTextApi _text = const SourceScriptTextApi();
   final Map<String, SourceScriptState> _sourceStates = {};
@@ -48,12 +50,11 @@ class SourceScriptHostApi {
     final arguments = message['args'] is List
         ? message['args'] as List
         : const [];
+    if (SourceScriptEncodingApi.operations.contains(operation)) {
+      return _encoding.handle(operation, arguments);
+    }
     return switch (operation) {
       'md5' ||
-      'base64Encode' ||
-      'base64Decode' ||
-      'base64DecodeBytes' ||
-      'base64EncodeBytes' ||
       'bytesToUtf8' ||
       'hexDecodeToString' ||
       'aesBase64DecodeToString' ||
@@ -68,6 +69,7 @@ class SourceScriptHostApi {
       'toNumChapter' ||
       'utf8Bytes' ||
       'htmlFormat' ||
+      'htmlText' ||
       'traditionalToSimplified' ||
       'simplifiedToTraditional' => _text.handle(operation, arguments),
       'getString' ||

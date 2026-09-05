@@ -3712,6 +3712,84 @@ class AppLocalizationsJa extends AppLocalizations {
   String get readerSettingsAdvancedTypography => '詳細な組版';
 
   @override
+  String get readerAutoPageTurnTitle => '自動ページめくり';
+
+  @override
+  String get readerAutoPageTurnOff => '未開始';
+
+  @override
+  String get readerAutoPageTurnHint => '選択した秒数ごとに1画面進み、縦ページ送りにも対応します。';
+
+  @override
+  String get readerAutoPageTurnModeTimed => 'タイマーめくり';
+
+  @override
+  String get readerAutoPageTurnModeSweep => 'スイープめくり';
+
+  @override
+  String get readerAutoPageTurnModeContinuous => '連続スクロール';
+
+  @override
+  String get readerAutoPageTurnModeInterval => '間隔スクロール';
+
+  @override
+  String get readerAutoPageTurnTimedHint => '設定した間隔で次のページへ進みます。';
+
+  @override
+  String get readerAutoPageTurnSweepHint => '境界線が下へ移動し、その上に次のページを徐々に表示します。';
+
+  @override
+  String get readerAutoPageTurnContinuousHint => '一定の読書速度で本文を連続して下へスクロールします。';
+
+  @override
+  String get readerAutoPageTurnIntervalHint => '設定した間隔で約1画面分を滑らかにスクロールします。';
+
+  @override
+  String get readerAutoPageTurnSweepDurationLabel => 'スイープ時間';
+
+  @override
+  String get readerAutoPageTurnScrollSpeedLabel => 'スクロール速度';
+
+  @override
+  String readerAutoPageTurnSecondsPerScreen(int seconds) {
+    return '1画面 $seconds秒';
+  }
+
+  @override
+  String readerAutoPageTurnModeValue(String mode, int seconds) {
+    return '$mode · 1画面$seconds秒';
+  }
+
+  @override
+  String readerAutoPageTurnModePaused(String mode, int seconds) {
+    return '一時停止 · $mode · 1画面$seconds秒';
+  }
+
+  @override
+  String get readerAutoPageTurnIntervalLabel => 'ページ間隔';
+
+  @override
+  String readerAutoPageTurnInterval(int seconds) {
+    return '$seconds秒ごとに1画面';
+  }
+
+  @override
+  String get readerAutoPageTurnStart => '自動ページめくりを開始';
+
+  @override
+  String get readerAutoPageTurnResume => '自動ページめくりを再開';
+
+  @override
+  String readerAutoPageTurnRunning(int seconds) {
+    return '自動 · $seconds秒/画面';
+  }
+
+  @override
+  String readerAutoPageTurnPaused(int seconds) {
+    return '一時停止 · $seconds秒/画面';
+  }
+
+  @override
   String get readerThemeDay => '昼';
 
   @override
@@ -5030,7 +5108,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get webDavFilesTooLarge => 'このバージョンでは 100 MiB を超える書籍ファイルに対応していません';
+  String get webDavFilesTooLarge => 'この形式の同期サイズ上限を超えています';
 
   @override
   String get webDavFilesEmpty => 'この分類に書籍はありません';
@@ -5557,4 +5635,208 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get readingDataExportUnknownChapter => '位置不明の注釈';
+
+  @override
+  String get cloudSyncTitle => 'クラウド同期';
+
+  @override
+  String get cloudSyncTagline => '別のデバイスで続きから読む';
+
+  @override
+  String get cloudSyncResumeTitle => 'デバイス間で読書を継続';
+
+  @override
+  String get cloudSyncAutoResume => '本を開くときに続きから読む';
+
+  @override
+  String get cloudSyncAutoResumeHint => '開くときに最新の位置を確認し、読書中は更新を通知';
+
+  @override
+  String get cloudSyncAutoHint => '読書中に進捗を保存し、本を開くときに更新を確認';
+
+  @override
+  String get cloudSyncMoreContent => 'その他の同期内容';
+
+  @override
+  String get cloudSyncBooks => '本と本文';
+
+  @override
+  String get cloudSyncBooksHint => '同期する本、本文の更新とダウンロード';
+
+  @override
+  String get cloudSyncActivity => '同期履歴と対応が必要な項目';
+
+  @override
+  String get cloudSyncStorage => 'ストレージ接続';
+
+  @override
+  String get cloudSyncNoActivity => '同期履歴はまだありません';
+
+  @override
+  String get cloudSyncProgress => '読書位置';
+
+  @override
+  String get cloudSyncText => '本文ファイル';
+
+  @override
+  String get cloudSyncMetadataComplete => '選択した読書データをWebDAVと同期済み';
+
+  @override
+  String get cloudSyncPaused => '自動同期は一時停止中';
+
+  @override
+  String get cloudSyncLocalOnly => 'このデバイスのみに保存';
+
+  @override
+  String get cloudSyncCheckHint => '接続成功は他のデバイスの受信完了を意味しません。各項目をご確認ください';
+
+  @override
+  String get cloudSyncPendingFiles => '本文の更新に対応が必要です';
+
+  @override
+  String get cloudSyncFileIdle => '関連付けた本文を次回の同期で確認します';
+
+  @override
+  String get cloudSyncManageBooks => '本の選択とダウンロード';
+
+  @override
+  String get cloudSyncNoBooks => '本文同期に参加しているTXTはありません';
+
+  @override
+  String get cloudSyncCompare => 'バージョンを比較';
+
+  @override
+  String get cloudSyncKeepLocal => 'このデバイスの版を使用';
+
+  @override
+  String get cloudSyncUseRemote => 'クラウドの版を使用';
+
+  @override
+  String get cloudSyncBothKept => '両方の版を保存済みです。選択後に同期を再開します';
+
+  @override
+  String get cloudSyncPreviewLimited => '最初の相違箇所付近を表示しています。完全な版は両方保存済みです';
+
+  @override
+  String get cloudSyncPending => '同期待ち';
+
+  @override
+  String get cloudSyncConflict => 'バージョンの確認が必要';
+
+  @override
+  String get cloudSyncCurrent => '現在の本文はWebDAVと同期済み';
+
+  @override
+  String get cloudSyncFailed => '同期未完了。再試行できます';
+
+  @override
+  String get cloudSyncHistory => 'バージョン履歴';
+
+  @override
+  String get cloudSyncApplyUpdate => '本文の更新を適用';
+
+  @override
+  String get cloudSyncParticipate => 'この本の本文を同期';
+
+  @override
+  String get cloudSyncCloseReaderToUpdate => '本文の更新を適用する前に、この本の読書・編集画面を閉じてください';
+
+  @override
+  String get cloudSyncTextLocation => 'クラウド上の現在のファイル';
+
+  @override
+  String get cloudSyncTextLocationHint =>
+      '本文の編集は以下の場所のTXTに反映されます。アップグレード前のコピーは保持されますが、その後の編集は反映されません。';
+
+  @override
+  String get bookSourcesImportIntro => 'リンクか JSON ファイルを読み込み、確認してから追加します。';
+
+  @override
+  String get bookSourcesImportInputStep => '書源を選択';
+
+  @override
+  String get bookSourcesImportReviewStep => '確認して追加';
+
+  @override
+  String get bookSourcesImportFileHint => 'JSON 形式の書源ファイルを選択してください。';
+
+  @override
+  String get bookSourcesImportDownloading => '書源をダウンロード中…';
+
+  @override
+  String get bookSourcesImportAnalyzing => 'ルール解析・重複確認中…';
+
+  @override
+  String get bookSourcesImportSaving => '書源を保存中…';
+
+  @override
+  String get bookSourcesImportPicking => 'ファイル選択を開いています…';
+
+  @override
+  String get bookSourcesImportWaitHint => '大きな書源リストには時間がかかります。キャンセルして再試行できます。';
+
+  @override
+  String get bookSourcesImportSaveHint => '保存が終わると書源管理に戻ります。';
+
+  @override
+  String get bookSourcesImportReady => '追加の準備ができました';
+
+  @override
+  String get bookSourcesImportEmpty => '選択された書源がありません。ファイルや重複の選択を確認してください。';
+
+  @override
+  String get bookSourcesImportRetry => '再試行';
+
+  @override
+  String get bookSourcesImportFailed =>
+      '書源を読み込めませんでした。アドレスやファイルを確認して再試行してください。';
+
+  @override
+  String get bookSourcesImportSaveFailed =>
+      '書源を保存できませんでした。プレビューは保持されています。再試行してください。';
+
+  @override
+  String get bookSourcesImportErrorDetails => 'エラーの詳細';
+
+  @override
+  String get bookSourcesImportFileUnreadable =>
+      '選択したファイルを読み込めませんでした。再度選択してください。';
+
+  @override
+  String bookSourcesImportAction(int count) {
+    return '$count 件の書源を追加';
+  }
+
+  @override
+  String get bookSourcesImportFileTab => 'JSON ファイル';
+
+  @override
+  String get bookSourcesImportTimedOut =>
+      '読み込みがタイムアウトしました。接続を確認するか、JSON ファイルをダウンロードして追加してください。';
+
+  @override
+  String get cloudSyncIncrementalMode => '差分同期';
+
+  @override
+  String get cloudSyncPlainMode => '通常の TXT ファイル';
+
+  @override
+  String get cloudSyncIncrementalDescription =>
+      '初回アップロード後は変更された部分だけを転送します。端末には完全な TXT が残ります。';
+
+  @override
+  String get cloudSyncEnableIncremental => '差分同期に切り替える';
+
+  @override
+  String get cloudSyncIncrementalConfirmTitle => 'この本のクラウド保存形式を変更しますか？';
+
+  @override
+  String get cloudSyncIncrementalConfirmBody =>
+      'クラウドではアプリ専用の分割形式を使います。既存の TXT は残りますが、更新されなくなります。他の端末にも差分同期に対応した新版アプリが必要です。端末には完全な TXT が残ります。';
+
+  @override
+  String get cloudSyncIncrementalConfirm => '切り替えて同期';
+
+  @override
+  String get bookSourcesImportUsageNotice => '書源の利用について';
 }

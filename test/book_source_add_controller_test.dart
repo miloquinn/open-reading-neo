@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:xxread/book_sources/models/registered_book_source.dart';
@@ -21,6 +21,22 @@ void main() {
     await first;
 
     expect(controller.state.analysis?.sources.single.id, 'new');
+    expect(controller.state.loading, isFalse);
+    controller.dispose();
+  });
+
+  test('reports download, analysis, and idle phases', () async {
+    final analyzer = _Analyzer();
+    final controller = BookSourceAddController(analyzer: analyzer);
+
+    final pending = controller.analyzeUrl('https://source.example');
+    expect(controller.state.phase, BookSourceAddPhase.downloading);
+    analyzer.finishDownload();
+    expect(controller.state.phase, BookSourceAddPhase.analyzing);
+    analyzer.url.complete(BookSourceImportAnalysis.orsp(_source('source')));
+    await pending;
+
+    expect(controller.state.phase, BookSourceAddPhase.idle);
     expect(controller.state.loading, isFalse);
     controller.dispose();
   });
@@ -78,6 +94,32 @@ void main() {
     borrowedController.dispose();
     expect(borrowed.closed, isFalse);
   });
+
+  test('cancels an owned analysis and recreates its import service', () async {
+    final services = <_ImportService>[];
+    final controller = BookSourceAddController(
+      importServiceFactory: () {
+        final service = _ImportService();
+        services.add(service);
+        return service;
+      },
+    );
+
+    final first = controller.analyzeUrl('https://source.example');
+    expect(controller.state.phase, BookSourceAddPhase.downloading);
+    controller.cancelAnalysis();
+    await first;
+
+    expect(controller.state.phase, BookSourceAddPhase.idle);
+    expect(controller.state.analysis, isNull);
+    expect(services.single.closed, isTrue);
+
+    final second = controller.analyzeUrl('https://next.example');
+    expect(services, hasLength(2));
+    controller.cancelAnalysis();
+    await second;
+    controller.dispose();
+  });
 }
 
 RegisteredBookSource _source(String id) => RegisteredBookSource(
@@ -96,9 +138,19 @@ RegisteredBookSource _source(String id) => RegisteredBookSource(
 class _Analyzer extends BookSourceImportAnalyzer {
   final Completer<BookSourceImportAnalysis> url = Completer();
   final Completer<BookSourceImportAnalysis> bytes = Completer();
+  VoidCallback? _onDownloadComplete;
 
   @override
-  Future<BookSourceImportAnalysis> analyzeUrl(String input) => url.future;
+  Future<BookSourceImportAnalysis> analyzeUrl(
+    String input, {
+    VoidCallback? onDownloadStarted,
+    VoidCallback? onDownloadComplete,
+  }) {
+    _onDownloadComplete = onDownloadComplete;
+    return url.future;
+  }
+
+  void finishDownload() => _onDownloadComplete?.call();
 
   @override
   Future<BookSourceImportAnalysis> analyzeBytesAsync(
@@ -119,14 +171,17 @@ class _Registry extends BookSourceRegistry {
 
 class _ImportService extends SourceImportService {
   bool closed = false;
+  final Completer<Uint8List> download = Completer();
 
   @override
-  Future<Uint8List> downloadBytes(String input) =>
-      Completer<Uint8List>().future;
+  Future<Uint8List> downloadBytes(String input) => download.future;
 
   @override
   void close({bool force = true}) {
     closed = true;
+    if (!download.isCompleted) {
+      download.completeError(const SourceImportCancelledException());
+    }
     super.close(force: force);
   }
 }

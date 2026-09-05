@@ -2,6 +2,7 @@ part of 'native_reader_page.dart';
 
 extension _NativeReaderInteraction on _NativeReaderPageState {
   void _handleDesktopNextPage() {
+    _cancelAutoSweepOrPause();
     if (_annotationInteractionActive || _visiblePages.isEmpty) return;
     if (_pageMode == NativePageMode.verticalScroll) {
       unawaited(_scrollVerticalByViewport(forward: true));
@@ -16,6 +17,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
   }
 
   void _handleDesktopPreviousPage() {
+    _cancelAutoSweepOrPause();
     if (_annotationInteractionActive || _visiblePages.isEmpty) return;
     if (_pageMode == NativePageMode.verticalScroll) {
       unawaited(_scrollVerticalByViewport(forward: false));
@@ -34,6 +36,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
         ? _verticalPageScrollController
         : _verticalChapterScrollController;
     if (!itemController.isAttached || _verticalViewportSize.isEmpty) return;
+    _markReadingPositionChanged();
     _hideControlsForPageTurn();
     final offsetController = _scrollByChapter
         ? _verticalPageOffsetController
@@ -104,24 +107,25 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     }
   }
 
-  void _nextPage(
+  Future<void> _nextPage(
     List<_ReaderPageData> pages,
     int chapterCount, {
     required bool usesTwoPageLayout,
     bool animate = true,
-  }) {
+  }) async {
+    _markReadingPositionChanged();
     _hideControlsForPageTurn();
     if (_pageMode == NativePageMode.pageCurl && animate) {
       _markReaderAloudForManualPageTurn();
       final controller = usesTwoPageLayout
           ? _spreadForwardPageCurlController
           : _pageCurlController;
-      unawaited(controller.turnForward());
+      await controller.turnForward();
       return;
     }
     if (_pageMode == NativePageMode.coverSlide && animate) {
       _markReaderAloudForManualPageTurn();
-      unawaited(_coverPageTurnController.turnForward());
+      await _coverPageTurnController.turnForward();
       return;
     }
     final pageController = _pageController;
@@ -130,7 +134,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
         pageController.hasClients) {
       if (animate) {
         _markReaderAloudForManualPageTurn();
-        pageController.nextPage(
+        await pageController.nextPage(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
         );
@@ -149,7 +153,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     } else if (_chapterIndex < chapterCount - 1) {
       _sessionPagesRead++;
       _markReaderAloudForManualPageTurn();
-      _setChapter(_chapterIndex + 1, chapterCount);
+      await _setChapter(_chapterIndex + 1, chapterCount);
     }
   }
 
@@ -159,6 +163,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
     required bool usesTwoPageLayout,
     bool animate = true,
   }) {
+    _markReadingPositionChanged();
     _hideControlsForPageTurn();
     if (_pageMode == NativePageMode.pageCurl && animate) {
       _markReaderAloudForManualPageTurn();
@@ -290,6 +295,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
   }
 
   void _handleReaderTap(Offset localPosition) {
+    if (_consumeAutoPageTurnContentTap()) return;
     _handleTap(
       localPosition,
       _readerViewportSize,
@@ -320,6 +326,7 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
       _hideControlsForPageTurn();
       return;
     }
+    _pauseAutoPageTurn();
     _controlsTimer?.cancel();
     _setReaderState(() => _controlsVisible = true);
     _controlsTimer = Timer(const Duration(seconds: 10), () {

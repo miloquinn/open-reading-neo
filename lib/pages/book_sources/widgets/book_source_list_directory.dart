@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_list_reveal.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_cards.dart';
+
+import 'book_source_pill.dart';
 
 class BookSourceListDirectory extends StatelessWidget {
   final TextEditingController searchController;
@@ -131,16 +134,26 @@ class BookSourceListSelectionHeader extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       key: const Key('bookSourceListSelectionHeader'),
-      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
-      decoration: bookSourcePanelDecoration(
-        context,
-        radius: 18,
-        stronger: true,
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
-          Icon(Icons.rss_feed_rounded, color: scheme.primary),
-          const SizedBox(width: 12),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: ShapeDecoration(
+              color: scheme.primaryContainer,
+              shape: const CircleBorder(),
+            ),
+            child: Icon(
+              Icons.rss_feed_rounded,
+              color: scheme.onPrimaryContainer,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,11 +177,15 @@ class BookSourceListSelectionHeader extends StatelessWidget {
               ],
             ),
           ),
-          TextButton.icon(
+          const SizedBox(width: 10),
+          BookSourcePill(
             key: const Key('bookSourceListChangeChannel'),
+            label: changeLabel,
+            selected: false,
+            icon: Icons.swap_horiz_rounded,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            maxLabelWidth: 88,
             onPressed: onChange,
-            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-            label: Text(changeLabel),
           ),
         ],
       ),
@@ -242,8 +259,16 @@ class _SearchField extends StatelessWidget {
           vertical: 14,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(999),
           borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
       ),
     );
@@ -387,7 +412,9 @@ class _SourceEntryState extends State<_SourceEntry>
     final controller = _expansionController;
     return Container(
       key: Key('bookSourceListSource-${widget.group.source.id}'),
-      decoration: bookSourcePanelDecoration(context, radius: 18),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -395,7 +422,7 @@ class _SourceEntryState extends State<_SourceEntry>
             color: Colors.transparent,
             child: InkWell(
               key: Key('bookSourceListSourceToggle-${widget.group.source.id}'),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
               onTap: widget.onToggle,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -404,7 +431,19 @@ class _SourceEntryState extends State<_SourceEntry>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.rss_feed_rounded, color: scheme.primary),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: ShapeDecoration(
+                        color: scheme.primaryContainer,
+                        shape: const CircleBorder(),
+                      ),
+                      child: Icon(
+                        Icons.rss_feed_rounded,
+                        color: scheme.onPrimaryContainer,
+                        size: 22,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -601,14 +640,40 @@ class _ExpandedSourceBody extends StatelessWidget {
           ? SizedBox(
               key: const Key('bookSourceListLazyChannels'),
               height: _lazyChannelHeight,
-              child: ListView.separated(
-                primary: false,
-                itemCount: group.channels.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 4),
-                itemBuilder: (context, index) => Align(
-                  alignment: Alignment.centerLeft,
-                  child: _channelChip(group.channels[index]),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final textTheme = Theme.of(context).textTheme;
+                  final baseFontSize = textTheme.labelLarge?.fontSize ?? 14;
+                  final scaledFontSize = MediaQuery.textScalerOf(
+                    context,
+                  ).scale(baseFontSize);
+                  final scaleGrowth = (scaledFontSize / baseFontSize - 1).clamp(
+                    0.0,
+                    2.0,
+                  );
+                  final targetWidth = 104 + (scaleGrowth * 44);
+                  final columnCount =
+                      ((constraints.maxWidth + 8) / (targetWidth + 8))
+                          .floor()
+                          .clamp(1, 8)
+                          .toInt();
+                  final rowHeight = (scaledFontSize + 26)
+                      .clamp(48.0, 76.0)
+                      .toDouble();
+                  return GridView.builder(
+                    primary: false,
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(48),
+                    itemCount: group.channels.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columnCount,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      mainAxisExtent: rowHeight,
+                    ),
+                    itemBuilder: (context, index) =>
+                        _channelChip(group.channels[index]),
+                  );
+                },
               ),
             )
           : Wrap(
@@ -621,9 +686,10 @@ class _ExpandedSourceBody extends StatelessWidget {
     );
   }
 
-  Widget _channelChip(SourcedBookCategory channel) => ActionChip(
+  Widget _channelChip(SourcedBookCategory channel) => BookSourcePill(
     key: Key('bookSourceListChannel-${channel.source.id}-${channel.id}'),
-    label: Text(channel.name),
+    label: channel.name,
+    selected: false,
     onPressed: () => onSelectCategory(channel),
   );
 }

@@ -11,10 +11,22 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       _verticalChrome.contentHeight(viewport.height);
 
   Widget _buildVerticalReadingWindow(Widget child) =>
-      ReaderVerticalReadingWindow(
-        windowKey: const ValueKey('native-vertical-reading-window'),
-        metrics: _verticalChrome,
-        child: child,
+      NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification is ScrollStartNotification &&
+              notification.dragDetails != null) {
+            _markReadingPositionChanged();
+          } else if (notification is ScrollEndNotification &&
+              _progressSyncEventPending) {
+            unawaited(_persistCurrentReaderPosition(reason: 'scroll-end'));
+          }
+          return false;
+        },
+        child: ReaderVerticalReadingWindow(
+          windowKey: const ValueKey('native-vertical-reading-window'),
+          metrics: _verticalChrome,
+          child: child,
+        ),
       );
 
   GlobalKey _continuousPartKey(String chapterId, int partIndex) =>
@@ -23,7 +35,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
   void _onVerticalPagePositionsChanged() {
     if (!mounted ||
         _pageMode != NativePageMode.verticalScroll ||
-        !_scrollByChapter ||
+        !_usesChapterScopedVerticalList ||
         _visibleContinuousParts.isEmpty) {
       return;
     }
@@ -56,7 +68,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     if (!mounted ||
         !_initialPositionRestored ||
         _pageMode != NativePageMode.verticalScroll ||
-        _scrollByChapter ||
+        _usesChapterScopedVerticalList ||
         _visibleChapters.isEmpty ||
         _verticalViewportSize.isEmpty) {
       return;
@@ -106,6 +118,11 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     if (chapterChanged && widget.book.id != null) {
       unawaited(_queueBookProgress(widget.book.id!, nextChapter));
     }
+    if (chapterChanged &&
+        _autoPageTurnController.isActive &&
+        _autoPageTurnController.mode == ReaderAutoPageTurnMode.continuous) {
+      unawaited(_prepareContinuousAutoScrollAhead());
+    }
     final offset = _continuousOffsetAtViewportCenter(
       _visibleChapters[nextChapter],
       parts[nextPage],
@@ -135,28 +152,13 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     );
   }
 
-  double? _continuousCaretOffset(
-    _NativeChapter chapter,
-    _ContinuousReaderPart part,
-    int partIndex,
-    int sourceOffset,
-  ) {
-    return readerCaretDyForSourceOffset(
-      paragraph: readerParagraphForKey(
-        _continuousPartKey(chapter.id, partIndex),
-      ),
-      text: part.content.text,
-      sourceOffset: sourceOffset,
-      textOffsetForSourceOffset: part.content.textOffsetForSourceOffset,
-    );
-  }
-
   Future<void> _scrollContinuousAnchorIntoView(
     _NativeChapter chapter,
     List<_ContinuousReaderPart> parts,
     int partIndex,
-    int sourceOffset,
-  ) async {
+    int sourceOffset, {
+    bool centerInViewport = false,
+  }) async {
     final targetContext = _continuousPartKey(
       chapter.id,
       partIndex,
@@ -170,20 +172,32 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     }
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    final caretOffset = _continuousCaretOffset(
-      chapter,
-      parts[partIndex],
-      partIndex,
-      sourceOffset,
+    final paragraph = readerParagraphForKey(
+      _continuousPartKey(chapter.id, partIndex),
     );
-    if (caretOffset == null || caretOffset <= 0) return;
-    if (_scrollByChapter) {
-      final scrollable = Scrollable.maybeOf(
-        _continuousPartKey(chapter.id, partIndex).currentContext!,
-      );
+    final part = parts[partIndex];
+    final caretOffset = readerCaretDyForSourceOffset(
+      paragraph: paragraph,
+      text: part.content.text,
+      sourceOffset: sourceOffset,
+      textOffsetForSourceOffset: part.content.textOffsetForSourceOffset,
+    );
+    if (caretOffset == null) return;
+    final restoredContext = _continuousPartKey(
+      chapter.id,
+      partIndex,
+    ).currentContext;
+    final scrollable = restoredContext == null || !restoredContext.mounted
+        ? null
+        : Scrollable.maybeOf(restoredContext);
+    final offsetDelta = centerInViewport && paragraph != null
+        ? paragraph.localToGlobal(Offset(0, caretOffset)).dy -
+              MediaQuery.sizeOf(context).height / 2
+        : caretOffset;
+    if (_usesChapterScopedVerticalList) {
       if (scrollable != null) {
         scrollable.position.jumpTo(
-          (scrollable.position.pixels + caretOffset).clamp(
+          (scrollable.position.pixels + offsetDelta).clamp(
             scrollable.position.minScrollExtent,
             scrollable.position.maxScrollExtent,
           ),
@@ -192,7 +206,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       return;
     }
     await _verticalChapterOffsetController.animateScroll(
-      offset: caretOffset,
+      offset: offsetDelta,
       duration: const Duration(milliseconds: 1),
     );
   }

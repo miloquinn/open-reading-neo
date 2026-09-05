@@ -100,18 +100,18 @@ void main() {
     );
   });
 
-  test('adapts Legado inline flags and horizontal whitespace', () {
+  test('adapts compatible inline flags and horizontal whitespace', () {
     const rule = ReplaceRule(
-      id: 'legado',
-      name: 'legado',
+      id: 'reading-compatible',
+      name: 'reading-compatible',
       pattern: r'广告|(?i)APP\h+下载',
       replacement: '',
     );
     expect(service.applyRules([rule], '广告 APP  下载', bookTitle: '书'), ' ');
 
     const classRule = ReplaceRule(
-      id: 'legado-class',
-      name: 'legado-class',
+      id: 'reading-compatible-class',
+      name: 'reading-compatible-class',
       pattern: r'字[\h\-]数',
       replacement: '',
     );

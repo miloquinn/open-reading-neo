@@ -72,6 +72,7 @@ android {
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
                 storeType = releaseKeystoreType
+                enableV3Signing = true
             }
         }
     }

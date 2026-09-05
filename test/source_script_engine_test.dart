@@ -207,8 +207,8 @@ void main() {
     final evaluator = QuickJsSourceScriptEvaluator();
     addTearDown(evaluator.dispose);
     final source = ReadingSourceConfig.fromJson({
-      'bookSourceName': 'Legado-style source',
-      'bookSourceUrl': 'https://legado.test',
+      'bookSourceName': 'Compatible reading source',
+      'bookSourceUrl': 'https://reading-source.test',
     });
     final chapter = <String, Object?>{'title': 'Chapter 12'};
 

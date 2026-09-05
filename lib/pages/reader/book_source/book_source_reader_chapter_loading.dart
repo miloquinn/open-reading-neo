@@ -228,7 +228,11 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
     bool retain(int index) {
       if (index == center || index == requested) return true;
       if (aggressive) return false;
-      return index >= center - 1 && index <= center + 2;
+      return index >= center - 1 &&
+          index <=
+              (_autoWholeBook
+                  ? math.max(center + 2, _autoRetainThrough)
+                  : center + 2);
     }
 
     _prefetchedContent.removeWhere((index, _) => !retain(index));
@@ -324,7 +328,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
         : targetPage / (_verticalPageCount - 1);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    if (_scrollByChapter) {
+    if (_effectiveScrollByChapter) {
       if (_verticalPageScrollController.isAttached) {
         await _verticalPageScrollController.scrollTo(
           index: targetPage,

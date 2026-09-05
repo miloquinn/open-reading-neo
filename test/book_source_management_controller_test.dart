@@ -51,11 +51,23 @@ void main() {
     );
     controller.replaceSources([enabled, disabled]);
 
-    expect(controller.state.availableGroups, ['Archive', 'Featured', 'News']);
-    expect(controller.state.displayedSources, [enabled]);
+    final initialState = controller.state;
+    final initialVisible = initialState.visibleSources;
+    final initialGroups = initialState.availableGroups;
+    expect(initialGroups, ['Archive', 'Featured', 'News']);
+    expect(initialState.displayedSources, [enabled]);
     controller.loadMore();
+    expect(controller.state.sources, same(initialState.sources));
+    expect(
+      controller.state.selectedSourceIds,
+      same(initialState.selectedSourceIds),
+    );
+    expect(controller.state.visibleSources, same(initialVisible));
+    expect(controller.state.availableGroups, same(initialGroups));
     expect(controller.state.displayedSources, [enabled, disabled]);
     controller.setFilter(BookSourceManagementFilter.disabled);
+    expect(controller.state.visibleSources, isNot(same(initialVisible)));
+    expect(controller.state.availableGroups, same(initialGroups));
     expect(controller.state.visibleSources, [disabled]);
     expect(controller.state.displayLimit, 1);
     controller.setFilter(BookSourceManagementFilter.all);
@@ -68,6 +80,13 @@ void main() {
       () => controller.state.selectedSourceIds.add('x'),
       throwsUnsupportedError,
     );
+    expect(() => controller.state.sources.add(enabled), throwsUnsupportedError);
+
+    final filtered = controller.state.visibleSources;
+    final groups = controller.state.availableGroups;
+    controller.replaceSources([enabled]);
+    expect(controller.state.visibleSources, isNot(same(filtered)));
+    expect(controller.state.availableGroups, isNot(same(groups)));
     controller.dispose();
   });
 
@@ -93,7 +112,7 @@ void main() {
 
   test(
     'duplicate scan ignores ORSP and keeps same-site variants for review',
-    () {
+    () async {
       final controller = BookSourceManagementController();
       final canonicalOld = _source(
         'canonical-old',
@@ -134,6 +153,14 @@ void main() {
         BookSourceDedupeConfidence.sameSite,
       );
       expect(site.result.groups.single.defaultSelectedIndices, hasLength(3));
+
+      final background = await controller.findDuplicateSourcesInBackground();
+      expect(background.result.groups, hasLength(1));
+      expect(
+        background.result.groups.single.confidence,
+        BookSourceDedupeConfidence.canonical,
+      );
+      expect(background.sourcesByIndex.keys, standard.sourcesByIndex.keys);
       controller.dispose();
     },
   );
@@ -177,13 +204,20 @@ void main() {
       controller.replaceSources([source]);
       controller.toggleSelectionMode();
       controller.toggleSourceSelection(source.id);
+      var notifications = 0;
+      controller.addListener(() => notifications++);
 
       final check = controller.checkSelectedSourcesHealth();
       health.onProgress?.call(1, 1);
       expect(controller.state.healthProgress?.completed, 1);
+      for (var completed = 2; completed <= 100; completed++) {
+        health.onProgress?.call(completed, 100);
+      }
+      expect(notifications, 2);
       final updated = source.copyWith(enabled: false);
       health.all.complete([updated]);
       expect(await check, [updated]);
+      expect(notifications, 3);
       expect(controller.state.sources.single.enabled, isFalse);
       expect(controller.state.healthProgress, isNull);
 

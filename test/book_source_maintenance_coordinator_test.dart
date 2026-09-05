@@ -49,6 +49,31 @@ void main() {
       coordinator.dispose();
     },
   );
+
+  test(
+    'coalesces rapid progress updates before rebuilding listeners',
+    () async {
+      final service = _HealthService();
+      final coordinator = BookSourceMaintenanceCoordinator(service: service);
+      var notifications = 0;
+      coordinator.addListener(() => notifications++);
+
+      final run = coordinator.start([_source('source')]);
+      expect(notifications, 1);
+      service.onProgress?.call(1, 100);
+      for (var completed = 2; completed <= 100; completed++) {
+        service.onProgress?.call(completed, 100);
+      }
+
+      expect(notifications, 2);
+      expect(coordinator.state.progress?.completed, 1);
+      service.completer.complete(const []);
+      await run;
+      expect(notifications, 3);
+      expect(coordinator.state.status, BookSourceMaintenanceStatus.completed);
+      coordinator.dispose();
+    },
+  );
 }
 
 RegisteredBookSource _source(String id) => RegisteredBookSource(

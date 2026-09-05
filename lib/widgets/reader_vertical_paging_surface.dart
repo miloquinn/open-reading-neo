@@ -6,6 +6,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:xxread/core/reader/reader_safe_area.dart';
 import 'package:xxread/core/reader/reader_system_ui.dart';
 import 'package:xxread/core/reader/reader_vertical_paging.dart';
+import 'reader_chapter_title_page.dart';
 
 ReaderViewportChromeMetrics readerViewportChromeForTopBar({
   required ReaderSafeAreaMetrics safeArea,
@@ -30,7 +31,7 @@ RenderParagraph? readerParagraphForKey(GlobalKey key) {
   if (root == null) return null;
   RenderParagraph? result;
   void visit(Element element) {
-    if (result != null) return;
+    if (result != null || element.widget is ReaderInlineChapterTitle) return;
     final renderObject = element.renderObject;
     if (renderObject is RenderParagraph) {
       result = renderObject;

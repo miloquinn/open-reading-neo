@@ -146,6 +146,7 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
   );
 
   Future<void> _handleVolumePageTurn({required bool forward}) async {
+    _pauseAutoPageTurn();
     if (!mounted ||
         _loadingCatalog ||
         _loadingContent ||

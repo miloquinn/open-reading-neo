@@ -46,6 +46,9 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
         _txtChapterTitlePageEnabled = txtChapterTitlePageEnabled;
         _readerSettingsLoaded = true;
       });
+      _autoPageTurnController.setVertical(
+        _pageMode == NativePageMode.verticalScroll,
+      );
       unawaited(_syncVolumeKeyPaging());
     } catch (error, stackTrace) {
       debugPrint('Reader settings failed to load: $error');
@@ -65,6 +68,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
   );
 
   void _handleVolumePageTurn({required bool forward}) {
+    _cancelAutoSweepOrPause();
     if (!mounted ||
         _pageMode == NativePageMode.verticalScroll ||
         _visiblePages.isEmpty ||
@@ -199,7 +203,9 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       palette: _readerTheme,
       bodyStyle: _readerTextStyle,
       flowStyle: flowStyle,
-      annotations: _annotations,
+      annotations: _annotations
+          .where((note) => isTxtNoteLocatorResolved(note.toMap()))
+          .toList(growable: false),
       spokenHighlight: _readerAloudHighlight,
       baseSourceSpanBuilder: (start, end) => _styledSpanForRange(
         chapter,
@@ -215,6 +221,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       fillAvailableSpace: fillAvailableSpace,
       onInteractionChanged: (active) {
         if (!mounted || _annotationInteractionActive == active) return;
+        if (active) _cancelAutoSweepOrPause();
         _setReaderState(() => _annotationInteractionActive = active);
       },
     );

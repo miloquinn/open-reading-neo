@@ -10,6 +10,8 @@ import '../../../book_sources/services/book_source_health_check_service.dart';
 import '../../../book_sources/services/book_source_registry.dart';
 import '../../../book_sources/source_engine/source_health_checker.dart';
 
+part 'book_source_management_state.dart';
+
 enum BookSourceManagementFilter {
   all,
   enabled,
@@ -59,136 +61,6 @@ class BookSourceHealthProgress {
   final int total;
 }
 
-@immutable
-class BookSourceManagementState {
-  BookSourceManagementState({
-    List<RegisteredBookSource> sources = const [],
-    this.loading = true,
-    this.query = '',
-    this.filter = BookSourceManagementFilter.all,
-    this.selectedGroup,
-    this.displayLimit = 24,
-    this.selectionMode = false,
-    Set<String> selectedSourceIds = const {},
-    this.healthProgress,
-    this.mutation,
-    this.failure,
-    this.sourcesRevision = 0,
-  }) : sources = List.unmodifiable(sources),
-       selectedSourceIds = Set.unmodifiable(selectedSourceIds);
-
-  final List<RegisteredBookSource> sources;
-
-  /// Bumped only when [sources] is actually replaced with a new list (a
-  /// load, a mutation, a health-check merge) — never on an unrelated change
-  /// like [query] or [healthProgress] ticking during a batch check.
-  /// [visibleSources]/[availableGroups] re-filter every source and parse
-  /// each one's group tags with a regex; a library running into the
-  /// thousands shouldn't pay for that on every rebuild, so callers memoize
-  /// those getters keyed on this revision instead of calling them directly.
-  final int sourcesRevision;
-  final bool loading;
-  final String query;
-  final BookSourceManagementFilter filter;
-  final String? selectedGroup;
-  final int displayLimit;
-  final bool selectionMode;
-  final Set<String> selectedSourceIds;
-  final BookSourceHealthProgress? healthProgress;
-  final BookSourceManagementMutation? mutation;
-  final Object? failure;
-
-  List<RegisteredBookSource> get visibleSources {
-    final normalizedQuery = query.trim().toLowerCase();
-    return List.unmodifiable(
-      sources.where((source) {
-        final groups = bookSourceGroups(source);
-        final matchesState = switch (filter) {
-          BookSourceManagementFilter.all => true,
-          BookSourceManagementFilter.enabled => source.enabled,
-          BookSourceManagementFilter.disabled => !source.enabled,
-          BookSourceManagementFilter.runnable => source.capabilities.isNotEmpty,
-          BookSourceManagementFilter.pending => source.capabilities.isEmpty,
-          BookSourceManagementFilter.requiresLogin => sourceRequiresLogin(
-            source,
-          ),
-        };
-        if (!matchesState) return false;
-        if (selectedGroup case final selected?) {
-          if (!groups.contains(selected)) return false;
-        }
-        if (normalizedQuery.isEmpty) return true;
-        return source.name.toLowerCase().contains(normalizedQuery) ||
-            source.description.toLowerCase().contains(normalizedQuery) ||
-            source.apiBaseUrl.toString().toLowerCase().contains(
-              normalizedQuery,
-            ) ||
-            groups.any(
-              (group) => group.toLowerCase().contains(normalizedQuery),
-            );
-      }),
-    );
-  }
-
-  List<String> get availableGroups {
-    final groups = <String>{};
-    for (final source in sources) {
-      groups.addAll(bookSourceGroups(source));
-    }
-    return List.unmodifiable(groups.toList()..sort());
-  }
-
-  List<RegisteredBookSource> get displayedSources =>
-      List.unmodifiable(visibleSources.take(displayLimit));
-
-  bool get allVisibleSelected {
-    final ids = visibleSources.map((source) => source.id).toSet();
-    return ids.isNotEmpty && selectedSourceIds.containsAll(ids);
-  }
-
-  BookSourceManagementState copyWith({
-    List<RegisteredBookSource>? sources,
-    bool? loading,
-    String? query,
-    BookSourceManagementFilter? filter,
-    Object? selectedGroup = _unchanged,
-    int? displayLimit,
-    bool? selectionMode,
-    Set<String>? selectedSourceIds,
-    Object? healthProgress = _unchanged,
-    Object? mutation = _unchanged,
-    Object? failure = _unchanged,
-  }) {
-    return BookSourceManagementState(
-      sources: List.unmodifiable(sources ?? this.sources),
-      loading: loading ?? this.loading,
-      query: query ?? this.query,
-      filter: filter ?? this.filter,
-      selectedGroup: identical(selectedGroup, _unchanged)
-          ? this.selectedGroup
-          : selectedGroup as String?,
-      displayLimit: displayLimit ?? this.displayLimit,
-      selectionMode: selectionMode ?? this.selectionMode,
-      selectedSourceIds: Set.unmodifiable(
-        selectedSourceIds ?? this.selectedSourceIds,
-      ),
-      healthProgress: identical(healthProgress, _unchanged)
-          ? this.healthProgress
-          : healthProgress as BookSourceHealthProgress?,
-      mutation: identical(mutation, _unchanged)
-          ? this.mutation
-          : mutation as BookSourceManagementMutation?,
-      failure: identical(failure, _unchanged) ? this.failure : failure,
-      // Every call site only ever passes `sources:` when it genuinely has a
-      // new list, so bumping whenever it's non-null (rather than hunting
-      // down each mutation method individually) can't miss a real change.
-      sourcesRevision: sources == null ? sourcesRevision : sourcesRevision + 1,
-    );
-  }
-}
-
-const _unchanged = Object();
-
 List<String> bookSourceGroups(RegisteredBookSource source) {
   final raw = source.sourceConfig?['bookSourceGroup'];
   if (raw is! String || raw.trim().isEmpty) return const [];
@@ -200,7 +72,7 @@ List<String> bookSourceGroups(RegisteredBookSource source) {
   );
 }
 
-/// Whether this source declares its own login flow (a Legado-style
+/// Whether this source declares its own login flow (a reading-source-style
 /// `loginUrl` script), as opposed to needing no authentication at all.
 bool sourceRequiresLogin(RegisteredBookSource source) =>
     source.sourceProtocol == BookSourceProtocolKind.readingSource &&
@@ -246,6 +118,8 @@ class BookSourceManagementController extends ChangeNotifier {
   int _mutationRevision = 0;
   int _healthRevision = 0;
   bool _cleanupCancelRequested = false;
+  Timer? _healthProgressTimer;
+  BookSourceHealthProgress? _pendingHealthProgress;
 
   BookSourceManagementState get state => _state;
 
@@ -433,22 +307,25 @@ class BookSourceManagementController extends ChangeNotifier {
         targets,
         onProgress: (completed, total) {
           if (!_isCurrentHealth(revision)) return;
-          _emit(
-            _state.copyWith(
-              healthProgress: BookSourceHealthProgress(
-                completed: completed,
-                total: total,
-              ),
-            ),
+          _queueHealthProgress(
+            BookSourceHealthProgress(completed: completed, total: total),
+            revision,
           );
         },
       );
       if (!_isCurrentHealth(revision)) return const [];
-      _mergeSources(updated);
-      _emit(_state.copyWith(mutation: null, healthProgress: null));
+      _clearPendingHealthProgress();
+      _emit(
+        _state.copyWith(
+          sources: updated.isEmpty ? null : _mergedSources(updated),
+          mutation: null,
+          healthProgress: null,
+        ),
+      );
       return updated;
     } on Object catch (error) {
       if (!_isCurrentHealth(revision)) return const [];
+      _clearPendingHealthProgress();
       _emit(
         _state.copyWith(mutation: null, healthProgress: null, failure: error),
       );
@@ -472,8 +349,9 @@ class BookSourceManagementController extends ChangeNotifier {
     try {
       final updated = await _sourceHealthService.checkOne(source);
       if (!_isCurrentHealth(revision)) return null;
-      _mergeSources([updated]);
-      _emit(_state.copyWith(mutation: null));
+      _emit(
+        _state.copyWith(sources: _mergedSources([updated]), mutation: null),
+      );
       return updated;
     } on Object catch (error) {
       if (!_isCurrentHealth(revision)) return null;
@@ -523,13 +401,9 @@ class BookSourceManagementController extends ChangeNotifier {
         targets,
         onProgress: (completed, total) {
           if (!_isCurrentHealth(revision)) return;
-          _emit(
-            _state.copyWith(
-              healthProgress: BookSourceHealthProgress(
-                completed: completed,
-                total: total,
-              ),
-            ),
+          _queueHealthProgress(
+            BookSourceHealthProgress(completed: completed, total: total),
+            revision,
           );
         },
         isCancelled: () =>
@@ -538,8 +412,14 @@ class BookSourceManagementController extends ChangeNotifier {
       if (!_isCurrentHealth(revision)) {
         return BookSourceCleanupSweepResult.empty;
       }
-      _mergeSources(updated);
-      _emit(_state.copyWith(mutation: null, healthProgress: null));
+      _clearPendingHealthProgress();
+      _emit(
+        _state.copyWith(
+          sources: updated.isEmpty ? null : _mergedSources(updated),
+          mutation: null,
+          healthProgress: null,
+        ),
+      );
       final fullyAvailable = <RegisteredBookSource>[];
       final needsAttention = <RegisteredBookSource>[];
       for (final source in updated) {
@@ -556,6 +436,7 @@ class BookSourceManagementController extends ChangeNotifier {
       if (!_isCurrentHealth(revision)) {
         return BookSourceCleanupSweepResult.empty;
       }
+      _clearPendingHealthProgress();
       _emit(
         _state.copyWith(mutation: null, healthProgress: null, failure: error),
       );
@@ -577,6 +458,39 @@ class BookSourceManagementController extends ChangeNotifier {
   BookSourceInstalledDedupeResult findDuplicateSources({
     BookSourceDedupeMode mode = BookSourceDedupeMode.standard,
   }) {
+    final prepared = _prepareDedupeCandidates();
+    return BookSourceInstalledDedupeResult(
+      result: const BookSourceDedupeEngine().analyze(
+        prepared.candidates,
+        mode: mode,
+      ),
+      sourcesByIndex: prepared.sourcesByIndex,
+    );
+  }
+
+  Future<BookSourceInstalledDedupeResult> findDuplicateSourcesInBackground({
+    BookSourceDedupeMode mode = BookSourceDedupeMode.standard,
+  }) async {
+    final sourcesRevision = _state.sourcesRevision;
+    final prepared = _prepareDedupeCandidates();
+    final result = await compute(_analyzeDedupeCandidates, (
+      candidates: prepared.candidates,
+      mode: mode,
+    ));
+    if (sourcesRevision != _state.sourcesRevision) {
+      return findDuplicateSourcesInBackground(mode: mode);
+    }
+    return BookSourceInstalledDedupeResult(
+      result: result,
+      sourcesByIndex: prepared.sourcesByIndex,
+    );
+  }
+
+  ({
+    List<BookSourceDedupeCandidate> candidates,
+    Map<int, RegisteredBookSource> sourcesByIndex,
+  })
+  _prepareDedupeCandidates() {
     final candidates = <BookSourceDedupeCandidate>[];
     final sourcesByIndex = <int, RegisteredBookSource>{};
     for (final source in _state.sources) {
@@ -599,8 +513,8 @@ class BookSourceManagementController extends ChangeNotifier {
         ),
       );
     }
-    return BookSourceInstalledDedupeResult(
-      result: const BookSourceDedupeEngine().analyze(candidates, mode: mode),
+    return (
+      candidates: List.unmodifiable(candidates),
       sourcesByIndex: Map.unmodifiable(sourcesByIndex),
     );
   }
@@ -654,14 +568,15 @@ class BookSourceManagementController extends ChangeNotifier {
 
   void _mergeSources(List<RegisteredBookSource> updated) {
     if (updated.isEmpty) return;
+    _emit(_state.copyWith(sources: _mergedSources(updated)));
+  }
+
+  List<RegisteredBookSource> _mergedSources(
+    List<RegisteredBookSource> updated,
+  ) {
+    if (updated.isEmpty) return _state.sources;
     final byId = {for (final source in updated) source.id: source};
-    _emit(
-      _state.copyWith(
-        sources: [
-          for (final source in _state.sources) byId[source.id] ?? source,
-        ],
-      ),
-    );
+    return [for (final source in _state.sources) byId[source.id] ?? source];
   }
 
   void _resetView(BookSourceManagementState state) {
@@ -673,6 +588,28 @@ class BookSourceManagementController extends ChangeNotifier {
       !_disposed && revision == _mutationRevision;
   bool _isCurrentHealth(int revision) =>
       !_disposed && revision == _healthRevision;
+
+  void _queueHealthProgress(BookSourceHealthProgress progress, int revision) {
+    if (_healthProgressTimer == null) {
+      _emit(_state.copyWith(healthProgress: progress));
+      _healthProgressTimer = Timer(const Duration(milliseconds: 100), () {
+        _healthProgressTimer = null;
+        final pending = _pendingHealthProgress;
+        _pendingHealthProgress = null;
+        if (pending != null && _isCurrentHealth(revision)) {
+          _emit(_state.copyWith(healthProgress: pending));
+        }
+      });
+      return;
+    }
+    _pendingHealthProgress = progress;
+  }
+
+  void _clearPendingHealthProgress() {
+    _healthProgressTimer?.cancel();
+    _healthProgressTimer = null;
+    _pendingHealthProgress = null;
+  }
 
   void _emit(BookSourceManagementState state) {
     if (_disposed) return;
@@ -687,7 +624,16 @@ class BookSourceManagementController extends ChangeNotifier {
     _loadRevision++;
     _mutationRevision++;
     _healthRevision++;
+    _clearPendingHealthProgress();
     if (_ownsClient) _client?.close();
     super.dispose();
   }
 }
+
+BookSourceDedupeResult _analyzeDedupeCandidates(
+  ({List<BookSourceDedupeCandidate> candidates, BookSourceDedupeMode mode})
+  request,
+) => const BookSourceDedupeEngine().analyze(
+  request.candidates,
+  mode: request.mode,
+);

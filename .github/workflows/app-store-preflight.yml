@@ -1,0 +1,38 @@
+name: App Store integration checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/app-store-preflight.yml'
+      - 'tool/app_store/**'
+      - 'marketing/app-store/metadata.json'
+      - 'ios/Runner/PrivacyInfo.xcprivacy'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/app-store-preflight.yml'
+      - 'tool/app_store/**'
+      - 'marketing/app-store/metadata.json'
+      - 'ios/Runner/PrivacyInfo.xcprivacy'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-store-tooling:
+    name: App Store tooling and metadata validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Validate build command orchestration (mocked Apple tools)
+        run: python3 -m unittest discover -s tool/app_store -p 'test_*.py' -v
+      - name: Validate App Store Connect client (mocked API)
+        run: node --test tool/app_store/connect.test.mjs
+      - name: Check listing metadata without Apple credentials
+        run: node tool/app_store/connect.mjs metadata
+      - name: Check shell and privacy manifest syntax
+        run: |
+          bash -n tool/app_store/build_ipa.sh
+          python3 -c "import plistlib; plistlib.load(open('ios/Runner/PrivacyInfo.xcprivacy', 'rb'))"

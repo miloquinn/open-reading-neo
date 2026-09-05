@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,7 +9,6 @@ import '../../book_sources/protocol/book_source_protocol.dart';
 import '../../book_sources/services/book_source_import_analyzer.dart';
 import '../../book_sources/services/book_source_maintenance_coordinator.dart';
 import '../../book_sources/source_engine/source_health_checker.dart';
-import '../../book_sources/source_engine/source_import_service.dart';
 import '../../services/core/app_settings_service.dart';
 import '../../utils/layout_helper.dart';
 import '../../utils/localization_extension.dart';
@@ -20,7 +18,7 @@ import 'controllers/book_source_add_controller.dart';
 import 'controllers/book_source_management_controller.dart';
 import 'source_debug_page.dart';
 import 'source_login_page.dart';
-import 'widgets/book_source_add_panel.dart';
+import 'widgets/book_source_add_flow.dart';
 import 'widgets/book_source_cleanup_review_sheet.dart';
 import 'widgets/book_source_dedupe_review_sheet.dart';
 import 'widgets/book_source_group_picker.dart';
@@ -55,47 +53,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   late final bool _ownsMaintenance;
   int _handledMaintenanceRunId = 0;
   bool _maintenanceProgressOpen = false;
-
-  // `visibleSources`/`availableGroups` re-filter every source and regex-parse
-  // each one's group tags; this page rebuilds on every controller
-  // notification (a single health-check progress tick among thousands
-  // included), so recomputing them unconditionally on every build is what
-  // made this page feel like it never finished loading with a large library.
-  int? _cachedVisibleSourcesRevision;
-  String? _cachedVisibleSourcesQuery;
-  BookSourceManagementFilter? _cachedVisibleSourcesFilter;
-  String? _cachedVisibleSourcesGroup;
-  List<RegisteredBookSource>? _cachedVisibleSources;
-  int? _cachedAvailableGroupsRevision;
-  List<String>? _cachedAvailableGroups;
-
-  List<RegisteredBookSource> _memoizedVisibleSources() {
-    final state = _controller.state;
-    if (_cachedVisibleSourcesRevision == state.sourcesRevision &&
-        _cachedVisibleSourcesQuery == state.query &&
-        _cachedVisibleSourcesFilter == state.filter &&
-        _cachedVisibleSourcesGroup == state.selectedGroup) {
-      return _cachedVisibleSources!;
-    }
-    final visible = state.visibleSources;
-    _cachedVisibleSourcesRevision = state.sourcesRevision;
-    _cachedVisibleSourcesQuery = state.query;
-    _cachedVisibleSourcesFilter = state.filter;
-    _cachedVisibleSourcesGroup = state.selectedGroup;
-    _cachedVisibleSources = visible;
-    return visible;
-  }
-
-  List<String> _memoizedAvailableGroups() {
-    final state = _controller.state;
-    if (_cachedAvailableGroupsRevision == state.sourcesRevision) {
-      return _cachedAvailableGroups!;
-    }
-    final groups = state.availableGroups;
-    _cachedAvailableGroupsRevision = state.sourcesRevision;
-    _cachedAvailableGroups = groups;
-    return groups;
-  }
+  BookSourceMaintenanceStatus? _lastMaintenanceStatus;
 
   @override
   void initState() {
@@ -116,6 +74,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     _handledMaintenanceRunId = _maintenance.state.isRunning
         ? _maintenance.state.runId - 1
         : _maintenance.state.runId;
+    _lastMaintenanceStatus = _maintenance.state.status;
     _maintenance.addListener(_onMaintenanceChanged);
     _controller = BookSourceManagementController()..addListener(_onChanged);
     _scrollController.addListener(_loadMoreSourcesIfNeeded);
@@ -129,6 +88,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   void _onMaintenanceChanged() {
     if (!mounted) return;
     final state = _maintenance.state;
+    final statusChanged = state.status != _lastMaintenanceStatus;
+    _lastMaintenanceStatus = state.status;
     if (!state.isRunning && state.runId > _handledMaintenanceRunId) {
       _handledMaintenanceRunId = state.runId;
       final result = state.result;
@@ -157,7 +118,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         showSideToast(context, '${state.failure}', kind: SideToastKind.error);
       }
     }
-    setState(() {});
+    if (statusChanged) setState(() {});
   }
 
   void _loadMoreSourcesIfNeeded() {
@@ -278,8 +239,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           constraints: const BoxConstraints(maxWidth: 920),
           child: BookSourceManagementList(
             state: state,
-            visibleSources: _memoizedVisibleSources(),
-            availableGroups: _memoizedAvailableGroups(),
+            visibleSources: state.visibleSources,
+            availableGroups: state.availableGroups,
             searchController: _searchController,
             scrollController: _scrollController,
             additionalProtocolsEnabled: additionalProtocolsEnabled,
@@ -327,7 +288,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (context) => BookSourceGroupPicker(
-        groups: _memoizedAvailableGroups(),
+        groups: state.availableGroups,
         selected: state.selectedGroup,
       ),
     );
@@ -544,7 +505,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 
   Future<void> _reviewInstalledDuplicates() async {
-    final analysis = _controller.findDuplicateSources();
+    final analysis = await _controller.findDuplicateSourcesInBackground();
+    if (!mounted) return;
     if (analysis.result.groups.isEmpty) {
       showSideToast(
         context,

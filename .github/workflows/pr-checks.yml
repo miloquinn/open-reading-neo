@@ -110,6 +110,12 @@ jobs:
             'cover opening skips a brief loader and fades directly to content'
             'a genuinely slow opening never overlaps loader and content'
             'loads source chapters and navigates to the next chapter'
+            'automatic page turning advances source text and pauses on touch'
+            'automatic page turning advances a vertical source viewport'
+            'automatic page turning stops at the end of a source book'
+            'source sweep uses ten seconds and resumes its reveal'
+            'source continuous scroll preserves chapter preference and pauses'
+            'source continuous scroll crosses chapters without changing its layout preference'
             'replacement rules clean source chapter titles and content'
             'restores the last source chapter on reopen'
             'uses the shared reader settings with independent margins'
@@ -141,6 +147,8 @@ jobs:
           # mutation cannot make later pumpAndSettle calls time out.
           discovery_tests=(
             'discover scope defaults to all and filters every section'
+            'reading source scope shows channels without ORSP tabs'
+            'rapid source and layout changes settle on the newest view'
             'latest aggregation interleaves sources and caps each contribution'
             'pull to refresh invalidates cached responses before reloading'
             'pull to refresh keeps content instead of showing another loader'

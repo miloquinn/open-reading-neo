@@ -225,27 +225,28 @@ extension _NativeReaderLoading on _NativeReaderPageState {
   Future<List<_NativeChapter>> _loadBook() async {
     final l10n = context.l10n;
     await _replaceRules.load();
-    final format = widget.book.format.toLowerCase();
+    final format = _activeBook.format.toLowerCase();
     final webBytes = kIsWeb
-        ? await WebBookFileStore().read(widget.book.filePath)
+        ? await WebBookFileStore().read(_activeBook.filePath)
         : null;
     if (kIsWeb && webBytes == null) {
       throw StateError('Web 书籍文件不存在');
     }
     if (format == 'txt') {
+      if (!kIsWeb) await TxtEditService().recoverInterruptedEdit(_activeBook);
       if (webBytes != null) {
         final decoded = EnhancedTxtImportService().decodeWithOverride(
           webBytes,
-          encodingOverride: widget.book.textEncoding,
+          encodingOverride: _activeBook.textEncoding,
           verifyEncodingOverride: true,
         );
         return _parseTxtChapters(
           decoded,
-          widget.book.title,
+          _activeBook.title,
           l10n.readerPrefaceTitle,
         );
       }
-      final sourceFile = File(widget.book.filePath);
+      final sourceFile = File(_activeBook.filePath);
       final fileSize = await sourceFile.length();
       final useParsedCache = fileSize <= _largeTxtFileThreshold;
       final cacheDirectory = Directory(
@@ -263,7 +264,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
               .map(
                 (chapter) => _nativeChapterFromMap(
                   chapter,
-                  bookTitle: widget.book.title,
+                  bookTitle: _activeBook.title,
                 ),
               )
               .toList(growable: false);
@@ -272,8 +273,8 @@ extension _NativeReaderLoading on _NativeReaderPageState {
 
       final parseArguments = <String, dynamic>{
         'path': sourceFile.path,
-        'encoding': widget.book.textEncoding,
-        'title': widget.book.title,
+        'encoding': _activeBook.textEncoding,
+        'title': _activeBook.title,
         'prefaceTitle': l10n.readerPrefaceTitle,
       };
       if (!useParsedCache) {
@@ -290,7 +291,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         if (cachedIndex != null) {
           return _nativeChaptersFromFileIndex(
             cachedIndex,
-            bookTitle: widget.book.title,
+            bookTitle: _activeBook.title,
           );
         }
 
@@ -321,7 +322,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         );
         return _nativeChaptersFromFileIndex(
           indexed,
-          bookTitle: widget.book.title,
+          bookTitle: _activeBook.title,
         );
       }
 
@@ -338,7 +339,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
       return parsed
           .map(
             (chapter) =>
-                _nativeChapterFromMap(chapter, bookTitle: widget.book.title),
+                _nativeChapterFromMap(chapter, bookTitle: _activeBook.title),
           )
           .toList(growable: false);
     }

@@ -23,7 +23,7 @@ void main() {
   test('remote LWW applies newer HLC and is idempotent', () async {
     final clock = HybridLogicalClock(deviceId: 'local', nowMillis: () => 1000);
     await store.recordLocal(
-      dataset: 'progress',
+      dataset: 'books',
       recordId: 'book-1',
       entityKey: 'book-1',
       payload: const {
@@ -38,7 +38,7 @@ void main() {
       createdHlc: '2000-0000-remote',
       operations: const [
         SyncOperation(
-          dataset: 'progress',
+          dataset: 'books',
           recordId: 'book-1',
           entityKey: 'book-1',
           hlc: '2000-0000-remote',
@@ -73,7 +73,7 @@ void main() {
       ),
       0,
     );
-    final record = (await store.recordsForDataset('progress')).single;
+    final record = (await store.recordsForDataset('books')).single;
     expect(record.payload!['canonical_locator'], {'progression': 0.1});
     expect(record.dirty, isFalse);
     expect(businessApplies, 1);

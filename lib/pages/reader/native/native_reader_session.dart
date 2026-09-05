@@ -31,7 +31,9 @@ extension _NativeReaderSession on _NativeReaderPageState {
     if (bookId == null) return;
     try {
       final bookmarks = await _bookmarkDao.getBookmarksForBook(bookId);
-      if (mounted) _setReaderState(() => _bookmarks = bookmarks);
+      if (mounted) {
+        _setReaderState(() => _bookmarks = bookmarks);
+      }
     } catch (error) {
       debugPrint('load bookmarks failed: $error');
     }
@@ -117,6 +119,7 @@ extension _NativeReaderSession on _NativeReaderPageState {
   }
 
   Future<void> _exitReader() async {
+    _pauseAutoPageTurn();
     if (_exitInProgress) return;
     _exitInProgress = true;
     BookOpenTransition.beginExit();

@@ -365,69 +365,14 @@ List<Map<String, dynamic>> _parseTxtFileInBackground(
 }
 
 Map<String, dynamic> _indexTxtFileInBackground(Map<String, dynamic> arguments) {
-  final bytes = File(arguments['path'] as String).readAsBytesSync();
-  final decoded = EnhancedTxtImportService().decodeWithOverride(
-    bytes,
-    encodingOverride: arguments['encoding'] as String?,
-    verifyEncodingOverride: true,
-  );
-  final sections = splitOversizedTxtSections(
-    decoded,
-    parseTxtChapterSections(
-      decoded,
-      fallbackTitle: arguments['title'] as String,
-      prefaceTitle: arguments['prefaceTitle'] as String,
-    ),
-  );
-  final chapters = <Map<String, dynamic>>[];
   final indexPath = arguments['indexPath'] as String;
-  final dataPath = arguments['dataPath'] as String;
-  final dataFile = File(dataPath);
-  dataFile.parent.createSync(recursive: true);
-  final temporaryData = File('$dataPath.tmp');
-  final output = temporaryData.openSync(mode: FileMode.write);
-
-  void writeChapter({
-    required String id,
-    required String title,
-    required int startChar,
-    required int endChar,
-    required bool isNeedSplitTitle,
-  }) {
-    final startByte = output.positionSync();
-    output.writeFromSync(utf8.encode(decoded.substring(startChar, endChar)));
-    chapters.add(<String, dynamic>{
-      'id': id,
-      'title': title,
-      'depth': 0,
-      'isNeedSplitTitle': isNeedSplitTitle,
-      'start': startByte,
-      'end': output.positionSync(),
-    });
-  }
-
-  try {
-    for (final section in sections) {
-      writeChapter(
-        id: section.id,
-        title: section.title,
-        startChar: section.bodyStart,
-        endChar: section.bodyEnd,
-        isNeedSplitTitle: section.isNeedSplitTitle,
-      );
-    }
-  } finally {
-    output.closeSync();
-  }
-
-  if (dataFile.existsSync()) dataFile.deleteSync();
-  temporaryData.renameSync(dataPath);
-
-  final result = <String, dynamic>{
-    'version': _txtChapterCacheVersion,
-    'dataPath': dataPath,
-    'chapters': chapters,
-  };
+  final result = buildStreamingTxtIndexWorker(<String, dynamic>{
+    'sourcePath': arguments['path'],
+    'dataPath': arguments['dataPath'],
+    'encoding': arguments['encoding'],
+    'title': arguments['title'],
+    'prefaceTitle': arguments['prefaceTitle'],
+  })..['version'] = _txtChapterCacheVersion;
   final indexFile = File(indexPath);
   final temporaryIndex = File('$indexPath.tmp');
   temporaryIndex.writeAsStringSync(jsonEncode(result), flush: true);

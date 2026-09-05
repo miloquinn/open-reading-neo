@@ -20,8 +20,14 @@ List<Object?> evaluateSourceHtmlRule(
   List<Element> roots,
   String rule, {
   required bool listMode,
+  bool allAttributes = false,
 }) {
-  final segments = rule.split('@').where((part) => part.isNotEmpty).toList();
+  // Compatible RuleAnalyzer semantics keep separators inside quoted selectors
+  // and predicates intact (for example, URLs containing `@`).
+  final segments = splitSourceRuleTopLevel(
+    rule,
+    '@',
+  ).where((part) => part.isNotEmpty).toList();
   if (segments.isEmpty) return roots;
   var current = roots;
   for (var index = 0; index < segments.length; index++) {
@@ -30,7 +36,7 @@ List<Object?> evaluateSourceHtmlRule(
     final terminal = sourceHtmlTerminalValue(
       current,
       segment,
-      singleValue: isLast && !listMode,
+      singleValue: isLast && !listMode && !allAttributes,
     );
     if (terminal != null && isLast) return terminal;
     current = selectSourceHtml(current, segment, includeRoots: index == 0);
@@ -48,28 +54,40 @@ List<Object?>? sourceHtmlTerminalValue(
     'text' => nodes.map((node) => node.text).toList(),
     'ownText' => nodes.map(sourceOwnText).toList(),
     'textNodes' => nodes.map(sourceDirectTextNodes).toList(),
-    'html' => nodes.map((node) => node.innerHtml).toList(),
+    'html' => nodes.map(_sourceCleanHtml).toList(),
     'all' => [nodes.map((node) => node.outerHtml).join()],
     _
         when sourceHtmlAttributeNames.contains(segment.toLowerCase()) ||
             nodes.any((node) => node.attributes.containsKey(segment)) =>
       singleValue
-          ? [_sourceFirstAttributeValue(nodes, segment)]
-          : nodes.map((node) => node.attributes[segment] ?? '').toList(),
+          ? [_sourceAttributeValues(nodes, segment).firstOrNull ?? '']
+          : _sourceAttributeValues(nodes, segment).toList(growable: false),
     _ => null,
   };
 }
 
-/// Mirrors jsoup's `Elements.attr()`: the first matched element that carries
-/// the attribute wins, instead of concatenating every matched element's
-/// value together (which produced mangled URLs when a rule such as
-/// `tag.a@href` matched more than one anchor inside a single item).
-String _sourceFirstAttributeValue(List<Element> nodes, String segment) {
+String _sourceCleanHtml(Element node) {
+  final clone = node.clone(true);
+  clone
+      .querySelectorAll('script, style')
+      .forEach((element) => element.remove());
+  return clone.outerHtml;
+}
+
+// Share ordered, nonblank attribute extraction between scalar metadata and
+// joined content. Scalar callers stop after the first value, avoiding a scan
+// of the remaining nodes; list callers follow the compatibility URL order.
+Iterable<String> _sourceAttributeValues(
+  List<Element> nodes,
+  String segment,
+) sync* {
+  final seen = <String>{};
   for (final node in nodes) {
     final value = node.attributes[segment];
-    if (value != null) return value;
+    if (value != null && value.trim().isNotEmpty && seen.add(value)) {
+      yield value;
+    }
   }
-  return '';
 }
 
 List<Element> selectSourceHtml(

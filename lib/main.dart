@@ -361,8 +361,11 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_runAutomaticWebDavSyncIfNeeded());
+    if (_webDavSyncInitialized && mounted) {
+      provider.Provider.of<WebDavSyncController>(
+        context,
+        listen: false,
+      ).setForeground(state == AppLifecycleState.resumed);
     }
   }
 
@@ -390,11 +393,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
       listen: false,
     );
     if (!sync.isConfigured || !sync.autoSync) return;
-    final lastSuccess = sync.lastSuccessfulSync;
-    if (lastSuccess != null &&
-        DateTime.now().difference(lastSuccess) < const Duration(minutes: 15)) {
-      return;
-    }
     try {
       await sync.syncNow();
     } catch (error) {

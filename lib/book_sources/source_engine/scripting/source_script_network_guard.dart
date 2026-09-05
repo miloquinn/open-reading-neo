@@ -9,7 +9,7 @@
 /// outside the whole script, performing the real request, and re-running the
 /// script with the answer cached. That only works if the marker error
 /// propagates all the way out of the script uncaught — but many real-world
-/// Legado sources wrap their own network calls in a defensive
+/// Imported source scripts often wrap their own network calls in a defensive
 /// `try { ... } catch (e) { ... }`, which intercepts the marker just like any
 /// other error and never lets Dart see it. The request then silently never
 /// happens.
@@ -172,7 +172,7 @@ class _CatchGuardTransform {
     if (braceAt >= _length || source[braceAt] != '{') return false;
 
     if (catchVar == null) {
-      // `catch { ... }` (no binding) — Legado sources commonly write this.
+      // `catch { ... }` (no binding) is common in imported source scripts.
       _out.write('catch ($_syntheticCatchVar) {');
       catchVar = _syntheticCatchVar;
     } else {

@@ -285,11 +285,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Import link'), findsOneWidget);
-    expect(find.text('Add from JSON file'), findsOneWidget);
+    expect(find.text('JSON file'), findsOneWidget);
     final urlField = tester.widget<TextField>(
       find.byKey(const Key('bookSourceUnifiedUrlField')),
     );
     expect(urlField.autofocus, isFalse);
+
+    await tester.tap(find.byKey(const Key('bookSourceImportUsageNotice')));
+    await tester.pumpAndSettle();
 
     expect(
       find.textContaining('OpenReading includes no sources'),

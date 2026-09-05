@@ -1,7 +1,7 @@
 import '../services/book_download_cancellation.dart';
 
 /// Caps how often requests to one reading source may fire, mirroring the
-/// legado `concurrentRate` contract: `"N/M"` allows N requests per M
+/// reading-source `concurrentRate` contract: `"N/M"` allows N requests per M
 /// milliseconds, a bare `"M"` is shorthand for `"1/M"`, and `"0"`/blank means
 /// unlimited. All calls sharing a [SourceConcurrencyLimiter] instance and key
 /// (typically a source's stable id) draw from the same sliding window,

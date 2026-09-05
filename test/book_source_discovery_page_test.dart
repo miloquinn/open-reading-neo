@@ -9,11 +9,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
+import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/book_sources/book_sources_page.dart';
+import 'package:xxread/pages/home/home_mobile_chrome.dart';
+import 'package:xxread/pages/book_sources/widgets/book_source_pill.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_widgets.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
@@ -76,6 +79,74 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('reading source scope shows channels without ORSP tabs', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+    final sources = [
+      _source('orsp', 'ORSP'),
+      _source(
+        'reading',
+        'Reading',
+        protocol: BookSourceProtocolKind.readingSource,
+      ),
+    ];
+    SharedPreferences.setMockInitialValues({
+      additionalSourceProtocolsPreferenceKey: true,
+      'open_reading_book_sources_v1': jsonEncode(
+        sources.map((s) => s.toJson()).toList(),
+      ),
+    });
+    final client = _DiscoveryClient();
+    final layout = BookSourcesPageController();
+    addTearDown(layout.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: client, controller: layout),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Categories'), findsOneWidget);
+    expect(find.text('Latest'), findsOneWidget);
+    await tester.tap(find.text('Latest'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourceDiscoverScope-reading')));
+    await tester.pumpAndSettle();
+    expect(find.text('Categories'), findsNothing);
+    expect(find.text('Latest'), findsNothing);
+    expect(
+      find.byKey(
+        const Key('bookSourceDiscoveryChannel-reading-reading-fiction'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Reading category book'), findsOneWidget);
+    expect(client.discoverySourceIds, ['orsp']);
+
+    await layout.setLayout(BookSourceDiscoverLayout.list);
+    await tester.pumpAndSettle();
+    await layout.setLayout(BookSourceDiscoverLayout.standard);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourceDiscoverScope-reading')));
+    await tester.pumpAndSettle();
+    expect(find.text('Latest'), findsNothing);
+    expect(find.text('Reading category book'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('bookSourceDiscoverScope-orsp')));
+    await tester.pumpAndSettle();
+    expect(find.text('Categories'), findsOneWidget);
+    expect(find.text('Latest'), findsOneWidget);
+    await tester.tap(find.text('Latest'));
+    await tester.pumpAndSettle();
+    expect(find.text('ORSP latest 1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('latest aggregation interleaves sources and caps each contribution', () {
     final sourceA = _source('source-a', 'Source A');
     final sourceB = _source('source-b', 'Source B');
@@ -98,6 +169,69 @@ void main() {
     );
 
     expect(merged.map((result) => result.book.title), ['B1', 'A1', 'B2', 'A2']);
+  });
+
+  testWidgets('rapid source and layout changes settle on the newest view', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1100);
+    addTearDown(tester.view.reset);
+    final sources = [
+      _source('source-a', 'Source A'),
+      _source('source-b', 'Source B'),
+    ];
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode(
+        sources.map((source) => source.toJson()).toList(),
+      ),
+    });
+    final layout = BookSourcesPageController();
+    addTearDown(layout.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookSourcesPage(client: _DiscoveryClient(), controller: layout),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourceDiscoverScope-source-b')));
+    await tester.pump(const Duration(milliseconds: 30));
+    await tester.tap(find.byKey(const Key('bookSourceDiscoverScope-source-a')));
+    await tester.pumpAndSettle();
+    expect(find.text('Source A picks'), findsOneWidget);
+    expect(find.text('Source B picks'), findsNothing);
+
+    await layout.setLayout(BookSourceDiscoverLayout.list);
+    await tester.pump(const Duration(milliseconds: 30));
+    await layout.setLayout(BookSourceDiscoverLayout.standard);
+    await tester.pump(const Duration(milliseconds: 30));
+    await layout.setLayout(BookSourceDiscoverLayout.list);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListLayoutDirectory')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('bookSourceDiscoverScopeControl')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('bookSourceDiscoverScrollView')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const Key('bookSourceListSourceToggle-source-a')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('bookSourceListChannel-source-a-source-a-fiction')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('pull to refresh invalidates cached responses before reloading', (
@@ -448,6 +582,11 @@ void main() {
           const Key('bookSourceListChannel-source-20-source-20-fiction'),
         ),
       );
+      await tester.pump();
+      // Do not jump the still-visible directory to its top before fading out.
+      expect(controller.offset, closeTo(directoryOffset, 1));
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(controller.offset, closeTo(directoryOffset, 1));
       await tester.pumpAndSettle();
 
       expect(controller.offset, 0);
@@ -458,7 +597,33 @@ void main() {
         greaterThan(0),
       );
 
+      final header = find.byKey(const Key('bookSourceListSelectionHeader'));
+      final chrome = HomeMobileChromeScope.of(tester.element(header));
+      expect(tester.getTopLeft(header).dy, closeTo(chrome.pageTopPadding, 1));
       await tester.tap(find.byKey(const Key('bookSourceListChangeChannel')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      final outgoing = find
+          .descendant(
+            of: find.byKey(const Key('bookSourceSectionTransition')),
+            matching: find.byType(SliverFadeTransition),
+          )
+          .first;
+      expect(
+        tester.widget<SliverFadeTransition>(outgoing).opacity.value,
+        inExclusiveRange(0, 1),
+      );
+      expect(controller.offset, 0);
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.pump();
+      final row = find.byKey(const Key('bookSourceListReveal-source-20'));
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.byType(TweenAnimationBuilder<double>),
+        ),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
       expect(controller.offset, closeTo(directoryOffset, 1));
       expect(sourceToggle, findsOneWidget);
@@ -503,7 +668,10 @@ void main() {
         find.byKey(const Key('bookSourceDiscoverScope-source-000')),
         findsOneWidget,
       );
-      expect(find.byType(ChoiceChip).evaluate().length, lessThan(20));
+      expect(
+        find.byType(BookSourcePill).evaluate().length,
+        inExclusiveRange(0, 20),
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -696,7 +864,13 @@ void main() {
       find.byKey(const Key('bookSourceCategoryPickerButton')),
       findsOneWidget,
     );
-    expect(find.text('Category 000'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('bookSourceDiscoveryChannels')),
+        matching: find.text('Category 000'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Category 499'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bookSourceCategoryPickerButton')));
@@ -714,7 +888,15 @@ void main() {
     await tester.tap(find.text('Category 499'));
     await tester.pumpAndSettle();
     expect(client.lastCategoryId, 'category-499');
-    expect(find.text('Category 499'), findsOneWidget);
+    expect(
+      find
+          .descendant(
+            of: find.byKey(const Key('bookSourceDiscoveryChannels')),
+            matching: find.text('Category 499'),
+          )
+          .hitTestable(),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -746,7 +928,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('bookSourceListLazyChannels')), findsOneWidget);
-    expect(find.byType(ActionChip).evaluate().length, lessThan(30));
+    expect(
+      find.byType(BookSourcePill).evaluate().length,
+      inExclusiveRange(0, 30),
+    );
     expect(find.text('Category 000'), findsOneWidget);
     expect(find.text('Category 499'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -1296,6 +1481,7 @@ class _EmptyDiscoveryClient extends BookSourceClient {
 RegisteredBookSource _source(
   String id,
   String name, {
+  BookSourceProtocolKind protocol = BookSourceProtocolKind.orsp,
   Set<String> capabilities = const {
     'search',
     'discover',
@@ -1312,6 +1498,15 @@ RegisteredBookSource _source(
     protocolVersion: '1.1',
     languages: const ['en'],
     capabilities: capabilities,
+    sourceProtocol: protocol,
+    sourceConfig: protocol == BookSourceProtocolKind.readingSource
+        ? {
+            'bookSourceName': name,
+            'bookSourceUrl': 'https://example.org/$id/',
+            'exploreUrl': 'Fiction::https://example.org/$id/fiction',
+            'ruleExplore': {'bookList': 'class.book'},
+          }
+        : null,
     enabled: true,
     addedAt: DateTime.utc(2026, 7, 19),
   );

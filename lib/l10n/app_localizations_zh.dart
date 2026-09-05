@@ -3666,6 +3666,84 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerSettingsAdvancedTypography => '高级排版';
 
   @override
+  String get readerAutoPageTurnTitle => '自动翻页';
+
+  @override
+  String get readerAutoPageTurnOff => '未开启';
+
+  @override
+  String get readerAutoPageTurnHint => '按照选定的秒数自动前进一屏，上下翻页模式同样适用。';
+
+  @override
+  String get readerAutoPageTurnModeTimed => '定时翻页';
+
+  @override
+  String get readerAutoPageTurnModeSweep => '扫屏翻页';
+
+  @override
+  String get readerAutoPageTurnModeContinuous => '匀速滚动';
+
+  @override
+  String get readerAutoPageTurnModeInterval => '间隔滚动';
+
+  @override
+  String get readerAutoPageTurnTimedHint => '停留设定时间后，翻到下一页。';
+
+  @override
+  String get readerAutoPageTurnSweepHint => '分界线从上往下扫过，线上方逐渐显示下一页。';
+
+  @override
+  String get readerAutoPageTurnContinuousHint => '正文按照稳定的阅读速度持续向下滚动。';
+
+  @override
+  String get readerAutoPageTurnIntervalHint => '停留设定时间后，平滑向下滚动约一屏。';
+
+  @override
+  String get readerAutoPageTurnSweepDurationLabel => '扫屏时长';
+
+  @override
+  String get readerAutoPageTurnScrollSpeedLabel => '滚动速度';
+
+  @override
+  String readerAutoPageTurnSecondsPerScreen(int seconds) {
+    return '$seconds 秒/屏';
+  }
+
+  @override
+  String readerAutoPageTurnModeValue(String mode, int seconds) {
+    return '$mode · $seconds 秒/屏';
+  }
+
+  @override
+  String readerAutoPageTurnModePaused(String mode, int seconds) {
+    return '已暂停 · $mode · $seconds 秒/屏';
+  }
+
+  @override
+  String get readerAutoPageTurnIntervalLabel => '翻页间隔';
+
+  @override
+  String readerAutoPageTurnInterval(int seconds) {
+    return '每 $seconds 秒前进一屏';
+  }
+
+  @override
+  String get readerAutoPageTurnStart => '开始自动翻页';
+
+  @override
+  String get readerAutoPageTurnResume => '继续自动翻页';
+
+  @override
+  String readerAutoPageTurnRunning(int seconds) {
+    return '自动 · $seconds 秒/屏';
+  }
+
+  @override
+  String readerAutoPageTurnPaused(int seconds) {
+    return '已暂停 · $seconds 秒/屏';
+  }
+
+  @override
   String get readerThemeDay => '白天';
 
   @override
@@ -4964,7 +5042,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get webDavFilesTooLarge => '当前版本暂不支持超过 100 MiB 的书籍文件';
+  String get webDavFilesTooLarge => '此格式的文件大小超过同步限制';
 
   @override
   String get webDavFilesEmpty => '这个分类中没有书籍';
@@ -5468,6 +5546,205 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readingDataExportUnknownChapter => '未定位的批注';
+
+  @override
+  String get cloudSyncTitle => '云端同步';
+
+  @override
+  String get cloudSyncTagline => '换一台设备，接着上次的位置读';
+
+  @override
+  String get cloudSyncResumeTitle => '跨设备续读';
+
+  @override
+  String get cloudSyncAutoResume => '打开书籍自动接续';
+
+  @override
+  String get cloudSyncAutoResumeHint => '打开时检查最新位置；阅读中收到更新时提示';
+
+  @override
+  String get cloudSyncAutoHint => '阅读时保存进度，打开书籍时检查更新';
+
+  @override
+  String get cloudSyncMoreContent => '更多同步内容';
+
+  @override
+  String get cloudSyncBooks => '书籍与正文';
+
+  @override
+  String get cloudSyncBooksHint => '参与同步的书籍、正文更新与文件下载';
+
+  @override
+  String get cloudSyncActivity => '同步记录与需要处理';
+
+  @override
+  String get cloudSyncStorage => '存储连接';
+
+  @override
+  String get cloudSyncNoActivity => '尚无同步记录';
+
+  @override
+  String get cloudSyncProgress => '阅读位置';
+
+  @override
+  String get cloudSyncText => '正文文件';
+
+  @override
+  String get cloudSyncMetadataComplete => '所选阅读数据已与 WebDAV 交换';
+
+  @override
+  String get cloudSyncPaused => '自动同步已暂停';
+
+  @override
+  String get cloudSyncLocalOnly => '仅保留在本机';
+
+  @override
+  String get cloudSyncCheckHint => '连接成功不代表其他设备已接收；各项状态分别显示';
+
+  @override
+  String get cloudSyncPendingFiles => '正文有待处理的更新';
+
+  @override
+  String get cloudSyncFileIdle => '已关联的正文等待下次检查';
+
+  @override
+  String get cloudSyncManageBooks => '选择书籍与下载';
+
+  @override
+  String get cloudSyncNoBooks => '还没有参与正文同步的 TXT';
+
+  @override
+  String get cloudSyncCompare => '对照版本';
+
+  @override
+  String get cloudSyncKeepLocal => '使用本机版本';
+
+  @override
+  String get cloudSyncUseRemote => '使用云端版本';
+
+  @override
+  String get cloudSyncBothKept => '双方版本均已保留，选择后会继续同步';
+
+  @override
+  String get cloudSyncPreviewLimited => '预览显示首处分歧附近的片段，完整版本均已保留';
+
+  @override
+  String get cloudSyncPending => '等待同步';
+
+  @override
+  String get cloudSyncConflict => '需要对照版本';
+
+  @override
+  String get cloudSyncCurrent => '当前正文已同步到 WebDAV';
+
+  @override
+  String get cloudSyncFailed => '同步未完成，可重试';
+
+  @override
+  String get cloudSyncHistory => '版本历史';
+
+  @override
+  String get cloudSyncApplyUpdate => '应用正文更新';
+
+  @override
+  String get cloudSyncParticipate => '参与正文同步';
+
+  @override
+  String get cloudSyncCloseReaderToUpdate => '请先关闭这本书的阅读或编辑页面，再应用正文更新';
+
+  @override
+  String get cloudSyncTextLocation => '云端当前文件';
+
+  @override
+  String get cloudSyncTextLocationHint =>
+      '正文修改会更新下方位置的 TXT。升级前的上传副本会保留，但不再跟随正文修改。';
+
+  @override
+  String get bookSourcesImportIntro => '从链接或 JSON 文件读取，预览后再导入。';
+
+  @override
+  String get bookSourcesImportInputStep => '选择书源';
+
+  @override
+  String get bookSourcesImportReviewStep => '预览并导入';
+
+  @override
+  String get bookSourcesImportFileHint => '选择 JSON 格式的书源文件。';
+
+  @override
+  String get bookSourcesImportDownloading => '正在下载书源…';
+
+  @override
+  String get bookSourcesImportAnalyzing => '正在解析规则与检查重复…';
+
+  @override
+  String get bookSourcesImportSaving => '正在保存书源…';
+
+  @override
+  String get bookSourcesImportPicking => '正在打开文件选择器…';
+
+  @override
+  String get bookSourcesImportWaitHint => '书源合集较大时需要一些时间，可以取消后重试。';
+
+  @override
+  String get bookSourcesImportSaveHint => '保存完成后会自动返回书源管理。';
+
+  @override
+  String get bookSourcesImportReady => '已准备好导入';
+
+  @override
+  String get bookSourcesImportEmpty => '没有可导入的书源，请检查文件或重复书源的选择。';
+
+  @override
+  String get bookSourcesImportRetry => '重试';
+
+  @override
+  String get bookSourcesImportFailed => '未能读取书源，请检查地址或文件后重试。';
+
+  @override
+  String get bookSourcesImportSaveFailed => '未能保存书源，已保留预览，请重试。';
+
+  @override
+  String get bookSourcesImportErrorDetails => '错误详情';
+
+  @override
+  String get bookSourcesImportFileUnreadable => '无法读取所选文件，请重新选择。';
+
+  @override
+  String bookSourcesImportAction(int count) {
+    return '导入 $count 个书源';
+  }
+
+  @override
+  String get bookSourcesImportFileTab => 'JSON 文件';
+
+  @override
+  String get bookSourcesImportTimedOut => '读取超时，请检查网络，或下载 JSON 文件后导入。';
+
+  @override
+  String get cloudSyncIncrementalMode => '增量同步';
+
+  @override
+  String get cloudSyncPlainMode => '普通 TXT 文件';
+
+  @override
+  String get cloudSyncIncrementalDescription => '首次上传后，只传输变化的内容块。本机书籍仍是完整 TXT。';
+
+  @override
+  String get cloudSyncEnableIncremental => '切换为增量同步';
+
+  @override
+  String get cloudSyncIncrementalConfirmTitle => '切换这本书的云端存储方式？';
+
+  @override
+  String get cloudSyncIncrementalConfirmBody =>
+      '云端将使用 App 管理的分块格式。已有 TXT 副本会保留，但不再跟随更新。其他设备需要使用支持增量同步的新版 App。本机仍保留完整 TXT 文件。';
+
+  @override
+  String get cloudSyncIncrementalConfirm => '切换并同步';
+
+  @override
+  String get bookSourcesImportUsageNotice => '书源使用说明';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -9092,6 +9369,84 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get readerSettingsAdvancedTypography => '進階排版';
 
   @override
+  String get readerAutoPageTurnTitle => '自動翻頁';
+
+  @override
+  String get readerAutoPageTurnOff => '未開啟';
+
+  @override
+  String get readerAutoPageTurnHint => '按照選定的秒數自動前進一屏，上下翻頁模式同樣適用。';
+
+  @override
+  String get readerAutoPageTurnModeTimed => '定時翻頁';
+
+  @override
+  String get readerAutoPageTurnModeSweep => '掃屏翻頁';
+
+  @override
+  String get readerAutoPageTurnModeContinuous => '勻速捲動';
+
+  @override
+  String get readerAutoPageTurnModeInterval => '間隔捲動';
+
+  @override
+  String get readerAutoPageTurnTimedHint => '停留設定時間後，翻到下一頁。';
+
+  @override
+  String get readerAutoPageTurnSweepHint => '分界線從上往下掃過，線上方逐漸顯示下一頁。';
+
+  @override
+  String get readerAutoPageTurnContinuousHint => '正文按照穩定的閱讀速度持續向下捲動。';
+
+  @override
+  String get readerAutoPageTurnIntervalHint => '停留設定時間後，平滑向下捲動約一屏。';
+
+  @override
+  String get readerAutoPageTurnSweepDurationLabel => '掃屏時長';
+
+  @override
+  String get readerAutoPageTurnScrollSpeedLabel => '捲動速度';
+
+  @override
+  String readerAutoPageTurnSecondsPerScreen(int seconds) {
+    return '$seconds 秒/屏';
+  }
+
+  @override
+  String readerAutoPageTurnModeValue(String mode, int seconds) {
+    return '$mode · $seconds 秒/屏';
+  }
+
+  @override
+  String readerAutoPageTurnModePaused(String mode, int seconds) {
+    return '已暫停 · $mode · $seconds 秒/屏';
+  }
+
+  @override
+  String get readerAutoPageTurnIntervalLabel => '翻頁間隔';
+
+  @override
+  String readerAutoPageTurnInterval(int seconds) {
+    return '每 $seconds 秒前進一屏';
+  }
+
+  @override
+  String get readerAutoPageTurnStart => '開始自動翻頁';
+
+  @override
+  String get readerAutoPageTurnResume => '繼續自動翻頁';
+
+  @override
+  String readerAutoPageTurnRunning(int seconds) {
+    return '自動 · $seconds 秒/屏';
+  }
+
+  @override
+  String readerAutoPageTurnPaused(int seconds) {
+    return '已暫停 · $seconds 秒/屏';
+  }
+
+  @override
   String get readerThemeDay => '白天';
 
   @override
@@ -10390,7 +10745,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get webDavFilesTooLarge => '目前版本暫不支援超過 100 MiB 的書籍檔案';
+  String get webDavFilesTooLarge => '此格式的檔案大小超過同步限制';
 
   @override
   String get webDavFilesEmpty => '此分類中沒有書籍';
@@ -10814,4 +11169,204 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get readingDataExportUnknownChapter => '未定位的批註';
+
+  @override
+  String get cloudSyncTitle => '雲端同步';
+
+  @override
+  String get cloudSyncTagline => '換一台裝置，接著上次的位置讀';
+
+  @override
+  String get cloudSyncResumeTitle => '跨裝置續讀';
+
+  @override
+  String get cloudSyncAutoResume => '開啟書籍自動接續';
+
+  @override
+  String get cloudSyncAutoResumeHint => '開啟時檢查最新位置；閱讀中收到更新時提示';
+
+  @override
+  String get cloudSyncAutoHint => '閱讀時儲存進度，開啟書籍時檢查更新';
+
+  @override
+  String get cloudSyncMoreContent => '更多同步內容';
+
+  @override
+  String get cloudSyncBooks => '書籍與正文';
+
+  @override
+  String get cloudSyncBooksHint => '參與同步的書籍、正文更新與檔案下載';
+
+  @override
+  String get cloudSyncActivity => '同步紀錄與需要處理';
+
+  @override
+  String get cloudSyncStorage => '儲存連線';
+
+  @override
+  String get cloudSyncNoActivity => '尚無同步紀錄';
+
+  @override
+  String get cloudSyncProgress => '閱讀位置';
+
+  @override
+  String get cloudSyncText => '正文檔案';
+
+  @override
+  String get cloudSyncMetadataComplete => '所選閱讀資料已與 WebDAV 交換';
+
+  @override
+  String get cloudSyncPaused => '自動同步已暫停';
+
+  @override
+  String get cloudSyncLocalOnly => '僅保留在本機';
+
+  @override
+  String get cloudSyncCheckHint => '連線成功不代表其他裝置已接收；各項狀態分別顯示';
+
+  @override
+  String get cloudSyncPendingFiles => '正文有待處理的更新';
+
+  @override
+  String get cloudSyncFileIdle => '已關聯的正文等待下次檢查';
+
+  @override
+  String get cloudSyncManageBooks => '選擇書籍與下載';
+
+  @override
+  String get cloudSyncNoBooks => '尚無參與正文同步的 TXT';
+
+  @override
+  String get cloudSyncCompare => '對照版本';
+
+  @override
+  String get cloudSyncKeepLocal => '使用本機版本';
+
+  @override
+  String get cloudSyncUseRemote => '使用雲端版本';
+
+  @override
+  String get cloudSyncBothKept => '雙方版本均已保留，選擇後會繼續同步';
+
+  @override
+  String get cloudSyncPreviewLimited => '預覽顯示首處分歧附近的片段，完整版本均已保留';
+
+  @override
+  String get cloudSyncPending => '等待同步';
+
+  @override
+  String get cloudSyncConflict => '需要對照版本';
+
+  @override
+  String get cloudSyncCurrent => '目前正文已同步到 WebDAV';
+
+  @override
+  String get cloudSyncFailed => '同步未完成，可重試';
+
+  @override
+  String get cloudSyncHistory => '版本歷史';
+
+  @override
+  String get cloudSyncApplyUpdate => '套用正文更新';
+
+  @override
+  String get cloudSyncParticipate => '參與正文同步';
+
+  @override
+  String get cloudSyncCloseReaderToUpdate => '請先關閉這本書的閱讀或編輯頁面，再套用正文更新';
+
+  @override
+  String get cloudSyncTextLocation => '雲端目前檔案';
+
+  @override
+  String get cloudSyncTextLocationHint =>
+      '正文修改會更新下方位置的 TXT。升級前的上傳副本會保留，但不再跟隨正文修改。';
+
+  @override
+  String get bookSourcesImportIntro => '從連結或 JSON 檔案讀取，預覽後再匯入。';
+
+  @override
+  String get bookSourcesImportInputStep => '選擇書源';
+
+  @override
+  String get bookSourcesImportReviewStep => '預覽並匯入';
+
+  @override
+  String get bookSourcesImportFileHint => '選擇 JSON 格式的書源檔案。';
+
+  @override
+  String get bookSourcesImportDownloading => '正在下載書源…';
+
+  @override
+  String get bookSourcesImportAnalyzing => '正在解析規則與檢查重複…';
+
+  @override
+  String get bookSourcesImportSaving => '正在儲存書源…';
+
+  @override
+  String get bookSourcesImportPicking => '正在開啟檔案選擇器…';
+
+  @override
+  String get bookSourcesImportWaitHint => '書源合集較大時需要一些時間，可以取消後重試。';
+
+  @override
+  String get bookSourcesImportSaveHint => '儲存完成後會自動返回書源管理。';
+
+  @override
+  String get bookSourcesImportReady => '已準備好匯入';
+
+  @override
+  String get bookSourcesImportEmpty => '沒有可匯入的書源，請檢查檔案或重複書源的選擇。';
+
+  @override
+  String get bookSourcesImportRetry => '重試';
+
+  @override
+  String get bookSourcesImportFailed => '未能讀取書源，請檢查地址或檔案後重試。';
+
+  @override
+  String get bookSourcesImportSaveFailed => '未能儲存書源，已保留預覽，請重試。';
+
+  @override
+  String get bookSourcesImportErrorDetails => '錯誤詳情';
+
+  @override
+  String get bookSourcesImportFileUnreadable => '無法讀取所選檔案，請重新選擇。';
+
+  @override
+  String bookSourcesImportAction(int count) {
+    return '匯入 $count 個書源';
+  }
+
+  @override
+  String get bookSourcesImportFileTab => 'JSON 檔案';
+
+  @override
+  String get bookSourcesImportTimedOut => '讀取逾時，請檢查網路，或下載 JSON 檔案後匯入。';
+
+  @override
+  String get cloudSyncIncrementalMode => '增量同步';
+
+  @override
+  String get cloudSyncPlainMode => '一般 TXT 檔案';
+
+  @override
+  String get cloudSyncIncrementalDescription =>
+      '首次上傳後，只傳輸變更的內容區塊。本機書籍仍是完整 TXT。';
+
+  @override
+  String get cloudSyncEnableIncremental => '切換為增量同步';
+
+  @override
+  String get cloudSyncIncrementalConfirmTitle => '切換這本書的雲端儲存方式？';
+
+  @override
+  String get cloudSyncIncrementalConfirmBody =>
+      '雲端將使用 App 管理的分塊格式。現有 TXT 副本會保留，但不再跟隨更新。其他裝置需要使用支援增量同步的新版 App。本機仍保留完整 TXT 檔案。';
+
+  @override
+  String get cloudSyncIncrementalConfirm => '切換並同步';
+
+  @override
+  String get bookSourcesImportUsageNotice => '書源使用說明';
 }

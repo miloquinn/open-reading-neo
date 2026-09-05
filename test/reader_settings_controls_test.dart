@@ -132,8 +132,43 @@ void main() {
         ),
       );
 
+      final animatedSizeFinder = find.byKey(
+        const ValueKey('reader-settings-tab-animated-size'),
+      );
+      final themeContentHeight = tester.getSize(animatedSizeFinder).height;
       await tester.tap(find.text('Text tab'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-text')),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is IgnorePointer && widget.ignoring,
+          ),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is ExcludeSemantics && widget.excluding,
+          ),
+        ),
+        findsWidgets,
+      );
       await tester.pumpAndSettle();
+      expect(
+        tester.getSize(animatedSizeFinder).height,
+        greaterThan(themeContentHeight),
+      );
       expect(
         find.byKey(const ValueKey('reader-font-choice-tile')),
         findsOneWidget,
@@ -289,6 +324,51 @@ void main() {
       expect(pullBookmark, isTrue);
       expect(tapAnimation, isFalse);
       expect(tabletTwoPage, isFalse);
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('reader-settings-tab-bar')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Text tab'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Slider>(textBrightnessFinder).value, 67);
+
+      await tester.tap(find.text('Layout tab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Paging tab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Theme tab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Text tab'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-text')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+        findsNothing,
+      );
+
+      tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pump();
+      expect(
+        tester.widget<AnimatedSize>(animatedSizeFinder).duration,
+        Duration.zero,
+      );
+      expect(
+        tester
+            .widget<AnimatedSwitcher>(
+              find.byKey(const ValueKey('reader-settings-tab-switcher')),
+            )
+            .duration,
+        Duration.zero,
+      );
     },
   );
 

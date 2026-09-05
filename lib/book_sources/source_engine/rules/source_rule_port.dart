@@ -37,11 +37,12 @@ class SourceRuleDocument {
       baseUri: baseUri,
       scriptContext: scriptContext,
       ruleState: ruleState,
-      // Legado hands script rules the raw fetched string, not a parsed DOM;
+      // Reading-source script rules receive the raw fetched string, not a
+      // parsed DOM;
       // CSS/XPath selectors still get `value` (the parsed document) via
       // on-demand traversal. Keeping both lets a top-level `<js>` rule (no
-      // preceding selector) see the same `result` a real Legado client
-      // would, instead of a DOM object's meaningless toString().
+      // preceding selector) see the protocol-compatible `result` instead of a
+      // DOM object's meaningless toString().
       rawText: body,
     );
   }
@@ -106,6 +107,8 @@ abstract interface class SourceRuleSelectorPort {
     Object? context,
     String rule, {
     bool resolveUrl = false,
+    String joinSeparator = '',
+    bool regexDotAll = true,
   });
 
   Future<String> evaluateStringAsync(

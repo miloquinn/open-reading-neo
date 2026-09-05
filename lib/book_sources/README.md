@@ -63,3 +63,61 @@ ownership, and the HTTP end-to-end reading flow. The architecture guard in
 exceeding 800 lines, importing compatibility barrels or root rule/script
 shims internally, or keeping cache/network-policy files on the old
 `services/` paths.
+
+## Reading-source compatibility contracts
+
+Regression fixtures cover the reading-source compatibility contracts around
+`AnalyzeUrl`, `RuleAnalyzer`, `AnalyzeByJSoup`, and `webBook/BookContent`.
+
+- Split HTML rule chains with the shared balanced rule parser. Quoted attribute
+  values and predicates can contain `@` without introducing another rule stage.
+- Metadata URL extraction keeps the first nonblank attribute. Content evaluation
+  with a nonempty `joinSeparator` collects distinct attribute values in source
+  order. Keep the string path through script, put, and replacement stages so
+  collecting multiple images never requires running a source script twice.
+- Request options start at the first `,{` delimiter; nested JSON body arrays
+  and quoted values may contain later delimiters. POST bodies may be JSON
+  objects/arrays or strings. Preserve explicit content types and form encoding;
+  structured JSON defaults to the JSON media type. GET/HEAD ignore body options.
+
+- A single `nextContentUrl` follows a chain; multiple first-page URLs form a
+  fixed list. Fetch fixed pages with at most four concurrent requests, consume
+  content rules in page order, deduplicate redirects, stop before the next
+  chapter, and retain the twenty-page limit. Capture prefetch errors immediately
+  and surface them when consuming that page.
+- `subContent` and `title` use the first response context after content pages.
+  Text sources append local or fetched subcontent before chapter-wide regex
+  replacement. Optional title errors preserve the original title and content,
+  matching the reference; content and pagination errors still propagate.
+- `html` returns outer tags with descendant script/style nodes removed from a
+  clone. `all` preserves raw outer tags. A later rule sees the unchanged DOM.
+- Synchronous script DOM helpers share string evaluation and replacement
+  semantics with asynchronous rules. `java.htmlFormat` preserves paragraph
+  indentation, image options, and entities; `Jsoup.text()` returns plain text.
+
+The scripting bridge is split into encoding, Java-class adapters, DOM, text,
+and crypto modules. Character conversion covers UTF-8, GBK/GB2312, UTF-16,
+ASCII, and Latin-1; unsupported charset names fail explicitly. Supported Java
+adapters include String, Base64, URL form encoding, ArrayList/Map convenience
+methods, MessageDigest, and the existing cipher/HMAC operations. Class/package
+imports are restored after each invocation, including failures and network
+replay. The adapters implement tested method shapes, not a full JVM or Rhino.
+Android UI, arbitrary Java reflection/bytecode, unrestricted filesystem APIs,
+full Jsoup APIs, and all Java charset/collection overloads are not supplied.
+Existing traditional/simplified conversion remains a limited character table.
+Do not infer complete source compatibility from these individual fixtures or
+compensate for unsupported APIs with broad raw-page scraping.
+
+Image extraction lives in `source_content_images.dart`; shared cover/chapter
+asset URL and request-option parsing lives in `source_remote_asset.dart`.
+Neither helper depends on runtime orchestration. `source_text_replacement.dart`
+retains page origins through chapter-wide text regex replacements, then reuses
+the same image extractor. Literal replacement text belongs to the page where
+the match starts; captured text moved across page boundaries uses that base
+too. Evaluate chapter rules once and resolve assets against response URLs. Keep image
+order while merging repeated URLs through one accumulator. Attach current
+source/login headers and cookies after content scripts have finished.
+
+Raw-page recovery is a bounded compatibility path for missing comic rules.
+It must not replace a successful explicit selection or revive images removed
+by `replaceRegex`. Normal successful extraction should not scan the raw page.

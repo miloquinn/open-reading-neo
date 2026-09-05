@@ -66,7 +66,7 @@ void main() {
   );
 
   test(
-    'includes compatible text and comic sources in latest discovery',
+    'reading sources expose their channels instead of ORSP sections',
     () async {
       final comic = _source(
         'comic',
@@ -86,12 +86,62 @@ void main() {
 
       await controller.load();
 
-      expect(controller.state.sourcesFor(BookSourcesSection.latest), [
+      expect(controller.state.sourcesFor(BookSourcesSection.latest), isEmpty);
+      expect(
+        controller.state.sourcesFor(BookSourcesSection.recommended),
+        isEmpty,
+      );
+      expect(controller.state.sourcesFor(BookSourcesSection.categories), [
         comic,
         text,
       ]);
+      expect(controller.state.availableSections, [
+        BookSourcesSection.categories,
+      ]);
+      expect(controller.state.section, BookSourcesSection.categories);
+      expect(gateway.discoveryIds, isEmpty);
+      expect(gateway.browseCategories, ['category']);
       await controller.changeSection(BookSourcesSection.latest);
-      expect(gateway.browseIds, containsAll(['comic', 'text']));
+      expect(controller.state.section, BookSourcesSection.categories);
+      await controller.changeSourceScope('text');
+      expect(controller.state.selectedCategory?.source.id, 'text');
+      expect(gateway.browseIds, ['comic', 'text']);
+      expect(gateway.browseCategories, everyElement(isNotNull));
+      await controller.close();
+    },
+  );
+
+  test(
+    'mixed libraries reserve recommended and latest for ORSP sources',
+    () async {
+      final orsp = _source('orsp');
+      final reading = _source(
+        'reading',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([orsp, reading]),
+      );
+      await controller.load();
+      expect(controller.state.discoverySources, [orsp, reading]);
+      expect(controller.state.availableSections, BookSourcesSection.values);
+      expect(gateway.discoveryIds, ['orsp']);
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseIds, ['orsp']);
+      expect(gateway.browseCategories, [null]);
+      await controller.changeSourceScope('reading');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.availableSections, [
+        BookSourcesSection.categories,
+      ]);
+      expect(controller.state.categoryBooks.single.source.id, 'reading');
+      expect(gateway.browseCategories.last, 'category');
+      await controller.changeSourceScope('orsp');
+      expect(controller.state.availableSections, BookSourcesSection.values);
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseIds.last, 'orsp');
       await controller.close();
     },
   );
@@ -247,6 +297,80 @@ void main() {
     await controller.close();
   });
 
+  test(
+    'selecting the active categories section preserves its loaded books',
+    () async {
+      final source = _source('source');
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([source]),
+      );
+
+      await controller.load();
+      await controller.changeSection(BookSourcesSection.categories);
+      await Future<void>.delayed(Duration.zero);
+      final selected = controller.state.selectedCategory;
+      final books = controller.state.categoryBooks;
+      final browseRequestCount = gateway.browseCategories.length;
+
+      await controller.changeSection(BookSourcesSection.categories);
+
+      expect(controller.state.selectedCategory, selected);
+      expect(controller.state.categoryBooks, books);
+      expect(gateway.browseCategories, hasLength(browseRequestCount));
+
+      controller.setListLayout(true);
+      await controller.changeSection(BookSourcesSection.categories);
+      expect(gateway.browseCategories, hasLength(browseRequestCount));
+      await controller.close();
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseCategories, hasLength(browseRequestCount));
+    },
+  );
+
+  test(
+    'returning to cached categories reloads its first category after stale work',
+    () async {
+      final source = _source('source');
+      final staleCategory = Completer<BookSourceSearchPage>();
+      final gateway = _ControllerGateway(
+        browseResults: [
+          staleCategory.future,
+          Future.value(_page([_book('latest')])),
+          Future.value(_page([_book('restored-category')])),
+        ],
+      );
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([source]),
+      );
+
+      await controller.load();
+      await controller.changeSection(BookSourcesSection.categories);
+      expect(controller.state.loadingCategoryBooks, isTrue);
+
+      await controller.changeSection(BookSourcesSection.latest);
+      await controller.changeSection(BookSourcesSection.categories);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.selectedCategory?.id, 'category');
+      expect(
+        controller.state.categoryBooks.single.book.id,
+        'restored-category',
+      );
+      expect(gateway.browseCategories, ['category', null, 'category']);
+
+      staleCategory.complete(_page([_book('stale-category')]));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.state.categoryBooks.single.book.id,
+        'restored-category',
+      );
+      await controller.close();
+    },
+  );
+
   test('category paging retries and deduplicates appended books', () async {
     final source = _source('source');
     final gateway = _ControllerGateway(
@@ -331,6 +455,7 @@ class _ControllerGateway extends BookSourceClient {
   final List<Future<BookSourceSearchPage>> browseResults;
   final List<String> discoveryIds = [];
   final List<String> browseIds = [];
+  final List<String?> browseCategories = [];
   int _browseIndex = 0;
   int _discoveryIndex = 0;
   int active = 0;
@@ -374,6 +499,7 @@ class _ControllerGateway extends BookSourceClient {
     int pageSize = 20,
   }) {
     browseIds.add(source.id);
+    browseCategories.add(category);
     if (browseResults.isNotEmpty) return browseResults[_browseIndex++];
     return Future.value(_page([_book('${source.id}-$page')]));
   }

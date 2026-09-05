@@ -4,13 +4,14 @@ extension _NativeReaderContinuousLayout on _NativeReaderPageState {
   void _scheduleInitialContinuousScrollRestore(Size viewport) {
     if (_initialPositionRestored || _initialPositionRestoreScheduled) return;
     if ((_anchorOffset ?? 0) <= 0) {
+      _restoreContinuousAnchorCentered = false;
       _initialPositionRestored = true;
       return;
     }
     _initialPositionRestoreScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final controllerReady = _scrollByChapter
+      final controllerReady = _usesChapterScopedVerticalList
           ? _verticalPageScrollController.isAttached
           : _verticalChapterScrollController.isAttached;
       if (!controllerReady) {
@@ -28,7 +29,7 @@ extension _NativeReaderContinuousLayout on _NativeReaderPageState {
           viewport,
         );
       }
-      if (!_scrollByChapter && precedingExtent > 0) {
+      if (!_usesChapterScopedVerticalList && precedingExtent > 0) {
         unawaited(
           _verticalChapterOffsetController
               .animateScroll(
@@ -42,17 +43,20 @@ extension _NativeReaderContinuousLayout on _NativeReaderPageState {
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        final centerAnchor = _restoreContinuousAnchorCentered;
         unawaited(
           _scrollContinuousAnchorIntoView(
             chapter,
             parts,
             _pageIndex,
             _anchorOffset ?? parts[_pageIndex].content.startOffset,
+            centerInViewport: centerAnchor,
           ).whenComplete(() {
             if (!mounted) return;
             _setReaderState(() {
               _initialPositionRestored = true;
               _initialPositionRestoreScheduled = false;
+              if (centerAnchor) _restoreContinuousAnchorCentered = false;
             });
           }),
         );

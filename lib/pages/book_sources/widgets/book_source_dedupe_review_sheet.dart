@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../book_sources/dedupe/book_source_dedupe_engine.dart';
@@ -10,10 +11,12 @@ class BookSourceImportDedupeSelection {
   const BookSourceImportDedupeSelection({
     required this.mode,
     required this.selectedIndices,
+    this.preview,
   });
 
   final BookSourceDedupeMode mode;
   final Set<int> selectedIndices;
+  final SourceImportPreview? preview;
 }
 
 class BookSourceImportDedupeReviewSheet extends StatefulWidget {
@@ -31,11 +34,30 @@ class _BookSourceImportDedupeReviewSheetState
   late SourceImportPreview _preview = widget.preview;
   late Set<int> _selected = _preview.selectedIndices.toSet();
 
-  void _setMode(BookSourceDedupeMode mode) {
+  bool _analyzing = false;
+  Object? _failure;
+
+  Future<void> _setMode(BookSourceDedupeMode mode) async {
+    if (_analyzing || mode == _preview.mode) return;
     setState(() {
-      _preview = _preview.withMode(mode);
-      _selected = _preview.selectedIndices.toSet();
+      _analyzing = true;
+      _failure = null;
     });
+    try {
+      final preview = await compute(_changeImportMode, (
+        preview: _preview,
+        mode: mode,
+      ));
+      if (!mounted) return;
+      setState(() {
+        _preview = preview;
+        _selected = preview.selectedIndices.toSet();
+      });
+    } on Object catch (error) {
+      if (mounted) setState(() => _failure = error);
+    } finally {
+      if (mounted) setState(() => _analyzing = false);
+    }
   }
 
   @override
@@ -49,44 +71,53 @@ class _BookSourceImportDedupeReviewSheetState
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ModeSelector(mode: _preview.mode, onChanged: _setMode),
+          _ModeSelector(
+            mode: _preview.mode,
+            onChanged: _analyzing ? null : _setMode,
+          ),
           const SizedBox(height: 8),
           TextButton.icon(
-            onPressed: () => setState(() {
-              _selected = _preview.dedupeResult.defaultSelectedIndices.toSet();
-            }),
+            onPressed: _analyzing
+                ? null
+                : () => setState(() {
+                    _selected = _preview.dedupeResult.defaultSelectedIndices
+                        .toSet();
+                  }),
             icon: const Icon(Icons.restart_alt_rounded),
             label: Text(context.l10n.bookSourcesDedupeRestoreDefaults),
           ),
         ],
       ),
-      groups: _preview.dedupeResult.groups
-          .map((group) {
-            return _ImportGroup(
-              group: group,
-              selected: _selected,
-              onSelected: (index, selected) => setState(() {
-                final indices = group.candidates
-                    .map((item) => item.index)
-                    .toSet();
-                if (group.requiresReview) {
-                  selected ? _selected.add(index) : _selected.remove(index);
-                } else {
-                  _selected.removeAll(indices);
-                  _selected.add(index);
-                }
-              }),
-            );
-          })
-          .toList(growable: false),
+      busy: _analyzing,
+      failure: _failure,
+      groupCount: _preview.dedupeResult.groups.length,
+      groupBuilder: (context, index) {
+        final group = _preview.dedupeResult.groups[index];
+        return _ImportGroup(
+          group: group,
+          selected: _selected,
+          onSelected: (index, selected) => setState(() {
+            final indices = group.candidates.map((item) => item.index).toSet();
+            if (group.requiresReview) {
+              selected ? _selected.add(index) : _selected.remove(index);
+            } else {
+              _selected.removeAll(indices);
+              _selected.add(index);
+            }
+          }),
+        );
+      },
       actionLabel: context.l10n.bookSourcesConfirm,
-      onConfirm: () => Navigator.pop(
-        context,
-        BookSourceImportDedupeSelection(
-          mode: _preview.mode,
-          selectedIndices: Set.unmodifiable(_selected),
-        ),
-      ),
+      onConfirm: _analyzing
+          ? null
+          : () => Navigator.pop(
+              context,
+              BookSourceImportDedupeSelection(
+                mode: _preview.mode,
+                selectedIndices: Set.unmodifiable(_selected),
+                preview: _preview.withSelectedIndices(_selected),
+              ),
+            ),
     );
   }
 }
@@ -120,14 +151,30 @@ class _BookSourceInstalledDedupeReviewSheetState
             widget.sourcesByIndex[candidate.index]!.id,
   };
 
-  void _setMode(BookSourceDedupeMode mode) {
+  bool _analyzing = false;
+  Object? _failure;
+
+  Future<void> _setMode(BookSourceDedupeMode mode) async {
+    if (_analyzing || mode == _result.mode) return;
     setState(() {
-      _result = const BookSourceDedupeEngine().analyze(
-        widget.result.candidates,
-        mode: mode,
-      );
-      _selected = _defaultSelection(_result);
+      _analyzing = true;
+      _failure = null;
     });
+    try {
+      final result = await compute(_changeInstalledMode, (
+        candidates: widget.result.candidates,
+        mode: mode,
+      ));
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _selected = _defaultSelection(result);
+      });
+    } on Object catch (error) {
+      if (mounted) setState(() => _failure = error);
+    } finally {
+      if (mounted) setState(() => _analyzing = false);
+    }
   }
 
   @override
@@ -141,7 +188,10 @@ class _BookSourceInstalledDedupeReviewSheetState
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ModeSelector(mode: _result.mode, onChanged: _setMode),
+          _ModeSelector(
+            mode: _result.mode,
+            onChanged: _analyzing ? null : _setMode,
+          ),
           const SizedBox(height: 8),
           Text(
             context.l10n.bookSourcesDedupeReviewHint,
@@ -152,28 +202,30 @@ class _BookSourceInstalledDedupeReviewSheetState
           ),
         ],
       ),
-      groups: _result.groups
-          .map((group) {
-            final winner = widget.sourcesByIndex[group.recommendedIndex]!;
-            final candidates = group.candidates
-                .where((candidate) => candidate.index != group.recommendedIndex)
-                .map((candidate) => widget.sourcesByIndex[candidate.index]!)
-                .toList(growable: false);
-            return _InstalledGroup(
-              group: group,
-              winner: winner,
-              candidates: candidates,
-              selected: _selected,
-              onChanged: (id, selected) => setState(() {
-                selected ? _selected.add(id) : _selected.remove(id);
-              }),
-            );
-          })
-          .toList(growable: false),
+      busy: _analyzing,
+      failure: _failure,
+      groupCount: _result.groups.length,
+      groupBuilder: (context, index) {
+        final group = _result.groups[index];
+        final winner = widget.sourcesByIndex[group.recommendedIndex]!;
+        final candidates = group.candidates
+            .where((candidate) => candidate.index != group.recommendedIndex)
+            .map((candidate) => widget.sourcesByIndex[candidate.index]!)
+            .toList(growable: false);
+        return _InstalledGroup(
+          group: group,
+          winner: winner,
+          candidates: candidates,
+          selected: _selected,
+          onChanged: (id, selected) => setState(() {
+            selected ? _selected.add(id) : _selected.remove(id);
+          }),
+        );
+      },
       actionLabel: context.l10n.bookSourcesDedupeDisableSelected(
         _selected.length,
       ),
-      onConfirm: _selected.isEmpty
+      onConfirm: _analyzing || _selected.isEmpty
           ? null
           : () => Navigator.pop(context, Set.unmodifiable(_selected)),
     );
@@ -185,17 +237,23 @@ class _DedupeSheetFrame extends StatelessWidget {
     required this.title,
     required this.summary,
     required this.header,
-    required this.groups,
+    required this.groupCount,
+    required this.groupBuilder,
     required this.actionLabel,
     required this.onConfirm,
+    this.busy = false,
+    this.failure,
   });
 
   final String title;
   final String summary;
   final Widget header;
-  final List<Widget> groups;
+  final int groupCount;
+  final IndexedWidgetBuilder groupBuilder;
   final String actionLabel;
   final VoidCallback? onConfirm;
+  final bool busy;
+  final Object? failure;
 
   @override
   Widget build(BuildContext context) {
@@ -220,19 +278,36 @@ class _DedupeSheetFrame extends StatelessWidget {
                 Text(summary, style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 12),
                 header,
+                if (busy) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(context.l10n.bookSourcesImportAnalyzing),
+                  ),
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(),
+                ],
+                if (failure != null)
+                  Text(
+                    '$failure',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
               ],
             ),
           ),
           const Divider(height: 1),
           Expanded(
-            child: groups.isEmpty
-                ? Center(child: Text(context.l10n.bookSourcesDedupeNone))
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: groups.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (_, index) => groups[index],
-                  ),
+            child: IgnorePointer(
+              ignoring: busy,
+              child: groupCount == 0
+                  ? Center(child: Text(context.l10n.bookSourcesDedupeNone))
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: groupCount,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: groupBuilder,
+                    ),
+            ),
           ),
           const Divider(height: 1),
           Padding(
@@ -265,7 +340,7 @@ class _ModeSelector extends StatelessWidget {
   const _ModeSelector({required this.mode, required this.onChanged});
 
   final BookSourceDedupeMode mode;
-  final ValueChanged<BookSourceDedupeMode> onChanged;
+  final ValueChanged<BookSourceDedupeMode>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -285,7 +360,9 @@ class _ModeSelector extends StatelessWidget {
         ),
       ],
       selected: {mode},
-      onSelectionChanged: (selection) => onChanged(selection.first),
+      onSelectionChanged: onChanged == null
+          ? null
+          : (selection) => onChanged!(selection.first),
     );
   }
 }
@@ -419,3 +496,15 @@ String _reason(BuildContext context, BookSourceDedupeConfidence confidence) =>
       BookSourceDedupeConfidence.conflict =>
         context.l10n.bookSourcesDedupeSiteReason,
     };
+
+SourceImportPreview _changeImportMode(
+  ({SourceImportPreview preview, BookSourceDedupeMode mode}) request,
+) => request.preview.withMode(request.mode);
+
+BookSourceDedupeResult _changeInstalledMode(
+  ({List<BookSourceDedupeCandidate> candidates, BookSourceDedupeMode mode})
+  request,
+) => const BookSourceDedupeEngine().analyze(
+  request.candidates,
+  mode: request.mode,
+);

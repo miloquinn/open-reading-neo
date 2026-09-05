@@ -173,7 +173,11 @@ class BookSourcesController extends ChangeNotifier {
   }
 
   Future<void> changeSection(BookSourcesSection section) async {
-    if (_closed) return;
+    if (_closed ||
+        _state.section == section ||
+        !_state.availableSections.contains(section)) {
+      return;
+    }
     _categoryRevision++;
     _emit(_resetCategory(_state.copyWith(section: section)));
     await loadSection(section);
@@ -186,7 +190,16 @@ class BookSourcesController extends ChangeNotifier {
   }) async {
     if (_closed) return;
     final revision = ++_sectionRevision;
-    if (!force && _state.caches[section] != null) return;
+    final cachedSection = _state.caches[section];
+    if (!force && cachedSection != null) {
+      if (section == BookSourcesSection.categories &&
+          cachedSection.categories != null &&
+          _state.section == section &&
+          !(_state.listLayout && _state.showListDirectory)) {
+        _autoSelectFirstCategory();
+      }
+      return;
+    }
     final currentCache = _state.caches[section];
     final keepCurrentContent =
         preserveContent &&
@@ -511,6 +524,13 @@ class BookSourcesController extends ChangeNotifier {
       result[section] = sources
           .where((source) => source.enabled)
           .where((source) => source.capabilities.contains(capability))
+          // Reading sources browse their own explore channels. Their browse
+          // capability does not provide an independent ORSP latest feed.
+          .where(
+            (source) =>
+                source.sourceProtocol == BookSourceProtocolKind.orsp ||
+                section == BookSourcesSection.categories,
+          )
           .toList(growable: false);
     }
     return Map.unmodifiable(result);

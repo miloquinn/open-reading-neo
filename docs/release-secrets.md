@@ -41,6 +41,22 @@ flow, while iOS keeps the native system authorization sheet.
 | `MACOS_RELEASE_ENABLED` | Enables signed and notarized macOS artifacts when set to `true` |
 | `IOS_TESTFLIGHT_URL` | Optional public TestFlight URL added to release notes |
 
+## iOS App Store Connect
+
+The existing cross-platform workflow produces an **unsigned** iOS IPA. It does
+not upload to TestFlight or App Store Connect. See [the iOS runbook](app-store-release.md)
+for the separate signed archive/export/upload commands.
+
+Local commands read `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and
+`ASC_KEY_PATH` from the environment. Keep the `.p8` and any private env file
+outside the repository with owner-only permissions. A Sign in with Apple key
+is not an App Store Connect API key. Do not rename or overwrite the existing
+macOS notarization secrets. No iOS secret values have been added by this setup.
+
+`app-store-preflight.yml` uses no Apple credentials, only mocked tools/API tests
+and local metadata validation. A green result is not proof of a signed build,
+Apple processing, TestFlight availability, or approval.
+
 ## Local private inventory
 
 Maintain `.secrets/local-release-inventory.md` locally. The `.secrets/`

@@ -246,7 +246,8 @@ class BookImportService implements BookFileImporter {
         throw const BookImportFailure(code: 'source_missing');
       }
       final size = await sourceFile.length();
-      if (size > maximumBookImportBytes) {
+      final isStreamedTxt = source.extension.toLowerCase() == 'txt';
+      if (size > maximumBookImportBytes && !isStreamedTxt) {
         throw const BookImportFailure(code: 'file_too_large');
       }
 

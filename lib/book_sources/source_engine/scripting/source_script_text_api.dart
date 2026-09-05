@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:html/parser.dart' as html_parser;
 
+import 'source_script_html_formatter.dart';
+
 class SourceScriptTextApi {
   const SourceScriptTextApi();
 
@@ -10,7 +12,8 @@ class SourceScriptTextApi {
     return switch (operation) {
       'toNumChapter' => sourceScriptToNumChapter(value),
       'utf8Bytes' => List<int>.from(utf8.encode(value)),
-      'htmlFormat' => html_parser.parseFragment(value).text ?? '',
+      'htmlFormat' => sourceScriptFormatKeepImg(value),
+      'htmlText' => html_parser.parseFragment(value).text ?? '',
       'traditionalToSimplified' => traditionalToSimplified(value),
       'simplifiedToTraditional' => simplifiedToTraditional(value),
       _ => null,

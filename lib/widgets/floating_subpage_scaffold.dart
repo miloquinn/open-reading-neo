@@ -7,6 +7,7 @@ import '../utils/glass_config.dart';
 import '../utils/page_style_helper.dart';
 import '../utils/system_ui_helper.dart';
 import 'glass_top_bar.dart';
+import 'glass_control_surface.dart';
 
 /// Shared navigation shell for pushed secondary pages.
 ///
@@ -232,19 +233,22 @@ class FloatingSubpageAction extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return SizedBox.square(
       dimension: 48,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: Icon(icon),
-        style: IconButton.styleFrom(
-          backgroundColor: scheme.surface.withValues(alpha: 0.2),
-          disabledBackgroundColor: scheme.surface.withValues(alpha: 0.12),
-          side: BorderSide(
-            color: scheme.onSurface.withValues(alpha: 0.16),
-            width: 0.8,
+      child: GlassControlSurface(
+        color: scheme.surfaceContainerHigh,
+        blurBackground:
+            context.findAncestorWidgetOfExactType<GlassTopBar>() == null,
+        shape: const CircleBorder(),
+        enabled: onPressed != null,
+        child: IconButton(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          icon: Icon(icon),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            disabledBackgroundColor: Colors.transparent,
+            shape: const CircleBorder(),
+            iconSize: 30,
           ),
-          shape: const CircleBorder(),
-          iconSize: 30,
         ),
       ),
     );
@@ -386,26 +390,10 @@ class FloatingSubpageMenuButton<T> extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: 48,
-    child: IconButton(
-      tooltip: tooltip,
-      onPressed: () => _show(context),
-      icon: Icon(icon),
-      style: IconButton.styleFrom(
-        backgroundColor: Theme.of(
-          context,
-        ).colorScheme.surface.withValues(alpha: 0.2),
-        side: BorderSide(
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurface.withValues(alpha: 0.16),
-          width: 0.8,
-        ),
-        shape: const CircleBorder(),
-        iconSize: 30,
-      ),
-    ),
+  Widget build(BuildContext context) => FloatingSubpageAction(
+    icon: icon,
+    tooltip: tooltip,
+    onPressed: () => _show(context),
   );
 }
 

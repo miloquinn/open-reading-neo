@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/reader/reader_annotation.dart';
 import '../models/book_note.dart';
@@ -141,6 +142,9 @@ class ReaderNavigationSheet extends StatefulWidget {
     this.onAnnotationSelected,
     this.onAnnotationDeleted,
     this.onExportAnnotations,
+    this.isBookmarkNavigable,
+    this.isAnnotationNavigable,
+    this.unavailableLocationLabel,
     this.currentAnchorKey,
     this.currentChapterOffset,
     this.currentChapterText,
@@ -170,6 +174,9 @@ class ReaderNavigationSheet extends StatefulWidget {
   final ValueChanged<BookNote>? onAnnotationSelected;
   final ValueChanged<BookNote>? onAnnotationDeleted;
   final VoidCallback? onExportAnnotations;
+  final bool Function(Bookmark bookmark)? isBookmarkNavigable;
+  final bool Function(BookNote annotation)? isAnnotationNavigable;
+  final String? unavailableLocationLabel;
 
   @override
   State<ReaderNavigationSheet> createState() => _ReaderNavigationSheetState();
@@ -892,6 +899,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
   }
 
   Widget _buildAnnotationTile(BuildContext context, BookNote annotation) {
+    final navigable = widget.isAnnotationNavigable?.call(annotation) ?? true;
     final color = readerAnnotationColor(annotation.color, widget.palette);
     final title = annotation.chapter.trim().isEmpty
         ? context.l10n.readerChapterFallback((annotation.pageNumber ?? 0) + 1)
@@ -913,7 +921,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
       color: widget.palette.controlBar.withValues(alpha: 0.72),
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap: widget.onAnnotationSelected == null
+        onTap: widget.onAnnotationSelected == null || !navigable
             ? null
             : () => widget.onAnnotationSelected!(annotation),
         borderRadius: BorderRadius.circular(18),
@@ -972,7 +980,13 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     ],
                     const SizedBox(height: 7),
                     Text(
-                      '$typeLabel · $dateText',
+                      [
+                        typeLabel,
+                        dateText,
+                        if (!navigable &&
+                            widget.unavailableLocationLabel != null)
+                          widget.unavailableLocationLabel!,
+                      ].join(' · '),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: widget.palette.secondaryText,
                       ),
@@ -983,11 +997,20 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
               PopupMenuButton<String>(
                 tooltip: MaterialLocalizations.of(context).showMenuTooltip,
                 onSelected: (value) {
-                  if (value == 'delete') {
+                  if (value == 'copy') {
+                    unawaited(Clipboard.setData(ClipboardData(text: excerpt)));
+                  } else if (value == 'delete') {
                     widget.onAnnotationDeleted?.call(annotation);
                   }
                 },
                 itemBuilder: (context) => [
+                  if (excerpt.isNotEmpty)
+                    PopupMenuItem(
+                      value: 'copy',
+                      child: Text(
+                        MaterialLocalizations.of(context).copyButtonLabel,
+                      ),
+                    ),
                   PopupMenuItem(
                     value: 'delete',
                     enabled: widget.onAnnotationDeleted != null,
@@ -1009,6 +1032,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
     Bookmark bookmark,
     bool current,
   ) {
+    final navigable = widget.isBookmarkNavigable?.call(bookmark) ?? true;
     final chapterNumber =
         (bookmark.chapterIndex ?? bookmark.pageNumber).clamp(0, 1000000) + 1;
     final chapterTitle = bookmark.chapterTitle?.trim().isNotEmpty == true
@@ -1020,7 +1044,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
         '${date.year}-${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
     return Semantics(
-      button: true,
+      button: navigable,
       selected: current,
       label: chapterTitle,
       child: Material(
@@ -1029,7 +1053,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
             : widget.palette.controlBar.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          onTap: () => widget.onBookmarkSelected(bookmark),
+          onTap: navigable ? () => widget.onBookmarkSelected(bookmark) : null,
           borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 13, 8, 13),
@@ -1088,7 +1112,12 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                       ],
                       const SizedBox(height: 7),
                       Text(
-                        dateText,
+                        [
+                          dateText,
+                          if (!navigable &&
+                              widget.unavailableLocationLabel != null)
+                            widget.unavailableLocationLabel!,
+                        ].join(' · '),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: widget.palette.secondaryText,
                         ),
@@ -1113,9 +1142,22 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     ),
                   ),
                   onSelected: (value) {
-                    if (value == 'delete') widget.onBookmarkDeleted(bookmark);
+                    if (value == 'copy') {
+                      unawaited(
+                        Clipboard.setData(ClipboardData(text: excerpt)),
+                      );
+                    } else if (value == 'delete') {
+                      widget.onBookmarkDeleted(bookmark);
+                    }
                   },
                   itemBuilder: (context) => [
+                    if (excerpt.isNotEmpty)
+                      PopupMenuItem(
+                        value: 'copy',
+                        child: Text(
+                          MaterialLocalizations.of(context).copyButtonLabel,
+                        ),
+                      ),
                     PopupMenuItem(
                       value: 'delete',
                       child: Text(

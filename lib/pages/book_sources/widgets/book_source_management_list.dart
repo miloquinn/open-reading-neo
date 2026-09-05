@@ -58,17 +58,27 @@ class BookSourceManagementList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visible = visibleSources;
-    final allOrsp = visible
-        .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
-        .toList(growable: false);
-    final allAdditional = visible
-        .where((source) => source.sourceProtocol != BookSourceProtocolKind.orsp)
-        .toList(growable: false);
-    final orsp = allOrsp.take(state.displayLimit).toList(growable: false);
+    var orspCount = 0;
+    var additionalCount = 0;
+    final orsp = <RegisteredBookSource>[];
+    final additionalCandidates = <RegisteredBookSource>[];
+    for (final source in visible) {
+      if (source.sourceProtocol == BookSourceProtocolKind.orsp) {
+        orspCount++;
+        if (orsp.length < state.displayLimit) orsp.add(source);
+      } else {
+        additionalCount++;
+        if (additionalCandidates.length < state.displayLimit) {
+          additionalCandidates.add(source);
+        }
+      }
+    }
     final remaining = state.displayLimit - orsp.length;
-    final additional = allAdditional
-        .take(remaining > 0 ? remaining : 0)
-        .toList(growable: false);
+    final additional = remaining <= 0
+        ? const <RegisteredBookSource>[]
+        : additionalCandidates.length <= remaining
+        ? additionalCandidates
+        : additionalCandidates.sublist(0, remaining);
     final displayedCount = orsp.length + additional.length;
 
     return Scrollbar(
@@ -123,14 +133,14 @@ class BookSourceManagementList extends StatelessWidget {
                 context,
                 title: context.l10n.bookSourcesProtocolGroupOrsp,
                 sources: orsp,
-                totalCount: allOrsp.length,
+                totalCount: orspCount,
               ),
             if (additional.isNotEmpty)
               ..._sourceGroupSlivers(
                 context,
                 title: context.l10n.bookSourcesProtocolGroupAdditional,
                 sources: additional,
-                totalCount: allAdditional.length,
+                totalCount: additionalCount,
               ),
             if (displayedCount < visible.length)
               const SliverPadding(

@@ -6,23 +6,26 @@ import '../../../book_sources/services/book_source_import_analyzer.dart';
 import '../../../book_sources/services/book_source_registry.dart';
 import '../../../book_sources/source_engine/source_import_service.dart';
 
+enum BookSourceAddPhase { idle, downloading, analyzing, saving }
+
 @immutable
 class BookSourceAddState {
   const BookSourceAddState({
     this.analysis,
-    this.loading = false,
+    this.phase = BookSourceAddPhase.idle,
     this.error,
     this.generation = 0,
   });
 
   final BookSourceImportAnalysis? analysis;
-  final bool loading;
+  final BookSourceAddPhase phase;
   final Object? error;
   final int generation;
+  bool get loading => phase != BookSourceAddPhase.idle;
 
   BookSourceAddState copyWith({
     Object? analysis = _unchanged,
-    bool? loading,
+    BookSourceAddPhase? phase,
     Object? error = _unchanged,
     int? generation,
   }) {
@@ -30,7 +33,7 @@ class BookSourceAddState {
       analysis: identical(analysis, _unchanged)
           ? this.analysis
           : analysis as BookSourceImportAnalysis?,
-      loading: loading ?? this.loading,
+      phase: phase ?? this.phase,
       error: identical(error, _unchanged) ? this.error : error,
       generation: generation ?? this.generation,
     );
@@ -92,11 +95,37 @@ class BookSourceAddController extends ChangeNotifier {
     );
   }
 
-  Future<void> analyzeUrl(String input) =>
-      _analyze(() => _analyzer.analyzeUrl(input));
+  Future<void> analyzeUrl(String input) => _analyze(
+    BookSourceAddPhase.downloading,
+    (generation) => _analyzer.analyzeUrl(
+      input,
+      onDownloadStarted: () =>
+          _setAnalysisPhase(generation, BookSourceAddPhase.downloading),
+      onDownloadComplete: () =>
+          _setAnalysisPhase(generation, BookSourceAddPhase.analyzing),
+    ),
+  );
 
-  Future<void> analyzeBytes(Uint8List bytes) =>
-      _analyze(() => _analyzer.analyzeBytesAsync(bytes));
+  Future<void> analyzeBytes(Uint8List bytes) => _analyze(
+    BookSourceAddPhase.analyzing,
+    (_) => _analyzer.analyzeBytesAsync(bytes),
+  );
+
+  void cancelAnalysis() {
+    if (_state.phase != BookSourceAddPhase.downloading &&
+        _state.phase != BookSourceAddPhase.analyzing) {
+      return;
+    }
+    final generation = ++_generation;
+    _providedAnalyzer?.cancel();
+    _createdAnalyzer?.cancel();
+    if (_ownsImportService) {
+      _importService?.close();
+      _importService = null;
+      _createdAnalyzer = null;
+    }
+    _emit(BookSourceAddState(generation: generation));
+  }
 
   void clear() {
     final generation = ++_generation;
@@ -134,11 +163,30 @@ class BookSourceAddController extends ChangeNotifier {
     );
   }
 
+  void setDedupePreview(SourceImportPreview preview) {
+    final analysis = _state.analysis;
+    if (analysis?.kind != BookSourceImportKind.additional || _state.loading) {
+      return;
+    }
+    _emit(
+      BookSourceAddState(
+        analysis: BookSourceImportAnalysis.additional(preview),
+        generation: ++_generation,
+      ),
+    );
+  }
+
   Future<BookSourceAddCommitResult?> commit() async {
     final analysis = _state.analysis;
     if (analysis == null || _state.loading) return null;
     final generation = ++_generation;
-    _emit(_state.copyWith(loading: true, error: null, generation: generation));
+    _emit(
+      _state.copyWith(
+        phase: BookSourceAddPhase.saving,
+        error: null,
+        generation: generation,
+      ),
+    );
     try {
       late final List<RegisteredBookSource> sources;
       late final int importedCount;
@@ -156,7 +204,11 @@ class BookSourceAddController extends ChangeNotifier {
       }
       if (!_isCurrent(generation)) return null;
       _emit(
-        _state.copyWith(loading: false, error: null, generation: generation),
+        _state.copyWith(
+          phase: BookSourceAddPhase.idle,
+          error: null,
+          generation: generation,
+        ),
       );
       return BookSourceAddCommitResult(
         sources: List.unmodifiable(sources),
@@ -167,19 +219,29 @@ class BookSourceAddController extends ChangeNotifier {
     } on Object catch (error) {
       if (!_isCurrent(generation)) return null;
       _emit(
-        _state.copyWith(loading: false, error: error, generation: generation),
+        _state.copyWith(
+          phase: BookSourceAddPhase.idle,
+          error: error,
+          generation: generation,
+        ),
       );
       return null;
     }
   }
 
   Future<void> _analyze(
-    Future<BookSourceImportAnalysis> Function() operation,
+    BookSourceAddPhase phase,
+    Future<BookSourceImportAnalysis> Function(int generation) operation,
   ) async {
+    if (_state.phase == BookSourceAddPhase.saving) return;
+    if (_state.phase == BookSourceAddPhase.downloading ||
+        _state.phase == BookSourceAddPhase.analyzing) {
+      cancelAnalysis();
+    }
     final generation = ++_generation;
-    _emit(BookSourceAddState(loading: true, generation: generation));
+    _emit(BookSourceAddState(phase: phase, generation: generation));
     try {
-      final analysis = await operation();
+      final analysis = await operation(generation);
       if (!_isCurrent(generation)) return;
       _emit(BookSourceAddState(analysis: analysis, generation: generation));
     } on Object catch (error) {
@@ -189,6 +251,11 @@ class BookSourceAddController extends ChangeNotifier {
   }
 
   bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  void _setAnalysisPhase(int generation, BookSourceAddPhase phase) {
+    if (!_isCurrent(generation) || _state.phase == phase) return;
+    _emit(_state.copyWith(phase: phase));
+  }
 
   void _emit(BookSourceAddState state) {
     if (_disposed) return;
@@ -201,6 +268,7 @@ class BookSourceAddController extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _generation++;
+    _createdAnalyzer?.close();
     if (_ownsImportService) _importService?.close();
     super.dispose();
   }

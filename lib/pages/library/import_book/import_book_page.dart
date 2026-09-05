@@ -129,8 +129,9 @@ class _ImportBookPageState extends State<ImportBookPage> {
       if (book.isOnline || book.filePath.isEmpty) continue;
       final file = File(book.filePath);
       if (!await file.exists()) continue;
-      if (await file.length() <=
-          WebDavBookFileService.maxRecoverableFileBytes) {
+      if (book.format.toLowerCase() == 'txt' ||
+          await file.length() <=
+              WebDavBookFileService.maxRecoverableFileBytes) {
         eligible.add(book);
       }
     }

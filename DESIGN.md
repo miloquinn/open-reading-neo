@@ -3,10 +3,12 @@
 ## Source of truth
 
 - Status: Active
-- Last refreshed: 2026-08-11
+- Last refreshed: 2026-09-05（TXT编辑、跨设备续读与云端同步首页实施；既有设计约束保留）
 - Primary product surfaces: 首页、书库、阅读器、阅读统计、书源管理、设置，以及“数据与同步 / WebDAV”页面。
 - Evidence reviewed: `README.md`、`structure.md`、`docs/webdav-sync-design.md`、`docs/webdav-sync-ux-design.md`、`docs/book-source-group-design.md`、`lib/pages/settings/sync/`、`lib/pages/book_sources/`、`lib/book_sources/source_engine/source_health_checker.dart`、现有导入、存储与同步实现，以及 Git 历史中 2026-07-11 移除的旧 WebDAV 同步实现。
 - Feature specifications: `docs/webdav-sync-design.md`（同步协议与数据架构）、`docs/webdav-sync-ux-design.md`（页面、交互、文案与状态流）、`docs/book-source-group-design.md`（书源分组、校验状态与管理交互）。
+- Current feature specification: `docs/txt-editing-webdav-sync-design.md`（首期TXT正文编辑、真实文件双向同步、内容锚点续读和以续读为核心的同步首页；用户已批准实施，交付范围与验证限制列于文档首部）。`docs/reader-text-editing-design.md` 为已被取代的先前草案。首期实现优先采用该文档中的交付边界，后续目标不代表全部已实现。
+- Accepted additions: 用户已认可首次连接合并、同书关联、接续撤回、分项同步详情、设备排版偏好独立；具体合同与验收见上述草案。首页续读卡片、正文自动合并及复杂历史管理后置，产品补充获认可不等于技术协议全部实施。实际交付限制见该文档“本次交付边界”。
 
 ## Brand
 
@@ -31,6 +33,7 @@
 - Primary navigation: 设置页新增“数据与同步”分区，入口为“WebDAV 同步”。
 - Core routes/screens: WebDAV 概览页、首次配置四步流程、同步内容页、书籍文件同步页、同步活动与错误详情、危险操作确认；书库卡片和多选模式直接提供单本/批量上传下载；书源管理中的“书源整理”统一承载联网体检、本地重复项整理和待审查结果。
 - Content hierarchy: 当前状态与主要操作优先；连接信息其次；同步范围和自动同步策略再次；诊断与危险操作置底。
+- Implemented core update: 入口为“云端同步”，首屏突出跨设备续读状态、进度同步及开书自动接续；书籍/正文与更多范围次之，WebDAV连接参数进入次级页，版本恢复保持次级能力。进度联网策略与大文件传输分别控制；不要求为同步位置上传已有同版书籍。
 
 ## Design principles
 
@@ -38,6 +41,8 @@
 - Safe by default: 首次连接默认合并；书籍原文件默认不上传；HTTP 默认拒绝；清除本机配置不删除远端数据。
 - Explain state: 区分“正在同步”“同步完成”“有待上传变更”“部分失败”“需要处理”，不只显示一个开关。
 - Tradeoffs: 首版优先保证一致性和可恢复性，不追求实时同步；元数据变更日志会占用少量远端文件数量，以换取不依赖 WebDAV 锁和共享文件覆盖。
+- Proposed continuation contract: 以内容锚点而非TXT屏幕页码跨设备续读；A已发布且B及时获得时第一屏接续，网络慢时本地先开、晚到仅提示。活动阅读不自动跳页；并发离线保留各设备位置，旧同步回放不产生新的阅读事件。
+- Accepted continuation details: 新设备初始化0%不覆盖真实进度；同名不能作为书籍关联证据；接续后可返回本机原位置；进度、正文及检查结果分开表达；新用户排版偏好默认保留在各设备，升级尊重已有显式同步选择。
 
 ## Visual language
 
@@ -88,12 +93,13 @@
 
 - Framework/styling system: Flutter、Provider、现有 Material 3/玻璃风格适配；网络层复用 Dio。
 - Design-token constraints: 不新增主题依赖和同步专属 token。
-- Performance constraints: 阅读进度写入需防抖；元数据批次上限 1 MiB；书籍文件流式传输，不整文件载入内存。
+- Performance constraints: 阅读进度写入需防抖；元数据批次上限 1 MiB；TXT 阅读/编辑共用流式索引和有界分段，文件写回与传输不整书载入内存。v3 增量同步为明确选择的分块格式，默认保留 v2 普通 TXT；200/500 MiB 性能验收记录在 `docs/plans/large-txt-streaming-incremental-sync.md`。
 - Compatibility constraints: WebDAV 服务端能力不一致；不得依赖 LOCK；Web 端受 CORS 与浏览器方法限制，首版不承诺可用。
 - Test/screenshot expectations: UI 与状态流按 `docs/webdav-sync-ux-design.md` 验收；协议和冲突策略按 `docs/webdav-sync-design.md` 的验收矩阵验证；书源分组、迁移、组合筛选和校验反馈按 `docs/book-source-group-design.md` 验收。
 
 ## Open questions
 
+- [ ] TXT正文编辑入口、文件自动双向同步、冲突与v2迁移按 `docs/txt-editing-webdav-sync-design.md` 对照；在线书/EPUB不属于首期。
 - [ ] 笔记/高亮产品能力完整后何时开启 `notes` 数据集；启用必须通过业务 schema、保留记录回放、范围偏好迁移和降级兼容验收，不能只打开 UI 开关。
 - [ ] Android 不同系统文件提供器与坚果云 WebDAV 的兼容矩阵是否完整；需要至少一次 Android 真机端到端复测。
 - [ ] 后续是否引入客户端端到端加密；当前应明确披露“WebDAV 服务端可读取已同步内容”，加密需独立设计恢复密钥与旧数据迁移。

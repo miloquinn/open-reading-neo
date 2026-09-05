@@ -73,6 +73,9 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
 
   static const _cacheAuthRevisionPrefix =
       'reading_source_chapter_cache_auth_revision_v1:';
+  // Bump when rule semantics change so persisted catalogs and content are
+  // reparsed. Revision 1 fixes XPath positions after earlier predicates.
+  static const _ruleEngineRevision = 1;
 
   final SourceRuntime Function() _runtime;
   final BookSourceChapterCache _chapterCache;
@@ -241,6 +244,7 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   ) async {
     final authRevision = await _cacheAuthRevision(source.id);
     final stable = _stableCacheJson({
+      'ruleEngineRevision': _ruleEngineRevision,
       'manifestUrl': source.manifestUrl.toString(),
       'apiBaseUrl': source.apiBaseUrl.toString(),
       'protocolVersion': source.protocolVersion,

@@ -69,7 +69,7 @@ void main() {
 
     expect(find.text('Disable 1 selected'), findsOneWidget);
     await tester.tap(find.text('Same site'));
-    await tester.pumpAndSettle();
+    await _waitForMode(tester);
     expect(find.text('Disable 0 selected'), findsOneWidget);
     expect(
       tester
@@ -79,6 +79,98 @@ void main() {
           .onPressed,
       isNull,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'import mode computes before confirm and returns the prepared preview',
+    (tester) async {
+      final preview = SourceImportPreview(
+        sources: [
+          _config('Old', 'https://EXAMPLE.com:443/?utm_source=list'),
+          _config('New', 'https://example.com'),
+        ],
+        errors: const [],
+      );
+      BookSourceImportDedupeSelection? selection;
+      await tester.pumpWidget(
+        _app(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                selection =
+                    await showModalBottomSheet<BookSourceImportDedupeSelection>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) =>
+                          BookSourceImportDedupeReviewSheet(preview: preview),
+                    );
+              },
+              child: const Text('Open review'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open review'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Same site'));
+      await tester.pump();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Confirm'))
+            .onPressed,
+        isNull,
+      );
+      await _waitForMode(tester);
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      expect(selection?.preview?.mode, BookSourceDedupeMode.siteReview);
+      expect(selection?.preview?.selectedIndices, selection?.selectedIndices);
+      expect(selection?.preview?.candidates.length, preview.candidates.length);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('duplicate groups are built lazily for large reviews', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.reset);
+    final sources = <RegisteredBookSource>[];
+    for (var group = 0; group < 40; group++) {
+      final url = 'https://source-$group.example';
+      sources
+        ..add(_registered('$group-old', 'Old $group', url))
+        ..add(_registered('$group-new', 'New $group', url));
+    }
+    final candidates = [
+      for (final entry in sources.indexed)
+        BookSourceDedupeCandidate(
+          index: entry.$1,
+          rawConfig: entry.$2.sourceConfig!,
+          installedSourceId: entry.$2.id,
+        ),
+    ];
+    final result = const BookSourceDedupeEngine().analyze(candidates);
+
+    await tester.pumpWidget(
+      _app(
+        BookSourceInstalledDedupeReviewSheet(
+          result: result,
+          sourcesByIndex: {
+            for (final entry in sources.indexed) entry.$1: entry.$2,
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final builtGroups = find.byType(ExpansionTile).evaluate().length;
+    expect(result.groups, hasLength(40));
+    expect(builtGroups, greaterThan(0));
+    expect(builtGroups, lessThan(result.groups.length));
     expect(tester.takeException(), isNull);
   });
 }
@@ -101,3 +193,17 @@ ReadingSourceConfig _config(String name, String url) =>
 
 RegisteredBookSource _registered(String id, String name, String url) =>
     _config(name, url).toRegisteredSource(id: id);
+
+Future<void> _waitForMode(WidgetTester tester) async {
+  for (var attempt = 0; attempt < 500; attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump();
+    if (find.byType(LinearProgressIndicator).evaluate().isEmpty) {
+      await tester.pumpAndSettle();
+      return;
+    }
+  }
+  fail('Background duplicate analysis did not complete.');
+}

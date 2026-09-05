@@ -110,8 +110,13 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
         builder: (context, constraints) {
           final viewport = constraints.biggest;
           _verticalViewportSize = viewport;
-          if (!_scrollByChapter) {
-            return _buildVerticalReadingWindow(_buildVerticalBook(viewport));
+          if (!_effectiveScrollByChapter) {
+            return ReaderAutoScrollSurface(
+              controller: _autoPageTurnController,
+              ready: _autoContinuousReady,
+              onBoundary: () async => !_verticalViewportAtEnd(),
+              child: _buildVerticalReadingWindow(_buildVerticalBook(viewport)),
+            );
           }
           final layout = _verticalLayoutFor(_chapterIndex, content, viewport);
           return _buildVerticalReadingWindow(
@@ -134,7 +139,7 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
         }
         _ensurePagination(paginationViewport, content: content);
         _schedulePagedLayoutWarm(_chapterIndex + 1);
-        return switch (_pageMode) {
+        final paged = switch (_pageMode) {
           BookSourcePageMode.instantPage => _buildInstantReader(),
           BookSourcePageMode.horizontalSlide => _buildSlideReader(),
           BookSourcePageMode.coverSlide => _buildCoverReader(),
@@ -143,6 +148,15 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
           ),
           BookSourcePageMode.verticalScroll => const SizedBox.shrink(),
         };
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            paged,
+            if (_autoPageTurnController.isActive &&
+                _autoPageTurnController.mode == ReaderAutoPageTurnMode.sweep)
+              Positioned.fill(child: _buildAutoSweepSurface()),
+          ],
+        );
       },
     );
   }
@@ -273,6 +287,7 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
         canPop: _canPopWithoutPrompt && !_tapZoneEditorVisible,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) {
+            _stopAutoPageTurn();
             BookOpenTransition.beginExit();
           } else if (_tapZoneEditorVisible) {
             _updateReaderState(() => _tapZoneEditorVisible = false);
@@ -308,23 +323,13 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: ReaderDesktopInput(
-                        key: const ValueKey('book-source-reader-desktop-input'),
-                        enabled:
-                            _readerFontReady &&
-                            !_loadingCatalog &&
-                            (!_loadingContent || _content != null) &&
-                            _error == null &&
-                            _chapters.isNotEmpty &&
-                            _content != null &&
-                            !_annotationInteractionActive,
-                        turnPageOnPointerScroll:
-                            _pageMode != BookSourcePageMode.verticalScroll,
-                        onNext: _handleDesktopNextPage,
-                        onPrevious: _handleDesktopPreviousPage,
-                        child: ReaderTapObserver(
+                      child: Listener(
+                        onPointerDown: _handleAutoPointerDown,
+                        onPointerMove: _handleAutoPointerMove,
+                        onPointerSignal: (_) => _cancelAutoSweepOrPause(),
+                        child: ReaderDesktopInput(
                           key: const ValueKey(
-                            'book-source-reader-tap-observer',
+                            'book-source-reader-desktop-input',
                           ),
                           enabled:
                               _readerFontReady &&
@@ -334,14 +339,31 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                               _chapters.isNotEmpty &&
                               _content != null &&
                               !_annotationInteractionActive,
-                          onTap: _handleReaderTap,
-                          child: Semantics(
-                            label: widget.book.title,
-                            child: KeyedSubtree(
-                              key: ValueKey(
-                                'book-source-reader-$_bodyStateName',
+                          turnPageOnPointerScroll:
+                              _pageMode != BookSourcePageMode.verticalScroll,
+                          onNext: _handleDesktopNextPage,
+                          onPrevious: _handleDesktopPreviousPage,
+                          child: ReaderTapObserver(
+                            key: const ValueKey(
+                              'book-source-reader-tap-observer',
+                            ),
+                            enabled:
+                                _readerFontReady &&
+                                !_loadingCatalog &&
+                                (!_loadingContent || _content != null) &&
+                                _error == null &&
+                                _chapters.isNotEmpty &&
+                                _content != null &&
+                                !_annotationInteractionActive,
+                            onTap: _handleReaderTap,
+                            child: Semantics(
+                              label: widget.book.title,
+                              child: KeyedSubtree(
+                                key: ValueKey(
+                                  'book-source-reader-$_bodyStateName',
+                                ),
+                                child: _buildTransitionAwareBody(),
                               ),
-                              child: _buildTransitionAwareBody(),
                             ),
                           ),
                         ),
@@ -358,6 +380,8 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                     ReaderChromeOverlay(
                       palette: _readerTheme,
                       visible: _controlsVisible,
+                      autoPageTurnController: _autoPageTurnController,
+                      onResumeAutoPageTurn: _resumeAutoPageTurn,
                       title: _chapters.isEmpty
                           ? widget.book.title
                           : _chapters[_chapterIndex.clamp(

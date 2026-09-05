@@ -316,10 +316,17 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
     final openingActivity = BookOpenTransition.beginActivity();
     final initialThemeFuture = ReaderThemes.loadSavedPalette();
     try {
-      final fullBook = book.id == null
+      var fullBook = book.id == null
           ? book
           : await _bookDao.getBookById(book.id!);
       if (fullBook == null || !mounted) return;
+      if (fullBook.isOnline) {
+        fullBook = await BookReaderLauncher.refreshProgressBeforeOpen(
+          context,
+          fullBook,
+        );
+        if (!mounted) return;
+      }
       final initialTheme = await initialThemeFuture;
       if (!mounted) return;
 

@@ -177,10 +177,6 @@ jobs:
           flutter test test/book_source_search_page_test.dart \
             --plain-name 'discover page selects a reading source, channel, and next page'
 
-          # The charset suite can remain pending in the broad coverage run;
-          # keep all five assertions active in a dedicated process.
-          flutter test test/source_response_codec_test.dart
-
       - name: Explain validation failures
         if: ${{ failure() }}
         run: |
@@ -195,9 +191,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  response-codec:
+    name: Core Flutter validation / response codec
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Install locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Validate response codecs in an isolated process
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GBK initializes large Dart map literals. Give the Linux test VM
+          # more stack while keeping every codec assertion enabled.
+          ulimit -s 65536
+          flutter test test/source_response_codec_test.dart --reporter expanded
+
   build-smoke:
     name: Product build / ${{ matrix.name }}
-    needs: flutter-validation
+    needs: [flutter-validation, response-codec]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     continue-on-error: ${{ matrix.advisory }}

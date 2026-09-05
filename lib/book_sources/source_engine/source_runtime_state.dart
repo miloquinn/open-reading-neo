@@ -116,6 +116,14 @@ class SourceRuntimeState {
     String chapterId,
   ) => '${source.stableId}\u0000$bookId\u0000$chapterId';
 
+  void clearSource(ReadingSourceConfig source) {
+    final prefix = '${source.stableId}\u0000';
+    _bookRuleStates.removeWhere((key, _) => key.startsWith(prefix));
+    _bookEntityContexts.removeWhere((key, _) => key.startsWith(prefix));
+    _chapterRuleContexts.removeWhere((key, _) => key.startsWith(prefix));
+    _bookInfoResponses.removeWhere((key, _) => key.startsWith(prefix));
+  }
+
   void clear() {
     _bookRuleStates.clear();
     _bookEntityContexts.clear();

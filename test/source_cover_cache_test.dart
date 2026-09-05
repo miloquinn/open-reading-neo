@@ -348,6 +348,82 @@ void main() {
       expect(calls, 2);
     },
   );
+
+  test('clear prevents an active load from reviving memory or disk', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-clear-load-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final started = Completer<void>();
+    final release = Completer<void>();
+    var calls = 0;
+    final cache = SourceCoverCache(
+      cacheDirectory: directory,
+      loader: (_) async {
+        calls++;
+        if (calls == 1) {
+          started.complete();
+          await release.future;
+        }
+        return Uint8List.fromList([calls]);
+      },
+    );
+    final uri = Uri.parse('https://example.org/clear-race.jpg');
+
+    final oldLoad = cache.load(uri);
+    await started.future;
+    await cache.clear();
+    release.complete();
+    expect(await oldLoad, [1]);
+    expect(await cache.load(uri), [2]);
+    expect(calls, 2);
+  });
+
+  test('clear while publishing a file cannot revive the old image', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-clear-publish-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final publishStarted = Completer<void>();
+    final allowPublish = Completer<void>();
+    var calls = 0;
+    final cache = SourceCoverCache(
+      cacheDirectory: directory,
+      beforeDiskRename: () {
+        if (!publishStarted.isCompleted) publishStarted.complete();
+        return allowPublish.future;
+      },
+      loader: (_) async => Uint8List.fromList([++calls]),
+    );
+    final uri = Uri.parse('https://example.org/publish-race.jpg');
+
+    final oldLoad = cache.load(uri);
+    await publishStarted.future;
+    await cache.clear();
+    allowPublish.complete();
+    expect(await oldLoad, [1]);
+    expect(await cache.load(uri), [2]);
+  });
+
+  test('prunes image files to the disk byte budget', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-disk-budget-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    var value = 0;
+    final cache = SourceCoverCache(
+      cacheDirectory: directory,
+      maxDiskBytes: 5,
+      diskMaintenanceInterval: Duration.zero,
+      loader: (_) async => Uint8List.fromList([++value, 1, 2]),
+    );
+
+    await cache.load(Uri.parse('https://example.org/first.jpg'));
+    await cache.load(Uri.parse('https://example.org/second.jpg'));
+    await cache.maintainDisk(force: true);
+
+    expect(await cache.diskSizeBytes(), lessThanOrEqualTo(5));
+  });
 }
 
 class _FakePlatformImageLoader implements SourceWebViewLoaderPort {

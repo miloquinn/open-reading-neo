@@ -29,6 +29,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   }
 
   Future<void> _showFullTextSearch({String initialQuery = ''}) async {
+    _pauseAutoPageTurn();
     _controlsTimer?.cancel();
     _updateReaderState(() => _controlsVisible = false);
     await showReaderSearchSheet(
@@ -56,6 +57,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
       _updateReaderState(() => _controlsVisible = false);
       return;
     }
+    _pauseAutoPageTurn();
     _updateReaderState(() => _controlsVisible = true);
     _controlsTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) _updateReaderState(() => _controlsVisible = false);
@@ -71,6 +73,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
 
   Future<void> _requestExit() async {
     if (_exitPromptVisible) return;
+    _stopAutoPageTurn();
     if (_shelfBookId != null) {
       BookOpenTransition.beginExit();
       await _saveProgress();
@@ -241,6 +244,15 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   }
 
   void _handleReaderTap(Offset localPosition) {
+    if (_consumeAutoTap) {
+      _consumeAutoTap = false;
+      return;
+    }
+    if (_autoPageTurnController.isActive &&
+        _autoPageTurnController.mode == ReaderAutoPageTurnMode.sweep) {
+      _stopAutoPageTurn();
+      return;
+    }
     if (_pageMode == BookSourcePageMode.horizontalSlide &&
         _pageController.hasClients) {
       final page = _pageController.page;
@@ -258,6 +270,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
   }
 
   Future<void> _showTapZoneSettings() async {
+    _pauseAutoPageTurn();
     Navigator.of(context).pop();
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
@@ -469,7 +482,8 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
       );
     }
     _restoreTextOffset = locator?.textAnchor?.startOffsetUtf16;
-    if (_pageMode == BookSourcePageMode.verticalScroll && !_scrollByChapter) {
+    if (_pageMode == BookSourcePageMode.verticalScroll &&
+        !_effectiveScrollByChapter) {
       await _jumpToVerticalChapter(
         chapterIndex,
         textOffset: _restoreTextOffset,
@@ -507,6 +521,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
 
   Future<void> _showCatalog() async {
     if (_chapters.isEmpty) return;
+    _pauseAutoPageTurn();
     _controlsTimer?.cancel();
     // Prepared with the catalog so the interaction frame only mounts the
     // sheet instead of allocating one navigation model per chapter.
@@ -536,7 +551,7 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
             onChapterSelected: (index) {
               Navigator.of(sheetContext).pop();
               if (_pageMode == BookSourcePageMode.verticalScroll &&
-                  !_scrollByChapter) {
+                  !_effectiveScrollByChapter) {
                 unawaited(_jumpToVerticalChapter(index));
               } else {
                 unawaited(_loadChapter(index));

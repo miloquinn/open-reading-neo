@@ -73,6 +73,9 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
 
   static const _cacheAuthRevisionPrefix =
       'reading_source_chapter_cache_auth_revision_v1:';
+  // Bump when rule semantics change so persisted catalogs and content are
+  // reparsed. Revision 2 includes the OnlyOne and JS-followed-by-## fixes.
+  static const _ruleEngineRevision = 2;
 
   final SourceRuntime Function() _runtime;
   final BookSourceChapterCache _chapterCache;
@@ -93,15 +96,24 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
     Map<String, String> values,
   ) async {
     await _ensureEnabled();
-    await _runtime().login(source, values);
-    await _bumpCacheAuthRevision(source.id);
+    try {
+      await _runtime().login(source, values);
+    } finally {
+      // The runtime saves login data before executing the source script, so a
+      // thrown script can still leave a different session or cookie state.
+      // This helper absorbs persistence failures and preserves login errors.
+      await _bumpCacheAuthRevision(source.id);
+    }
   }
 
   @override
   Future<void> clearSourceLogin(RegisteredBookSource source) async {
     await _ensureEnabled();
-    await _runtime().clearLoginSession(source);
-    await _bumpCacheAuthRevision(source.id);
+    try {
+      await _runtime().clearLoginSession(source);
+    } finally {
+      await _bumpCacheAuthRevision(source.id);
+    }
   }
 
   @override
@@ -184,10 +196,16 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   }) async {
     cancellation?.throwIfCancelled();
     await _ensureEnabled();
-    final chapters = await _runtime().getChapters(
-      source,
-      bookId,
-      sourceVariables: sourceVariables,
+    final chapters = await _chapterCache.getChapterCatalogOrLoad(
+      sourceId: source.id,
+      sourceRevision: await _cacheRevision(source, sourceVariables),
+      bookId: bookId,
+      staleWhileRevalidate: false,
+      loader: () => _runtime().getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      ),
     );
     cancellation?.throwIfCancelled();
     return chapters;
@@ -225,11 +243,18 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   }) async {
     cancellation?.throwIfCancelled();
     await _ensureEnabled();
-    final content = await _runtime().getChapterContent(
-      source,
+    final content = await _chapterCache.getOrLoad(
+      sourceId: source.id,
+      sourceRevision: await _cacheRevision(source, sourceVariables),
       bookId: bookId,
       chapterId: chapterId,
-      sourceVariables: sourceVariables,
+      staleWhileRevalidate: false,
+      loader: () => _runtime().getChapterContent(
+        source,
+        bookId: bookId,
+        chapterId: chapterId,
+        sourceVariables: sourceVariables,
+      ),
     );
     cancellation?.throwIfCancelled();
     return content;
@@ -241,6 +266,7 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   ) async {
     final authRevision = await _cacheAuthRevision(source.id);
     final stable = _stableCacheJson({
+      'ruleEngineRevision': _ruleEngineRevision,
       'manifestUrl': source.manifestUrl.toString(),
       'apiBaseUrl': source.apiBaseUrl.toString(),
       'protocolVersion': source.protocolVersion,

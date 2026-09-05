@@ -6,7 +6,8 @@ import 'source_rule_parser.dart';
 
 /// Evaluates a JSONPath rule. When [listMode] is true and the path resolves
 /// to exactly one match whose value is itself a `List`, that list's elements
-/// are returned instead of the list-as-one-value — matching Legado, where a
+/// are returned instead of the list-as-one-value, matching reading-source
+/// JSONPath compatibility where a
 /// bare list rule like `bookList: "$.data"` is expected to produce one
 /// context per array element without requiring the caller to write
 /// `$.data[*]`.

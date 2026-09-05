@@ -1,5 +1,7 @@
 # 书源分组与校验结果设计
 
+> 2026-09-05：收藏与自建分组已按用户确认方案实现。当前交互、存储与同步边界见 [书源收藏与自建分组](plans/2026-09-05-source-favorites-and-groups.md)。下文保留原设计背景，未实现的校验视图仍按原计划说明。
+
 ## 目标
 
 在现有书源管理页中补齐两类不同需求：
@@ -7,7 +9,7 @@
 1. 用户可以按最近一次校验结果快速找到正常、异常和未校验书源。
 2. 用户可以创建自己的分组，并对单个或多个书源维护分组归属。
 
-本设计参考 Legado 书源 JSON 的 `bookSourceGroup` 兼容语义，但不把动态校验结果写入该字段。
+本设计遵循阅读书源 JSON 的 `bookSourceGroup` 兼容语义，但不把动态校验结果写入该字段。
 
 ## 已有基础
 
@@ -122,7 +124,7 @@ final List<String> groups;
 3. 顶层 `groups: []` 表示用户明确清空，不再次从兼容字段恢复。
 4. 同源重新导入或刷新时保留原记录的 `groups`。
 5. 新导入书源首次使用其 `bookSourceGroup` 作为初始分组。
-6. 导出为 Legado 兼容 JSON 时，将顶层 `groups` 序列化回 `bookSourceGroup`。
+6. 导出为阅读书源兼容 JSON 时，将顶层 `groups` 序列化回 `bookSourceGroup`。
 7. WebDAV 同步把 `groups` 作为书源记录的一部分；沿用现有记录级冲突规则。
 
 分组本身不需要独立数据库表。当前分组集合可由所有书源的 `groups` 聚合得到；如果将来需要空分组、手动排序、颜色或图标，再引入独立 `BookSourceGroup` 元数据存储。
@@ -204,4 +206,3 @@ enum BookSourceHealthFilter { any, healthy, unhealthy, unchecked }
 - 重新导入或刷新书源后，用户分组和最近校验结果仍保留。
 - 改名和删除分组不会删除、停用或重复任何书源。
 - 多选操作、窄屏布局和大量书源增量加载均有 widget/controller 回归测试。
-

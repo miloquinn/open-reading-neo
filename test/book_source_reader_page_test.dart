@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -14,15 +15,18 @@ import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/core/reader/reader_page_turn_geometry.dart';
+import 'package:xxread/core/reader/reader_auto_page_turn_controller.dart';
 import 'package:xxread/core/reader/reader_margin_settings.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
+import 'package:xxread/services/books/pagination_cache_dao.dart';
 import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_chapter_title_page.dart';
+import 'package:xxread/widgets/reader_annotated_text_page.dart';
 import 'package:xxread/widgets/reader_opening_loader.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
@@ -53,6 +57,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -93,6 +98,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -129,6 +135,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -183,6 +190,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -222,6 +230,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -298,12 +307,14 @@ void main() {
       categories: [],
     );
     final client = _FakeBookSourceClient();
+    final paginationCache = _MemoryPaginationCacheDao();
 
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: paginationCache,
           replaceRuleService: _replaceRules,
           source: source,
           book: book,
@@ -343,6 +354,12 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(client.requestedChapterIds, contains('chapter-2'));
+    expect(
+      paginationCache.readCount,
+      0,
+      reason:
+          'continuous scrolling does not need persisted pagination boundaries',
+    );
   });
 
   testWidgets('replacement rules clean source chapter titles and content', (
@@ -382,6 +399,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -434,6 +452,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: source,
           book: book,
@@ -470,6 +489,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: source,
           book: book,
@@ -528,6 +548,377 @@ void main() {
     );
   });
 
+  testWidgets(
+    'automatic page turning advances source text and pauses on touch',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: BookSourcePageMode.instantPage.name,
+        ReaderAutoPageTurnController.intervalPreferenceKey: 5,
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
+            replaceRuleService: _replaceRules,
+            source: _testSource(),
+            book: const BookSourceBook(
+              id: 'book-1',
+              title: 'Automatic page turning',
+              author: 'Author',
+              description: '',
+              categories: [],
+            ),
+            client: _LongFakeBookSourceClient(),
+          ),
+        ),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('book-source-reader-content')),
+      );
+      await tester.pumpAndSettle();
+
+      await _showReaderControls(tester);
+      await _openAndStartAutoPageTurn(tester);
+
+      expect(
+        find.byKey(const ValueKey('reader-auto-page-turn-control-bar')),
+        findsOneWidget,
+      );
+      final statusFinder = find.byKey(
+        const ValueKey('book-source-reader-status'),
+      );
+      final initialStatus = tester.widget<Text>(statusFinder).data;
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(tester.widget<Text>(statusFinder).data, isNot(initialStatus));
+
+      await tester.tapAt(const Offset(400, 300));
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('reader-auto-page-turn-resume')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('reader-auto-page-turn-resume')),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('reader-auto-page-turn-pause')),
+        findsOneWidget,
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('reader-auto-page-turn-resume')),
+        findsOneWidget,
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+    },
+  );
+
+  testWidgets('automatic page turning advances a vertical source viewport', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: BookSourcePageMode.verticalScroll.name,
+      ReaderAutoPageTurnController.intervalPreferenceKey: 5,
+      ReaderAutoPageTurnController.verticalModePreferenceKey: 'interval',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
+          replaceRuleService: _replaceRules,
+          source: _testSource(),
+          book: const BookSourceBook(
+            id: 'book-1',
+            title: 'Vertical automatic page turning',
+            author: 'Author',
+            description: '',
+            categories: [],
+          ),
+          client: _LongFakeBookSourceClient(),
+        ),
+      ),
+    );
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('book-source-reader-surface')),
+    );
+    await tester.pumpAndSettle();
+    await _showReaderControls(tester);
+    await _openAndStartAutoPageTurn(tester);
+
+    final scrollableFinder = find.descendant(
+      of: find.byType(ScrollablePositionedList),
+      matching: find.byType(Scrollable),
+    );
+    final initialPixels = tester
+        .state<ScrollableState>(scrollableFinder)
+        .position
+        .pixels;
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      tester.state<ScrollableState>(scrollableFinder).position.pixels,
+      greaterThan(initialPixels),
+    );
+  });
+
+  testWidgets('automatic page turning stops at the end of a source book', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: BookSourcePageMode.instantPage.name,
+      ReaderAutoPageTurnController.intervalPreferenceKey: 5,
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
+          replaceRuleService: _replaceRules,
+          source: _testSource(),
+          book: const BookSourceBook(
+            id: 'book-1',
+            title: 'Short automatic page turning',
+            author: 'Author',
+            description: '',
+            categories: [],
+          ),
+          client: _SingleChapterBookSourceClient(),
+        ),
+      ),
+    );
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('book-source-reader-content')),
+    );
+    await tester.pumpAndSettle();
+    await _showReaderControls(tester);
+    await _openAndStartAutoPageTurn(tester);
+
+    final controlBar = find.byKey(
+      const ValueKey('reader-auto-page-turn-control-bar'),
+    );
+    for (var attempt = 0; attempt < 4; attempt++) {
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+    }
+    // Hidden running controls alone do not prove playback stopped.
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pump();
+    expect(controlBar, findsNothing);
+  });
+
+  testWidgets('source sweep uses ten seconds and resumes its reveal', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.pageModeKey: BookSourcePageMode.instantPage.name,
+      ReaderAutoPageTurnController.horizontalModePreferenceKey: 'sweep',
+    });
+    await tester.pumpWidget(
+      _buildTabletSourceReader(_LongFakeBookSourceClient()),
+    );
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('book-source-reader-content')),
+    );
+    await tester.pumpAndSettle();
+    await _showReaderControls(tester);
+    await _openAndStartAutoPageTurn(tester);
+    await tester.pump(const Duration(milliseconds: 400));
+    final status = find
+        .byKey(const ValueKey('book-source-reader-status'))
+        .first;
+    final initial = tester.widget<Text>(status).data;
+    expect(find.byKey(const ValueKey('reader-sweep-surface')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 7));
+    expect(tester.widget<Text>(status).data, initial);
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 20));
+    expect(tester.widget<Text>(status).data, initial);
+    await tester.tap(
+      find.byKey(const ValueKey('reader-auto-page-turn-resume')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump();
+    expect(tester.widget<Text>(status).data, isNot(initial));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'source continuous scroll preserves chapter preference and pauses',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: BookSourcePageMode.verticalScroll.name,
+        ReaderSettingsStore.scrollByChapterKey: true,
+        ReaderAutoPageTurnController.verticalModePreferenceKey: 'continuous',
+      });
+      await tester.pumpWidget(
+        _buildTabletSourceReader(_LongFakeBookSourceClient()),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('book-source-reader-surface')),
+      );
+      await tester.pumpAndSettle();
+      await _showReaderControls(tester);
+      await _openAndStartAutoPageTurn(tester);
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      final scrollable = find
+          .descendant(
+            of: find.byType(ScrollablePositionedList),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final initial = tester.state<ScrollableState>(scrollable).position.pixels;
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      final moved = tester.state<ScrollableState>(scrollable).position.pixels;
+      expect(moved, greaterThan(initial));
+      final gesture = await tester.startGesture(const Offset(400, 300));
+      final atTouchDown = tester
+          .state<ScrollableState>(scrollable)
+          .position
+          .pixels;
+      await tester.pump(const Duration(milliseconds: 16));
+      for (var i = 0; i < 2; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(
+        tester.state<ScrollableState>(scrollable).position.pixels,
+        greaterThan(atTouchDown),
+      );
+      await gesture.moveBy(const Offset(0, -1));
+      await tester.pump();
+      final atDrag = tester.state<ScrollableState>(scrollable).position.pixels;
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(
+        tester.state<ScrollableState>(scrollable).position.pixels,
+        closeTo(atDrag, 0.1),
+      );
+      await gesture.up();
+      await tester.pump();
+      final anchor = _sourceCenterAnchor(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('reader-auto-page-turn-stop')),
+      );
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(
+        _sourceAnchorY(tester, anchor.$1, anchor.$2),
+        closeTo(anchor.$3, 20),
+      );
+      expect(
+        tester
+            .widget<ScrollablePositionedList>(
+              find.byType(ScrollablePositionedList),
+            )
+            .key
+            .toString(),
+        contains('source-vertical-book:'),
+      );
+      expect(
+        (await SharedPreferences.getInstance()).getBool(
+          ReaderSettingsStore.scrollByChapterKey,
+        ),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'source continuous scroll crosses chapters without changing its layout preference',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.pageModeKey: BookSourcePageMode.verticalScroll.name,
+        ReaderSettingsStore.scrollByChapterKey: true,
+        ReaderAutoPageTurnController.verticalModePreferenceKey: 'continuous',
+        ReaderAutoPageTurnController.continuousSecondsPreferenceKey: 5.0,
+      });
+      final client = _ConfigurableBookSourceClient({
+        'chapter-1': _tabletChapterText(20),
+        'chapter-2': _tabletChapterText(25),
+        'chapter-3': _tabletChapterText(25),
+      });
+      await tester.pumpWidget(_buildTabletSourceReader(client));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('book-source-reader-surface')),
+      );
+      await tester.pumpAndSettle();
+      await _showReaderControls(tester);
+      await _openAndStartAutoPageTurn(tester);
+      var crossed = false;
+      for (var frame = 0; frame < 800; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (frame < 10) continue;
+        try {
+          if (_sourceCenterAnchor(tester).$1 == 'chapter-2') {
+            crossed = true;
+            break;
+          }
+        } on TestFailure {
+          // The chapter title and inter-paragraph gap can cross the center.
+        }
+      }
+      expect(crossed, isTrue);
+      await tester.tapAt(const Offset(400, 300));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      final anchor = _sourceCenterAnchor(tester);
+      expect(anchor.$1, 'chapter-2');
+      await tester.tap(
+        find.byKey(const ValueKey('reader-auto-page-turn-stop')),
+      );
+      for (var frame = 0; frame < 8; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(
+        _sourceAnchorY(tester, anchor.$1, anchor.$2),
+        closeTo(anchor.$3, 20),
+      );
+      expect(
+        (await SharedPreferences.getInstance()).getBool(
+          ReaderSettingsStore.scrollByChapterKey,
+        ),
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<ScrollablePositionedList>(
+              find.byType(ScrollablePositionedList),
+            )
+            .key
+            .toString(),
+        contains('source-vertical-book:'),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final mode in [
     BookSourcePageMode.verticalScroll,
     BookSourcePageMode.instantPage,
@@ -544,6 +935,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -593,6 +985,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -634,6 +1027,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -692,6 +1086,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              paginationCacheDao: _MemoryPaginationCacheDao(),
               replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
@@ -995,6 +1390,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              paginationCacheDao: _MemoryPaginationCacheDao(),
               replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
@@ -1121,6 +1517,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              paginationCacheDao: _MemoryPaginationCacheDao(),
               replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
@@ -1393,6 +1790,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -1431,6 +1829,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -1475,6 +1874,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -1542,6 +1942,84 @@ Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
   }
 }
 
+Future<void> _showReaderControls(WidgetTester tester) async {
+  final controls = find.byKey(const ValueKey('book-source-bottom-controls'));
+  for (var attempt = 0; attempt < 3; attempt++) {
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    if (tester.widget<AnimatedPositioned>(controls).bottom == 16) return;
+  }
+  expect(tester.widget<AnimatedPositioned>(controls).bottom, 16);
+}
+
+(String, int, double) _sourceCenterAnchor(WidgetTester tester) {
+  final center =
+      tester.view.physicalSize.height / tester.view.devicePixelRatio / 2;
+  for (final element in find.byType(ReaderAnnotatedTextPage).evaluate()) {
+    final page = element.widget as ReaderAnnotatedTextPage;
+    final paragraphs = find.descendant(
+      of: find.byWidget(page),
+      matching: find.byType(RichText),
+    );
+    for (final rich in paragraphs.evaluate()) {
+      final paragraph = rich.renderObject as RenderParagraph;
+      final top = paragraph.localToGlobal(Offset.zero).dy;
+      if (top > center || top + paragraph.size.height < center) continue;
+      final position = paragraph.getPositionForOffset(
+        Offset(paragraph.size.width / 2, center - top),
+      );
+      return (
+        page.chapterId,
+        page.page.sourceOffsetForTextOffset(position.offset),
+        top + paragraph.getOffsetForCaret(position, Rect.zero).dy,
+      );
+    }
+  }
+  throw TestFailure('No source body paragraph at viewport center');
+}
+
+double _sourceAnchorY(WidgetTester tester, String chapterId, int sourceOffset) {
+  for (final element in find.byType(ReaderAnnotatedTextPage).evaluate()) {
+    final page = element.widget as ReaderAnnotatedTextPage;
+    if (page.chapterId != chapterId ||
+        sourceOffset < page.page.startOffset ||
+        sourceOffset >= page.page.endOffset) {
+      continue;
+    }
+    final rich = find
+        .descendant(of: find.byWidget(page), matching: find.byType(RichText))
+        .first;
+    final paragraph = tester.renderObject<RenderParagraph>(rich);
+    return paragraph
+        .localToGlobal(
+          paragraph.getOffsetForCaret(
+            TextPosition(
+              offset: page.page.textOffsetForSourceOffset(sourceOffset),
+            ),
+            Rect.zero,
+          ),
+        )
+        .dy;
+  }
+  throw TestFailure('Restored source anchor is missing');
+}
+
+Future<void> _openAndStartAutoPageTurn(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.tune_rounded));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Paging'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('reader-auto-page-turn-tile')));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(
+    find.byKey(const ValueKey('reader-auto-page-turn-start')),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('reader-auto-page-turn-start')));
+  await tester.pump();
+}
+
 Widget _buildTabletSourceReader(
   BookSourceClient client, {
   BookSourceReadingProgressStore progressStore =
@@ -1550,6 +2028,7 @@ Widget _buildTabletSourceReader(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    paginationCacheDao: _MemoryPaginationCacheDao(),
     replaceRuleService: _replaceRules,
     source: _testSource(),
     book: const BookSourceBook(
@@ -1852,6 +2331,31 @@ class _FakeBookSourceClient extends BookSourceClient {
   }
 }
 
+class _SingleChapterBookSourceClient extends BookSourceClient {
+  @override
+  Future<List<BookSourceChapter>> getChapters(
+    RegisteredBookSource source,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [
+    BookSourceChapter(id: 'only-chapter', title: 'Only chapter', order: 1),
+  ];
+
+  @override
+  Future<BookSourceChapterContent> getChapterContent(
+    RegisteredBookSource source, {
+    required String bookId,
+    required String chapterId,
+    Map<String, String> sourceVariables = const {},
+  }) async => BookSourceChapterContent(
+    bookId: bookId,
+    chapterId: chapterId,
+    title: 'Only chapter',
+    content: 'Short body.',
+    contentType: 'text/plain',
+  );
+}
+
 class _ReplacementBookSourceClient extends BookSourceClient {
   final List<String?> requestedChapterTitles = <String?>[];
 
@@ -1900,6 +2404,43 @@ class _LongFakeBookSourceClient extends _FakeBookSourceClient {
         (index) => 'Paragraph $index keeps both tablet leaves populated.',
       ).join('\n'),
       contentType: 'text/plain',
+    );
+  }
+}
+
+/// UI behavior tests own their storage; SQLite persistence has separate coverage.
+class _MemoryPaginationCacheDao extends PaginationCacheDao {
+  final Map<String, Map<String, Uint8List>> _layouts = {};
+  int readCount = 0;
+
+  @override
+  Future<Map<String, Uint8List>> loadForIdentity(
+    String identity,
+    String bookRevision,
+  ) async {
+    readCount++;
+    return Map.of(_layouts['$identity:$bookRevision'] ?? {});
+  }
+
+  @override
+  Future<void> upsertForIdentity({
+    required String identity,
+    int? localBookId,
+    required String bookRevision,
+    required String layoutFingerprint,
+    required int chapterIndex,
+    required Uint8List payload,
+    int? expectedEpoch,
+    int? expectedRevisionEpoch,
+  }) async {
+    if (expectedEpoch != null && expectedEpoch != PaginationCacheDao.epoch) {
+      return;
+    }
+    _layouts.putIfAbsent(
+      '$identity:$bookRevision',
+      () => {},
+    )[layoutFingerprint] = Uint8List.fromList(
+      payload,
     );
   }
 }

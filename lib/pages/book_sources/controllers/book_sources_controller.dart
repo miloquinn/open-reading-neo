@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
@@ -11,6 +12,8 @@ export 'book_sources_state.dart';
 
 import 'book_source_batch_fetcher.dart';
 import 'book_sources_state.dart';
+
+part 'book_sources_organization.dart';
 
 class BookSourcesController extends ChangeNotifier {
   BookSourcesController({
@@ -37,6 +40,7 @@ class BookSourcesController extends ChangeNotifier {
   int _sourceRevision = 0;
   int _sectionRevision = 0;
   int _categoryRevision = 0;
+  int _registryChangeRevision = 0;
   bool _started = false;
   bool _closed = false;
 
@@ -47,11 +51,23 @@ class BookSourcesController extends ChangeNotifier {
     if (!_started) {
       _started = true;
       _registrySubscription = _registry.changes.listen((_) {
-        unawaited(reload());
+        unawaited(refreshSourceMetadata());
       });
     }
     await _loadSources();
   }
+
+  Future<void> refreshSourceMetadata() => _refreshOrganizationMetadata();
+
+  Future<void> changeOrganizationScope({
+    bool favoritesOnly = false,
+    String? group,
+    bool force = false,
+  }) => _changeOrganizationScope(
+    favoritesOnly: favoritesOnly,
+    group: group,
+    force: force,
+  );
 
   void setListLayout(bool value) {
     if (_closed || _state.listLayout == value) return;
@@ -137,11 +153,17 @@ class BookSourcesController extends ChangeNotifier {
         .where((source) => discoveryIds.contains(source.id))
         .toList(growable: false);
     var selectedSourceId = _state.selectedSourceId;
+    final organizedSources = discoverySources
+        .where(_state.matchesOrganization)
+        .toList(growable: false);
+    if (!organizedSources.any((source) => source.id == selectedSourceId)) {
+      selectedSourceId = null;
+    }
     if (!_state.listLayout &&
-        discoverySources.length > largeSourceLibraryThreshold &&
+        organizedSources.length > largeSourceLibraryThreshold &&
         (selectedSourceId == null ||
             !discoveryIds.contains(selectedSourceId))) {
-      selectedSourceId = discoverySources.firstOrNull?.id;
+      selectedSourceId = organizedSources.firstOrNull?.id;
     }
     var next = _state.copyWith(
       sources: sources,
@@ -173,7 +195,11 @@ class BookSourcesController extends ChangeNotifier {
   }
 
   Future<void> changeSection(BookSourcesSection section) async {
-    if (_closed) return;
+    if (_closed ||
+        _state.section == section ||
+        !_state.availableSections.contains(section)) {
+      return;
+    }
     _categoryRevision++;
     _emit(_resetCategory(_state.copyWith(section: section)));
     await loadSection(section);
@@ -186,7 +212,16 @@ class BookSourcesController extends ChangeNotifier {
   }) async {
     if (_closed) return;
     final revision = ++_sectionRevision;
-    if (!force && _state.caches[section] != null) return;
+    final cachedSection = _state.caches[section];
+    if (!force && cachedSection != null) {
+      if (section == BookSourcesSection.categories &&
+          cachedSection.categories != null &&
+          _state.section == section &&
+          !(_state.listLayout && _state.showListDirectory)) {
+        _autoSelectFirstCategory();
+      }
+      return;
+    }
     final currentCache = _state.caches[section];
     final keepCurrentContent =
         preserveContent &&
@@ -511,6 +546,13 @@ class BookSourcesController extends ChangeNotifier {
       result[section] = sources
           .where((source) => source.enabled)
           .where((source) => source.capabilities.contains(capability))
+          // Reading sources browse their own explore channels. Their browse
+          // capability does not provide an independent ORSP latest feed.
+          .where(
+            (source) =>
+                source.sourceProtocol == BookSourceProtocolKind.orsp ||
+                section == BookSourcesSection.categories,
+          )
           .toList(growable: false);
     }
     return Map.unmodifiable(result);

@@ -5,8 +5,13 @@ import 'package:flutter/foundation.dart';
 import '../../models/book.dart';
 import '../library/library_event_bus_service.dart';
 import '../reader/replace_rule_service.dart';
+import '../books/txt_content_change_bus.dart';
 
 import 'adapters/metadata_sync_adapters.dart';
+import 'automatic_sync_scheduler.dart';
+import 'book_sync_identity.dart';
+import 'mutable_txt_sync_service.dart';
+import 'reading_progress_sync_service.dart';
 import 'secure_sync_config.dart';
 import 'sync_change_store.dart';
 import 'sync_dataset_catalog.dart';
@@ -19,15 +24,32 @@ class WebDavSyncController extends ChangeNotifier {
   WebDavSyncController({
     SecureSyncConfigStore? configStore,
     SyncChangeStore? changeStore,
-    this._engine,
+    SyncEngine? engine,
     WebDavClientFactory? clientFactory,
     WebDavBookFileService? bookFileService,
+    MutableTxtSyncService? mutableTxtService,
     this._replaceRuleService,
   }) : _configStore = configStore ?? SecureSyncConfigStore(),
        _changeStore = changeStore ?? SyncChangeStore(),
        _clientFactory = clientFactory ?? WebDavClient.standard {
+    _engine = engine;
+    _mutableTxt =
+        mutableTxtService ??
+        MutableTxtSyncService(
+          configStore: _configStore,
+          clientFactory: _clientFactory,
+        );
     _bookFileService =
-        bookFileService ?? WebDavBookFileService(configStore: _configStore);
+        bookFileService ??
+        WebDavBookFileService(
+          configStore: _configStore,
+          clientFactory: _clientFactory,
+          mutableTxtSyncService: _mutableTxt,
+        );
+    _scheduler = AutomaticSyncScheduler(
+      run: _runAutomaticCycle,
+      enabled: () => isConfigured && autoSync && !_disposed,
+    );
   }
 
   final SecureSyncConfigStore _configStore;
@@ -53,6 +75,144 @@ class WebDavSyncController extends ChangeNotifier {
   final List<Book> _backgroundUploadQueue = <Book>[];
   final Set<String> _backgroundUploadTitles = <String>{};
   bool _backgroundUploadRunning = false;
+  late final MutableTxtSyncService _mutableTxt;
+  StreamSubscription<ReadingProgressSyncEvent>? _progressSubscription;
+  StreamSubscription<TxtContentChanged>? _textSubscription;
+  Future<void>? _fileRun;
+  List<MutableTxtBookState> _textStates = const [];
+  bool get syncingText => _fileRun != null;
+  List<MutableTxtBookState> get textStates => List.unmodifiable(_textStates);
+  MutableTxtSyncService get mutableTxtService => _mutableTxt;
+
+  Future<void> refreshTextStates() async {
+    _textStates = await _mutableTxt.listStates();
+    notifyListeners();
+  }
+
+  late final AutomaticSyncScheduler _scheduler;
+  bool _disposed = false;
+  bool _autoResume = true;
+  DateTime? _lastCheckedAt;
+  DateTime? _lastProgressSyncAt;
+  int _progressGeneration = 0;
+  bool _progressPending = false;
+
+  bool get autoResume => _autoResume;
+  DateTime? get lastCheckedAt => _lastCheckedAt;
+  DateTime? get lastProgressSyncAt => _lastProgressSyncAt;
+  bool get progressPending => _progressPending;
+
+  void requestAutomaticSync({bool immediate = false}) =>
+      _scheduler.request(immediate: immediate);
+
+  void setForeground(bool foreground) => _scheduler.setForeground(foreground);
+
+  Future<void> checkProgressBeforeOpen() async {
+    if (!isConfigured || !autoSync || !scope.progress) return;
+    await _syncMetadataNow();
+  }
+
+  Future<void> _runAutomaticCycle() async {
+    await _syncMetadataNow();
+    if (autoSync && scope.bookFiles && _backgroundUploadQueue.isNotEmpty) {
+      unawaited(_drainBackgroundBookUploads());
+    }
+    if (autoSync && scope.bookFiles) {
+      unawaited(
+        synchronizeTextFiles(automatic: true).catchError((Object error) {
+          debugPrint('TXT synchronization will retry: ${error.runtimeType}');
+        }),
+      );
+    }
+  }
+
+  Future<void> synchronizeTextFiles({bool automatic = false}) {
+    if (!isConfigured || !scope.bookFiles) return Future<void>.value();
+    return _fileRun ??= _runTextFiles(automatic: automatic).whenComplete(() {
+      _fileRun = null;
+      notifyListeners();
+    });
+  }
+
+  Future<void> _runTextFiles({required bool automatic}) async {
+    notifyListeners();
+    final connection = '$serverUrl|$username|$rootPath';
+    try {
+      // Follow a storage upgrade on the file lane. Waiting for another file
+      // operation must never delay the independent reading-progress lane.
+      final boundUids = (await _mutableTxt.listStates())
+          .map((state) => state.bookUid)
+          .toSet();
+      for (final remote in _remoteBooks.toList(growable: false)) {
+        final remotePath = remote.remotePath;
+        final hash = remote.blobSha256;
+        final size = remote.sizeBytes;
+        if (!boundUids.contains(remote.bookUid) ||
+            remote.format.toLowerCase() != 'txt' ||
+            remotePath == null ||
+            !remotePath.startsWith('v3:') ||
+            hash == null ||
+            size == null) {
+          continue;
+        }
+        await _mutableTxt.followRemoteStorage(
+          bookUid: remote.bookUid,
+          remotePath: remotePath,
+          contentHash: hash,
+          fileSize: size,
+        );
+      }
+      final result = await _mutableTxt.reconcile(
+        shouldContinue: () =>
+            !_disposed &&
+            isConfigured &&
+            scope.bookFiles &&
+            connection == '$serverUrl|$username|$rootPath' &&
+            (!automatic || autoSync),
+      );
+      _textStates = await _mutableTxt.listStates();
+      if (result.failed > 0 ||
+          result.conflicts > 0 ||
+          _textStates.any(
+            (s) =>
+                s.status == MutableTxtSyncStatus.failed ||
+                s.status == MutableTxtSyncStatus.conflict,
+          )) {
+        _status = WebDavSyncStatus.partialFailure;
+      }
+      if (result.downloaded > 0) LibraryEventBus().notifyLibraryChanged();
+      if (result.uploaded > 0 || result.downloaded > 0) {
+        // Publish the file descriptor after its current TXT is committed.
+        // This stays on the small metadata lane, independent of file transfer.
+        await _syncMetadataNow();
+      }
+      await _refreshRemoteBooks();
+    } catch (_) {
+      _status = WebDavSyncStatus.partialFailure;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> _onTextChanged(TxtContentChanged event) async {
+    if (event.origin == TxtContentChangeOrigin.remoteApply || !isConfigured) {
+      return;
+    }
+    try {
+      final uid = await stableBookUid(event.book);
+      final bindings = await _mutableTxt.listStates();
+      if (!bindings.any((state) => state.bookUid == uid)) return;
+      await _mutableTxt.enqueueLocalUpdate(event.book, bookUid: uid);
+      _textStates = await _mutableTxt.listStates();
+      notifyListeners();
+      requestAutomaticSync();
+    } catch (error) {
+      // The editor has committed the original file. Reconciliation detects its
+      // hash after restart even if queuing this notification fails.
+      debugPrint('TXT update will be reconciled: ${error.runtimeType}');
+    }
+  }
 
   bool get isConfigured => _configuration != null;
   WebDavSyncStatus get status => _status;
@@ -73,21 +233,15 @@ class WebDavSyncController extends ChangeNotifier {
   SyncFileCapabilities get fileCapabilities => const SyncFileCapabilities();
 
   /// Queues automatic uploads without making the caller wait for network I/O.
-  /// Existing remote titles and titles already queued in this app session are
-  /// skipped before any transfer starts.
+  /// Queue identity uses the local book, never its title: unrelated books can
+  /// legitimately share a name. The file service resolves the stable identity.
   int enqueueNewBookUploads(Iterable<Book> books) {
-    if (!isConfigured || !scope.bookFiles) return 0;
-    final remoteTitles = remoteBooks
-        .map((book) => _normalizedBookTitle(book.title))
-        .where((title) => title.isNotEmpty)
-        .toSet();
+    if (!isConfigured || !scope.bookFiles || !autoSync) return 0;
     var queued = 0;
     for (final book in books) {
       if (book.isOnline || book.filePath.isEmpty) continue;
-      final title = _normalizedBookTitle(book.title);
-      if (title.isEmpty ||
-          remoteTitles.contains(title) ||
-          !_backgroundUploadTitles.add(title)) {
+      final identity = '${book.id ?? book.filePath}';
+      if (!_backgroundUploadTitles.add(identity)) {
         continue;
       }
       _backgroundUploadQueue.add(book);
@@ -98,9 +252,13 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
+    // Finishing an interrupted local file swap does not require credentials
+    // or permission to make a network request.
+    await _mutableTxt.recoverLocalState();
     _configuration = await _configStore.readConfiguration();
     _scope = SyncDatasetCatalog.normalizeScope(await _configStore.readScope());
     _newBookUploadPolicy = await _configStore.readNewBookUploadPolicy();
+    _autoResume = await _configStore.readAutoResume();
     _pendingChanges = await _enabledPendingCount();
     final lastSuccess = await _changeStore.getState('last_successful_sync');
     _lastSuccessfulSync = lastSuccess == null
@@ -110,6 +268,21 @@ class WebDavSyncController extends ChangeNotifier {
         ? WebDavSyncStatus.idle
         : WebDavSyncStatus.unconfigured;
     await _refreshRemoteBooks();
+    _progressSubscription ??= ReadingProgressSyncService.instance.events.listen(
+      (event) {
+        _progressGeneration++;
+        _progressPending = true;
+        notifyListeners();
+        requestAutomaticSync(
+          immediate: event.kind == ReadingProgressSyncEventKind.readerClosed,
+        );
+      },
+    );
+    _textSubscription ??= TxtContentChangeBus.instance.stream.listen(
+      (event) => unawaited(_onTextChanged(event)),
+    );
+    _textStates = await _mutableTxt.listStates();
+    _scheduler.start();
     notifyListeners();
   }
 
@@ -155,18 +328,46 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   Future<void> configure(WebDavSyncConfigDraft draft) async {
+    _ensureConnectionIdle();
+    _scheduler.cancelPending();
     final password = await _resolvePassword(draft.password);
     final configuration = draft.withoutPassword(
       autoSync: _configuration?.autoSync ?? true,
     );
+    if (_configuration == null) {
+      _scope = await _configStore.readScope();
+      await _configStore.saveScope(_scope);
+    }
+    final old = _configuration;
+    if (old == null ||
+        old.serverUrl != configuration.serverUrl ||
+        old.rootPath != configuration.rootPath ||
+        old.username != configuration.username) {
+      await _changeStore.resetRemoteMirrorForNewSpace();
+      _remoteBooks = const [];
+      _lastResult = null;
+      _lastSuccessfulSync = null;
+      _lastProgressSyncAt = null;
+      _lastCheckedAt = null;
+      _backgroundUploadQueue.clear();
+      _backgroundUploadTitles.clear();
+    }
     await _configStore.save(configuration, password);
     _configuration = configuration;
     _status = WebDavSyncStatus.idle;
     _clearError();
     notifyListeners();
+    requestAutomaticSync(immediate: true);
   }
 
   Future<WebDavSyncRunResult> syncNow() {
+    return _syncMetadataNow().then((result) async {
+      if (scope.bookFiles) await synchronizeTextFiles();
+      return result;
+    });
+  }
+
+  Future<WebDavSyncRunResult> _syncMetadataNow() {
     final running = _running;
     if (running != null) return running;
     final future = _runSync();
@@ -176,6 +377,8 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   Future<WebDavSyncRunResult> _runSync() async {
+    final progressGeneration = _progressGeneration;
+    final syncProgress = scope.progress;
     if (!isConfigured) {
       const failure = WebDavSyncFailure(
         WebDavSyncErrorCode.invalidConfiguration,
@@ -206,6 +409,11 @@ class WebDavSyncController extends ChangeNotifier {
         },
       );
       _lastResult = result;
+      _lastCheckedAt = result.completedAt;
+      if (syncProgress) {
+        _lastProgressSyncAt = result.completedAt;
+        if (progressGeneration == _progressGeneration) _progressPending = false;
+      }
       _lastFailedPhase = WebDavSyncPhase.none;
       _lastSuccessfulSync = result.completedAt;
       await _changeStore.setState(
@@ -217,7 +425,15 @@ class WebDavSyncController extends ChangeNotifier {
       if (result.downloaded > 0) {
         LibraryEventBus().notifyLibraryChanged();
       }
-      _status = WebDavSyncStatus.success;
+      _status =
+          scope.bookFiles &&
+              _textStates.any(
+                (state) =>
+                    state.status == MutableTxtSyncStatus.failed ||
+                    state.status == MutableTxtSyncStatus.conflict,
+              )
+          ? WebDavSyncStatus.partialFailure
+          : WebDavSyncStatus.success;
       _phase = WebDavSyncPhase.none;
       notifyListeners();
       return result;
@@ -260,6 +476,17 @@ class WebDavSyncController extends ChangeNotifier {
     final updated = current.copyWith(autoSync: enabled);
     await _configStore.save(updated, credentials.password);
     _configuration = updated;
+    if (enabled) {
+      _scheduler.request(immediate: true);
+    } else {
+      _scheduler.cancelPending();
+    }
+    notifyListeners();
+  }
+
+  Future<void> setAutoResume(bool enabled) async {
+    await _configStore.saveAutoResume(enabled);
+    _autoResume = enabled;
     notifyListeners();
   }
 
@@ -282,8 +509,19 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   Future<void> clearConfiguration() async {
+    _ensureConnectionIdle();
+    _scheduler.cancelPending();
     await _configStore.clear();
     _configuration = null;
+    _autoResume = true;
+    _lastResult = null;
+    _lastCheckedAt = null;
+    _lastProgressSyncAt = null;
+    _lastSuccessfulSync = null;
+    _textStates = const [];
+    _remoteBooks = const [];
+    _backgroundUploadQueue.clear();
+    _backgroundUploadTitles.clear();
     _scope = const WebDavSyncScope();
     _status = WebDavSyncStatus.unconfigured;
     _phase = WebDavSyncPhase.none;
@@ -291,6 +529,16 @@ class WebDavSyncController extends ChangeNotifier {
     _newBookUploadPolicy = WebDavNewBookUploadPolicy.askEveryTime;
     _clearError();
     notifyListeners();
+    await _changeStore.resetRemoteMirrorForNewSpace();
+  }
+
+  void _ensureConnectionIdle() {
+    if (_running != null || _fileRun != null || _backgroundUploadRunning) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'Wait for the active transfer before changing the storage connection.',
+      );
+    }
   }
 
   Future<void> refreshRemoteBooks() async {
@@ -300,6 +548,7 @@ class WebDavSyncController extends ChangeNotifier {
 
   Future<RemoteBookDescriptor> uploadBookFile(
     Book book, {
+    bool incrementalTxt = false,
     void Function(BookFileTransferProgress progress)? onProgress,
   }) async {
     if (!_scope.bookFiles) {
@@ -310,6 +559,7 @@ class WebDavSyncController extends ChangeNotifier {
     }
     final descriptor = await _bookFileService.upload(
       book,
+      incrementalTxt: incrementalTxt,
       onProgress: onProgress,
     );
     await syncNow();
@@ -371,14 +621,15 @@ class WebDavSyncController extends ChangeNotifier {
     _backgroundUploadRunning = true;
     try {
       while (_backgroundUploadQueue.isNotEmpty) {
+        if (!isConfigured || !autoSync || !scope.bookFiles) break;
         final book = _backgroundUploadQueue.removeAt(0);
-        final title = _normalizedBookTitle(book.title);
         try {
           await uploadBookFile(book);
         } catch (error, stackTrace) {
-          _backgroundUploadTitles.remove(title);
+          _backgroundUploadQueue.insert(0, book);
           debugPrint('Background WebDAV book upload failed: $error');
           debugPrintStack(stackTrace: stackTrace);
+          break;
         }
       }
     } finally {
@@ -396,7 +647,18 @@ class WebDavSyncController extends ChangeNotifier {
     _lastError = null;
     _lastErrorMessage = null;
   }
-}
 
-String _normalizedBookTitle(String title) =>
-    title.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _scheduler.dispose();
+    unawaited(_progressSubscription?.cancel());
+    unawaited(_textSubscription?.cancel());
+    super.dispose();
+  }
+}

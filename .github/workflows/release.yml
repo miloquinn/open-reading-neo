@@ -245,11 +245,16 @@ jobs:
           fi
 
           for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
-            "$apksigner_path" verify --verbose "$apk" >/dev/null
+            signing_report="$("$apksigner_path" verify --verbose "$apk")"
+            if ! grep -Fxq 'Verified using v3 scheme (APK Signature Scheme v3): true' <<< "$signing_report"; then
+              echo "::error::$(basename "$apk") is missing the required APK Signature Scheme v3 signature."
+              echo "$signing_report"
+              exit 1
+            fi
             # Newer build-tools print "V2 Signer:"; older ones print "Signer #1".
             actual_digest="$(
               "$apksigner_path" verify --print-certs "$apk" \
-                | sed -n -E 's/^.*(Signer #[0-9]+|V[0-9]+ Signer): certificate SHA-256 digest: //p' \
+                | sed -n -E 's/^.*(Signer #[0-9]+|V[0-9]+ Signer):? certificate SHA-256 digest: //p' \
                 | head -n 1 \
                 | tr -d ':' \
                 | tr '[:upper:]' '[:lower:]'

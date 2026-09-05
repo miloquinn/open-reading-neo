@@ -4,7 +4,7 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import 'package:xxread/book_sources/source_engine/rules/source_rule_engine.dart';
-import 'package:xxread/book_sources/source_engine/rules/source_rule_regex.dart';
+import 'package:xxread/book_sources/source_engine/rules/source_rule_parser.dart';
 
 import 'source_script_contract.dart';
 import 'source_script_state.dart';
@@ -36,10 +36,15 @@ class SourceScriptDomApi {
     final content = arguments.length > 1 ? arguments[1] : context.result;
     final document = _document(content, context);
     if (!listMode) {
-      final values = _selectors.evaluateList(document, document.value, rule);
-      if (values.isEmpty) return '';
-      return values.map(sourceRuleStringValue).join('\n');
+      return _selectors.evaluateString(
+        document,
+        document.value,
+        rule,
+        joinSeparator: '\n',
+        regexDotAll: false,
+      );
     }
+    final transform = splitSourceRuleTransform(rule);
     return _selectors
         .evaluateList(document, document.value, rule)
         .map((item) {
@@ -47,6 +52,21 @@ class SourceScriptDomApi {
           if (item is Map || item is List) return jsonEncode(item);
           return '$item';
         })
+        .map(
+          (value) => transform.pattern == null
+              ? value
+              : transform.extractFirst
+              ? _selectors.evaluateString(
+                  SourceRuleDocument.fromValue(value, document.baseUri),
+                  null,
+                  '##${transform.pattern}##${transform.replacement}###',
+                  regexDotAll: false,
+                )
+              : _selectors.applyReplaceRule(
+                  value,
+                  '##${transform.pattern}##${transform.replacement}',
+                ),
+        )
         .toList(growable: false);
   }
 

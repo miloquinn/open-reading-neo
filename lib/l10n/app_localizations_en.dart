@@ -416,19 +416,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get bookSourcesCleanupReviewTitle => 'Cleanup review';
+  String get bookSourcesCleanupReviewTitle => 'Health results';
 
   @override
   String bookSourcesCleanupReviewSummary(
     int fullyAvailable,
     int needsAttention,
   ) {
-    return '$fullyAvailable fully available, $needsAttention need attention';
+    return '$fullyAvailable fully available · $needsAttention to review';
   }
 
   @override
   String get bookSourcesCleanupReviewHint =>
-      'These sources didn\'t pass every check. Selected ones will be disabled.';
+      'Missing features or a timeout do not mean a source is unusable. Select only the sources you want to disable.';
 
   @override
   String bookSourcesCleanupDisableSelected(int count) {
@@ -450,7 +450,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookSourcesMaintenanceSubtitle =>
-      'Check source health and disable broken or duplicate entries';
+      'Find duplicates, then check availability as needed';
 
   @override
   String get bookSourcesMaintenanceHealthTitle => 'Source health check';
@@ -3852,6 +3852,96 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerSettingsAdvancedTypography => 'Advanced typography';
 
   @override
+  String get readerAutoPageTurnTitle => 'Auto page turn';
+
+  @override
+  String get readerAutoPageTurnOff => 'Not started';
+
+  @override
+  String get readerAutoPageTurnShortcutTitle => 'Automatic reading shortcut';
+
+  @override
+  String get readerAutoPageTurnShortcutHint =>
+      'Show with the reading controls for quick start or pause';
+
+  @override
+  String get readerAutoPageTurnHint =>
+      'Advance one screen at the selected interval, including in vertical paging mode.';
+
+  @override
+  String get readerAutoPageTurnModeTimed => 'Timed page turn';
+
+  @override
+  String get readerAutoPageTurnModeSweep => 'Sweep page turn';
+
+  @override
+  String get readerAutoPageTurnModeContinuous => 'Continuous scroll';
+
+  @override
+  String get readerAutoPageTurnModeInterval => 'Interval scroll';
+
+  @override
+  String get readerAutoPageTurnTimedHint =>
+      'Wait for the selected interval, then turn to the next page.';
+
+  @override
+  String get readerAutoPageTurnSweepHint =>
+      'A line sweeps downward, gradually revealing the next page above it.';
+
+  @override
+  String get readerAutoPageTurnContinuousHint =>
+      'Scroll downward continuously at a steady reading speed.';
+
+  @override
+  String get readerAutoPageTurnIntervalHint =>
+      'Wait for the selected interval, then scroll down by about one screen.';
+
+  @override
+  String get readerAutoPageTurnSweepDurationLabel => 'Sweep duration';
+
+  @override
+  String get readerAutoPageTurnScrollSpeedLabel => 'Scroll speed';
+
+  @override
+  String readerAutoPageTurnSecondsPerScreen(int seconds) {
+    return '$seconds seconds per screen';
+  }
+
+  @override
+  String readerAutoPageTurnModeValue(String mode, int seconds) {
+    return '$mode · ${seconds}s/screen';
+  }
+
+  @override
+  String readerAutoPageTurnModePaused(String mode, int seconds) {
+    return 'Paused · $mode · ${seconds}s/screen';
+  }
+
+  @override
+  String get readerAutoPageTurnIntervalLabel => 'Page interval';
+
+  @override
+  String readerAutoPageTurnInterval(int seconds) {
+    return '$seconds seconds per screen';
+  }
+
+  @override
+  String get readerAutoPageTurnStart => 'Start auto page turn';
+
+  @override
+  String get readerAutoPageTurnResume => 'Resume auto page turn';
+
+  @override
+  String readerAutoPageTurnRunning(int seconds) {
+    return 'Auto · ${seconds}s/screen';
+  }
+
+  @override
+  String readerAutoPageTurnPaused(int seconds) {
+    return 'Paused · ${seconds}s/screen';
+  }
+
+  @override
   String get readerThemeDay => 'Day';
 
   @override
@@ -5224,7 +5314,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get webDavFilesTooLarge =>
-      'Files over 100 MiB are not supported in this release';
+      'This file exceeds the sync size limit for its format';
 
   @override
   String get webDavFilesEmpty => 'No books in this category';
@@ -5764,4 +5854,336 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readingDataExportUnknownChapter => 'Unlocated annotations';
+
+  @override
+  String get cloudSyncTitle => 'Cloud sync';
+
+  @override
+  String get cloudSyncTagline => 'Pick up where you left off on another device';
+
+  @override
+  String get cloudSyncResumeTitle => 'Continue across devices';
+
+  @override
+  String get cloudSyncAutoResume => 'Resume when opening a book';
+
+  @override
+  String get cloudSyncAutoResumeHint =>
+      'Check the latest position on open; offer updates while reading';
+
+  @override
+  String get cloudSyncAutoHint =>
+      'Save progress while reading and check updates when opening a book';
+
+  @override
+  String get cloudSyncMoreContent => 'More sync options';
+
+  @override
+  String get cloudSyncBooks => 'Books and text';
+
+  @override
+  String get cloudSyncBooksHint =>
+      'Participating books, text updates and downloads';
+
+  @override
+  String get cloudSyncActivity => 'Sync activity and attention needed';
+
+  @override
+  String get cloudSyncStorage => 'Storage connection';
+
+  @override
+  String get cloudSyncNoActivity => 'No sync activity yet';
+
+  @override
+  String get cloudSyncProgress => 'Reading position';
+
+  @override
+  String get cloudSyncText => 'Book text files';
+
+  @override
+  String get cloudSyncMetadataComplete =>
+      'Selected reading data exchanged with WebDAV';
+
+  @override
+  String get cloudSyncPaused => 'Automatic sync is paused';
+
+  @override
+  String get cloudSyncLocalOnly => 'Keep on this device';
+
+  @override
+  String get cloudSyncCheckHint =>
+      'A connection does not confirm receipt on other devices; check each item below';
+
+  @override
+  String get cloudSyncPendingFiles => 'Text updates need attention';
+
+  @override
+  String get cloudSyncFileIdle =>
+      'Linked text files will be checked on the next sync';
+
+  @override
+  String get cloudSyncManageBooks => 'Choose books and downloads';
+
+  @override
+  String get cloudSyncNoBooks => 'No TXT books are linked yet';
+
+  @override
+  String get cloudSyncCompare => 'Compare versions';
+
+  @override
+  String get cloudSyncKeepLocal => 'Use this device’s version';
+
+  @override
+  String get cloudSyncUseRemote => 'Use the cloud version';
+
+  @override
+  String get cloudSyncBothKept =>
+      'Both versions are preserved. Sync continues after your choice.';
+
+  @override
+  String get cloudSyncPreviewLimited =>
+      'Preview shows the first difference. Both full versions are preserved.';
+
+  @override
+  String get cloudSyncPending => 'Waiting to sync';
+
+  @override
+  String get cloudSyncConflict => 'Versions need review';
+
+  @override
+  String get cloudSyncCurrent => 'Current text is synced to WebDAV';
+
+  @override
+  String get cloudSyncFailed => 'Sync incomplete. Retry available.';
+
+  @override
+  String get cloudSyncHistory => 'Version history';
+
+  @override
+  String get cloudSyncApplyUpdate => 'Apply text update';
+
+  @override
+  String get cloudSyncParticipate => 'Sync this book’s text';
+
+  @override
+  String get cloudSyncCloseReaderToUpdate =>
+      'Close this book’s reader or editor before applying the text update';
+
+  @override
+  String get cloudSyncTextLocation => 'Current cloud file';
+
+  @override
+  String get cloudSyncTextLocationHint =>
+      'Text edits update the TXT at the location below. Copies uploaded before the upgrade remain available but do not receive later edits.';
+
+  @override
+  String get bookSourcesImportIntro =>
+      'Choose a link or JSON file, then review before adding.';
+
+  @override
+  String get bookSourcesImportInputStep => 'Choose source';
+
+  @override
+  String get bookSourcesImportReviewStep => 'Review & import';
+
+  @override
+  String get bookSourcesImportFileHint => 'Select a JSON source file.';
+
+  @override
+  String get bookSourcesImportDownloading => 'Downloading source…';
+
+  @override
+  String get bookSourcesImportAnalyzing =>
+      'Reading rules and checking duplicates…';
+
+  @override
+  String get bookSourcesImportSaving => 'Saving sources…';
+
+  @override
+  String get bookSourcesImportPicking => 'Opening file picker…';
+
+  @override
+  String get bookSourcesImportWaitHint =>
+      'Large source lists can take longer. You can cancel and try again.';
+
+  @override
+  String get bookSourcesImportSaveHint =>
+      'Please keep this window open until saving finishes.';
+
+  @override
+  String get bookSourcesImportReady => 'Ready to import';
+
+  @override
+  String get bookSourcesImportEmpty =>
+      'No sources selected. Check the file or duplicate selection.';
+
+  @override
+  String get bookSourcesImportRetry => 'Try again';
+
+  @override
+  String get bookSourcesImportFailed =>
+      'Could not read sources. Check the address or file and try again.';
+
+  @override
+  String get bookSourcesImportSaveFailed =>
+      'Could not save sources. Your preview is kept; please try again.';
+
+  @override
+  String get bookSourcesImportErrorDetails => 'Error details';
+
+  @override
+  String get bookSourcesImportFileUnreadable =>
+      'Could not read the selected file. Choose it again.';
+
+  @override
+  String bookSourcesImportAction(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Import $count sources',
+      one: 'Import 1 source',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get bookSourcesImportFileTab => 'JSON file';
+
+  @override
+  String get bookSourcesImportTimedOut =>
+      'Reading took too long. Check your connection or try importing a downloaded JSON file.';
+
+  @override
+  String get cloudSyncIncrementalMode => 'Incremental storage';
+
+  @override
+  String get cloudSyncPlainMode => 'Standard TXT file';
+
+  @override
+  String get cloudSyncIncrementalDescription =>
+      'After the first upload, only changed content blocks are transferred. Your local book stays a complete TXT.';
+
+  @override
+  String get cloudSyncEnableIncremental => 'Use incremental storage';
+
+  @override
+  String get cloudSyncIncrementalConfirmTitle =>
+      'Change this book’s cloud storage?';
+
+  @override
+  String get cloudSyncIncrementalConfirmBody =>
+      'The cloud copy will use an app-managed block format. Existing TXT copies will be kept but will stop receiving updates. Other devices need a version of this app that supports incremental storage. Your complete TXT remains available locally.';
+
+  @override
+  String get cloudSyncIncrementalConfirm => 'Switch and sync';
+
+  @override
+  String get bookSourcesImportUsageNotice => 'Source usage information';
+
+  @override
+  String get bookSourcesMaintenanceScope => 'Scope';
+
+  @override
+  String get bookSourcesMaintenanceScopeEnabled => 'Enabled';
+
+  @override
+  String get bookSourcesMaintenanceScopeAll => 'All sources';
+
+  @override
+  String get bookSourcesMaintenanceScopeSelected => 'Selected';
+
+  @override
+  String bookSourcesMaintenanceCount(int count) {
+    return '$count sources in this scope';
+  }
+
+  @override
+  String get bookSourcesMaintenanceEmptyScope => 'No sources in this scope';
+
+  @override
+  String get bookSourcesMaintenanceLocalLabel => 'Local cleanup';
+
+  @override
+  String get bookSourcesMaintenanceNetworkLabel => 'Online checks';
+
+  @override
+  String get bookSourcesMaintenanceCancelledTitle => 'Check stopped';
+
+  @override
+  String get bookSourcesMaintenanceCancellingTitle => 'Stopping checks';
+
+  @override
+  String get bookSourcesMaintenanceCancellingHint =>
+      'Finishing active checks and keeping completed results';
+
+  @override
+  String get bookSourcesMaintenanceFailedTitle => 'Check interrupted';
+
+  @override
+  String get bookSourcesMaintenanceResume => 'Resume remaining checks';
+
+  @override
+  String get bookSourcesMaintenanceRetry => 'Retry unresolved checks';
+
+  @override
+  String bookSourcesMaintenanceRemaining(int count) {
+    return '$count sources not checked yet';
+  }
+
+  @override
+  String get bookSourcesMaintenanceResultTitle => 'Health results';
+
+  @override
+  String get bookSourcesMaintenanceReviewAll => 'All results';
+
+  @override
+  String get bookSourcesMaintenanceAvailable => 'Available';
+
+  @override
+  String get bookSourcesMaintenanceLimited => 'Partial';
+
+  @override
+  String get bookSourcesMaintenanceFailed => 'Failed checks';
+
+  @override
+  String get bookSourcesMaintenanceTimedOut => 'Timed out';
+
+  @override
+  String get bookSourcesMaintenanceUnchecked => 'Unconfirmed';
+
+  @override
+  String get bookSourcesMaintenanceReviewSearch => 'Search name or address';
+
+  @override
+  String get bookSourcesMaintenanceReviewEmpty => 'No matching results';
+
+  @override
+  String bookSourcesMaintenanceReviewSelection(int count) {
+    return '$count selected to disable';
+  }
+
+  @override
+  String get bookSourcesMaintenanceSelectFailures => 'Select failed checks';
+
+  @override
+  String get bookSourcesMaintenanceTimeoutReason =>
+      'Connection timed out; retry later';
+
+  @override
+  String get bookSourcesMaintenanceUncheckedReason =>
+      'No conclusive result from this check';
+
+  @override
+  String get bookSourcesMaintenanceAvailableReason => 'Core checks passed';
+
+  @override
+  String get bookSourcesMaintenanceDedupeBusy => 'Finding duplicates…';
+
+  @override
+  String get bookSourcesMaintenanceShelfProtected =>
+      'Used by your shelf · kept by default';
+
+  @override
+  String get bookSourcesMaintenanceApplyFailed =>
+      'Could not save changes. Try again.';
 }

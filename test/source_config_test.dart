@@ -147,6 +147,63 @@ void main() {
     expect(scripted.canRun, isTrue);
   });
 
+  test(
+    'compatibility markers remain case insensitive and exclude optional fields',
+    () {
+      const scanner = SourceCompatibilityScanner();
+      final source = ReadingSourceConfig.fromJson({
+        ..._source(),
+        'jsLib': 'prefix WebView and WEBJS suffix',
+        'header': '{"DNSIP":"1.2.3.4", "PrOxY":"http://proxy.example"}',
+        'custom': {
+          'WebViewOption': 'enabled',
+          'loginUrl': 'https://login.example',
+        },
+      });
+      final report = scanner.scan(source);
+      expect(report.level, SourceCompatibilityLevel.partial);
+      expect(report.issues, {
+        SourceCompatibilityIssue.webView,
+        SourceCompatibilityIssue.customDns,
+        SourceCompatibilityIssue.customProxy,
+        SourceCompatibilityIssue.login,
+      });
+      final optional = ReadingSourceConfig.fromJson({
+        ..._source(),
+        'exploreUrl': 'WEBJS',
+        'ruleExplore': {'content': 'WebView "dnsip" "proxy"'},
+        'loginUrl': 'https://login.example',
+        'loginCheckJs': 'WebView',
+      });
+      expect(scanner.scan(optional).issues, isEmpty);
+    },
+  );
+
+  test(
+    'capability counts match registered sources for map and serialized rules',
+    () {
+      for (final serialize in [false, true]) {
+        final raw = _source(exploreUrl: '排行榜::/rank?page={{page}}');
+        if (serialize) {
+          for (final name in [
+            'ruleSearch',
+            'ruleBookInfo',
+            'ruleToc',
+            'ruleContent',
+          ]) {
+            raw[name] = jsonEncode(raw[name]);
+          }
+        }
+        final source = ReadingSourceConfig.fromJson(raw);
+        expect(
+          source.runnableCapabilities,
+          source.toRegisteredSource().capabilities,
+        );
+        expect(source.runnableCapabilities, hasLength(6));
+      }
+    },
+  );
+
   test('infers legacy type-zero manga from its complete image rule chain', () {
     final source = ReadingSourceConfig.fromJson({
       ..._source(

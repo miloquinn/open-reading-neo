@@ -43,6 +43,7 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
           onSelectCategory: (category) =>
               unawaited(_selectListCategory(category)),
           shouldAnimateSource: _revealedListSourceIds.add,
+          sourceActionsBuilder: _sourceActions,
         ),
       ];
     }
@@ -53,10 +54,173 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
           category: _state.selectedCategory!,
           changeLabel: context.l10n.bookSourceChangeChannel,
           onChange: _returnToListDirectory,
+          actions: _sourceActions(_state.selectedCategory!.source),
         ),
-        bottomPadding: 12,
+        topPadding: 0,
+        bottomPadding: 8,
       ),
       ..._buildCategoriesSlivers(cache, bottomPadding, showChannelStrip: false),
+    ];
+  }
+
+  List<Widget> _buildCategoriesSlivers(
+    BookSourcesSectionCache cache,
+    double bottomPadding, {
+    bool showChannelStrip = true,
+  }) {
+    final categories = (cache.categories ?? const <SourcedBookCategory>[])
+        .where((category) => _state.matchesSelectedSource(category.source))
+        .toList(growable: false);
+    if (categories.isEmpty) {
+      return [
+        _paddedSectionSliver(
+          _state.sourcesFor(BookSourcesSection.categories).isEmpty
+              ? _buildUnsupportedMessage('categories')
+              : _buildEmptyMessage(),
+          bottomPadding: bottomPadding,
+        ),
+      ];
+    }
+    final selectedCategory = _state.selectedCategory ?? categories.first;
+    final slivers = <Widget>[];
+    if (showChannelStrip) {
+      slivers.add(
+        _paddedSectionSliver(
+          _buildCategoryChannels(categories, selectedCategory),
+          bottomPadding: 18,
+        ),
+      );
+    }
+    if (_state.loadingCategoryBooks) {
+      slivers.add(
+        _paddedSectionSliver(
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 36),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          topPadding: 0,
+          bottomPadding: bottomPadding,
+        ),
+      );
+    } else if (_state.categoryLoadError != null) {
+      slivers.add(
+        _paddedSectionSliver(
+          BookSourceMessageCard(
+            icon: Icons.cloud_off_outlined,
+            title: context.l10n.bookSourceChannelLoadFailed,
+            message: context.l10n.bookSourceChannelLoadFailedMessage(
+              _categoryErrorMessage(_state.categoryLoadError!),
+            ),
+            actionLabel: context.l10n.retry,
+            onAction: () => _controller.selectCategory(selectedCategory),
+          ),
+          topPadding: 0,
+          bottomPadding: bottomPadding,
+        ),
+      );
+    } else if (_state.categoryBooks.isEmpty) {
+      slivers.add(
+        _paddedSectionSliver(
+          BookSourceMessageCard(
+            icon: Icons.menu_book_outlined,
+            title: context.l10n.bookSourcesNoResults,
+            message: context.l10n.discoverCategoryEmpty,
+          ),
+          topPadding: 0,
+          bottomPadding: bottomPadding,
+        ),
+      );
+    } else {
+      slivers.add(
+        _bookListSliver(
+          _state.categoryBooks,
+          bottomPadding:
+              _state.categoryHasMore ||
+                  _state.loadingMoreCategoryBooks ||
+                  _state.categoryLoadMoreFailed
+              ? 12
+              : bottomPadding,
+        ),
+      );
+      if (_state.categoryHasMore ||
+          _state.loadingMoreCategoryBooks ||
+          _state.categoryLoadMoreFailed) {
+        slivers.add(
+          _paddedSectionSliver(
+            Center(
+              child: _state.loadingMoreCategoryBooks
+                  ? const CircularProgressIndicator()
+                  : OutlinedButton.icon(
+                      key: const Key('bookSourceCategoryLoadMore'),
+                      onPressed: _controller.loadMoreCategory,
+                      icon: Icon(
+                        _state.categoryLoadMoreFailed
+                            ? Icons.refresh_rounded
+                            : Icons.expand_more_rounded,
+                      ),
+                      label: Text(
+                        _state.categoryLoadMoreFailed
+                            ? context.l10n.retry
+                            : context.l10n.bookSourcesLoadMore,
+                      ),
+                    ),
+            ),
+            topPadding: 0,
+            bottomPadding: bottomPadding,
+          ),
+        );
+      }
+    }
+    // Category controls remain live while only the book results transition.
+    // Loading, error and empty states use the same lazy content boundary.
+    final channelSliver = showChannelStrip ? slivers.removeAt(0) : null;
+    final phase = _state.loadingCategoryBooks
+        ? 'loading'
+        : _state.categoryLoadError != null
+        ? 'error'
+        : _state.categoryBooks.isEmpty
+        ? 'empty'
+        : 'books';
+    return [
+      ?channelSliver,
+      if (showChannelStrip)
+        _paddedSectionSliver(
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selectedCategory.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Flexible(
+                child: Text(
+                  selectedCategory.source.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              if (_state.selectedSourceId == null)
+                _sourceActions(selectedCategory.source),
+            ],
+          ),
+          topPadding: 0,
+          bottomPadding: 0,
+        ),
+      BookSourceSliverTransition(
+        key: const Key('bookSourceCategoryTransition'),
+        identity: (selectedCategory.source.id, selectedCategory.id, phase),
+        slivers: slivers,
+      ),
     ];
   }
 
@@ -68,25 +232,15 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
   Future<void> _selectListCategory(SourcedBookCategory category) async {
     if (_scrollController.hasClients) {
       _listDirectoryScrollOffset = _scrollController.offset;
-      _scrollController.jumpTo(0);
     }
+    _pendingScrollOffset = 0;
     await _controller.selectListCategory(category);
   }
 
   void _returnToListDirectory() {
-    if (_scrollController.hasClients && _scrollController.offset != 0) {
-      _scrollController.jumpTo(0);
-    }
+    _revealedListSourceIds.clear();
+    _pendingScrollOffset = _listDirectoryScrollOffset ?? 0;
     _controller.returnToListDirectory();
-    final target = _listDirectoryScrollOffset;
-    if (target == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      final position = _scrollController.position;
-      _scrollController.jumpTo(
-        target.clamp(position.minScrollExtent, position.maxScrollExtent),
-      );
-    });
   }
 
   Widget _buildCategoryChannels(
@@ -96,7 +250,7 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
     return BookSourceCategoryChannels(
       categories: categories,
       selectedCategory: selectedCategory,
-      pickerLabel: context.l10n.discoverCategories,
+      pickerLabel: context.l10n.statsRangeAll,
       onSelected: (category) => unawaited(_controller.selectCategory(category)),
       onOpenPicker: () => unawaited(_openCategoryPicker(categories)),
     );
@@ -131,7 +285,7 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, childIndex) {
-            if (childIndex.isOdd) return const SizedBox(height: 10);
+            if (childIndex.isOdd) return const SizedBox(height: 4);
             final index = childIndex ~/ 2;
             final result = books[index];
             return BookSourceListReveal(
@@ -143,7 +297,13 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
               child: _centerSectionChild(
                 SourcedBookListTile(
                   result: result,
+                  editorial: true,
                   onTap: () => _actions.showBookDetails(result),
+                  onSourceTap:
+                      _state.section == BookSourcesSection.latest &&
+                          _state.selectedSourceId == null
+                      ? () => _showSourceActions(result.source)
+                      : null,
                 ),
               ),
             );

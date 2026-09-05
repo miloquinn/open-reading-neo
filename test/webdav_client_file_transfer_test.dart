@@ -86,6 +86,49 @@ void main() {
       ),
     );
   });
+
+  test('conditional upload sends If-Match and returns the new ETag', () async {
+    final source = File('${temporaryDirectory.path}/book.txt');
+    await source.writeAsString('updated');
+    final adapter = _TransferAdapter(
+      statusCode: 204,
+      responseHeaders: {
+        'etag': ['"revision-2"'],
+      },
+    );
+    final client = _client(adapter);
+
+    final result = await client.putFileConditionally(
+      client.mutablePath(const ['books', 'id', 'current.txt']),
+      source,
+      ifMatch: '"revision-1"',
+    );
+
+    expect(adapter.lastHeaders?['If-Match'], '"revision-1"');
+    expect(adapter.lastHeaders?['If-None-Match'], isNull);
+    expect(result.etag, '"revision-2"');
+  });
+
+  test('conditional upload maps a stale ETag to conflict', () async {
+    final source = File('${temporaryDirectory.path}/book.txt');
+    await source.writeAsString('updated');
+    final client = _client(_TransferAdapter(statusCode: 412));
+
+    await expectLater(
+      client.putFileConditionally(
+        client.mutablePath(const ['books', 'id', 'current.txt']),
+        source,
+        ifMatch: '"stale"',
+      ),
+      throwsA(
+        isA<WebDavSyncFailure>().having(
+          (failure) => failure.code,
+          'code',
+          WebDavSyncErrorCode.conflict,
+        ),
+      ),
+    );
+  });
 }
 
 WebDavClient _client(HttpClientAdapter adapter) {
@@ -113,6 +156,7 @@ class _TransferAdapter implements HttpClientAdapter {
   final List<Uint8List> responseChunks;
   final Map<String, List<String>> responseHeaders;
   final uploadedBytes = <int>[];
+  Map<String, dynamic>? lastHeaders;
 
   @override
   void close({bool force = false}) {}
@@ -123,6 +167,7 @@ class _TransferAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    lastHeaders = Map<String, dynamic>.from(options.headers);
     if (requestStream != null) {
       await for (final chunk in requestStream) {
         uploadedBytes.addAll(chunk);

@@ -481,7 +481,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.find_replace_outlined,
               ),
               _buildActionSetting(
-                title: l10n.settingsWebDavSyncTitle,
+                title: l10n.cloudSyncTitle,
                 badge: l10n.webDavBetaBadge,
                 subtitle: _webDavSyncSubtitle(webDavSync),
                 onTap: () => Navigator.of(context).push(

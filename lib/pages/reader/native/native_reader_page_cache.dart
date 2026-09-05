@@ -8,6 +8,7 @@ extension _NativeReaderPageCache on _NativeReaderPageState {
     TextDirection direction,
     TextScaler textScaler,
   ) {
+    _checkPaginationCacheEpoch();
     final key = _paginationFingerprintFor(
       chapterIndex,
       size,

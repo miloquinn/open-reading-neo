@@ -82,6 +82,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     BookSourceChapterContent content,
     Size viewport,
   ) {
+    _checkOnlinePaginationEpoch();
     final chrome = _verticalChrome;
     final width = readerTextContentWidth(viewport.width, _horizontalMargin);
     final height = _verticalPageExtentFor(viewport);
@@ -135,7 +136,10 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     required bool wholeBook,
   }) {
     if (!_restorePagedPosition) return;
+    _autoScrollRestoring = true;
     final restoreOffset = _restoreTextOffset;
+    final restoreCentered = _autoRestoreCentered;
+    _autoRestoreCentered = false;
     final target = restoreOffset != null
         ? bookSourcePageIndexForOffset(layout.pages, restoreOffset)
         : ((layout.pages.length - 1) * _restorePageProgress).round();
@@ -162,7 +166,10 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
           _chapterIndex,
           _verticalPageIndex,
         ).currentContext;
-        if (targetContext == null) return;
+        if (targetContext == null) {
+          _updateReaderState(() => _autoScrollRestoring = false);
+          return;
+        }
         unawaited(
           Scrollable.ensureVisible(
             targetContext,
@@ -187,9 +194,17 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
           final scrollable = currentTarget == null
               ? null
               : Scrollable.maybeOf(currentTarget);
+          _updateReaderState(() => _autoScrollRestoring = false);
           if (caretOffset != null && scrollable != null) {
+            final paragraph = readerParagraphForKey(
+              _verticalPartKey(_chapterIndex, _verticalPageIndex),
+            );
+            final adjustment = restoreCentered && paragraph != null
+                ? paragraph.localToGlobal(Offset(0, caretOffset)).dy -
+                      MediaQuery.sizeOf(context).height / 2
+                : caretOffset;
             scrollable.position.jumpTo(
-              (scrollable.position.pixels + caretOffset).clamp(
+              (scrollable.position.pixels + adjustment).clamp(
                 scrollable.position.minScrollExtent,
                 scrollable.position.maxScrollExtent,
               ),
@@ -203,7 +218,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
   void _onVerticalPagePositionsChanged() {
     if (!mounted ||
         _pageMode != BookSourcePageMode.verticalScroll ||
-        !_scrollByChapter) {
+        !_effectiveScrollByChapter) {
       return;
     }
     final layout = _verticalLayouts[_chapterIndex];
@@ -237,7 +252,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
   void _onVerticalChapterPositionsChanged() {
     if (!mounted ||
         _pageMode != BookSourcePageMode.verticalScroll ||
-        _scrollByChapter ||
+        _effectiveScrollByChapter ||
         _chapters.isEmpty ||
         _verticalViewportSize.isEmpty) {
       return;
@@ -343,6 +358,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
       fillAvailableSpace: fillAvailableSpace,
       onInteractionChanged: (active) {
         if (!mounted || _annotationInteractionActive == active) return;
+        if (active) _pauseAutoPageTurn();
         _updateReaderState(() => _annotationInteractionActive = active);
       },
     );

@@ -798,13 +798,13 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesCleanupReviewTitle.
   ///
   /// In en, this message translates to:
-  /// **'Cleanup review'**
+  /// **'Health results'**
   String get bookSourcesCleanupReviewTitle;
 
   /// No description provided for @bookSourcesCleanupReviewSummary.
   ///
   /// In en, this message translates to:
-  /// **'{fullyAvailable} fully available, {needsAttention} need attention'**
+  /// **'{fullyAvailable} fully available · {needsAttention} to review'**
   String bookSourcesCleanupReviewSummary(
     int fullyAvailable,
     int needsAttention,
@@ -813,7 +813,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesCleanupReviewHint.
   ///
   /// In en, this message translates to:
-  /// **'These sources didn\'t pass every check. Selected ones will be disabled.'**
+  /// **'Missing features or a timeout do not mean a source is unusable. Select only the sources you want to disable.'**
   String get bookSourcesCleanupReviewHint;
 
   /// No description provided for @bookSourcesCleanupDisableSelected.
@@ -843,7 +843,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesMaintenanceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Check source health and disable broken or duplicate entries'**
+  /// **'Find duplicates, then check availability as needed'**
   String get bookSourcesMaintenanceSubtitle;
 
   /// No description provided for @bookSourcesMaintenanceHealthTitle.
@@ -6826,6 +6826,150 @@ abstract class AppLocalizations {
   /// **'Advanced typography'**
   String get readerSettingsAdvancedTypography;
 
+  /// No description provided for @readerAutoPageTurnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto page turn'**
+  String get readerAutoPageTurnTitle;
+
+  /// No description provided for @readerAutoPageTurnOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get readerAutoPageTurnOff;
+
+  /// No description provided for @readerAutoPageTurnShortcutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic reading shortcut'**
+  String get readerAutoPageTurnShortcutTitle;
+
+  /// No description provided for @readerAutoPageTurnShortcutHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show with the reading controls for quick start or pause'**
+  String get readerAutoPageTurnShortcutHint;
+
+  /// No description provided for @readerAutoPageTurnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance one screen at the selected interval, including in vertical paging mode.'**
+  String get readerAutoPageTurnHint;
+
+  /// No description provided for @readerAutoPageTurnModeTimed.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed page turn'**
+  String get readerAutoPageTurnModeTimed;
+
+  /// No description provided for @readerAutoPageTurnModeSweep.
+  ///
+  /// In en, this message translates to:
+  /// **'Sweep page turn'**
+  String get readerAutoPageTurnModeSweep;
+
+  /// No description provided for @readerAutoPageTurnModeContinuous.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous scroll'**
+  String get readerAutoPageTurnModeContinuous;
+
+  /// No description provided for @readerAutoPageTurnModeInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval scroll'**
+  String get readerAutoPageTurnModeInterval;
+
+  /// No description provided for @readerAutoPageTurnTimedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the selected interval, then turn to the next page.'**
+  String get readerAutoPageTurnTimedHint;
+
+  /// No description provided for @readerAutoPageTurnSweepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A line sweeps downward, gradually revealing the next page above it.'**
+  String get readerAutoPageTurnSweepHint;
+
+  /// No description provided for @readerAutoPageTurnContinuousHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll downward continuously at a steady reading speed.'**
+  String get readerAutoPageTurnContinuousHint;
+
+  /// No description provided for @readerAutoPageTurnIntervalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the selected interval, then scroll down by about one screen.'**
+  String get readerAutoPageTurnIntervalHint;
+
+  /// No description provided for @readerAutoPageTurnSweepDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sweep duration'**
+  String get readerAutoPageTurnSweepDurationLabel;
+
+  /// No description provided for @readerAutoPageTurnScrollSpeedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll speed'**
+  String get readerAutoPageTurnScrollSpeedLabel;
+
+  /// No description provided for @readerAutoPageTurnSecondsPerScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} seconds per screen'**
+  String readerAutoPageTurnSecondsPerScreen(int seconds);
+
+  /// No description provided for @readerAutoPageTurnModeValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{mode} · {seconds}s/screen'**
+  String readerAutoPageTurnModeValue(String mode, int seconds);
+
+  /// No description provided for @readerAutoPageTurnModePaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused · {mode} · {seconds}s/screen'**
+  String readerAutoPageTurnModePaused(String mode, int seconds);
+
+  /// No description provided for @readerAutoPageTurnIntervalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Page interval'**
+  String get readerAutoPageTurnIntervalLabel;
+
+  /// No description provided for @readerAutoPageTurnInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} seconds per screen'**
+  String readerAutoPageTurnInterval(int seconds);
+
+  /// No description provided for @readerAutoPageTurnStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start auto page turn'**
+  String get readerAutoPageTurnStart;
+
+  /// No description provided for @readerAutoPageTurnResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume auto page turn'**
+  String get readerAutoPageTurnResume;
+
+  /// No description provided for @readerAutoPageTurnRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto · {seconds}s/screen'**
+  String readerAutoPageTurnRunning(int seconds);
+
+  /// No description provided for @readerAutoPageTurnPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused · {seconds}s/screen'**
+  String readerAutoPageTurnPaused(int seconds);
+
   /// Day reading theme name
   ///
   /// In en, this message translates to:
@@ -9155,7 +9299,7 @@ abstract class AppLocalizations {
   /// Book file transfer size limit
   ///
   /// In en, this message translates to:
-  /// **'Files over 100 MiB are not supported in this release'**
+  /// **'This file exceeds the sync size limit for its format'**
   String get webDavFilesTooLarge;
 
   /// Empty book-file category
@@ -10105,6 +10249,588 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlocated annotations'**
   String get readingDataExportUnknownChapter;
+
+  /// No description provided for @cloudSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud sync'**
+  String get cloudSyncTitle;
+
+  /// No description provided for @cloudSyncTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick up where you left off on another device'**
+  String get cloudSyncTagline;
+
+  /// No description provided for @cloudSyncResumeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue across devices'**
+  String get cloudSyncResumeTitle;
+
+  /// No description provided for @cloudSyncAutoResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume when opening a book'**
+  String get cloudSyncAutoResume;
+
+  /// No description provided for @cloudSyncAutoResumeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the latest position on open; offer updates while reading'**
+  String get cloudSyncAutoResumeHint;
+
+  /// No description provided for @cloudSyncAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Save progress while reading and check updates when opening a book'**
+  String get cloudSyncAutoHint;
+
+  /// No description provided for @cloudSyncMoreContent.
+  ///
+  /// In en, this message translates to:
+  /// **'More sync options'**
+  String get cloudSyncMoreContent;
+
+  /// No description provided for @cloudSyncBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Books and text'**
+  String get cloudSyncBooks;
+
+  /// No description provided for @cloudSyncBooksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Participating books, text updates and downloads'**
+  String get cloudSyncBooksHint;
+
+  /// No description provided for @cloudSyncActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync activity and attention needed'**
+  String get cloudSyncActivity;
+
+  /// No description provided for @cloudSyncStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage connection'**
+  String get cloudSyncStorage;
+
+  /// No description provided for @cloudSyncNoActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No sync activity yet'**
+  String get cloudSyncNoActivity;
+
+  /// No description provided for @cloudSyncProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading position'**
+  String get cloudSyncProgress;
+
+  /// No description provided for @cloudSyncText.
+  ///
+  /// In en, this message translates to:
+  /// **'Book text files'**
+  String get cloudSyncText;
+
+  /// No description provided for @cloudSyncMetadataComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected reading data exchanged with WebDAV'**
+  String get cloudSyncMetadataComplete;
+
+  /// No description provided for @cloudSyncPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic sync is paused'**
+  String get cloudSyncPaused;
+
+  /// No description provided for @cloudSyncLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep on this device'**
+  String get cloudSyncLocalOnly;
+
+  /// No description provided for @cloudSyncCheckHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A connection does not confirm receipt on other devices; check each item below'**
+  String get cloudSyncCheckHint;
+
+  /// No description provided for @cloudSyncPendingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Text updates need attention'**
+  String get cloudSyncPendingFiles;
+
+  /// No description provided for @cloudSyncFileIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked text files will be checked on the next sync'**
+  String get cloudSyncFileIdle;
+
+  /// No description provided for @cloudSyncManageBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose books and downloads'**
+  String get cloudSyncManageBooks;
+
+  /// No description provided for @cloudSyncNoBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'No TXT books are linked yet'**
+  String get cloudSyncNoBooks;
+
+  /// No description provided for @cloudSyncCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare versions'**
+  String get cloudSyncCompare;
+
+  /// No description provided for @cloudSyncKeepLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this device’s version'**
+  String get cloudSyncKeepLocal;
+
+  /// No description provided for @cloudSyncUseRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the cloud version'**
+  String get cloudSyncUseRemote;
+
+  /// No description provided for @cloudSyncBothKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Both versions are preserved. Sync continues after your choice.'**
+  String get cloudSyncBothKept;
+
+  /// No description provided for @cloudSyncPreviewLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview shows the first difference. Both full versions are preserved.'**
+  String get cloudSyncPreviewLimited;
+
+  /// No description provided for @cloudSyncPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to sync'**
+  String get cloudSyncPending;
+
+  /// No description provided for @cloudSyncConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions need review'**
+  String get cloudSyncConflict;
+
+  /// No description provided for @cloudSyncCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current text is synced to WebDAV'**
+  String get cloudSyncCurrent;
+
+  /// No description provided for @cloudSyncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync incomplete. Retry available.'**
+  String get cloudSyncFailed;
+
+  /// No description provided for @cloudSyncHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Version history'**
+  String get cloudSyncHistory;
+
+  /// No description provided for @cloudSyncApplyUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply text update'**
+  String get cloudSyncApplyUpdate;
+
+  /// No description provided for @cloudSyncParticipate.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync this book’s text'**
+  String get cloudSyncParticipate;
+
+  /// No description provided for @cloudSyncCloseReaderToUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Close this book’s reader or editor before applying the text update'**
+  String get cloudSyncCloseReaderToUpdate;
+
+  /// No description provided for @cloudSyncTextLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Current cloud file'**
+  String get cloudSyncTextLocation;
+
+  /// No description provided for @cloudSyncTextLocationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text edits update the TXT at the location below. Copies uploaded before the upgrade remain available but do not receive later edits.'**
+  String get cloudSyncTextLocationHint;
+
+  /// No description provided for @bookSourcesImportIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a link or JSON file, then review before adding.'**
+  String get bookSourcesImportIntro;
+
+  /// No description provided for @bookSourcesImportInputStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose source'**
+  String get bookSourcesImportInputStep;
+
+  /// No description provided for @bookSourcesImportReviewStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Review & import'**
+  String get bookSourcesImportReviewStep;
+
+  /// No description provided for @bookSourcesImportFileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a JSON source file.'**
+  String get bookSourcesImportFileHint;
+
+  /// No description provided for @bookSourcesImportDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading source…'**
+  String get bookSourcesImportDownloading;
+
+  /// No description provided for @bookSourcesImportAnalyzing.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading rules and checking duplicates…'**
+  String get bookSourcesImportAnalyzing;
+
+  /// No description provided for @bookSourcesImportSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving sources…'**
+  String get bookSourcesImportSaving;
+
+  /// No description provided for @bookSourcesImportPicking.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening file picker…'**
+  String get bookSourcesImportPicking;
+
+  /// No description provided for @bookSourcesImportWaitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Large source lists can take longer. You can cancel and try again.'**
+  String get bookSourcesImportWaitHint;
+
+  /// No description provided for @bookSourcesImportSaveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Please keep this window open until saving finishes.'**
+  String get bookSourcesImportSaveHint;
+
+  /// No description provided for @bookSourcesImportReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to import'**
+  String get bookSourcesImportReady;
+
+  /// No description provided for @bookSourcesImportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No sources selected. Check the file or duplicate selection.'**
+  String get bookSourcesImportEmpty;
+
+  /// No description provided for @bookSourcesImportRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get bookSourcesImportRetry;
+
+  /// No description provided for @bookSourcesImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read sources. Check the address or file and try again.'**
+  String get bookSourcesImportFailed;
+
+  /// No description provided for @bookSourcesImportSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save sources. Your preview is kept; please try again.'**
+  String get bookSourcesImportSaveFailed;
+
+  /// No description provided for @bookSourcesImportErrorDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error details'**
+  String get bookSourcesImportErrorDetails;
+
+  /// No description provided for @bookSourcesImportFileUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the selected file. Choose it again.'**
+  String get bookSourcesImportFileUnreadable;
+
+  /// No description provided for @bookSourcesImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Import 1 source} other{Import {count} sources}}'**
+  String bookSourcesImportAction(int count);
+
+  /// No description provided for @bookSourcesImportFileTab.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON file'**
+  String get bookSourcesImportFileTab;
+
+  /// No description provided for @bookSourcesImportTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading took too long. Check your connection or try importing a downloaded JSON file.'**
+  String get bookSourcesImportTimedOut;
+
+  /// No description provided for @cloudSyncIncrementalMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Incremental storage'**
+  String get cloudSyncIncrementalMode;
+
+  /// No description provided for @cloudSyncPlainMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard TXT file'**
+  String get cloudSyncPlainMode;
+
+  /// No description provided for @cloudSyncIncrementalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'After the first upload, only changed content blocks are transferred. Your local book stays a complete TXT.'**
+  String get cloudSyncIncrementalDescription;
+
+  /// No description provided for @cloudSyncEnableIncremental.
+  ///
+  /// In en, this message translates to:
+  /// **'Use incremental storage'**
+  String get cloudSyncEnableIncremental;
+
+  /// No description provided for @cloudSyncIncrementalConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change this book’s cloud storage?'**
+  String get cloudSyncIncrementalConfirmTitle;
+
+  /// No description provided for @cloudSyncIncrementalConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The cloud copy will use an app-managed block format. Existing TXT copies will be kept but will stop receiving updates. Other devices need a version of this app that supports incremental storage. Your complete TXT remains available locally.'**
+  String get cloudSyncIncrementalConfirmBody;
+
+  /// No description provided for @cloudSyncIncrementalConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch and sync'**
+  String get cloudSyncIncrementalConfirm;
+
+  /// No description provided for @bookSourcesImportUsageNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Source usage information'**
+  String get bookSourcesImportUsageNotice;
+
+  /// No description provided for @bookSourcesMaintenanceScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope'**
+  String get bookSourcesMaintenanceScope;
+
+  /// No description provided for @bookSourcesMaintenanceScopeEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get bookSourcesMaintenanceScopeEnabled;
+
+  /// No description provided for @bookSourcesMaintenanceScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All sources'**
+  String get bookSourcesMaintenanceScopeAll;
+
+  /// No description provided for @bookSourcesMaintenanceScopeSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get bookSourcesMaintenanceScopeSelected;
+
+  /// No description provided for @bookSourcesMaintenanceCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sources in this scope'**
+  String bookSourcesMaintenanceCount(int count);
+
+  /// No description provided for @bookSourcesMaintenanceEmptyScope.
+  ///
+  /// In en, this message translates to:
+  /// **'No sources in this scope'**
+  String get bookSourcesMaintenanceEmptyScope;
+
+  /// No description provided for @bookSourcesMaintenanceLocalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Local cleanup'**
+  String get bookSourcesMaintenanceLocalLabel;
+
+  /// No description provided for @bookSourcesMaintenanceNetworkLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Online checks'**
+  String get bookSourcesMaintenanceNetworkLabel;
+
+  /// No description provided for @bookSourcesMaintenanceCancelledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check stopped'**
+  String get bookSourcesMaintenanceCancelledTitle;
+
+  /// No description provided for @bookSourcesMaintenanceCancellingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping checks'**
+  String get bookSourcesMaintenanceCancellingTitle;
+
+  /// No description provided for @bookSourcesMaintenanceCancellingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing active checks and keeping completed results'**
+  String get bookSourcesMaintenanceCancellingHint;
+
+  /// No description provided for @bookSourcesMaintenanceFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check interrupted'**
+  String get bookSourcesMaintenanceFailedTitle;
+
+  /// No description provided for @bookSourcesMaintenanceResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume remaining checks'**
+  String get bookSourcesMaintenanceResume;
+
+  /// No description provided for @bookSourcesMaintenanceRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry unresolved checks'**
+  String get bookSourcesMaintenanceRetry;
+
+  /// No description provided for @bookSourcesMaintenanceRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sources not checked yet'**
+  String bookSourcesMaintenanceRemaining(int count);
+
+  /// No description provided for @bookSourcesMaintenanceResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Health results'**
+  String get bookSourcesMaintenanceResultTitle;
+
+  /// No description provided for @bookSourcesMaintenanceReviewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All results'**
+  String get bookSourcesMaintenanceReviewAll;
+
+  /// No description provided for @bookSourcesMaintenanceAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get bookSourcesMaintenanceAvailable;
+
+  /// No description provided for @bookSourcesMaintenanceLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get bookSourcesMaintenanceLimited;
+
+  /// No description provided for @bookSourcesMaintenanceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed checks'**
+  String get bookSourcesMaintenanceFailed;
+
+  /// No description provided for @bookSourcesMaintenanceTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed out'**
+  String get bookSourcesMaintenanceTimedOut;
+
+  /// No description provided for @bookSourcesMaintenanceUnchecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unconfirmed'**
+  String get bookSourcesMaintenanceUnchecked;
+
+  /// No description provided for @bookSourcesMaintenanceReviewSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search name or address'**
+  String get bookSourcesMaintenanceReviewSearch;
+
+  /// No description provided for @bookSourcesMaintenanceReviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching results'**
+  String get bookSourcesMaintenanceReviewEmpty;
+
+  /// No description provided for @bookSourcesMaintenanceReviewSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected to disable'**
+  String bookSourcesMaintenanceReviewSelection(int count);
+
+  /// No description provided for @bookSourcesMaintenanceSelectFailures.
+  ///
+  /// In en, this message translates to:
+  /// **'Select failed checks'**
+  String get bookSourcesMaintenanceSelectFailures;
+
+  /// No description provided for @bookSourcesMaintenanceTimeoutReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection timed out; retry later'**
+  String get bookSourcesMaintenanceTimeoutReason;
+
+  /// No description provided for @bookSourcesMaintenanceUncheckedReason.
+  ///
+  /// In en, this message translates to:
+  /// **'No conclusive result from this check'**
+  String get bookSourcesMaintenanceUncheckedReason;
+
+  /// No description provided for @bookSourcesMaintenanceAvailableReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Core checks passed'**
+  String get bookSourcesMaintenanceAvailableReason;
+
+  /// No description provided for @bookSourcesMaintenanceDedupeBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding duplicates…'**
+  String get bookSourcesMaintenanceDedupeBusy;
+
+  /// No description provided for @bookSourcesMaintenanceShelfProtected.
+  ///
+  /// In en, this message translates to:
+  /// **'Used by your shelf · kept by default'**
+  String get bookSourcesMaintenanceShelfProtected;
+
+  /// No description provided for @bookSourcesMaintenanceApplyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save changes. Try again.'**
+  String get bookSourcesMaintenanceApplyFailed;
 }
 
 class _AppLocalizationsDelegate

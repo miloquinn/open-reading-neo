@@ -98,7 +98,24 @@ class _BookSourceCategoryPickerState extends State<BookSourceCategoryPicker> {
                         },
                         icon: const Icon(Icons.clear_rounded),
                       ),
-                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor: scheme.surfaceContainerLow,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide(color: scheme.primary, width: 1.5),
+                ),
               ),
             ),
           ),
@@ -133,20 +150,53 @@ class _BookSourceCategoryPickerState extends State<BookSourceCategoryPicker> {
                         );
                       }
                       final selected = category == widget.selectedCategory;
-                      return ListTile(
-                        key: Key(
-                          'bookSourceCategory-${category.source.id}-${category.id}',
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 3,
                         ),
-                        selected: selected,
-                        title: Text(
-                          category.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: AnimatedContainer(
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          decoration: ShapeDecoration(
+                            color: selected
+                                ? scheme.primaryContainer
+                                : Colors.transparent,
+                            shape: const StadiumBorder(),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            shape: const StadiumBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              key: Key(
+                                'bookSourceCategory-${category.source.id}-${category.id}',
+                              ),
+                              selected: selected,
+                              selectedColor: scheme.onPrimaryContainer,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 2,
+                              ),
+                              minTileHeight: 48,
+                              shape: const StadiumBorder(),
+                              title: Text(
+                                category.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: selected
+                                  ? Icon(
+                                      Icons.check_rounded,
+                                      color: scheme.onPrimaryContainer,
+                                    )
+                                  : null,
+                              onTap: () => Navigator.of(context).pop(category),
+                            ),
+                          ),
                         ),
-                        trailing: selected
-                            ? Icon(Icons.check_rounded, color: scheme.primary)
-                            : null,
-                        onTap: () => Navigator.of(context).pop(category),
                       );
                     },
                   ),

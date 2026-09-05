@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +21,9 @@ import '../sync_clock.dart';
 import '../sync_dataset_catalog.dart';
 import '../sync_models.dart';
 import '../sync_protocol.dart';
+import '../book_sync_identity.dart';
+import '../reading_progress_event.dart';
+import '../reading_progress_sync_service.dart';
 
 abstract interface class MetadataSyncAdapter {
   String get dataset;
@@ -188,7 +190,7 @@ abstract class _BaseAdapter implements MetadataSyncAdapter {
     for (final row in rows) {
       final id = row['id'] as int?;
       if (_rowHasPrivateSourceIdentity(row)) continue;
-      if (id != null) result[id] = await bookUidForMap(row);
+      if (id != null) result[id] = await stableBookUidForMap(db, row);
     }
     return result;
   }
@@ -196,7 +198,9 @@ abstract class _BaseAdapter implements MetadataSyncAdapter {
   Future<int?> localBookId(DatabaseExecutor db, String bookUid) async {
     final rows = await db.query('books');
     for (final row in rows) {
-      if (await bookUidForMap(row) == bookUid) return row['id'] as int?;
+      if (await stableBookUidForMap(db, row) == bookUid) {
+        return row['id'] as int?;
+      }
     }
     return null;
   }
@@ -334,7 +338,7 @@ class BooksSyncAdapter extends _BaseAdapter {
     final seen = <String>{};
     for (final row in rows) {
       if (_rowHasPrivateSourceIdentity(row)) continue;
-      final uid = await bookUidForMap(row);
+      final uid = await stableBookUidForMap(db, row);
       seen.add(uid);
       final fileRows = await db.query(
         'sync_book_files',
@@ -521,10 +525,14 @@ class ProgressSyncAdapter extends _BaseAdapter {
   Future<void> scan(HybridLogicalClock clock) async {
     final db = await database();
     final rows = await db.query('books');
+    final mirrored = <String, SyncRecord>{
+      for (final record in await store.recordsForDataset(dataset))
+        record.recordId: record,
+    };
     final seen = <String>{};
     for (final row in rows) {
       if (_rowHasPrivateSourceIdentity(row)) continue;
-      final uid = await bookUidForMap(row);
+      final uid = await stableBookUidForMap(db, row);
       final locator = _decodeOptionalJson(row['last_canonical_locator']);
       BookSourceReadingProgress? sourceProgress;
       final sourceId = _nonEmptyString(row['source_id']);
@@ -546,6 +554,8 @@ class ProgressSyncAdapter extends _BaseAdapter {
       seen.add(uid);
       final payload = <String, dynamic>{'book_uid': uid};
       if (locator != null) payload['canonical_locator'] = locator;
+      payload['current_page'] = row['currentPage'];
+      payload['total_pages'] = row['totalPages'];
       if (readingProgress != null) {
         payload['reading_progress'] = readingProgress;
       }
@@ -555,6 +565,60 @@ class ProgressSyncAdapter extends _BaseAdapter {
           'current_page': row['currentPage'],
           'total_pages': row['totalPages'],
         });
+      }
+      final rawEvent = await store.getState(
+        '${ReadingProgressSyncService.localEventStatePrefix}$uid',
+      );
+      // A database scan is observation, not a reading action. Publishing a
+      // never-seen legacy position here would give it a fresh HLC and let a
+      // new device's stale local page beat the real remote position.
+      if (rawEvent != null && rawEvent.isNotEmpty) {
+        try {
+          payload['position_event'] = jsonDecode(rawEvent);
+        } catch (_) {
+          // A damaged marker is not a reading event and must not be published.
+          continue;
+        }
+      } else if (sourceProgress != null) {
+        final sequence = sourceProgress.updatedAt.millisecondsSinceEpoch;
+        final sourceEvent = <String, Object?>{
+          'event_id': stableRecordId(
+            'source-progress',
+            '$uid|${sourceProgress.updatedAt.toUtc().toIso8601String()}',
+          ),
+          'saved_at': sourceProgress.updatedAt.toUtc().toIso8601String(),
+          'device_id': clock.deviceId,
+          'device_sequence': sequence,
+          'vector': {clock.deviceId: sequence},
+        };
+        payload['position_event'] = sourceEvent;
+        final sourceSnapshot = <String, Object?>{
+          'current_page': row['currentPage'],
+          'total_pages': row['totalPages'],
+          'reading_progress': readingProgress,
+          'canonical_locator': row['last_canonical_locator'],
+          'source_progress': sourceProgress.toJson(),
+          ...sourceEvent,
+        };
+        final encoded = jsonEncode(sourceSnapshot);
+        await store.setState(
+          '${ReadingProgressSyncService.localEventStatePrefix}$uid',
+          encoded,
+        );
+        await store.setState(
+          '${ReadingProgressSyncService.headStatePrefix}$uid',
+          encoded,
+        );
+      } else {
+        continue;
+      }
+      final mirroredEvent = mirrored[uid]?.payload?['position_event'];
+      final relation = compareReadingProgressEvents(
+        payload['position_event'],
+        mirroredEvent,
+      );
+      if (relation == ReadingProgressEventRelation.incomingDominates) {
+        continue;
       }
       await store.recordLocal(
         dataset: dataset,
@@ -589,6 +653,16 @@ class ProgressSyncAdapter extends _BaseAdapter {
         payload['reading_progress'] is! num) {
       throw _corruptSyncData('A synced reading percentage is invalid.');
     }
+    final positionEvent = payload['position_event'];
+    if (positionEvent != null &&
+        (positionEvent is! Map ||
+            positionEvent['event_id'] is! String ||
+            positionEvent['saved_at'] is! String ||
+            positionEvent['device_id'] is! String ||
+            positionEvent['device_sequence'] is! num ||
+            readingProgressEventVector(positionEvent) == null)) {
+      throw _corruptSyncData('A synced reading event is invalid.');
+    }
     final sourceProgress = payload['source_progress'];
     if (sourceProgress != null) {
       if (sourceProgress is! Map) {
@@ -616,17 +690,27 @@ class ProgressSyncAdapter extends _BaseAdapter {
       limit: 1,
     );
     if (rows.isEmpty) return false;
-    final row = rows.first;
+    final row = rows.single;
     final sourceId = _nonEmptyString(row['source_id']);
     final sourceBookId = _nonEmptyString(row['source_book_id']);
     if (operation.deleted) {
-      final values = <String, Object?>{'last_canonical_locator': null};
-      if (row['storage_type'] == 'online') values['currentPage'] = 0;
-      await txn.update('books', values, where: 'id = ?', whereArgs: [id]);
+      final candidatePrefix =
+          '${ReadingProgressSyncService.candidateStatePrefix}${operation.entityKey}:';
+      await txn.delete(
+        'sync_local_state',
+        where: 'substr(key, 1, ?) = ?',
+        whereArgs: [candidatePrefix.length, candidatePrefix],
+      );
       if (row['storage_type'] == 'online' &&
           sourceId != null &&
           sourceBookId != null) {
         await progressStore.delete(sourceId: sourceId, bookId: sourceBookId);
+        await txn.update(
+          'books',
+          {'currentPage': 0, 'last_canonical_locator': null},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
       }
       return true;
     }
@@ -634,36 +718,37 @@ class ProgressSyncAdapter extends _BaseAdapter {
     if (payload == null) {
       throw _corruptSyncData('Synced reading progress is missing data.');
     }
-    final values = <String, Object?>{};
-    if (payload.containsKey('canonical_locator')) {
-      values['last_canonical_locator'] = jsonEncode(
-        payload['canonical_locator'],
-      );
-    }
-    if (payload['reading_progress'] is num) {
-      values['reading_progress'] = (payload['reading_progress'] as num)
-          .toDouble()
-          .clamp(0.0, 1.0);
-    }
-    final rawSourceProgress = payload['source_progress'];
-    if (row['storage_type'] == 'online' &&
-        sourceId != null &&
-        sourceBookId != null &&
-        rawSourceProgress is Map) {
-      final sourceProgress = BookSourceReadingProgress.fromJson(
-        rawSourceProgress.map((key, value) => MapEntry('$key', value)),
-      );
-      await progressStore.save(
-        sourceId: sourceId,
-        bookId: sourceBookId,
-        progress: sourceProgress,
-      );
-      values['currentPage'] = (payload['current_page'] as num?)?.toInt() ?? 0;
-      values['totalPages'] = (payload['total_pages'] as num?)?.toInt() ?? 1;
-    }
-    if (values.isNotEmpty) {
-      await txn.update('books', values, where: 'id = ?', whereArgs: [id]);
-    }
+    final positionEvent = payload['position_event'];
+    final candidateEvent = positionEvent is Map
+        ? positionEvent
+        : <String, Object?>{
+            'event_id': 'legacy-${operation.hlc}',
+            'saved_at': DateTime.now().toUtc().toIso8601String(),
+          };
+    final candidateId = readingProgressCandidateId(candidateEvent);
+    final snapshot = <String, Object?>{
+      'current_page': (payload['current_page'] as num?)?.toInt() ?? 0,
+      'reading_progress': (payload['reading_progress'] as num?)?.toDouble(),
+      'total_pages': (payload['total_pages'] as num?)?.toInt(),
+      if (payload['source_progress'] is Map)
+        'source_progress': payload['source_progress'],
+      'canonical_locator': payload['canonical_locator'] == null
+          ? null
+          : jsonEncode(payload['canonical_locator']),
+      'event_id': candidateEvent['event_id'],
+      'saved_at': candidateEvent['saved_at'],
+      'device_id': candidateEvent['device_id'],
+      'device_sequence': candidateEvent['device_sequence'],
+      'vector': candidateEvent['vector'],
+      'locator_revision': candidateEvent['locator_revision'],
+    };
+    await txn.insert('sync_local_state', {
+      'key': readingProgressCandidateKey(operation.entityKey, candidateId),
+      'value': jsonEncode({
+        'snapshot': snapshot,
+        'received_at': DateTime.now().toUtc().toIso8601String(),
+      }),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     return true;
   }
 }
@@ -1855,38 +1940,7 @@ class ReplaceRulesSyncAdapter implements MetadataSyncAdapter {
 }
 
 Future<String> bookUidForMap(Map<String, Object?> row) async {
-  final sourceId = row['source_id'] as String?;
-  final sourceBookId = row['source_book_id'] as String?;
-  if (sourceId != null &&
-      sourceId.isNotEmpty &&
-      sourceBookId != null &&
-      sourceBookId.isNotEmpty) {
-    return 'source:$sourceId:$sourceBookId';
-  }
-  final path = row['filePath'] as String?;
-  if (path != null && path.isNotEmpty) {
-    final file = File(path);
-    try {
-      if (await file.exists()) {
-        final stat = await file.stat();
-        final cacheKey =
-            '$path|${stat.modified.millisecondsSinceEpoch}|${stat.size}';
-        final cached = _bookUidCache[cacheKey];
-        if (cached != null) return cached;
-        final digest = await sha256.bind(file.openRead()).first;
-        final uid = 'sha256:$digest';
-        _bookUidCache[cacheKey] = uid;
-        return uid;
-      }
-    } on FileSystemException {
-      // Android document providers and files removed between exists/stat/read
-      // can become temporarily inaccessible. Fall back to the persisted hash
-      // or metadata identity instead of failing the entire metadata sync.
-    }
-  }
-  final legacy = row['content_hash'] as String?;
-  if (legacy != null && legacy.isNotEmpty) return 'legacy-hash:$legacy';
-  return 'local-meta:${sha256.convert(utf8.encode('${row['title']}|${row['author']}|${row['format']}|${row['importDate']}'))}';
+  return initialBookUidForMap(row);
 }
 
 bool _rowHasPrivateSourceIdentity(Map<String, Object?> row) {
@@ -1934,6 +1988,8 @@ Map<String, dynamic>? _publicBookSourceSyncPayload(
     if (source.maxCatalogPageSize != null)
       'maxCatalogPageSize': source.maxCatalogPageSize,
     'enabled': source.enabled,
+    'isFavorite': source.isFavorite,
+    'groups': source.groups,
     'addedAt': source.addedAt.toIso8601String(),
     'sourceProtocol': source.sourceProtocol.name,
   };
@@ -1987,8 +2043,6 @@ bool _isPublicSyncUri(Uri uri) {
       !uri.hasQuery &&
       !uri.hasFragment;
 }
-
-final Map<String, String> _bookUidCache = <String, String>{};
 
 String stableRecordId(String type, String identity) {
   final hex = sha256.convert(utf8.encode('$type\u0000$identity')).toString();

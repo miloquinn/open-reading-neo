@@ -6,9 +6,11 @@ import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
+import 'package:xxread/widgets/side_toast.dart';
 
 import 'webdav_setup_page.dart';
-import 'book_file_sync_page.dart';
+import 'txt_sync_details_page.dart';
+import '../../../services/sync/mutable_txt_sync_service.dart';
 import 'webdav_sync_content_page.dart';
 import 'webdav_sync_translator.dart';
 
@@ -19,17 +21,17 @@ class WebDavSyncPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final sync = context.watch<WebDavSyncController>();
     return FloatingSubpageScaffold(
-      title: context.l10n.webDavPageTitle,
+      title: context.l10n.cloudSyncTitle,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 820;
           final sections = <Widget>[
             _StatusCard(sync: sync),
-            _AutomaticSyncCard(sync: sync),
-            _ScopeCard(sync: sync),
+            _ContinuationCard(sync: sync),
             _BookFilesCard(sync: sync),
+            _ScopeCard(sync: sync),
             _ConnectionCard(sync: sync),
-            _SecurityCard(),
+            _ActivityCard(sync: sync),
           ];
           return ListView(
             padding: floatingSubpagePadding(context, top: 20, bottom: 40),
@@ -116,8 +118,10 @@ class _StatusCard extends StatelessWidget {
     final subtitle = !configured
         ? l10n.webDavConfigureSubtitle
         : failed
-        ? '${webDavSyncErrorText(context, sync.lastError)}\n'
-              '${webDavSyncFailurePhaseText(context, sync.lastFailedPhase)}'
+        ? sync.lastError == null
+              ? l10n.cloudSyncPendingFiles
+              : '${webDavSyncErrorText(context, sync.lastError)}\n'
+                    '${webDavSyncFailurePhaseText(context, sync.lastFailedPhase)}'
         : sync.pendingChanges > 0
         ? l10n.webDavPendingChanges(sync.pendingChanges)
         : sync.lastSuccessfulSync == null
@@ -180,17 +184,8 @@ class _StatusCard extends StatelessWidget {
               ),
             ],
           ),
-          if (configured) ...[
-            const SizedBox(height: 12),
-            Text(
-              '${sync.serverUrl ?? ''} / ${sync.rootPath ?? ''}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ],
+          const SizedBox(height: 12),
+          Text(l10n.cloudSyncTagline),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -198,7 +193,9 @@ class _StatusCard extends StatelessWidget {
               onPressed: syncing
                   ? null
                   : configured
-                  ? () => sync.syncNow()
+                  ? () => _perform(context, () async {
+                      await sync.syncNow();
+                    })
                   : () => _openSetup(context),
               icon: Icon(configured ? Icons.sync_rounded : Icons.settings),
               label: Text(configured ? l10n.webDavSyncNow : l10n.webDavSetUp),
@@ -210,21 +207,53 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-class _AutomaticSyncCard extends StatelessWidget {
-  const _AutomaticSyncCard({required this.sync});
+class _ContinuationCard extends StatelessWidget {
+  const _ContinuationCard({required this.sync});
 
   final WebDavSyncController sync;
 
   @override
   Widget build(BuildContext context) {
     return _Card(
-      child: SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        secondary: const Icon(Icons.autorenew_rounded),
-        title: Text(context.l10n.webDavAutomaticSync),
-        subtitle: Text(context.l10n.webDavAutomaticSyncHint),
-        value: sync.autoSync,
-        onChanged: sync.isConfigured ? sync.setAutoSync : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.cloudSyncResumeTitle,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: Text(context.l10n.webDavAutomaticSync),
+            subtitle: Text(context.l10n.cloudSyncAutoHint),
+            value: sync.autoSync,
+            onChanged: sync.isConfigured
+                ? (value) => _perform(context, () => sync.setAutoSync(value))
+                : null,
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: Text(context.l10n.webDavScopeProgress),
+            value: sync.scope.progress,
+            onChanged: sync.isConfigured
+                ? (value) => _perform(
+                    context,
+                    () => sync.setScope(sync.scope.copyWith(progress: value)),
+                  )
+                : null,
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: Text(context.l10n.cloudSyncAutoResume),
+            subtitle: Text(context.l10n.cloudSyncAutoResumeHint),
+            value: sync.autoResume,
+            onChanged: sync.isConfigured && sync.scope.progress
+                ? (value) => _perform(context, () => sync.setAutoResume(value))
+                : null,
+          ),
+          if (sync.isConfigured && !sync.autoSync)
+            Text(context.l10n.cloudSyncPaused),
+        ],
       ),
     );
   }
@@ -250,7 +279,7 @@ class _ScopeCard extends StatelessWidget {
       child: ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.sync_alt_rounded),
-        title: Text(l10n.webDavSyncContent),
+        title: Text(l10n.cloudSyncMoreContent),
         subtitle: Text(enabled.join(' · ')),
         trailing: const Icon(Icons.chevron_right_rounded),
         enabled: sync.isConfigured,
@@ -300,7 +329,7 @@ class _ConnectionCard extends StatelessWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.tune_rounded),
-            title: Text(context.l10n.webDavConnectionDetails),
+            title: Text(context.l10n.cloudSyncStorage),
             subtitle: Text(
               sync.isConfigured
                   ? (sync.serverUrl ?? '')
@@ -341,10 +370,10 @@ class _BookFilesCard extends StatelessWidget {
       child: ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.cloud_download_outlined),
-        title: Text(context.l10n.webDavBookFilesTitle),
+        title: Text(context.l10n.cloudSyncBooks),
         subtitle: Text(
           available == 0
-              ? context.l10n.webDavBookFilesHint
+              ? context.l10n.cloudSyncBooksHint
               : '${context.l10n.webDavFilesAvailableDownload}：$available',
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
@@ -352,7 +381,7 @@ class _BookFilesCard extends StatelessWidget {
         onTap: sync.isConfigured
             ? () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const BookFileSyncPage(),
+                  builder: (_) => const TxtSyncDetailsPage(),
                 ),
               )
             : null,
@@ -361,19 +390,80 @@ class _BookFilesCard extends StatelessWidget {
   }
 }
 
-class _SecurityCard extends StatelessWidget {
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({required this.sync});
+
+  final WebDavSyncController sync;
+
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return _Card(
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.security_outlined,
-            color: Theme.of(context).colorScheme.primary,
+          Text(
+            l10n.cloudSyncActivity,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(context.l10n.webDavSecurityNotice)),
+          const SizedBox(height: 12),
+          Text(
+            l10n.cloudSyncProgress,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          Text(
+            !sync.scope.progress
+                ? l10n.cloudSyncLocalOnly
+                : sync.progressPending
+                ? l10n.cloudSyncPending
+                : sync.lastProgressSyncAt != null
+                ? l10n.cloudSyncMetadataComplete
+                : l10n.cloudSyncNoActivity,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.cloudSyncText,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          Text(
+            !sync.scope.bookFiles
+                ? l10n.cloudSyncLocalOnly
+                : sync.syncingText
+                ? l10n.webDavSyncing
+                : sync.textStates.isEmpty
+                ? l10n.cloudSyncNoBooks
+                : sync.textStates.every(
+                    (state) => state.status == MutableTxtSyncStatus.synced,
+                  )
+                ? l10n.cloudSyncCurrent
+                : l10n.cloudSyncPendingFiles,
+          ),
+          if (sync.isConfigured)
+            TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const TxtSyncDetailsPage(),
+                ),
+              ),
+              child: Text(l10n.cloudSyncActivity),
+            ),
+          if (sync.lastError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              webDavSyncErrorText(context, sync.lastError),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          const Divider(height: 28),
+          Text(
+            l10n.cloudSyncCheckHint,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.webDavSecurityNotice,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -403,3 +493,22 @@ class _Card extends StatelessWidget {
 Future<void> _openSetup(BuildContext context) => Navigator.of(
   context,
 ).push(MaterialPageRoute<void>(builder: (_) => const WebDavSetupPage()));
+
+Future<void> _perform(
+  BuildContext context,
+  Future<void> Function() action,
+) async {
+  try {
+    await action();
+  } catch (error) {
+    if (!context.mounted) return;
+    showSideToast(
+      context,
+      webDavSyncErrorText(
+        context,
+        error is WebDavSyncFailure ? error.code : WebDavSyncErrorCode.unknown,
+      ),
+      kind: SideToastKind.error,
+    );
+  }
+}

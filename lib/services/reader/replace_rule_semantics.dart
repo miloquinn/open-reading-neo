@@ -76,7 +76,7 @@ RegExp compileReplaceRulePattern(String pattern) {
   var caseSensitive = true;
   var multiLine = false;
   var dotAll = false;
-  // Legado/JVM rules commonly place flags at the beginning or after an
+  // Reading-source JVM rules commonly place flags at the beginning or after an
   // alternation. Preserve the historical Open Reading behavior: promote every
   // supported inline flag to the complete Dart expression.
   source = source.replaceAllMapped(_inlineFlags, (match) {

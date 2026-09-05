@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_list_reveal.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_cards.dart';
+
+import 'book_source_pill.dart';
+import '../../../utils/page_style_helper.dart';
 
 class BookSourceListDirectory extends StatelessWidget {
   final TextEditingController searchController;
@@ -20,6 +25,7 @@ class BookSourceListDirectory extends StatelessWidget {
   final ValueChanged<BookSourceListChannels> onExpandSource;
   final ValueChanged<SourcedBookCategory> onSelectCategory;
   final bool Function(String sourceId) shouldAnimateSource;
+  final Widget Function(RegisteredBookSource source)? sourceActionsBuilder;
 
   const BookSourceListDirectory({
     super.key,
@@ -39,63 +45,81 @@ class BookSourceListDirectory extends StatelessWidget {
     required this.onExpandSource,
     required this.onSelectCategory,
     required this.shouldAnimateSource,
+    this.sourceActionsBuilder,
   });
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = filteredGroups.isEmpty ? 2 : filteredGroups.length + 1;
-    final childCount = itemCount == 0 ? 0 : (itemCount * 2) - 1;
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      sliver: SliverList(
-        key: const Key('bookSourceListLayoutDirectory'),
-        delegate: SliverChildBuilderDelegate(
-          (context, childIndex) {
-            if (childIndex.isOdd) return const SizedBox(height: 10);
-            final index = childIndex ~/ 2;
-            final child = switch (index) {
-              0 => _SearchField(
-                controller: searchController,
-                groups: groups,
-                filteredGroups: filteredGroups,
-                query: state.listSourceQuery,
-                hint: searchHint,
-                clearTooltip: clearSearchTooltip,
-                onChanged: onQueryChanged,
-                onClear: onClearQuery,
-                onSubmitted: () {
-                  if (filteredGroups.isNotEmpty) {
-                    onExpandSource(filteredGroups.first);
-                  }
-                },
-              ),
-              1 when filteredGroups.isEmpty => _EmptySearch(
-                label: noMatchesLabel,
-                resetLabel: resetFiltersLabel,
-                onReset: onClearQuery,
-              ),
-              _ => BookSourceListReveal(
-                key: Key(
-                  'bookSourceListReveal-${filteredGroups[index - 1].source.id}',
+    final itemCount = filteredGroups.isEmpty ? 1 : filteredGroups.length;
+    final childCount = (itemCount * 2) - 1;
+    return SliverMainAxisGroup(
+      slivers: [
+        PinnedHeaderSliver(
+          child: ColoredBox(
+            color: PageStyleHelper.palette(context).backgroundStart,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1048),
+                  child: _SearchField(
+                    controller: searchController,
+                    groups: groups,
+                    filteredGroups: filteredGroups,
+                    query: state.listSourceQuery,
+                    hint: searchHint,
+                    clearTooltip: clearSearchTooltip,
+                    onChanged: onQueryChanged,
+                    onClear: onClearQuery,
+                    onSubmitted: () {
+                      if (filteredGroups.isNotEmpty) {
+                        onExpandSource(filteredGroups.first);
+                      }
+                    },
+                  ),
                 ),
-                animate: shouldAnimateSource(
-                  filteredGroups[index - 1].source.id,
-                ),
-                order: index - 1,
-                child: _sourceEntry(filteredGroups[index - 1]),
               ),
-            };
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1048),
-                child: child,
-              ),
-            );
-          },
-          childCount: childCount,
-          addAutomaticKeepAlives: false,
+            ),
+          ),
         ),
-      ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+          sliver: SliverList(
+            key: const Key('bookSourceListLayoutDirectory'),
+            delegate: SliverChildBuilderDelegate(
+              (context, childIndex) {
+                if (childIndex.isOdd) return const SizedBox(height: 10);
+                final index = childIndex ~/ 2;
+                final child = switch (index) {
+                  _ when filteredGroups.isEmpty => _EmptySearch(
+                    label: noMatchesLabel,
+                    resetLabel: resetFiltersLabel,
+                    onReset: onClearQuery,
+                  ),
+                  _ => BookSourceListReveal(
+                    key: Key(
+                      'bookSourceListReveal-${filteredGroups[index].source.id}',
+                    ),
+                    animate: shouldAnimateSource(
+                      filteredGroups[index].source.id,
+                    ),
+                    order: index,
+                    child: _sourceEntry(filteredGroups[index]),
+                  ),
+                };
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1048),
+                    child: child,
+                  ),
+                );
+              },
+              childCount: childCount,
+              addAutomaticKeepAlives: false,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -111,6 +135,7 @@ class BookSourceListDirectory extends StatelessWidget {
     onToggle: () => onToggleSource(group),
     onRetry: () => onExpandSource(group),
     onSelectCategory: onSelectCategory,
+    actions: sourceActionsBuilder?.call(group.source),
   );
 }
 
@@ -118,12 +143,14 @@ class BookSourceListSelectionHeader extends StatelessWidget {
   final SourcedBookCategory category;
   final String changeLabel;
   final VoidCallback onChange;
+  final Widget? actions;
 
   const BookSourceListSelectionHeader({
     super.key,
     required this.category,
     required this.changeLabel,
     required this.onChange,
+    this.actions,
   });
 
   @override
@@ -131,16 +158,26 @@ class BookSourceListSelectionHeader extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       key: const Key('bookSourceListSelectionHeader'),
-      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
-      decoration: bookSourcePanelDecoration(
-        context,
-        radius: 18,
-        stronger: true,
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
-          Icon(Icons.rss_feed_rounded, color: scheme.primary),
-          const SizedBox(width: 12),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: ShapeDecoration(
+              color: scheme.primaryContainer,
+              shape: const CircleBorder(),
+            ),
+            child: Icon(
+              Icons.rss_feed_rounded,
+              color: scheme.onPrimaryContainer,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,11 +201,16 @@ class BookSourceListSelectionHeader extends StatelessWidget {
               ],
             ),
           ),
-          TextButton.icon(
+          const SizedBox(width: 10),
+          ?actions,
+          BookSourcePill(
             key: const Key('bookSourceListChangeChannel'),
+            label: changeLabel,
+            selected: false,
+            icon: Icons.swap_horiz_rounded,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            maxLabelWidth: 88,
             onPressed: onChange,
-            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-            label: Text(changeLabel),
           ),
         ],
       ),
@@ -242,8 +284,16 @@ class _SearchField extends StatelessWidget {
           vertical: 14,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(999),
           borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
       ),
     );
@@ -287,6 +337,7 @@ class _EmptySearch extends StatelessWidget {
 }
 
 class _SourceEntry extends StatefulWidget {
+  final Widget? actions;
   final BookSourceListChannels group;
   final bool expanded;
   final bool loading;
@@ -300,6 +351,7 @@ class _SourceEntry extends StatefulWidget {
 
   const _SourceEntry({
     super.key,
+    this.actions,
     required this.group,
     required this.expanded,
     required this.loading,
@@ -387,7 +439,9 @@ class _SourceEntryState extends State<_SourceEntry>
     final controller = _expansionController;
     return Container(
       key: Key('bookSourceListSource-${widget.group.source.id}'),
-      decoration: bookSourcePanelDecoration(context, radius: 18),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -395,28 +449,38 @@ class _SourceEntryState extends State<_SourceEntry>
             color: Colors.transparent,
             child: InkWell(
               key: Key('bookSourceListSourceToggle-${widget.group.source.id}'),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
               onTap: widget.onToggle,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 15,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 child: Row(
                   children: [
-                    Icon(Icons.rss_feed_rounded, color: scheme.primary),
-                    const SizedBox(width: 12),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: ShapeDecoration(
+                        color: scheme.primaryContainer,
+                        shape: const CircleBorder(),
+                      ),
+                      child: Icon(
+                        Icons.rss_feed_rounded,
+                        color: scheme.onPrimaryContainer,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             widget.group.source.name,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
+                              height: 1.3,
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -426,6 +490,8 @@ class _SourceEntryState extends State<_SourceEntry>
                                     widget.group.channels.length,
                                   )
                                 : widget.group.source.apiBaseUrl.host,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
                               color: scheme.onSurfaceVariant,
@@ -434,6 +500,7 @@ class _SourceEntryState extends State<_SourceEntry>
                         ],
                       ),
                     ),
+                    ?widget.actions,
                     AnimatedRotation(
                       turns: widget.expanded ? 0.5 : 0,
                       duration: reduceMotion
@@ -601,14 +668,40 @@ class _ExpandedSourceBody extends StatelessWidget {
           ? SizedBox(
               key: const Key('bookSourceListLazyChannels'),
               height: _lazyChannelHeight,
-              child: ListView.separated(
-                primary: false,
-                itemCount: group.channels.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 4),
-                itemBuilder: (context, index) => Align(
-                  alignment: Alignment.centerLeft,
-                  child: _channelChip(group.channels[index]),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final textTheme = Theme.of(context).textTheme;
+                  final baseFontSize = textTheme.labelLarge?.fontSize ?? 14;
+                  final scaledFontSize = MediaQuery.textScalerOf(
+                    context,
+                  ).scale(baseFontSize);
+                  final scaleGrowth = (scaledFontSize / baseFontSize - 1).clamp(
+                    0.0,
+                    2.0,
+                  );
+                  final targetWidth = 104 + (scaleGrowth * 44);
+                  final columnCount =
+                      ((constraints.maxWidth + 8) / (targetWidth + 8))
+                          .floor()
+                          .clamp(1, 8)
+                          .toInt();
+                  final rowHeight = (scaledFontSize + 26)
+                      .clamp(48.0, 76.0)
+                      .toDouble();
+                  return GridView.builder(
+                    primary: false,
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(48),
+                    itemCount: group.channels.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columnCount,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      mainAxisExtent: rowHeight,
+                    ),
+                    itemBuilder: (context, index) =>
+                        _channelChip(group.channels[index]),
+                  );
+                },
               ),
             )
           : Wrap(
@@ -621,9 +714,10 @@ class _ExpandedSourceBody extends StatelessWidget {
     );
   }
 
-  Widget _channelChip(SourcedBookCategory channel) => ActionChip(
+  Widget _channelChip(SourcedBookCategory channel) => BookSourcePill(
     key: Key('bookSourceListChannel-${channel.source.id}-${channel.id}'),
-    label: Text(channel.name),
+    label: channel.name,
+    selected: false,
     onPressed: () => onSelectCategory(channel),
   );
 }

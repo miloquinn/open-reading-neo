@@ -1,0 +1,47 @@
+{
+  "bookSourceName": "4020🎃#bybk.cc",
+  "bookSourceUrl": "http://www.xwurexs.com#🎃",
+  "bookSourceType": 0,
+  "enabledCookieJar": true,
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36\"}",
+  "searchUrl": "/so.html?q={{key}}",
+  "ruleSearch": {
+    "author": ".even.1@text",
+    "bookList": ".detail_info tr!0",
+    "bookUrl": ".even.0@a@href",
+    "checkKeyWord": "逼我重生是吧",
+    "coverUrl": ".even.0@a@href<js>\nvar id = result.match(/(\\d+)/)[1];\nvar iid = parseInt(id/1000);\n'http://www.xwurexs.com/headimgs/'+iid+'/'+id+'/s'+id+'.jpg';\n</js>",
+    "kind": ".odd.2@text",
+    "lastChapter": ".odd.1@text",
+    "name": ".even.0@text"
+  },
+  "ruleExplore": {
+    "author": "text.作者@text##\\s.*",
+    "bookList": ".listBox ul li",
+    "bookUrl": "a.0@href##(\\d+)##http://www.xwurexs.com/read/$1/###",
+    "coverUrl": "a.0@href<js>\nvar id = result.match(/(\\d+)/)[1];\nvar iid = parseInt(id/1000);\n'http://www.xwurexs.com/headimgs/'+iid+'/'+id+'/s'+id+'.jpg';\n</js>",
+    "intro": ".u@text",
+    "kind": "text.更新@text##.*更新：",
+    "lastChapter": "div@a@text",
+    "name": "a.0@text##txt下载"
+  },
+  "ruleBookInfo": {
+    "author": ".small.0@text",
+    "coverUrl": "img@src",
+    "init": ".detail_info",
+    "intro": ".small.4@text##作者：.*|简介：",
+    "kind": ".small.2@text##更新日期：",
+    "lastChapter": ".small.3@text##最新章节：",
+    "name": "h1@text"
+  },
+  "ruleToc": {
+    "chapterList": ".showInfo.1@li@a",
+    "chapterName": "text@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "chapterUrl": "href"
+  },
+  "ruleContent": {
+    "content": "#content@textNodes",
+    "replaceRegex": "##请记住本书首发域名：.*"
+  },
+  "exploreUrl": "[{\"title\": \"最新小说\", \"url\": \"/new/{{page==1?'':'index_'+page+'.html'}}\", \"style\": {\"layout_flexGrow\": 1, \"layout_flexBasisPercent\": 0.25}}]"
+}

@@ -140,10 +140,14 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                       }
                       _visibleChapterCount = chapters.length;
                       _visibleUsesTwoPageLayout = usesTwoPageLayout;
-                      final bookPages =
+                      final buildsBookPages =
                           _pageMode == NativePageMode.horizontalSlide ||
-                              _pageMode == NativePageMode.coverSlide ||
-                              _pageMode == NativePageMode.pageCurl
+                          _pageMode == NativePageMode.coverSlide ||
+                          _pageMode == NativePageMode.pageCurl ||
+                          (_autoPageTurnController.isActive &&
+                              _autoPageTurnController.mode ==
+                                  ReaderAutoPageTurnMode.sweep);
+                      final bookPages = buildsBookPages
                           ? _bookPagesFor(
                               chapters,
                               _horizontalFirstChapter,
@@ -154,9 +158,10 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                               padOddChapters: usesTwoPageLayout,
                             )
                           : const <_BookPageRef>[];
-                      if (_pageMode == NativePageMode.horizontalSlide ||
-                          _pageMode == NativePageMode.coverSlide ||
-                          _pageMode == NativePageMode.pageCurl) {
+                      if (buildsBookPages &&
+                          (_pageMode == NativePageMode.horizontalSlide ||
+                              _pageMode == NativePageMode.coverSlide ||
+                              _pageMode == NativePageMode.pageCurl)) {
                         _scheduleBookPaginationWarm(
                           chapters,
                           _horizontalLastChapter + 1,
@@ -313,6 +318,7 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                       );
                       final currentPageIsBookmarked = _bookmarks.any(
                         (bookmark) =>
+                            isTxtBookmarkLocatorResolved(bookmark.anchorKey) &&
                             bookmark.anchorKey == currentBookmarkAnchorKey,
                       );
 
@@ -348,38 +354,47 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                         ),
                                         enabled: !_annotationInteractionActive,
                                         onTap: _handleReaderTap,
-                                        child: GestureDetector(
-                                          behavior: HitTestBehavior.translucent,
-                                          onHorizontalDragEnd:
-                                              _pageMode ==
-                                                      NativePageMode
-                                                          .horizontalSlide ||
-                                                  _pageMode ==
-                                                      NativePageMode
-                                                          .coverSlide ||
-                                                  _pageMode ==
-                                                      NativePageMode.pageCurl
-                                              ? null
-                                              : (details) =>
-                                                    _handleHorizontalSwipe(
-                                                      details,
-                                                      pages,
-                                                      chapters.length,
-                                                      usesTwoPageLayout,
-                                                    ),
-                                          child: _buildReaderContent(
-                                            chapters,
-                                            chapter,
-                                            pages,
-                                            bookPages,
-                                            usesTwoPageLayout,
-                                            _paginationFingerprintFor(
-                                              _chapterIndex,
-                                              paginationSize,
-                                              textDirection,
-                                              textScaler,
+                                        child: Listener(
+                                          onPointerDown:
+                                              _handleAutoPageTurnPointerDown,
+                                          onPointerMove:
+                                              _handleAutoPageTurnPointerMove,
+                                          onPointerSignal:
+                                              _handleAutoPageTurnPointerSignal,
+                                          child: GestureDetector(
+                                            behavior:
+                                                HitTestBehavior.translucent,
+                                            onHorizontalDragEnd:
+                                                _pageMode ==
+                                                        NativePageMode
+                                                            .horizontalSlide ||
+                                                    _pageMode ==
+                                                        NativePageMode
+                                                            .coverSlide ||
+                                                    _pageMode ==
+                                                        NativePageMode.pageCurl
+                                                ? null
+                                                : (details) =>
+                                                      _handleHorizontalSwipe(
+                                                        details,
+                                                        pages,
+                                                        chapters.length,
+                                                        usesTwoPageLayout,
+                                                      ),
+                                            child: _buildReaderContent(
+                                              chapters,
+                                              chapter,
+                                              pages,
+                                              bookPages,
+                                              usesTwoPageLayout,
+                                              _paginationFingerprintFor(
+                                                _chapterIndex,
+                                                paginationSize,
+                                                textDirection,
+                                                textScaler,
+                                              ),
+                                              size,
                                             ),
-                                            size,
                                           ),
                                         ),
                                       ),
@@ -406,6 +421,9 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                     _floatingStatusHorizontalPadding,
                               ),
                             ReaderChromeOverlay(
+                              autoPageTurnController: _autoPageTurnController,
+                              onResumeAutoPageTurn: () =>
+                                  unawaited(_resumeAutoPageTurn()),
                               palette: _readerTheme,
                               visible: _controlsVisible,
                               title: chapter.title.isEmpty
@@ -457,6 +475,12 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                 _showAskAiPanel(chapter, bookmarkPage),
                               ),
                               askAiTooltip: context.l10n.readerAskAi,
+                              onEditChapter: _canEditCurrentTxt
+                                  ? () => unawaited(_editCurrentTxtChapter())
+                                  : null,
+                              editChapterTooltip: TxtEditorCopy.of(
+                                context,
+                              ).editChapter,
                               onSettings: _showReadingSettings,
                               backTooltip: MaterialLocalizations.of(
                                 context,
@@ -495,6 +519,9 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                 ),
                               ),
                             ),
+                          if (_remoteProgressCandidate != null ||
+                              _showReturnToLocalPosition)
+                            _buildSyncContinuationBanner(),
                         ],
                       );
                     },

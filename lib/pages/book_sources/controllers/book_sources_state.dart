@@ -96,6 +96,8 @@ class BookSourcesState {
   final Map<BookSourcesSection, List<RegisteredBookSource>> sectionSources;
   final List<RegisteredBookSource> discoverySources;
   final bool loadingSources;
+  final bool favoritesOnly;
+  final String? selectedGroup;
   final BookSourcesSection section;
   final String? selectedSourceId;
   final Map<BookSourcesSection, BookSourcesSectionCache> caches;
@@ -130,6 +132,8 @@ class BookSourcesState {
         const {},
     List<RegisteredBookSource> discoverySources = const [],
     this.loadingSources = true,
+    this.favoritesOnly = false,
+    this.selectedGroup,
     this.section = BookSourcesSection.recommended,
     this.selectedSourceId,
     Map<BookSourcesSection, BookSourcesSectionCache> caches = const {},
@@ -159,11 +163,32 @@ class BookSourcesState {
        loadingListChannelSources = Set.unmodifiable(loadingListChannelSources),
        listChannelErrors = Map.unmodifiable(listChannelErrors);
 
-  List<RegisteredBookSource> sourcesFor(BookSourcesSection section) =>
-      sectionSources[section] ?? const [];
+  bool get hasOrganizationFilter => favoritesOnly || selectedGroup != null;
+
+  bool matchesOrganization(RegisteredBookSource source) =>
+      (!favoritesOnly || source.isFavorite) &&
+      (selectedGroup == null || source.groups.contains(selectedGroup));
+
+  late final Set<String> _organizedIds = sources
+      .where(matchesOrganization)
+      .map((source) => source.id)
+      .toSet();
+
+  List<RegisteredBookSource> get organizedDiscoverySources =>
+      hasOrganizationFilter
+      ? discoverySources.where(matchesOrganization).toList(growable: false)
+      : discoverySources;
+
+  List<RegisteredBookSource> sourcesFor(BookSourcesSection section) {
+    final sources = sectionSources[section] ?? const <RegisteredBookSource>[];
+    return hasOrganizationFilter
+        ? List.unmodifiable(sources.where(matchesOrganization))
+        : sources;
+  }
 
   bool matchesSelectedSource(RegisteredBookSource source) =>
-      selectedSourceId == null || source.id == selectedSourceId;
+      (!hasOrganizationFilter || _organizedIds.contains(source.id)) &&
+      (selectedSourceId == null || source.id == selectedSourceId);
 
   List<RegisteredBookSource> scopedSourcesFor(BookSourcesSection section) =>
       sourcesFor(section).where(matchesSelectedSource).toList(growable: false);
@@ -173,7 +198,7 @@ class BookSourcesState {
       .toList(growable: false);
 
   bool get requiresScopedDiscovery =>
-      discoverySources.length > largeSourceLibraryThreshold;
+      organizedDiscoverySources.length > largeSourceLibraryThreshold;
 
   List<BookSourceListChannels> get listSourceGroups =>
       sourcesFor(BookSourcesSection.categories)
@@ -190,6 +215,8 @@ class BookSourcesState {
     Map<BookSourcesSection, List<RegisteredBookSource>>? sectionSources,
     List<RegisteredBookSource>? discoverySources,
     bool? loadingSources,
+    bool? favoritesOnly,
+    Object? selectedGroup = _unset,
     BookSourcesSection? section,
     Object? selectedSourceId = _unset,
     Map<BookSourcesSection, BookSourcesSectionCache>? caches,
@@ -216,6 +243,10 @@ class BookSourcesState {
       discoverySources ?? this.discoverySources,
     ),
     loadingSources: loadingSources ?? this.loadingSources,
+    favoritesOnly: favoritesOnly ?? this.favoritesOnly,
+    selectedGroup: identical(selectedGroup, _unset)
+        ? this.selectedGroup
+        : selectedGroup as String?,
     section: section ?? this.section,
     selectedSourceId: identical(selectedSourceId, _unset)
         ? this.selectedSourceId

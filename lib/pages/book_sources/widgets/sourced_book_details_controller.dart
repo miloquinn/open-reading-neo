@@ -7,6 +7,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 
 import '../models/sourced_book.dart';
+import 'book_source_text_normalizer.dart';
 
 enum SourcedBookDetailsStep {
   details,
@@ -160,7 +161,25 @@ class SourcedBookDetailsController extends ChangeNotifier {
         sourceVariables: initial.book.sourceVariables,
       );
       if (!_isCurrentDetail(revision)) return;
-      _update(_state.copyWith(result: initial.copyWith(book: book)));
+      // Detail rules can omit metadata that discovery/search already supplied.
+      // Keep it when the response has no visible content, including empty HTML.
+      final merged = BookSourceBook(
+        id: book.id,
+        title: book.title,
+        author: book.author.trim().isEmpty ? initial.book.author : book.author,
+        description: normalizeBookSourceDescription(book.description).isEmpty
+            ? initial.book.description
+            : book.description,
+        type: book.type,
+        coverUrl: book.coverUrl,
+        coverHeaders: book.coverHeaders,
+        categories: book.categories,
+        status: book.status,
+        latestChapter: book.latestChapter,
+        updatedAt: book.updatedAt,
+        sourceVariables: book.sourceVariables,
+      );
+      _update(_state.copyWith(result: initial.copyWith(book: merged)));
     } catch (_) {
       // The discovery/search summary remains usable when detail loading fails.
     }

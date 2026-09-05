@@ -8,6 +8,7 @@ import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:epubx/epubx.dart' hide Image;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:html/parser.dart' as html_parser;
@@ -23,6 +24,7 @@ import 'package:xxread/core/reader/platform_reader_aloud_media_session.dart';
 import 'package:xxread/core/reader/indexed_text_reader.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
 import 'package:xxread/core/reader/reader_annotation.dart';
+import 'package:xxread/core/reader/reader_auto_page_turn_controller.dart';
 import 'package:xxread/core/reader/reader_custom_theme.dart';
 import 'package:xxread/core/reader/reader_font_profile.dart';
 import 'package:xxread/core/reader/reader_leaf_status.dart';
@@ -43,6 +45,7 @@ import 'package:xxread/core/reader/reader_theme_order.dart';
 import 'package:xxread/core/reader/reader_vertical_paging.dart';
 import 'package:xxread/core/reader/reader_volume_key_controller.dart';
 import 'package:xxread/core/reader/txt_chapter_parser.dart';
+import 'package:xxread/core/reader/streaming_txt_index.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/models/bookmark.dart';
 import 'package:xxread/models/book_note.dart';
@@ -57,7 +60,16 @@ import 'package:xxread/services/books/enhanced_txt_import_service.dart';
 import 'package:xxread/services/books/epub_native_parser.dart';
 import 'package:xxread/services/books/kindle_book_parser.dart';
 import 'package:xxread/services/books/pagination_cache_dao.dart';
+import 'package:xxread/services/books/native_reader_cache_store.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
+import 'package:xxread/services/books/txt_content_change_bus.dart';
+import 'package:xxread/services/books/txt_edit_service.dart';
+import 'package:xxread/services/books/txt_edit_reference_service.dart';
+import 'package:xxread/services/library/library_event_bus_service.dart';
+import 'package:xxread/services/sync/book_sync_identity.dart';
+import 'package:xxread/services/sync/reading_progress_event.dart';
+import 'package:xxread/services/sync/reading_progress_sync_service.dart';
+import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
@@ -74,6 +86,8 @@ import 'package:xxread/utils/system_ui_helper.dart';
 import 'package:xxread/widgets/reader_ai_panel.dart';
 import 'package:xxread/widgets/reader_annotated_text_page.dart';
 import 'package:xxread/widgets/reader_aloud_panel.dart';
+import 'package:xxread/widgets/reader_auto_scroll_surface.dart';
+import 'package:xxread/widgets/reader_auto_page_turn_controls.dart';
 import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_cover_page_turn.dart';
 import 'package:xxread/widgets/reader_desktop_input.dart';
@@ -85,6 +99,7 @@ import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_pull_bookmark.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
+import 'package:xxread/widgets/reader_sweep_page_turn.dart';
 import 'package:xxread/widgets/reader_tap_observer.dart';
 import 'package:xxread/widgets/reader_tap_zone_editor.dart';
 import 'package:xxread/widgets/reader_theme_background.dart';
@@ -93,6 +108,8 @@ import 'package:xxread/widgets/reader_vertical_paging_surface.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 import 'package:xxread/pages/reader/themes/reader_custom_themes_page.dart';
+import 'package:xxread/pages/reader/native/txt_chapter_editor_page.dart';
+import 'package:xxread/pages/reader/native/txt_editor_copy.dart';
 
 part 'native_reader_chapter.dart';
 part 'native_reader_pagination.dart';
@@ -105,6 +122,7 @@ part 'native_reader_loading.dart';
 part 'native_reader_configuration.dart';
 part 'native_reader_interaction.dart';
 part 'native_reader_controls.dart';
+part 'native_reader_auto_page_turn.dart';
 part 'native_reader_navigation.dart';
 part 'native_reader_page_cache.dart';
 part 'native_reader_shell.dart';
@@ -113,12 +131,14 @@ part 'native_reader_session.dart';
 part 'native_reader_horizontal_window.dart';
 part 'native_reader_document_parsers.dart';
 part 'native_reader_continuous_layout.dart';
+part 'native_reader_txt_editing.dart';
+part 'native_reader_sync_continuation.dart';
 
 typedef NativePageMode = ReaderPageMode;
 
 const int _largeTxtFileThreshold = 2 * 1024 * 1024;
 const int _largeInMemoryBookCacheThreshold = 16 * 1024 * 1024;
-const int _txtChapterCacheVersion = 5;
+const int _txtChapterCacheVersion = 6;
 const double _imagePageGap = 10;
 const int _imagePageImageFlex = 5;
 const int _imagePageTextFlex = 6;
@@ -134,8 +154,14 @@ final Map<String, Future<void>> _epubFontLoads = <String, Future<void>>{};
 /// Active readers keep their loaded chapters through their State fields and
 /// can rebuild pagination entries on demand.
 void clearNativeReaderMemoryCaches() {
+  for (final key in _bookMemoryCache.keys) {
+    unawaited(NativeReaderCacheStore.instance.release(key));
+  }
   _bookMemoryCache.clear();
   _navigationMemoryCache.clear();
+  for (final layouts in _paginationMemoryCache.values) {
+    layouts.clear();
+  }
   _paginationMemoryCache.clear();
 }
 
@@ -229,6 +255,8 @@ class NativeReaderPage extends StatefulWidget {
 
 class _NativeReaderPageState extends State<NativeReaderPage>
     with WidgetsBindingObserver {
+  late Book _activeBook;
+  String? _readerMemoryCacheKey;
   late final ReplaceRuleService _replaceRules = widget.replaceRuleService;
   late Future<List<_NativeChapter>> _chaptersFuture;
   PageController? _pageController;
@@ -277,6 +305,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   late final PaginationCacheDao _paginationCacheDao =
       widget.paginationCacheDao ?? PaginationCacheDao();
   final Map<String, Uint8List> _persistedPaginationPayloads = {};
+  int _paginationCacheEpoch = PaginationCacheDao.epoch;
   Future<void> _paginationCacheLoadFuture = Future<void>.value();
   Future<void> _paginationCacheWriteQueue = Future<void>.value();
   List<_NativeChapter> _loadedChapters = const [];
@@ -296,6 +325,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   String? _savedChapterId;
   bool _savedChapterResolved = false;
   bool _restoreAnchorAfterLayout = true;
+  bool _restoreContinuousAnchorCentered = false;
   bool _initialPositionRestored = false;
   bool _initialPositionRestoreScheduled = false;
   bool _exitInProgress = false;
@@ -311,6 +341,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _openPreviousChapterAtLastPage = false;
   bool _controlsVisible = false;
   Timer? _controlsTimer;
+  late final ReaderAutoPageTurnController _autoPageTurnController =
+      ReaderAutoPageTurnController(onAdvance: _advanceAutoPageTurn);
+  int _autoPageTurnStartRequest = 0;
+  bool _consumeAutoPageTurnTap = false;
+  bool _retainWholeBookAfterAutoScroll = false;
+  late (bool, bool, ReaderAutoPageTurnMode, double) _autoPageTurnUiState;
   NativePageMode _pageMode = ReaderSettings.defaultPageMode;
   bool _scrollByChapter = false;
   double _fontSize = 19;
@@ -351,6 +387,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
   final BookmarkDao _bookmarkDao = BookmarkDao();
   final BookNoteDao _bookNoteDao = BookNoteDao();
+  final TxtEditReferenceService _txtEditReferenceService =
+      TxtEditReferenceService();
   final ReaderSettingsStore _readerSettingsStore = const ReaderSettingsStore();
   final ReaderCustomThemeStore _customThemeStore =
       const ReaderCustomThemeStore();
@@ -373,13 +411,25 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   TextScaler _verticalTextScaler = TextScaler.noScaling;
   Size _lastPaginationSize = Size.zero;
   Size _readerViewportSize = Size.zero;
+  int _contentEditRevision = 0;
+  String? _currentContentSignature;
+  Timer? _syncContinuationTimer;
+  ReadingProgressRemoteCandidate? _remoteProgressCandidate;
+  String? _dismissedRemoteProgressEventId;
+  bool _showReturnToLocalPosition = false;
+  bool _progressSyncEventPending = false;
+  bool _suppressProgressSyncEvents = false;
   bool? _lastUsesTwoPageLayout;
   Animation<double>? _routeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _activeBook = widget.book;
     unawaited(_replaceRules.load());
+    _autoPageTurnUiState = _currentAutoPageTurnUiState;
+    _autoPageTurnController.addListener(_onAutoPageTurnChanged);
+    unawaited(_autoPageTurnController.loadInterval());
     _showOpeningLoader = widget.initialTheme == null;
     if (!_showOpeningLoader) {
       _openingLoaderTimer = Timer(_openingLoaderDelay, () {
@@ -394,6 +444,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     unawaited(ReadingResumeService.markReading(widget.book.id));
     _startReadingSession();
     _chapterIndex = widget.book.currentPage;
+    _currentContentSignature = widget.book.contentHash;
+    _showReturnToLocalPosition =
+        widget.book.id != null &&
+        ReadingProgressSyncService.instance.wasContinuationApplied(
+          widget.book.id!,
+        );
     _resetHorizontalPagingWindow(_chapterIndex);
     final savedLocator = widget.book.toCanonicalLocator();
     _anchorOffset = savedLocator?.textAnchor?.startOffsetUtf16;
@@ -410,10 +466,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     unawaited(_loadPageMode());
     unawaited(_loadBookmarks());
     unawaited(_loadAnnotations());
+    _startSyncContinuationWatch();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _pauseAutoPageTurn();
     if (state == AppLifecycleState.resumed) {
       _startReadingSession();
       unawaited(ReaderKeepScreenOnController.reapply(this));
@@ -586,15 +644,25 @@ class _NativeReaderPageState extends State<NativeReaderPage>
 
   String get _bookCacheKey =>
       '${widget.book.format.toLowerCase() == 'txt' ? 'txt-parser-v6:' : ''}'
-      '${widget.book.contentHash ?? widget.book.filePath}:'
-      '${widget.book.fileModifiedTime ?? (kIsWeb ? 0 : File(widget.book.filePath).lastModifiedSync().millisecondsSinceEpoch)}:'
-      '${widget.book.textEncoding ?? 'auto'}';
+      '${_activeBook.contentHash ?? _activeBook.filePath}:'
+      '$_sourceFileRevisionForCache:'
+      '${_activeBook.textEncoding ?? 'auto'}:edit-$_contentEditRevision';
+
+  String get _sourceFileRevisionForCache {
+    if (kIsWeb) return '${_activeBook.fileModifiedTime ?? 0}';
+    try {
+      final stat = File(_activeBook.filePath).statSync();
+      return '${stat.modified.microsecondsSinceEpoch}:${stat.size}';
+    } on FileSystemException {
+      return '${_activeBook.fileModifiedTime ?? 0}';
+    }
+  }
 
   bool get _isLargeTxtBook {
-    if (widget.book.format.toLowerCase() != 'txt') return false;
+    if (_activeBook.format.toLowerCase() != 'txt') return false;
     if (kIsWeb) return false;
     try {
-      return File(widget.book.filePath).lengthSync() > _largeTxtFileThreshold;
+      return File(_activeBook.filePath).lengthSync() > _largeTxtFileThreshold;
     } catch (_) {
       return false;
     }
@@ -618,9 +686,27 @@ class _NativeReaderPageState extends State<NativeReaderPage>
 
   @override
   void dispose() {
+    final cacheKey = _readerMemoryCacheKey;
+    if (widget.book.format.toLowerCase() == 'epub' && cacheKey != null) {
+      // Lazy EPUB chapters reference extracted files. Once this reader closes,
+      // retain disk pagination but let the resource budget reclaim those files.
+      _bookMemoryCache.remove(cacheKey);
+      _paginationMemoryCache.remove(cacheKey);
+      _navigationMemoryCache.removeWhere(
+        (key, _) => key == cacheKey || key.startsWith('$cacheKey:'),
+      );
+      unawaited(NativeReaderCacheStore.instance.release(cacheKey));
+    }
+    unawaited(
+      NativeReaderCacheStore.instance.release(this, enforceBudget: true),
+    );
+    _autoPageTurnStartRequest++;
+    _autoPageTurnController.removeListener(_onAutoPageTurnChanged);
+    _autoPageTurnController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _openingLoaderTimer?.cancel();
     _controlsTimer?.cancel();
+    _syncContinuationTimer?.cancel();
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
     _openingFlightSettled?.removeListener(_onOpeningFlightSettledChanged);
     _openingCoverHoldReached?.removeListener(_onOpeningCoverHoldChanged);
@@ -682,6 +768,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       progression: chapter.plainText.isEmpty
           ? 0
           : page.startOffset / chapter.plainText.length,
+      contentSignature: _currentContentSignature,
     );
     final chapterProgress = chapter.plainText.isEmpty
         ? 1.0
@@ -691,6 +778,9 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         ? null
         : ((chapterIndex + chapterProgress) / chapterCount).clamp(0.0, 1.0);
     final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
+    final emitSyncEvent =
+        _progressSyncEventPending && !_suppressProgressSyncEvents;
+    if (emitSyncEvent) _progressSyncEventPending = false;
     // The serialized write can run after this State has been disposed. Resolve
     // context-dependent font and locale data while the reader is still alive.
     final layoutSignature = _layoutSignature;
@@ -709,13 +799,18 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         layoutSignature,
         chapterIndex,
         readingProgress: readingProgress,
+        emitSyncEvent: emitSyncEvent,
       ),
     );
   }
 
   Future<void> _queueBookProgress(int bookId, int chapterIndex) {
     return _queuePositionWrite(
-      () => BookDao().updateBookProgress(bookId, chapterIndex),
+      () => BookDao().updateBookProgress(
+        bookId,
+        chapterIndex,
+        emitSyncEvent: false,
+      ),
     );
   }
 
@@ -725,12 +820,17 @@ class _NativeReaderPageState extends State<NativeReaderPage>
 
   void _setReaderState(VoidCallback callback) => setState(callback);
 
+  bool get _usesChapterScopedVerticalList =>
+      _scrollByChapter && !_retainWholeBookAfterAutoScroll;
+
   Future<void> _setPageMode(NativePageMode mode) async {
     if (_pageMode == mode) return;
+    _autoPageTurnController.stop();
     final previousPageController = _pageController;
     _pageController = null;
     _pageControllerGeneration++;
     setState(() {
+      _retainWholeBookAfterAutoScroll = false;
       _pageMode = mode;
       _pageIndex = 0;
       _restoreAnchorAfterLayout = true;
@@ -747,12 +847,15 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       );
     }
     unawaited(_syncVolumeKeyPaging());
+    _autoPageTurnController.setVertical(mode == NativePageMode.verticalScroll);
     await _readerSettingsStore.save(_readerSettings);
   }
 
   Future<void> _setScrollByChapter(bool value) async {
     if (_scrollByChapter == value) return;
+    _autoPageTurnController.stop();
     setState(() {
+      _retainWholeBookAfterAutoScroll = false;
       _scrollByChapter = value;
       _controlsVisible = false;
     });

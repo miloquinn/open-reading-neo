@@ -21,6 +21,8 @@ import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
+import 'support/reader_cache_test_utils.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -119,6 +121,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);
@@ -212,6 +215,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);
@@ -335,6 +339,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);

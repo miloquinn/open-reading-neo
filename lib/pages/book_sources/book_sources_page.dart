@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
+import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/utils/localization_extension.dart';
@@ -21,11 +22,15 @@ import 'widgets/book_source_category_picker.dart';
 import 'widgets/book_source_discovery_sections.dart';
 import 'widgets/book_source_list_directory.dart';
 import 'widgets/book_source_list_reveal.dart';
+import 'widgets/book_source_sliver_transition.dart';
+import 'widgets/book_source_organization_actions.dart';
+import 'widgets/book_source_pill.dart';
 import 'models/sourced_book.dart';
 import 'widgets/sourced_book_actions.dart';
 import 'widgets/sourced_book_cards.dart';
 
 part 'book_sources_page_list_content.dart';
+part 'book_sources_page_organization.dart';
 
 enum BookSourceDiscoverLayout { standard, list }
 
@@ -79,6 +84,7 @@ class BookSourcesPage extends StatefulWidget {
   final BookSourceClient? client;
   final BookSourceShelfService? shelfService;
   final BookSourcesPageController? controller;
+  final BookSourceRegistry? registry;
   final BookSourceClient Function()? clientFactory;
   final BookSourceShelfService Function(BookSourceClient client)?
   shelfServiceFactory;
@@ -90,6 +96,7 @@ class BookSourcesPage extends StatefulWidget {
     this.client,
     this.shelfService,
     this.controller,
+    this.registry,
     this.clientFactory,
     this.shelfServiceFactory,
   }) : assert(client == null || clientFactory == null),
@@ -108,7 +115,6 @@ class BookSourcesPage extends StatefulWidget {
   ) {
     final normalized = query.trim().toLowerCase();
     if (normalized.isEmpty) return true;
-    final group = source.sourceConfig?['bookSourceGroup'];
     final searchable = [
       source.name,
       source.description,
@@ -116,7 +122,7 @@ class BookSourcesPage extends StatefulWidget {
       source.manifestUrl.toString(),
       source.apiBaseUrl.toString(),
       if (source.websiteUrl != null) source.websiteUrl.toString(),
-      if (group is String) group,
+      ...source.groups,
     ];
     return searchable.any((value) => value.toLowerCase().contains(normalized));
   }
@@ -151,10 +157,12 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   late final BookSourcesPageController _layoutController;
   late final bool _ownsLayoutController;
   late final BookSourcesController _controller;
+  late final BookSourceRegistry _registry;
   final Set<String> _revealedListSourceIds = <String>{};
   final Set<String> _revealedBookIds = <String>{};
   String? _bookRevealScope;
   double? _listDirectoryScrollOffset;
+  double? _pendingScrollOffset;
 
   // Remapping every discoverable source into BookSourceListChannels (and
   // then filtering by search query) is O(source count) — cheap once, but
@@ -215,7 +223,8 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         widget.shelfService ??
         (widget.shelfServiceFactory ??
             (client) => BookSourceShelfService(client: client))(_client);
-    _controller = BookSourcesController(gateway: _client)
+    _registry = widget.registry ?? BookSourceRegistry();
+    _controller = BookSourcesController(gateway: _client, registry: _registry)
       ..addListener(_handleControllerChanged);
     _controller.setListLayout(
       _layoutController.layout.value == BookSourceDiscoverLayout.list,
@@ -247,6 +256,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
 
   void _handleLayoutChanged() {
     if (!mounted) return;
+    _pendingScrollOffset = 0;
     _controller.setListLayout(
       _layoutController.layout.value == BookSourceDiscoverLayout.list,
     );
@@ -344,9 +354,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
 
   Future<void> _openSourceManagement() async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const BookSourceManagementPage()),
+      MaterialPageRoute<void>(
+        builder: (_) => BookSourceManagementPage(registry: _registry),
+      ),
     );
-    if (mounted) await _controller.reload();
+    if (mounted) await _controller.refreshSourceMetadata();
   }
 
   @override
@@ -359,7 +371,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         : mobileChrome.pageBottomPadding;
     final listLayout =
         _layoutController.layout.value == BookSourceDiscoverLayout.list;
-    final discoverySources = _state.discoverySources;
+    final discoverySources = _state.organizedDiscoverySources;
     final availableSections = _state.availableSections;
     final scrollView = CustomScrollView(
       key: const Key('bookSourceDiscoverScrollView'),
@@ -373,7 +385,11 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   16,
-                  useRailNavigation ? 16 : mobileChrome.pageTopPadding,
+                  useRailNavigation
+                      ? 16
+                      : listLayout
+                      ? 0
+                      : mobileChrome.pageTopPadding,
                   16,
                   0,
                 ),
@@ -400,65 +416,166 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
                           onManage: () => unawaited(_openSourceManagement()),
                         ),
                       ),
-                    if (!listLayout)
-                      BookSourceDiscoveryControls(
-                        sources: discoverySources,
-                        includeAllSources: !_state.requiresScopedDiscovery,
-                        selectedSourceId: _state.selectedSourceId,
-                        sections: availableSections,
-                        selectedSection: _state.section,
-                        allLabel: context.l10n.statsRangeAll,
-                        recommendedLabel: context.l10n.discoverRecommended,
-                        categoriesLabel: context.l10n.discoverCategories,
-                        latestLabel: context.l10n.discoverLatest,
-                        onSourceSelected: (sourceId) =>
-                            unawaited(_controller.changeSourceScope(sourceId)),
-                        onSectionSelected: (section) =>
-                            unawaited(_controller.changeSection(section)),
-                      ),
-                    const SizedBox(height: 4),
+                    if (!listLayout) ...[
+                      _organizationFilters(),
+                      const SizedBox(height: 12),
+                    ],
+                    AnimatedSize(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topCenter,
+                      child: listLayout
+                          ? const SizedBox(width: double.infinity)
+                          : BookSourceDiscoveryControls(
+                              sources: discoverySources,
+                              includeAllSources:
+                                  !_state.requiresScopedDiscovery,
+                              selectedSourceId: _state.selectedSourceId,
+                              sections: availableSections,
+                              selectedSection: _state.section,
+                              allLabel: context.l10n.statsRangeAll,
+                              recommendedLabel:
+                                  context.l10n.discoverRecommended,
+                              categoriesLabel: context.l10n.discoverCategories,
+                              latestLabel: context.l10n.discoverLatest,
+                              onSourceSelected: (sourceId) => unawaited(
+                                _controller.changeSourceScope(sourceId),
+                              ),
+                              onSectionSelected: (section) =>
+                                  unawaited(_controller.changeSection(section)),
+                            ),
+                    ),
+                    if (!listLayout) const SizedBox(height: 12),
+                    if (!listLayout && _state.selectedSourceId != null)
+                      for (final source in discoverySources.where(
+                        (source) => source.id == _state.selectedSourceId,
+                      ))
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                source.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ),
+                            _sourceActions(source),
+                          ],
+                        ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-        ..._buildSectionSlivers(bottomPadding),
+        if (listLayout)
+          PinnedHeaderSliver(
+            child: ColoredBox(
+              key: const Key('bookSourceOrganizationPinnedFilters'),
+              color: PageStyleHelper.palette(context).backgroundStart,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1048),
+                    child: _organizationFilters(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        BookSourceSliverTransition(
+          key: const Key('bookSourceSectionTransition'),
+          identity: _sectionTransitionIdentity,
+          onSwap: _restorePendingScroll,
+          slivers: _buildSectionSlivers(bottomPadding),
+        ),
       ],
     );
 
     return Container(
       decoration: BoxDecoration(
-        gradient: PageStyleHelper.backgroundGradient(context),
+        color: listLayout
+            ? PageStyleHelper.palette(context).backgroundStart
+            : null,
+        gradient: listLayout
+            ? null
+            : PageStyleHelper.backgroundGradient(context),
       ),
       child: SafeArea(
         top: useRailNavigation,
         bottom: false,
-        child: RefreshIndicator(
-          edgeOffset: useRailNavigation ? 90 : mobileChrome.topBarHeight,
-          onRefresh: _refreshCurrentLayout,
-          child: listLayout
-              ? RawScrollbar(
-                  key: const Key('bookSourceDiscoverListScrollbar'),
-                  controller: _scrollController,
-                  thumbVisibility: true,
-                  interactive: true,
-                  thickness: 4,
-                  radius: const Radius.circular(99),
-                  minThumbLength: 44,
-                  crossAxisMargin: 2,
-                  padding: EdgeInsets.only(
-                    top: useRailNavigation ? 0 : mobileChrome.topBarHeight,
-                    bottom: useRailNavigation
-                        ? 0
-                        : mobileChrome.navContainerHeight,
-                  ),
-                  child: scrollView,
-                )
-              : scrollView,
+        child: Padding(
+          // Keep the list's pinned source search below the mobile title bar.
+          padding: EdgeInsets.only(
+            top: listLayout && !useRailNavigation
+                ? mobileChrome.pageTopPadding
+                : 0,
+          ),
+          child: RefreshIndicator(
+            edgeOffset: useRailNavigation
+                ? 90
+                : listLayout
+                ? 0
+                : mobileChrome.topBarHeight,
+            onRefresh: _refreshCurrentLayout,
+            child: RawScrollbar(
+              key: const Key('bookSourceDiscoverListScrollbar'),
+              controller: _scrollController,
+              thumbVisibility: listLayout,
+              interactive: listLayout,
+              thickness: 4,
+              radius: const Radius.circular(99),
+              minThumbLength: 44,
+              crossAxisMargin: 2,
+              padding: EdgeInsets.only(
+                top: useRailNavigation
+                    ? 0
+                    : listLayout
+                    ? 8
+                    : mobileChrome.topBarHeight,
+                bottom: useRailNavigation ? 0 : mobileChrome.navContainerHeight,
+              ),
+              child: scrollView,
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  Object get _sectionTransitionIdentity {
+    final cache = _state.caches[_state.section];
+    final phase = _state.loadingSources || cache == null || cache.loading
+        ? 'loading'
+        : cache.error != null
+        ? 'error'
+        : 'content';
+    return (
+      _state.listLayout,
+      _state.section,
+      _state.selectedSourceId,
+      _state.favoritesOnly,
+      _state.selectedGroup,
+      _state.listLayout && _state.showListDirectory,
+      phase,
+    );
+  }
+
+  void _restorePendingScroll() {
+    final target = _pendingScrollOffset;
+    if (target == null) return;
+    _pendingScrollOffset = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      _scrollController.jumpTo(
+        target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    });
   }
 
   RegisteredBookSource? get _selectedLoginSource {
@@ -517,6 +634,28 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
                 key: Key('bookSourceDiscoverSectionLoadingIndicator'),
               ),
             ),
+          ),
+          bottomPadding: bottomPadding,
+        ),
+      ];
+    }
+    if (_state.hasOrganizationFilter &&
+        _state.organizedDiscoverySources.isEmpty) {
+      final copy = BookSourceOrganizationCopy.of(context);
+      return [
+        _paddedSectionSliver(
+          BookSourceMessageCard(
+            icon: _state.favoritesOnly
+                ? Icons.star_outline_rounded
+                : Icons.folder_outlined,
+            title: _state.favoritesOnly
+                ? copy.favorites
+                : _state.selectedGroup!,
+            message: _state.favoritesOnly
+                ? copy.noFavorites
+                : copy.noGroupSources,
+            actionLabel: copy.all,
+            onAction: () => _controller.changeOrganizationScope(),
           ),
           bottomPadding: bottomPadding,
         ),
@@ -602,118 +741,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   Widget _buildShelf(BookSourceDiscoveryShelf shelf) {
     return BookSourceDiscoveryShelfSection(
       shelf: shelf,
+      sourceActions: _state.selectedSourceId == null
+          ? _sourceActions(shelf.source)
+          : null,
       onBookTap: _actions.showBookDetails,
     );
-  }
-
-  List<Widget> _buildCategoriesSlivers(
-    BookSourcesSectionCache cache,
-    double bottomPadding, {
-    bool showChannelStrip = true,
-  }) {
-    final categories = (cache.categories ?? const <SourcedBookCategory>[])
-        .where((category) => _state.matchesSelectedSource(category.source))
-        .toList(growable: false);
-    if (categories.isEmpty) {
-      return [
-        _paddedSectionSliver(
-          _state.sourcesFor(BookSourcesSection.categories).isEmpty
-              ? _buildUnsupportedMessage('categories')
-              : _buildEmptyMessage(),
-          bottomPadding: bottomPadding,
-        ),
-      ];
-    }
-    final selectedCategory = _state.selectedCategory ?? categories.first;
-    final slivers = <Widget>[];
-    if (showChannelStrip) {
-      slivers.add(
-        _paddedSectionSliver(
-          _buildCategoryChannels(categories, selectedCategory),
-          bottomPadding: 18,
-        ),
-      );
-    }
-    if (_state.loadingCategoryBooks) {
-      slivers.add(
-        _paddedSectionSliver(
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 36),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          topPadding: 0,
-          bottomPadding: bottomPadding,
-        ),
-      );
-    } else if (_state.categoryLoadError != null) {
-      slivers.add(
-        _paddedSectionSliver(
-          BookSourceMessageCard(
-            icon: Icons.cloud_off_outlined,
-            title: context.l10n.bookSourceChannelLoadFailed,
-            message: context.l10n.bookSourceChannelLoadFailedMessage(
-              _categoryErrorMessage(_state.categoryLoadError!),
-            ),
-            actionLabel: context.l10n.retry,
-            onAction: () => _controller.selectCategory(selectedCategory),
-          ),
-          topPadding: 0,
-          bottomPadding: bottomPadding,
-        ),
-      );
-    } else if (_state.categoryBooks.isEmpty) {
-      slivers.add(
-        _paddedSectionSliver(
-          BookSourceMessageCard(
-            icon: Icons.menu_book_outlined,
-            title: context.l10n.bookSourcesNoResults,
-            message: context.l10n.discoverCategoryEmpty,
-          ),
-          topPadding: 0,
-          bottomPadding: bottomPadding,
-        ),
-      );
-    } else {
-      slivers.add(
-        _bookListSliver(
-          _state.categoryBooks,
-          bottomPadding:
-              _state.categoryHasMore ||
-                  _state.loadingMoreCategoryBooks ||
-                  _state.categoryLoadMoreFailed
-              ? 12
-              : bottomPadding,
-        ),
-      );
-      if (_state.categoryHasMore ||
-          _state.loadingMoreCategoryBooks ||
-          _state.categoryLoadMoreFailed) {
-        slivers.add(
-          _paddedSectionSliver(
-            Center(
-              child: _state.loadingMoreCategoryBooks
-                  ? const CircularProgressIndicator()
-                  : OutlinedButton.icon(
-                      key: const Key('bookSourceCategoryLoadMore'),
-                      onPressed: _controller.loadMoreCategory,
-                      icon: Icon(
-                        _state.categoryLoadMoreFailed
-                            ? Icons.refresh_rounded
-                            : Icons.expand_more_rounded,
-                      ),
-                      label: Text(
-                        _state.categoryLoadMoreFailed
-                            ? context.l10n.retry
-                            : context.l10n.bookSourcesLoadMore,
-                      ),
-                    ),
-            ),
-            topPadding: 0,
-            bottomPadding: bottomPadding,
-          ),
-        );
-      }
-    }
-    return slivers;
   }
 }

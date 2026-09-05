@@ -24,29 +24,58 @@ List<Object?> evaluateSourceXPath(
     expression = expression.substring(7).trimLeft();
   }
   final roots = switch (root) {
-    Document document => <Element>[document.documentElement!],
-    Element element => <Element>[element],
-    _ => const <Element>[],
+    Document document => <Node>[document],
+    Element element => <Node>[element],
+    _ => const <Node>[],
   };
   if (roots.isEmpty) return const [];
   final steps = parseSourceXPathSteps(expression);
   if (steps.isEmpty) return const [];
   var current = roots;
+  Map<Node, int>? documentOrder;
+
+  List<Element> inDocumentOrder(Iterable<Element> candidates) {
+    final nodes = candidates.toSet().toList(growable: false);
+    if (nodes.length > 1) {
+      // Overlapping contexts can discover the same nodes in different orders.
+      // XPath node-sets use node identity and document order, including after
+      // following-sibling steps and before scalar attribute extraction.
+      // Child/descendant queries stay inside the root. Following siblings can
+      // also reach its parent's subtree, but never require the whole document
+      // for a chapter-local query.
+      final orderRoot =
+          steps.any((step) => step.axis == SourceXPathAxis.followingSibling)
+          ? roots.single.parentNode ?? roots.single
+          : roots.single;
+      documentOrder ??= _sourceXPathDocumentOrder(orderRoot);
+      nodes.sort(
+        (left, right) =>
+            documentOrder![left]!.compareTo(documentOrder![right]!),
+      );
+    }
+    return nodes;
+  }
+
   for (var index = 0; index < steps.length; index++) {
     final step = steps[index];
     if (step.test == 'text()') {
       if (index != steps.length - 1) return const [];
-      return current.map(sourceOwnText).toList(growable: false);
+      return current
+          .whereType<Element>()
+          .map(sourceOwnText)
+          .toList(growable: false);
     }
     if (step.test.startsWith('@')) {
       if (index != steps.length - 1) return const [];
       final attribute = step.test.substring(1);
-      final targets = step.axis == SourceXPathAxis.descendant
-          ? <Element>[
-              for (final element in current)
-                ...element.querySelectorAll('[$attribute]'),
-            ]
-          : current;
+      final targets = inDocumentOrder(
+        (step.axis == SourceXPathAxis.descendant
+                ? current
+                      .expand(_sourceXPathDescendantOrSelf)
+                      .whereType<Element>()
+                : current.whereType<Element>())
+            .where((element) => element.attributes.containsKey(attribute)),
+      );
       if (!listMode) {
         // XPath 1.0 converts a node-set to a string using the first node in
         // document order, not by concatenating every matched node — matching
@@ -61,28 +90,46 @@ List<Object?> evaluateSourceXPath(
           .map((element) => element.attributes[attribute] ?? '')
           .toList(growable: false);
     }
-    if (step.axis == SourceXPathAxis.followingSibling) {
-      current = [
-        for (final element in current)
-          ...sourceFollowingSiblings(
-            element,
-          ).where((candidate) => sourceXPathMatches(candidate, step)),
-      ];
-      continue;
+    final next = <Element>{};
+    for (final node in current) {
+      if (step.axis == SourceXPathAxis.followingSibling) {
+        if (node is Element) {
+          next.addAll(
+            _selectSourceXPathStep(sourceFollowingSiblings(node), step),
+          );
+        }
+      } else {
+        // `//` abbreviates /descendant-or-self::node()/child::, so each
+        // parent has its own candidate list and predicate positions.
+        final contexts = step.axis == SourceXPathAxis.descendant
+            ? _sourceXPathDescendantOrSelf(node)
+            : [node];
+        for (final context in contexts) {
+          next.addAll(_selectSourceXPathStep(context.children, step));
+        }
+      }
     }
-    final next = <Element>[];
-    for (final element in current) {
-      final candidates = step.axis == SourceXPathAxis.descendant
-          ? element.querySelectorAll('*')
-          : element.children;
-      next.addAll(
-        candidates.where((candidate) => sourceXPathMatches(candidate, step)),
-      );
-    }
-    current = next.toSet().toList(growable: false);
+    current = inDocumentOrder(next);
     if (current.isEmpty) break;
   }
-  return listMode ? current : current.map((node) => node.text).toList();
+  return listMode
+      ? current
+      : current.whereType<Element>().map((node) => node.text).toList();
+}
+
+Iterable<Node> _sourceXPathDescendantOrSelf(Node node) sync* {
+  yield node;
+  for (final child in node.children) {
+    yield* _sourceXPathDescendantOrSelf(child);
+  }
+}
+
+Map<Node, int> _sourceXPathDocumentOrder(Node node) {
+  var index = 0;
+  return {
+    for (final descendant in _sourceXPathDescendantOrSelf(node))
+      descendant: index++,
+  };
 }
 
 List<SourceXPathStep> parseSourceXPathSteps(String input) {
@@ -135,84 +182,77 @@ List<SourceXPathStep> parseSourceXPathSteps(String input) {
   return steps;
 }
 
-bool sourceXPathMatches(Element element, SourceXPathStep step) {
-  if (step.test != '*' && element.localName != step.test.toLowerCase()) {
-    return false;
-  }
+List<Element> _selectSourceXPathStep(
+  Iterable<Element> candidates,
+  SourceXPathStep step,
+) {
+  var selected = candidates
+      .where(
+        (element) =>
+            step.test == '*' || element.localName == step.test.toLowerCase(),
+      )
+      .toList(growable: false);
   for (final predicate in step.predicates) {
-    final attributeEquals = RegExp(
-      r'''^@([\w:-]+)\s*=\s*(["'])(.*?)\2$''',
-    ).firstMatch(predicate);
-    if (attributeEquals != null) {
-      if (element.attributes[attributeEquals.group(1)!] !=
-          attributeEquals.group(3)) {
-        return false;
-      }
-      continue;
-    }
-    final containsAttribute = RegExp(
-      r'''^contains\(\s*@([\w:-]+)\s*,\s*(["'])(.*?)\2\s*\)$''',
-    ).firstMatch(predicate);
-    if (containsAttribute != null) {
-      if (!(element.attributes[containsAttribute.group(1)!] ?? '').contains(
-        containsAttribute.group(3)!,
-      )) {
-        return false;
-      }
-      continue;
-    }
-    final textEquals = RegExp(
-      r'''^text\(\)\s*=\s*(["'])(.*?)\1$''',
-    ).firstMatch(predicate);
-    if (textEquals != null) {
-      if (sourceOwnText(element).trim() != textEquals.group(2)) return false;
-      continue;
-    }
-    final containsText = RegExp(
-      r'''^contains\(\s*text\(\)\s*,\s*(["'])(.*?)\1\s*\)$''',
-    ).firstMatch(predicate);
-    if (containsText != null) {
-      if (!element.text.contains(containsText.group(2)!)) return false;
-      continue;
-    }
+    if (selected.isEmpty) break;
+    // Each predicate filters the result of the preceding predicate. Positions
+    // are one-based within that result, never within unfiltered DOM siblings.
     final position = int.tryParse(predicate);
     if (position != null) {
-      if (sourceXPathSiblingPosition(element, step.test) != position) {
-        return false;
-      }
+      selected = position > 0 && position <= selected.length
+          ? [selected[position - 1]]
+          : [];
       continue;
     }
     final greaterThan = RegExp(
       r'^position\(\)\s*>\s*(\d+)$',
     ).firstMatch(predicate);
     if (greaterThan != null) {
-      if (sourceXPathSiblingPosition(element, step.test) <=
-          int.parse(greaterThan.group(1)!)) {
-        return false;
-      }
+      selected = selected
+          .skip(int.parse(greaterThan.group(1)!))
+          .toList(growable: false);
       continue;
     }
-    if (RegExp(r'^[A-Za-z][\w-]*$').hasMatch(predicate)) {
-      if (!element.children.any(
-        (child) => child.localName == predicate.toLowerCase(),
-      )) {
-        return false;
-      }
-      continue;
-    }
-    return false;
+    selected = selected
+        .where((element) => _sourceXPathPredicateMatches(element, predicate))
+        .toList(growable: false);
   }
-  return true;
+  return selected;
 }
 
-int sourceXPathSiblingPosition(Element element, String test) {
-  final siblings = element.parent?.children ?? const <Element>[];
-  var position = 0;
-  for (final sibling in siblings) {
-    if (test == '*' || sibling.localName == test.toLowerCase()) position++;
-    if (identical(sibling, element)) return position;
+bool _sourceXPathPredicateMatches(Element element, String predicate) {
+  final attributeEquals = RegExp(
+    r'''^@([\w:-]+)\s*=\s*(["'])(.*?)\2$''',
+  ).firstMatch(predicate);
+  if (attributeEquals != null) {
+    return element.attributes[attributeEquals.group(1)!] ==
+        attributeEquals.group(3);
   }
-  return -1;
+  final containsAttribute = RegExp(
+    r'''^contains\(\s*@([\w:-]+)\s*,\s*(["'])(.*?)\2\s*\)$''',
+  ).firstMatch(predicate);
+  if (containsAttribute != null) {
+    return (element.attributes[containsAttribute.group(1)!] ?? '').contains(
+      containsAttribute.group(3)!,
+    );
+  }
+  final textEquals = RegExp(
+    r'''^text\(\)\s*=\s*(["'])(.*?)\1$''',
+  ).firstMatch(predicate);
+  if (textEquals != null) {
+    return sourceOwnText(element).trim() == textEquals.group(2);
+  }
+  final containsText = RegExp(
+    r'''^contains\(\s*text\(\)\s*,\s*(["'])(.*?)\1\s*\)$''',
+  ).firstMatch(predicate);
+  if (containsText != null) {
+    return element.text.contains(containsText.group(2)!);
+  }
+  if (RegExp(r'^[A-Za-z][\w-]*$').hasMatch(predicate)) {
+    return element.children.any(
+      (child) => child.localName == predicate.toLowerCase(),
+    );
+  }
+  return false;
 }
 
 Iterable<Element> sourceFollowingSiblings(Element element) sync* {

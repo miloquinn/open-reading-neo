@@ -11,8 +11,10 @@ import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
 import 'book_source_registry_storage.dart';
 import '../../services/core/app_settings_service.dart';
+import 'book_source_health_configuration.dart';
 
 export 'book_source_registry_storage.dart' show BookSourceRegistryStorage;
+export 'book_source_health_configuration.dart';
 
 /// Result of [BookSourceRegistry.upsertAll]: the full registry after the
 /// write, plus any imported sources that were held back because they would
@@ -72,8 +74,7 @@ class BookSourceRegistry {
     if (raw.length < _backgroundDecodeThreshold) {
       return _decodeStoredSources(raw);
     }
-    final maps = await compute(_decodeStoredSourceMaps, raw);
-    return maps.map(RegisteredBookSource.fromJson).toList(growable: false);
+    return compute(_decodeStoredSources, raw);
   }
 
   Future<List<RegisteredBookSource>> _load() async {
@@ -109,10 +110,9 @@ class BookSourceRegistry {
     // Spawning an isolate costs more than a direct parse for small source
     // lists and does not advance inside Flutter widget-test fake async. Large
     // imported registries still stay completely off the UI isolate.
-    final maps = raw.length < _backgroundDecodeThreshold
-        ? _decodeRunnableSourceMaps(arguments)
-        : await compute(_decodeRunnableSourceMaps, arguments);
-    return maps.map(RegisteredBookSource.fromJson).toList(growable: false);
+    return raw.length < _backgroundDecodeThreshold
+        ? _decodeRunnableSources(arguments)
+        : compute(_decodeRunnableSources, arguments);
   }
 
   Future<List<RegisteredBookSource>> upsert(RegisteredBookSource source) async {
@@ -151,6 +151,8 @@ class BookSourceRegistry {
           capabilities: source.capabilities,
           maxCatalogPageSize: source.maxCatalogPageSize,
           enabled: previous.enabled,
+          isFavorite: previous.isFavorite,
+          groups: previous.groups,
           addedAt: previous.addedAt,
           sourceProtocol: source.sourceProtocol,
           sourceConfig: source.sourceConfig,
@@ -219,6 +221,8 @@ class BookSourceRegistry {
           capabilities: source.capabilities,
           maxCatalogPageSize: source.maxCatalogPageSize,
           enabled: previous.enabled && source.capabilities.isNotEmpty,
+          isFavorite: previous.isFavorite,
+          groups: previous.groups,
           addedAt: previous.addedAt,
           sourceProtocol: source.sourceProtocol,
           sourceConfig: source.sourceConfig,
@@ -246,6 +250,147 @@ class BookSourceRegistry {
           })
           .toList(growable: false);
       return _saveAndPublish(sources);
+    });
+  }
+
+  Future<List<RegisteredBookSource>> setFavorite(String id, bool value) async {
+    return _mutate(() async {
+      final sources = (await _load())
+          .map(
+            (source) =>
+                source.id == id ? source.copyWith(isFavorite: value) : source,
+          )
+          .toList(growable: false);
+      return _saveAndPublish(sources);
+    });
+  }
+
+  /// Replaces the complete group membership of every selected source.
+  Future<List<RegisteredBookSource>> setGroups(
+    Iterable<String> ids,
+    Iterable<String> groups,
+  ) async {
+    final selected = ids.toSet();
+    final normalized = _normalizeGroupNames(groups);
+    return _mutate(() async {
+      final sources = (await _load())
+          .map(
+            (source) => selected.contains(source.id)
+                ? source.copyWith(groups: normalized)
+                : source,
+          )
+          .toList(growable: false);
+      return _saveAndPublish(sources);
+    });
+  }
+
+  /// Adds and removes memberships without disturbing different existing
+  /// memberships across a mixed multi-selection.
+  Future<List<RegisteredBookSource>> updateGroups(
+    Iterable<String> ids, {
+    required Iterable<String> added,
+    required Iterable<String> removed,
+  }) async {
+    final selected = ids.toSet();
+    final addedGroups = _normalizeGroupNames(added);
+    final removedGroups = _normalizeGroupNames(removed).toSet();
+    return _mutate(() async {
+      final sources = (await _load())
+          .map((source) {
+            if (!selected.contains(source.id)) return source;
+            final next = source.groups
+                .where((group) => !removedGroups.contains(group))
+                .toList();
+            for (final group in addedGroups) {
+              if (!next.contains(group)) next.add(group);
+            }
+            return source.copyWith(groups: next);
+          })
+          .toList(growable: false);
+      return _saveAndPublish(sources);
+    });
+  }
+
+  /// Loads the explicit group order followed by any memberships found on
+  /// sources imported from an older or externally synced record.
+  Future<List<String>> loadGroups() async {
+    final raw = await _readRaw();
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final groups = raw.length < _backgroundDecodeThreshold
+        ? _decodeStoredGroupNames(raw)
+        : await compute(_decodeStoredGroupNames, raw);
+    return List.unmodifiable(groups);
+  }
+
+  Future<List<String>> createGroup(String name) async {
+    final group = _requiredGroupName(name);
+    return _mutate(() async {
+      final sources = await _load();
+      final groups = await loadGroups();
+      final next = groups.contains(group) ? groups : [...groups, group];
+      await _saveAndPublish(sources, groups: next);
+      return List.unmodifiable(next);
+    });
+  }
+
+  Future<List<String>> renameGroup(String oldName, String newName) async {
+    final oldGroup = _requiredGroupName(oldName);
+    final newGroup = _requiredGroupName(newName);
+    return _mutate(() async {
+      final sources = (await _load())
+          .map((source) {
+            if (!source.groups.contains(oldGroup)) return source;
+            return source.copyWith(
+              groups: _normalizeGroupNames(
+                source.groups.map(
+                  (group) => group == oldGroup ? newGroup : group,
+                ),
+              ),
+            );
+          })
+          .toList(growable: false);
+      final groups = (await loadGroups()).map(
+        (group) => group == oldGroup ? newGroup : group,
+      );
+      final next = _normalizeGroupNames(groups);
+      await _saveAndPublish(sources, groups: next);
+      return List.unmodifiable(next);
+    });
+  }
+
+  Future<List<String>> deleteGroup(String name) async {
+    final group = _requiredGroupName(name);
+    return _mutate(() async {
+      final sources = (await _load())
+          .map(
+            (source) => source.groups.contains(group)
+                ? source.copyWith(
+                    groups: source.groups
+                        .where((item) => item != group)
+                        .toList(),
+                  )
+                : source,
+          )
+          .toList(growable: false);
+      final next = (await loadGroups())
+          .where((item) => item != group)
+          .toList(growable: false);
+      await _saveAndPublish(sources, groups: next);
+      return List.unmodifiable(next);
+    });
+  }
+
+  Future<List<String>> reorderGroups(List<String> groups) async {
+    final requested = _normalizeGroupNames(groups);
+    return _mutate(() async {
+      final sources = await _load();
+      final current = await loadGroups();
+      final next = <String>[
+        ...requested.where(current.contains),
+        ...current.where((group) => !requested.contains(group)),
+      ];
+      await _saveAndPublish(sources, groups: next);
+      return List.unmodifiable(next);
     });
   }
 
@@ -306,6 +451,71 @@ class BookSourceRegistry {
     });
   }
 
+  /// Merges only completed health-check metadata into sources that still
+  /// exist. The current registry record remains authoritative for user-owned
+  /// fields such as enabled state, groups, order, and any edits made while a
+  /// long-running check was in flight.
+  Future<BookSourceHealthMergeResult> mergeHealthCheckResults(
+    Iterable<RegisteredBookSource> checkedSources, {
+    Set<String>? persistSourceIds,
+  }) async {
+    final checkedById = <String, RegisteredBookSource>{};
+    for (final source in checkedSources) {
+      final health = source.sourceConfig?['_openReadingHealthCheck'];
+      if (health != null) checkedById[source.id] = source;
+    }
+    if (checkedById.isEmpty) {
+      return BookSourceHealthMergeResult(
+        sources: await load(),
+        mergedSourceIds: const {},
+      );
+    }
+    return _mutate(() async {
+      final mergedSourceIds = <String>{};
+      var changed = false;
+      final sources = (await _load())
+          .map((source) {
+            final checked = checkedById[source.id];
+            if (checked == null ||
+                !sameBookSourceHealthCheckConfiguration(source, checked)) {
+              return source;
+            }
+            mergedSourceIds.add(source.id);
+            if (persistSourceIds != null &&
+                !persistSourceIds.contains(source.id)) {
+              return source;
+            }
+            changed = true;
+            return source.copyWith(
+              sourceConfig: {
+                ...?source.sourceConfig,
+                '_openReadingHealthCheck':
+                    checked.sourceConfig!['_openReadingHealthCheck'],
+              },
+            );
+          })
+          .toList(growable: false);
+      final List<RegisteredBookSource> saved;
+      try {
+        saved = changed
+            ? await _saveAndPublish(sources)
+            : List<RegisteredBookSource>.unmodifiable(sources);
+      } on Object catch (error) {
+        final persistedCandidates = persistSourceIds == null
+            ? mergedSourceIds
+            : mergedSourceIds.intersection(persistSourceIds);
+        throw BookSourceHealthMergePersistenceException(
+          cause: error,
+          unpersistedSourceIds: Set.unmodifiable(persistedCandidates),
+        );
+      }
+      return BookSourceHealthMergeResult(
+        sources: saved,
+        mergedSourceIds: Set.unmodifiable(mergedSourceIds),
+      );
+    });
+  }
+
   /// Applies an exact record-level winner received from the user's sync space.
   ///
   /// Unlike manifest refresh, sync must preserve the remote device's enabled
@@ -339,13 +549,21 @@ class BookSourceRegistry {
     return completer.future;
   }
 
-  Future<void> _save(List<RegisteredBookSource> sources) async {
+  Future<void> _save(
+    List<RegisteredBookSource> sources,
+    List<String> groups,
+  ) async {
     final maps = sources
         .map((source) => source.toJson())
         .toList(growable: false);
+    final stored = <String, Object>{
+      'version': 2,
+      'sources': maps,
+      'groups': groups,
+    };
     final raw = maps.length < 128
-        ? jsonEncode(maps)
-        : await compute(_encodeStoredSourceMaps, maps);
+        ? jsonEncode(stored)
+        : await compute(_encodeStoredRegistry, stored);
     final hasExternalRegistry = await _storage.read() != null;
     if (await _storage.write(raw)) {
       final preferences = await SharedPreferences.getInstance();
@@ -362,10 +580,13 @@ class BookSourceRegistry {
   }
 
   Future<List<RegisteredBookSource>> _saveAndPublish(
-    List<RegisteredBookSource> sources,
-  ) async {
+    List<RegisteredBookSource> sources, {
+    List<String>? groups,
+  }) async {
     sources.sort((a, b) => a.name.compareTo(b.name));
-    await _save(sources);
+    final existingGroups = groups ?? await loadGroups();
+    final orderedGroups = _mergeGroupOrder(existingGroups, sources);
+    await _save(sources, orderedGroups);
     _changesController.add(null);
     return List.unmodifiable(sources);
   }
@@ -399,9 +620,7 @@ String _sourceIdentity(RegisteredBookSource source) {
   return 'protocol:${source.sourceProtocol.name}:id:${source.id}';
 }
 
-List<Map<String, dynamic>> _decodeRunnableSourceMaps(
-  Map<String, Object> request,
-) {
+List<RegisteredBookSource> _decodeRunnableSources(Map<String, Object> request) {
   final raw = request['raw']! as String;
   final additionalEnabled = request['additionalEnabled']! as bool;
   final sources = _decodeStoredSources(raw).where((source) {
@@ -409,36 +628,85 @@ List<Map<String, dynamic>> _decodeRunnableSourceMaps(
     return additionalEnabled ||
         source.sourceProtocol == BookSourceProtocolKind.orsp;
   });
-  return sources.map((source) => source.toJson()).toList(growable: false);
-}
-
-List<Map<String, dynamic>> _decodeStoredSourceMaps(String raw) {
-  return _decodeStoredSources(
-    raw,
-  ).map((source) => source.toJson()).toList(growable: false);
+  return sources.toList(growable: false);
 }
 
 List<RegisteredBookSource> _decodeStoredSources(String raw) {
   try {
     final decoded = jsonDecode(raw);
-    if (decoded is! List) return const [];
-    final sources = <RegisteredBookSource>[];
-    for (final item in decoded) {
-      if (item is! Map) continue;
-      try {
-        final stored = RegisteredBookSource.fromJson(
-          item.map((key, value) => MapEntry('$key', value)),
-        );
-        sources.add(_refreshStoredCompatibility(stored));
-      } catch (_) {
-        // One damaged record must not hide the remaining sources.
-      }
-    }
-    sources.sort((a, b) => a.name.compareTo(b.name));
-    return sources;
+    return _decodeStoredRegistryValue(decoded).sources;
   } catch (_) {
     return const [];
   }
+}
+
+_StoredBookSourceRegistry _decodeStoredRegistryValue(Object? decoded) {
+  final sourceItems = decoded is List
+      ? decoded
+      : decoded is Map && decoded['sources'] is List
+      ? decoded['sources']! as List
+      : const [];
+  final explicitGroups = decoded is Map && decoded['groups'] is List
+      ? _normalizeGroupNames((decoded['groups']! as List).whereType<String>())
+      : const <String>[];
+  final sources = <RegisteredBookSource>[];
+  for (final item in sourceItems) {
+    if (item is! Map) continue;
+    try {
+      final stored = RegisteredBookSource.fromJson(
+        item.map((key, value) => MapEntry('$key', value)),
+      );
+      sources.add(_refreshStoredCompatibility(stored));
+    } catch (_) {
+      // One damaged record must not hide the remaining sources.
+    }
+  }
+  sources.sort((a, b) => a.name.compareTo(b.name));
+  return _StoredBookSourceRegistry(sources: sources, groups: explicitGroups);
+}
+
+List<String> _decodeStoredGroupNames(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    final sourceItems = decoded is List
+        ? decoded
+        : decoded is Map && decoded['sources'] is List
+        ? decoded['sources']! as List
+        : const [];
+    final groups = decoded is Map && decoded['groups'] is List
+        ? _normalizeGroupNames((decoded['groups']! as List).whereType<String>())
+        : <String>[];
+    final groupRecords = <({String name, List<String> groups})>[];
+    for (final item in sourceItems) {
+      if (item is! Map) continue;
+      final name = item['name'];
+      if (name is! String || name.trim().isEmpty) continue;
+      final sourceGroups = item.containsKey('groups')
+          ? _storedGroupList(item['groups'])
+          : _legacyStoredGroupList(item['sourceConfig']);
+      groupRecords.add((name: name.trim(), groups: sourceGroups));
+    }
+    groupRecords.sort((a, b) => a.name.compareTo(b.name));
+    final seen = groups.toSet();
+    for (final record in groupRecords) {
+      for (final group in record.groups) {
+        if (seen.add(group)) groups.add(group);
+      }
+    }
+    return groups;
+  } catch (_) {
+    return const [];
+  }
+}
+
+List<String> _storedGroupList(Object? value) =>
+    value is List ? _normalizeGroupNames(value.whereType<String>()) : const [];
+
+List<String> _legacyStoredGroupList(Object? sourceConfig) {
+  if (sourceConfig is! Map) return const [];
+  final value = sourceConfig['bookSourceGroup'];
+  if (value is! String || value.trim().isEmpty) return const [];
+  return _normalizeGroupNames(value.split(RegExp(r'[,;，；\n]')));
 }
 
 RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
@@ -451,13 +719,15 @@ RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
     // Compatibility is policy, not source data. Always rescan so upgrades
     // (for example image sources becoming supported) take effect immediately.
     final effectiveReport = const SourceCompatibilityScanner().scan(compatible);
-    return compatible.toRegisteredSource(
-      id: source.id,
-      enabled: source.enabled,
-      readingChainVerified: isReadingChainVerifiedSource(source),
-      compatibilityReport: effectiveReport,
-      addedAt: source.addedAt,
-    );
+    return compatible
+        .toRegisteredSource(
+          id: source.id,
+          enabled: source.enabled,
+          readingChainVerified: isReadingChainVerifiedSource(source),
+          compatibilityReport: effectiveReport,
+          addedAt: source.addedAt,
+        )
+        .copyWith(isFavorite: source.isFavorite, groups: source.groups);
   } on FormatException {
     // Keep a legacy record visible even if its raw configuration can no
     // longer be executed. The management page can still remove or replace it.
@@ -465,5 +735,46 @@ RegisteredBookSource _refreshStoredCompatibility(RegisteredBookSource source) {
   }
 }
 
-String _encodeStoredSourceMaps(List<Map<String, dynamic>> maps) =>
-    jsonEncode(maps);
+List<String> _normalizeGroupNames(Iterable<String> groups) {
+  final normalized = <String>[];
+  final seen = <String>{};
+  for (final group in groups) {
+    final value = group.trim();
+    if (value.isNotEmpty && seen.add(value)) normalized.add(value);
+  }
+  return normalized;
+}
+
+String _requiredGroupName(String name) {
+  final normalized = name.trim();
+  if (normalized.isEmpty) {
+    throw ArgumentError.value(name, 'name', 'Group name must not be empty.');
+  }
+  return normalized;
+}
+
+List<String> _mergeGroupOrder(
+  Iterable<String> explicitGroups,
+  Iterable<RegisteredBookSource> sources,
+) {
+  final groups = _normalizeGroupNames(explicitGroups);
+  final seen = groups.toSet();
+  for (final source in sources) {
+    for (final group in source.groups) {
+      if (seen.add(group)) groups.add(group);
+    }
+  }
+  return groups;
+}
+
+String _encodeStoredRegistry(Map<String, Object> value) => jsonEncode(value);
+
+class _StoredBookSourceRegistry {
+  const _StoredBookSourceRegistry({
+    required this.sources,
+    required this.groups,
+  });
+
+  final List<RegisteredBookSource> sources;
+  final List<String> groups;
+}

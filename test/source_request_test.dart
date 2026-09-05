@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/source_engine/source_request.dart';
@@ -22,6 +24,86 @@ void main() {
         request.headers['Content-Type'],
         'application/x-www-form-urlencoded; charset=gbk',
       );
+    });
+
+    for (final (index, body) in <Object>[
+      {'query': '剑来', 'page': 2},
+      [
+        {'id': 1},
+        {'id': 2},
+      ],
+      '{"query":"剑来"}',
+      '[1,2]',
+    ].indexed) {
+      test('serializes JSON POST body case $index', () {
+        final request = SourceRequestTemplate.parse(
+          '/search,${jsonEncode({'method': 'POST', 'body': body})}',
+          baseUri: Uri.parse('https://books.test/'),
+        );
+        expect(request.body, body is String ? body : jsonEncode(body));
+        expect(
+          request.headers['Content-Type'],
+          'application/json; charset=utf-8',
+        );
+      });
+    }
+
+    test('keeps nested option delimiters when resolving a relative target', () {
+      final options = jsonEncode({
+        'method': 'POST',
+        'body': [
+          {'nested': 'value,{'},
+          {'second': true},
+        ],
+      });
+      final target = resolveSourceRequestUrl(
+        Uri.parse('https://books.test/catalog/'),
+        '../search,$options',
+      );
+      expect(target, 'https://books.test/search,$options');
+      expect(
+        SourceRequestTemplate.parse(
+          target,
+          baseUri: Uri.parse('https://other.test/'),
+        ).url,
+        Uri.parse('https://books.test/search'),
+      );
+    });
+
+    test('preserves explicit content type and malformed JSON as form text', () {
+      final explicit = SourceRequestTemplate.parse(
+        '/search,${jsonEncode({
+          'method': 'POST',
+          'body': {'query': 'book'},
+          'headers': {'content-type': 'application/custom'},
+        })}',
+        baseUri: Uri.parse('https://books.test/'),
+      );
+      expect(explicit.headers['content-type'], 'application/custom');
+      expect(explicit.headers.containsKey('Content-Type'), isFalse);
+      final form = SourceRequestTemplate.parse(
+        '/search,${jsonEncode({'method': 'POST', 'body': '{query=book'})}',
+        baseUri: Uri.parse('https://books.test/'),
+      );
+      expect(form.body, '{query=book');
+      expect(
+        form.headers['Content-Type'],
+        'application/x-www-form-urlencoded; charset=utf-8',
+      );
+    });
+
+    test('ignores structured bodies for GET and HEAD like AnalyzeUrl', () {
+      for (final method in ['GET', 'HEAD']) {
+        final request = SourceRequestTemplate.parse(
+          '/search,${jsonEncode({
+            'method': method,
+            'body': {'unused': true},
+          })}',
+          baseUri: Uri.parse('https://books.test/'),
+        );
+        expect(request.body, isNull);
+        expect(request.headers.containsKey('Content-Type'), isFalse);
+      }
     });
 
     test('accepts non-executable single-quoted legacy options', () {

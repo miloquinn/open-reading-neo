@@ -6,8 +6,11 @@ import '../../../utils/localization_extension.dart';
 import '../../../utils/page_style_helper.dart';
 import '../../../widgets/source_cover_image.dart';
 import '../controllers/book_source_management_controller.dart';
+import 'book_source_organization_copy.dart';
 
 enum BookSourceManagementSourceAction {
+  groups,
+  favorite,
   refresh,
   rights,
   login,
@@ -142,6 +145,23 @@ class BookSourceManagementSourceCard extends StatelessWidget {
             Expanded(child: _SourceSummary(source: source)),
             const SizedBox(width: 4),
             if (!selectionMode)
+              IconButton(
+                key: ValueKey('bookSourceFavorite-${source.id}'),
+                tooltip: source.isFavorite
+                    ? BookSourceOrganizationCopy.of(context).unfavorite
+                    : BookSourceOrganizationCopy.of(context).favorite,
+                onPressed: () =>
+                    onAction(BookSourceManagementSourceAction.favorite),
+                icon: Icon(
+                  source.isFavorite
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  color: source.isFavorite
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+              ),
+            if (!selectionMode)
               Tooltip(
                 message: source.enabled
                     ? context.l10n.bookSourcesEnabled
@@ -275,10 +295,20 @@ class _SourceMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      tooltip: context.l10n.bookSourcesRemove,
+      tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
       onSelected: (value) =>
           onAction(BookSourceManagementSourceAction.values.byName(value)),
       itemBuilder: (context) => [
+        PopupMenuItem(
+          value: BookSourceManagementSourceAction.groups.name,
+          child: Row(
+            children: [
+              const Icon(Icons.folder_outlined),
+              const SizedBox(width: 10),
+              Text(BookSourceOrganizationCopy.of(context).editGroups),
+            ],
+          ),
+        ),
         if (source.sourceProtocol == BookSourceProtocolKind.orsp)
           PopupMenuItem(
             value: BookSourceManagementSourceAction.refresh.name,

@@ -23,6 +23,11 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   void _onReaderAloudChanged() {
+    final playbackState = _readerAloudController?.state;
+    if (playbackState == ReaderAloudPlaybackState.loading ||
+        playbackState == ReaderAloudPlaybackState.playing) {
+      _pauseAutoPageTurn();
+    }
     final active = _readerAloudController?.isActive ?? false;
     final highlight = _readerAloudController?.highlight;
     if (!mounted) return;
@@ -115,6 +120,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _showReaderAloudPanel() async {
+    _pauseAutoPageTurn();
     final controller = _ensureReaderAloudController();
     if (controller == null) return;
     final ttsService = context.read<TtsService>();
@@ -132,6 +138,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   /// Starts or resumes read-aloud on the first toolbar tap. Once playback is
   /// active, the same button becomes the entry point for its settings panel.
   Future<void> _handleReaderAloudButtonPressed() async {
+    _pauseAutoPageTurn();
     final controller = _ensureReaderAloudController();
     if (controller == null) return;
     if (controller.state == ReaderAloudPlaybackState.playing ||
@@ -144,6 +151,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
 
   Future<void> _showAskAiPanel() async {
     if (_chapters.isEmpty) return;
+    _pauseAutoPageTurn();
     final chapterIndex = _chapterIndex.clamp(0, _chapters.length - 1);
     var pageText = '';
     if (_pageMode == BookSourcePageMode.verticalScroll) {
@@ -179,6 +187,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _askAiAboutSelection(ReaderSelectionSnapshot selection) async {
+    _pauseAutoPageTurn();
     await showReaderAiPanelSheet(
       context: context,
       palette: _readerTheme,
@@ -199,6 +208,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<ReaderFontChoice?> _showReaderFontPicker() async {
+    _pauseAutoPageTurn();
     final appSettings = context.read<AppSettingsNotifier>();
     await appSettings.prepareCustomFontPreviews();
     if (!mounted) return null;
@@ -239,6 +249,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _showReadingSettings() async {
+    _pauseAutoPageTurn();
     _controlsTimer?.cancel();
     final selectedMode = await showModalBottomSheet<BookSourcePageMode>(
       context: context,
@@ -328,6 +339,9 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
             unawaited(_updateReadingSettings(themeId: themeId)),
         onCustomThemeTap: _showCustomThemeEditor,
         onPageModeTap: _showPageModeSettings,
+        autoPageTurnController: _autoPageTurnController,
+        autoPageTurnIsVertical: _pageMode == BookSourcePageMode.verticalScroll,
+        onAutoPageTurnSettings: () => unawaited(_showAutoPageTurnSettings()),
         onTopBarStyleTap: _showTopBarStyleSettings,
         onTapZonesTap: () => unawaited(_showTapZoneSettings()),
         onFontSizeChanged: (value) =>
@@ -373,6 +387,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _changeBookSource() async {
+    _stopAutoPageTurn();
     await _saveProgress();
     final shelfBook = await _shelfService.findShelfBook(
       sourceId: widget.source.id,
@@ -420,6 +435,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _showCustomThemeEditor() async {
+    _pauseAutoPageTurn();
     Navigator.of(context).pop();
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
@@ -446,6 +462,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _showPageModeSettings() async {
+    _pauseAutoPageTurn();
     var previewScrollByChapter = _scrollByChapter;
     final selectedMode = await showModalBottomSheet<BookSourcePageMode>(
       context: context,
@@ -480,6 +497,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   }
 
   Future<void> _showTopBarStyleSettings() async {
+    _pauseAutoPageTurn();
     final selectedStyle = await showModalBottomSheet<ReaderTopBarStyle>(
       context: context,
       backgroundColor: _readerTheme.surface,

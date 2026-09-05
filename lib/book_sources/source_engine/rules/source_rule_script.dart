@@ -60,6 +60,8 @@ class SourceRuleScript {
     Object? context,
     SourcePutRule putRule, {
     required bool resolveUrl,
+    required String joinSeparator,
+    required bool regexDotAll,
   }) {
     final value = putRule.selector.trim().isEmpty
         ? sourceRuleStringValue(context ?? document.value)
@@ -68,6 +70,8 @@ class SourceRuleScript {
             context,
             putRule.selector,
             resolveUrl: resolveUrl,
+            joinSeparator: joinSeparator,
+            regexDotAll: regexDotAll,
           );
     _storePutMappings(document, context, putRule.mappings);
     return value;
@@ -146,10 +150,18 @@ class SourceRuleScript {
     Object? context,
     SourceScriptRule scripted, {
     required bool resolveUrl,
+    required String joinSeparator,
+    required bool regexDotAll,
   }) {
     final input = scripted.selector.trim().isEmpty
         ? context ?? document.scriptResultValue
-        : selectors.evaluateString(document, context, scripted.selector);
+        : selectors.evaluateString(
+            document,
+            context,
+            scripted.selector,
+            joinSeparator: joinSeparator,
+            regexDotAll: regexDotAll,
+          );
     final output = _evaluate(document, input, scripted.script);
     var value = '';
     if (scripted.suffix.trim().isNotEmpty) {
@@ -158,9 +170,11 @@ class SourceRuleScript {
         nextDocument,
         nextDocument.value,
         scripted.suffix,
+        joinSeparator: joinSeparator,
+        regexDotAll: regexDotAll,
       );
     } else if (output is Iterable && output is! String) {
-      value = output.map(sourceRuleStringValue).join();
+      value = output.map(sourceRuleStringValue).join(joinSeparator);
     } else {
       value = sourceRuleStringValue(output);
     }
@@ -252,6 +266,7 @@ class SourceRuleScript {
     Object? result,
     String script,
   ) {
+    if (script.trim().isEmpty) return result;
     final evaluator = scriptEvaluatorProvider?.call();
     final context = document.scriptContext;
     if (evaluator == null || context == null) {
@@ -270,6 +285,7 @@ class SourceRuleScript {
     Object? result,
     String script,
   ) {
+    if (script.trim().isEmpty) return Future.value(result);
     final evaluator = scriptEvaluatorProvider?.call();
     final context = document.scriptContext;
     if (evaluator == null || context == null) {

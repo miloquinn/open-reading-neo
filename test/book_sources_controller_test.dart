@@ -8,6 +8,231 @@ import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
 
 void main() {
+  test(
+    'large library metadata comparisons preserve the current source',
+    () async {
+      final sources = List.generate(41, (index) => _source('source-$index'));
+      final registry = _FakeRegistry([
+        Future.value(sources),
+        Future.value([
+          sources.first.copyWith(isFavorite: true),
+          ...sources.skip(1),
+        ]),
+      ]);
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: registry,
+      );
+      addTearDown(controller.close);
+      addTearDown(gateway.close);
+      await controller.load();
+      final cache = controller.state.caches[controller.state.section];
+      await controller.refreshSourceMetadata();
+      expect(controller.state.sources.first.isFavorite, isTrue);
+      expect(controller.state.selectedSourceId, 'source-0');
+      expect(controller.state.caches[controller.state.section], same(cache));
+      expect(gateway.discoveryIds, ['source-0']);
+    },
+  );
+
+  test('deleting the active group returns to all sources', () async {
+    final source = _source('source').copyWith(groups: ['My sources']);
+    final registry = _FakeRegistry([
+      Future.value([source]),
+      Future.value([source.copyWith(groups: [])]),
+    ]);
+    final gateway = _ControllerGateway();
+    final controller = BookSourcesController(
+      gateway: gateway,
+      registry: registry,
+    );
+    addTearDown(controller.close);
+    addTearDown(gateway.close);
+    await controller.load();
+    await controller.changeOrganizationScope(group: 'My sources');
+    await controller.refreshSourceMetadata();
+    expect(controller.state.selectedGroup, isNull);
+    expect(controller.state.organizedDiscoverySources.single.id, 'source');
+  });
+
+  test(
+    'organizing a source in another section preserves the active cache',
+    () async {
+      final source = _source('orsp').copyWith(isFavorite: true);
+      final reading = _source(
+        'reading',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final registry = _FakeRegistry([
+        Future.value([source, reading]),
+        Future.value([source, reading.copyWith(isFavorite: true)]),
+      ]);
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: registry,
+      );
+      addTearDown(controller.close);
+      addTearDown(gateway.close);
+      await controller.load();
+      await controller.changeOrganizationScope(favoritesOnly: true);
+      await controller.changeSection(BookSourcesSection.latest);
+      final cache = controller.state.caches[BookSourcesSection.latest];
+      final requests = gateway.browseIds.length;
+      await controller.refreshSourceMetadata();
+      expect(controller.state.caches[BookSourcesSection.latest], same(cache));
+      expect(gateway.browseIds.length, requests);
+      expect(
+        controller.state.sourcesFor(BookSourcesSection.categories),
+        hasLength(2),
+      );
+    },
+  );
+
+  test(
+    'removing another favorite preserves the active category without fetching',
+    () async {
+      final a = _source('a').copyWith(isFavorite: true);
+      final b = _source('b').copyWith(isFavorite: true);
+      final registry = _FakeRegistry([
+        Future.value([a, b]),
+        Future.value([a, b.copyWith(isFavorite: false)]),
+      ]);
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: registry,
+      );
+      addTearDown(controller.close);
+      addTearDown(gateway.close);
+      await controller.load();
+      await controller.changeOrganizationScope(favoritesOnly: true);
+      await controller.changeSection(BookSourcesSection.categories);
+      await Future<void>.delayed(Duration.zero);
+      final category = controller.state.selectedCategory;
+      final cache = controller.state.caches[BookSourcesSection.categories];
+      final requests = gateway.browseIds.length;
+      await controller.refreshSourceMetadata();
+      expect(controller.state.selectedCategory, category);
+      expect(
+        controller.state.caches[BookSourcesSection.categories],
+        same(cache),
+      );
+      expect(gateway.browseIds.length, requests);
+      expect(controller.state.organizedDiscoverySources.single.id, 'a');
+    },
+  );
+
+  test(
+    'organization scopes filter every section and survive layout changes',
+    () async {
+      final favorite = _source(
+        'favorite',
+      ).copyWith(isFavorite: true, groups: ['漫画']);
+      final other = _source('other').copyWith(groups: ['备用']);
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([favorite, other]),
+      );
+      addTearDown(controller.close);
+      addTearDown(gateway.close);
+      await controller.load();
+      await controller.changeOrganizationScope(favoritesOnly: true);
+      for (final section in BookSourcesSection.values) {
+        expect(controller.state.scopedSourcesFor(section), [favorite]);
+      }
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(
+        controller.state.caches[BookSourcesSection.latest]!.books!.map(
+          (book) => book.source.id,
+        ),
+        everyElement('favorite'),
+      );
+      controller.setListLayout(true);
+      expect(
+        controller.state.listSourceGroups.map((group) => group.source.id),
+        ['favorite'],
+      );
+      await controller.changeOrganizationScope(group: '备用');
+      expect(controller.state.favoritesOnly, isFalse);
+      expect(controller.state.listSourceGroups.single.source.id, 'other');
+      controller.setListLayout(false);
+      expect(controller.state.selectedGroup, '备用');
+      await controller.changeOrganizationScope(group: '空分组');
+      expect(controller.state.organizedDiscoverySources, isEmpty);
+      expect(controller.state.availableSections, isEmpty);
+      expect(
+        controller.state.caches[controller.state.section]!.categories,
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'favorite and group metadata updates preserve selected category and cached content',
+    () async {
+      final source = _source('source');
+      final updated = source.copyWith(isFavorite: true, groups: ['常用']);
+      final registry = _FakeRegistry([
+        Future.value([source]),
+        Future.value([updated]),
+      ]);
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: registry,
+      );
+      addTearDown(controller.close);
+      addTearDown(gateway.close);
+      await controller.load();
+      await controller.changeSourceScope(source.id);
+      await controller.changeSection(BookSourcesSection.categories);
+      await Future<void>.delayed(Duration.zero);
+      final category = controller.state.selectedCategory;
+      final books = controller.state.categoryBooks;
+      final cache = controller.state.caches[BookSourcesSection.categories];
+      final requests = gateway.browseIds.length;
+      await controller.refreshSourceMetadata();
+      expect(controller.state.sources.single.isFavorite, isTrue);
+      expect(controller.state.sources.single.groups, ['常用']);
+      expect(controller.state.selectedSourceId, source.id);
+      expect(controller.state.selectedCategory, category);
+      expect(controller.state.categoryBooks, books);
+      expect(
+        controller.state.caches[BookSourcesSection.categories],
+        same(cache),
+      );
+      expect(gateway.browseIds.length, requests);
+      expect(controller.state.loadingSources, isFalse);
+    },
+  );
+
+  test('metadata updates do not cancel an in-flight channel request', () async {
+    final source = _source('source');
+    final response = Completer<BookSourceSearchPage>();
+    final registry = _FakeRegistry([
+      Future.value([source]),
+      Future.value([source.copyWith(isFavorite: true)]),
+    ]);
+    final gateway = _ControllerGateway(browseResults: [response.future]);
+    final controller = BookSourcesController(
+      gateway: gateway,
+      registry: registry,
+    );
+    addTearDown(controller.close);
+    addTearDown(gateway.close);
+    await controller.load();
+    await controller.changeSection(BookSourcesSection.categories);
+    expect(controller.state.loadingCategoryBooks, isTrue);
+    await controller.refreshSourceMetadata();
+    response.complete(_page([_book('loaded')]));
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.state.categoryBooks.single.book.id, 'loaded');
+    expect(controller.state.sources.single.isFavorite, isTrue);
+  });
+
   test('state freezes nested source and channel collections', () {
     final source = _source('source');
     final category = SourcedBookCategory(
@@ -66,7 +291,7 @@ void main() {
   );
 
   test(
-    'includes compatible text and comic sources in latest discovery',
+    'reading sources expose their channels instead of ORSP sections',
     () async {
       final comic = _source(
         'comic',
@@ -86,12 +311,62 @@ void main() {
 
       await controller.load();
 
-      expect(controller.state.sourcesFor(BookSourcesSection.latest), [
+      expect(controller.state.sourcesFor(BookSourcesSection.latest), isEmpty);
+      expect(
+        controller.state.sourcesFor(BookSourcesSection.recommended),
+        isEmpty,
+      );
+      expect(controller.state.sourcesFor(BookSourcesSection.categories), [
         comic,
         text,
       ]);
+      expect(controller.state.availableSections, [
+        BookSourcesSection.categories,
+      ]);
+      expect(controller.state.section, BookSourcesSection.categories);
+      expect(gateway.discoveryIds, isEmpty);
+      expect(gateway.browseCategories, ['category']);
       await controller.changeSection(BookSourcesSection.latest);
-      expect(gateway.browseIds, containsAll(['comic', 'text']));
+      expect(controller.state.section, BookSourcesSection.categories);
+      await controller.changeSourceScope('text');
+      expect(controller.state.selectedCategory?.source.id, 'text');
+      expect(gateway.browseIds, ['comic', 'text']);
+      expect(gateway.browseCategories, everyElement(isNotNull));
+      await controller.close();
+    },
+  );
+
+  test(
+    'mixed libraries reserve recommended and latest for ORSP sources',
+    () async {
+      final orsp = _source('orsp');
+      final reading = _source(
+        'reading',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([orsp, reading]),
+      );
+      await controller.load();
+      expect(controller.state.discoverySources, [orsp, reading]);
+      expect(controller.state.availableSections, BookSourcesSection.values);
+      expect(gateway.discoveryIds, ['orsp']);
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseIds, ['orsp']);
+      expect(gateway.browseCategories, [null]);
+      await controller.changeSourceScope('reading');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.availableSections, [
+        BookSourcesSection.categories,
+      ]);
+      expect(controller.state.categoryBooks.single.source.id, 'reading');
+      expect(gateway.browseCategories.last, 'category');
+      await controller.changeSourceScope('orsp');
+      expect(controller.state.availableSections, BookSourcesSection.values);
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseIds.last, 'orsp');
       await controller.close();
     },
   );
@@ -247,6 +522,80 @@ void main() {
     await controller.close();
   });
 
+  test(
+    'selecting the active categories section preserves its loaded books',
+    () async {
+      final source = _source('source');
+      final gateway = _ControllerGateway();
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([source]),
+      );
+
+      await controller.load();
+      await controller.changeSection(BookSourcesSection.categories);
+      await Future<void>.delayed(Duration.zero);
+      final selected = controller.state.selectedCategory;
+      final books = controller.state.categoryBooks;
+      final browseRequestCount = gateway.browseCategories.length;
+
+      await controller.changeSection(BookSourcesSection.categories);
+
+      expect(controller.state.selectedCategory, selected);
+      expect(controller.state.categoryBooks, books);
+      expect(gateway.browseCategories, hasLength(browseRequestCount));
+
+      controller.setListLayout(true);
+      await controller.changeSection(BookSourcesSection.categories);
+      expect(gateway.browseCategories, hasLength(browseRequestCount));
+      await controller.close();
+      await controller.changeSection(BookSourcesSection.latest);
+      expect(gateway.browseCategories, hasLength(browseRequestCount));
+    },
+  );
+
+  test(
+    'returning to cached categories reloads its first category after stale work',
+    () async {
+      final source = _source('source');
+      final staleCategory = Completer<BookSourceSearchPage>();
+      final gateway = _ControllerGateway(
+        browseResults: [
+          staleCategory.future,
+          Future.value(_page([_book('latest')])),
+          Future.value(_page([_book('restored-category')])),
+        ],
+      );
+      final controller = BookSourcesController(
+        gateway: gateway,
+        registry: _FakeRegistry.completed([source]),
+      );
+
+      await controller.load();
+      await controller.changeSection(BookSourcesSection.categories);
+      expect(controller.state.loadingCategoryBooks, isTrue);
+
+      await controller.changeSection(BookSourcesSection.latest);
+      await controller.changeSection(BookSourcesSection.categories);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.selectedCategory?.id, 'category');
+      expect(
+        controller.state.categoryBooks.single.book.id,
+        'restored-category',
+      );
+      expect(gateway.browseCategories, ['category', null, 'category']);
+
+      staleCategory.complete(_page([_book('stale-category')]));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.state.categoryBooks.single.book.id,
+        'restored-category',
+      );
+      await controller.close();
+    },
+  );
+
   test('category paging retries and deduplicates appended books', () async {
     final source = _source('source');
     final gateway = _ControllerGateway(
@@ -315,6 +664,9 @@ class _FakeRegistry extends BookSourceRegistry {
   Stream<void> get changes => _changes.stream;
 
   @override
+  Future<List<String>> loadGroups() async => const [];
+
+  @override
   Future<List<RegisteredBookSource>> loadRunnableInBackground() =>
       loads[_loadIndex++];
 }
@@ -331,6 +683,7 @@ class _ControllerGateway extends BookSourceClient {
   final List<Future<BookSourceSearchPage>> browseResults;
   final List<String> discoveryIds = [];
   final List<String> browseIds = [];
+  final List<String?> browseCategories = [];
   int _browseIndex = 0;
   int _discoveryIndex = 0;
   int active = 0;
@@ -374,6 +727,7 @@ class _ControllerGateway extends BookSourceClient {
     int pageSize = 20,
   }) {
     browseIds.add(source.id);
+    browseCategories.add(category);
     if (browseResults.isNotEmpty) return browseResults[_browseIndex++];
     return Future.value(_page([_book('${source.id}-$page')]));
   }

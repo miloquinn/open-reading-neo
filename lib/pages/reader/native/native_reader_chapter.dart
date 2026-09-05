@@ -244,11 +244,20 @@ class _NativeChapter {
     }
   }
 
-  Future<String> _readIndexedTextAsync() => readIndexedUtf8Range(
-    path: _dataPath!,
-    startOffset: _startOffset,
-    endOffset: _endOffset,
-  );
+  Future<String> _readIndexedTextAsync() async {
+    final operation = Object();
+    final cache = NativeReaderCacheStore.instance;
+    cache.retain(operation, _dataPath!);
+    try {
+      return await readIndexedUtf8Range(
+        path: _dataPath,
+        startOffset: _startOffset,
+        endOffset: _endOffset,
+      );
+    } finally {
+      unawaited(cache.release(operation));
+    }
+  }
 
   void attachPendingLoad(Future<void> load) => _pendingLoad = load;
 

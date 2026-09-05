@@ -18,6 +18,7 @@ import 'book_sources/caching/book_source_response_cache.dart';
 import 'book_sources/caching/source_cover_cache.dart';
 import 'book_sources/services/book_source_client.dart';
 import 'book_sources/services/book_source_registry.dart';
+import 'book_sources/services/book_source_maintenance_coordinator.dart';
 import 'book_sources/services/book_source_shelf_service.dart';
 import 'book_sources/source_engine/source_interaction_coordinator.dart';
 import 'models/book.dart';
@@ -103,6 +104,9 @@ void main(List<String> arguments) async {
       child: provider.MultiProvider(
         providers: [
           provider.ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+          provider.ChangeNotifierProvider(
+            create: (_) => BookSourceMaintenanceCoordinator(),
+          ),
           provider.ChangeNotifierProvider(create: (_) => AppSettingsNotifier()),
           provider.ChangeNotifierProvider(
             create: (_) => ReplaceRuleService()..load(),
@@ -361,8 +365,11 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_runAutomaticWebDavSyncIfNeeded());
+    if (_webDavSyncInitialized && mounted) {
+      provider.Provider.of<WebDavSyncController>(
+        context,
+        listen: false,
+      ).setForeground(state == AppLifecycleState.resumed);
     }
   }
 
@@ -390,11 +397,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
       listen: false,
     );
     if (!sync.isConfigured || !sync.autoSync) return;
-    final lastSuccess = sync.lastSuccessfulSync;
-    if (lastSuccess != null &&
-        DateTime.now().difference(lastSuccess) < const Duration(minutes: 15)) {
-      return;
-    }
     try {
       await sync.syncNow();
     } catch (error) {

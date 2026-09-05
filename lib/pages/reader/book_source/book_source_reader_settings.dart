@@ -51,6 +51,10 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
         (tabletTwoPageEnabled != null &&
             tabletTwoPageEnabled != _tabletTwoPageEnabled) ||
         (pageMode != null && pageMode != _pageMode);
+    if (repaginate) {
+      _stopAutoPageTurn();
+      _autoWholeBook = false;
+    }
     final currentProgress = _currentReadingProgress;
     final currentTextOffset = _currentTextOffset;
     _updateReaderState(() {
@@ -114,6 +118,10 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
         _topChromeReserveFor(_topBarStyle) != _topChromeReserveFor(style) ||
         (_topBarStyle == ReaderTopBarStyle.hidden) !=
             (style == ReaderTopBarStyle.hidden);
+    if (repaginate) {
+      _stopAutoPageTurn();
+      _autoWholeBook = false;
+    }
     final currentProgress = _currentReadingProgress;
     final currentTextOffset = _currentTextOffset;
     _updateReaderState(() {
@@ -136,6 +144,8 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
 
   Future<void> _setScrollByChapter(bool value) async {
     if (_scrollByChapter == value) return;
+    _stopAutoPageTurn();
+    _autoWholeBook = false;
     final currentProgress = _currentReadingProgress;
     _updateReaderState(() {
       _scrollByChapter = value;

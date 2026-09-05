@@ -3,6 +3,41 @@ import '../source_engine/source_health_checker.dart';
 import 'book_source_registry.dart';
 
 typedef SourceHealthCheckProgress = void Function(int completed, int total);
+typedef SourceHealthCheckItemCompleted =
+    void Function(RegisteredBookSource source);
+typedef SourceHealthCheckItemError =
+    void Function(
+      RegisteredBookSource source,
+      Object error,
+      StackTrace stackTrace,
+    );
+
+class SourceHealthCheckConfigurationChangedException implements Exception {
+  const SourceHealthCheckConfigurationChangedException(
+    this.sourceId, {
+    this.sourceWasRemoved = false,
+  });
+
+  final String sourceId;
+  final bool sourceWasRemoved;
+
+  @override
+  String toString() =>
+      'SourceHealthCheckConfigurationChangedException: $sourceId';
+}
+
+class SourceHealthCheckPersistenceException implements Exception {
+  const SourceHealthCheckPersistenceException({
+    required this.cause,
+    required this.unpersistedSourceIds,
+  });
+
+  final Object cause;
+  final Set<String> unpersistedSourceIds;
+
+  @override
+  String toString() => 'SourceHealthCheckPersistenceException: $cause';
+}
 
 /// Batches [SourceHealthChecker] runs across already-added sources and
 /// persists the results through [BookSourceRegistry] — the engine-level
@@ -64,16 +99,28 @@ class BookSourceHealthCheckService {
     await Future.wait(
       List.generate(targets.length.clamp(0, maxConcurrency), (_) => worker()),
     );
-    if (updated.isNotEmpty) await _registry.upsertAll(updated);
-    return List.unmodifiable(updated);
+    if (updated.isEmpty) return const [];
+    final merge = await _registry.mergeHealthCheckResults(updated);
+    final currentById = {for (final source in merge.sources) source.id: source};
+    final currentTargets = <RegisteredBookSource>[];
+    for (final source in updated) {
+      final current = currentById[source.id];
+      if (current != null) currentTargets.add(current);
+    }
+    return List.unmodifiable(currentTargets);
   }
 
   /// Checks and persists a single source, returning its updated copy.
   Future<RegisteredBookSource> checkOne(RegisteredBookSource source) async {
     final result = await _checker.check(source);
     final updated = withSourceHealthCheckResult(source, result);
-    await _registry.upsert(updated);
-    return updated;
+    final merge = await _registry.mergeHealthCheckResults([updated]);
+    return merge.sources.firstWhere(
+      (current) => current.id == source.id,
+      orElse: () => throw StateError(
+        'The source was removed while its health check was running.',
+      ),
+    );
   }
 
   /// A faster, cleanup-oriented sweep across [sources]: a shorter per-source
@@ -94,6 +141,8 @@ class BookSourceHealthCheckService {
     List<RegisteredBookSource> sources, {
     SourceHealthCheckProgress? onProgress,
     bool Function()? isCancelled,
+    SourceHealthCheckItemCompleted? onItemCompleted,
+    SourceHealthCheckItemError? onItemError,
   }) async {
     final now = DateTime.now().toUtc();
     final targets = <RegisteredBookSource>[];
@@ -101,6 +150,7 @@ class BookSourceHealthCheckService {
     for (final source in sources) {
       if (source.sourceProtocol != BookSourceProtocolKind.readingSource) {
         skipped.add(source);
+        onItemCompleted?.call(source);
         continue;
       }
       final previous = sourceHealthCheckResultOf(source);
@@ -108,7 +158,12 @@ class BookSourceHealthCheckService {
           previous != null &&
           previous.fullyAvailable &&
           now.difference(previous.checkedAt) < cleanupRecheckWindow;
-      (freshEnough ? skipped : targets).add(source);
+      if (freshEnough) {
+        skipped.add(source);
+        onItemCompleted?.call(source);
+      } else {
+        targets.add(source);
+      }
     }
 
     final checker = _checker.withTimeout(cleanupTimeout);
@@ -126,10 +181,13 @@ class BookSourceHealthCheckService {
         final source = targets[index];
         try {
           final result = await checker.check(source);
-          checkedOk.add(withSourceHealthCheckResult(source, result));
-        } on Object {
+          final updated = withSourceHealthCheckResult(source, result);
+          checkedOk.add(updated);
+          onItemCompleted?.call(updated);
+        } on Object catch (error, stackTrace) {
           // Leave this source's previously stored health state untouched.
           unchanged.add(source);
+          onItemError?.call(source, error, stackTrace);
         }
         completed++;
         onProgress?.call(completed, sources.length);
@@ -142,7 +200,86 @@ class BookSourceHealthCheckService {
         (_) => worker(),
       ),
     );
-    if (checkedOk.isNotEmpty) await _registry.upsertAll(checkedOk);
-    return List.unmodifiable([...skipped, ...checkedOk, ...unchanged]);
+    final cached = skipped.where(
+      (source) =>
+          source.sourceProtocol == BookSourceProtocolKind.readingSource &&
+          sourceHealthCheckResultOf(source) != null,
+    );
+    final healthCandidates = [...cached, ...checkedOk];
+    final healthCandidateIds = healthCandidates
+        .map((source) => source.id)
+        .toSet();
+    final checkedIds = checkedOk.map((source) => source.id).toSet();
+    final BookSourceHealthMergeResult merge;
+    try {
+      merge = await _registry.mergeHealthCheckResults(
+        healthCandidates,
+        persistSourceIds: checkedIds,
+      );
+    } on BookSourceHealthMergePersistenceException catch (error) {
+      throw SourceHealthCheckPersistenceException(
+        cause: error.cause,
+        unpersistedSourceIds: error.unpersistedSourceIds,
+      );
+    } on Object catch (error) {
+      if (checkedIds.isNotEmpty) {
+        throw SourceHealthCheckPersistenceException(
+          cause: error,
+          unpersistedSourceIds: Set.unmodifiable(checkedIds),
+        );
+      }
+      rethrow;
+    }
+    final currentById = {for (final source in merge.sources) source.id: source};
+    for (final candidate in healthCandidates) {
+      final current = currentById[candidate.id];
+      if (merge.mergedSourceIds.contains(candidate.id) && current != null) {
+        if (!checkedIds.contains(candidate.id)) {
+          onItemCompleted?.call(current);
+        }
+        continue;
+      }
+      onItemError?.call(
+        current ?? candidate,
+        SourceHealthCheckConfigurationChangedException(
+          candidate.id,
+          sourceWasRemoved: current == null,
+        ),
+        StackTrace.empty,
+      );
+    }
+    final completedById = <String, RegisteredBookSource>{
+      for (final source in unchanged)
+        source.id: currentById[source.id] ?? source,
+    };
+    for (final source in skipped) {
+      final current = currentById[source.id];
+      if (current == null) continue;
+      completedById[source.id] =
+          healthCandidateIds.contains(source.id) &&
+              !merge.mergedSourceIds.contains(source.id)
+          ? _withoutSourceHealthCheckResult(current)
+          : current;
+    }
+    for (final checked in checkedOk) {
+      final current = currentById[checked.id];
+      if (current == null) continue;
+      completedById[checked.id] = merge.mergedSourceIds.contains(checked.id)
+          ? current
+          : _withoutSourceHealthCheckResult(current);
+    }
+    final ordered = <RegisteredBookSource>[];
+    for (final source in sources) {
+      final completed = completedById[source.id];
+      if (completed != null) ordered.add(completed);
+    }
+    return List.unmodifiable(ordered);
   }
+}
+
+RegisteredBookSource _withoutSourceHealthCheckResult(
+  RegisteredBookSource source,
+) {
+  final config = {...?source.sourceConfig}..remove('_openReadingHealthCheck');
+  return source.copyWith(sourceConfig: config);
 }

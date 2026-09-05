@@ -37,6 +37,99 @@ void main() {
     },
   );
 
+  test(
+    'organization reload retains selection, pagination, and in-flight checks',
+    () async {
+      final registry = _Registry();
+      final health = _HealthService();
+      final source = _source(
+        'reading',
+        protocol: BookSourceProtocolKind.readingSource,
+      );
+      final controller = BookSourceManagementController(
+        registry: registry,
+        healthService: health,
+        initialDisplayLimit: 1,
+        displayBatchSize: 1,
+      );
+      addTearDown(controller.dispose);
+      controller.replaceSources([source, _source('second')]);
+      controller.loadMore();
+      controller.toggleSelectionMode();
+      controller.toggleSourceSelection(source.id);
+      final checking = controller.checkSelectedSourcesHealth();
+      final progress = controller.state.healthProgress;
+      registry.groupOrder = ['Empty folder', 'Useful'];
+      registry.loads.add(
+        Completer<List<RegisteredBookSource>>()..complete([
+          source.copyWith(isFavorite: true, groups: ['Useful']),
+          _source('second'),
+        ]),
+      );
+
+      await controller.reloadOrganization();
+
+      expect(controller.state.availableGroups, ['Empty folder', 'Useful']);
+      expect(controller.state.sources.first.isFavorite, isTrue);
+      expect(controller.state.sources.first.groups, ['Useful']);
+      expect(controller.state.selectionMode, isTrue);
+      expect(controller.state.selectedSourceIds, {source.id});
+      expect(controller.state.displayLimit, 2);
+      expect(controller.state.healthProgress, same(progress));
+      expect(controller.state.mutation, BookSourceManagementMutation.health);
+
+      health.all.complete([source]);
+      await checking;
+      expect(controller.state.healthProgress, isNull);
+      expect(controller.state.sources.first.isFavorite, isTrue);
+      expect(controller.state.sources.first.groups, ['Useful']);
+    },
+  );
+
+  test(
+    'organization reload resets a deleted group and retains empty group order',
+    () async {
+      final registry = _Registry()..groupOrder = ['Z empty', 'A empty'];
+      final source = _source('source', group: 'Old');
+      final controller = BookSourceManagementController(registry: registry);
+      addTearDown(controller.dispose);
+      controller.replaceSources([source]);
+      controller.setGroup('Old');
+      registry.loads.add(
+        Completer<List<RegisteredBookSource>>()
+          ..complete([source.copyWith(groups: [])]),
+      );
+
+      await controller.reloadOrganization();
+
+      expect(controller.state.selectedGroup, isNull);
+      expect(controller.state.availableGroups, ['Z empty', 'A empty']);
+      expect(controller.state.visibleSources, hasLength(1));
+      controller.setGroup('Z empty');
+      expect(controller.state.visibleSources, isEmpty);
+    },
+  );
+
+  test('favorites filter intersects with groups and search', () {
+    final controller = BookSourceManagementController();
+    addTearDown(controller.dispose);
+    final favorite = _source(
+      'favorite',
+      name: 'Alpha',
+    ).copyWith(isFavorite: true, groups: ['Useful']);
+    controller.replaceSources([
+      favorite,
+      _source('ordinary', name: 'Alpha', group: 'Useful'),
+      _source('other', name: 'Beta').copyWith(isFavorite: true),
+    ]);
+    controller.setFilter(BookSourceManagementFilter.favorites);
+    expect(controller.state.visibleSources, hasLength(2));
+    controller.setGroup('Useful');
+    expect(controller.state.visibleSources, [favorite]);
+    controller.setQuery('beta');
+    expect(controller.state.visibleSources, isEmpty);
+  });
+
   test('filters groups and advances the display limit immutably', () {
     final controller = BookSourceManagementController(
       initialDisplayLimit: 1,
@@ -51,11 +144,23 @@ void main() {
     );
     controller.replaceSources([enabled, disabled]);
 
-    expect(controller.state.availableGroups, ['Archive', 'Featured', 'News']);
-    expect(controller.state.displayedSources, [enabled]);
+    final initialState = controller.state;
+    final initialVisible = initialState.visibleSources;
+    final initialGroups = initialState.availableGroups;
+    expect(initialGroups, ['Archive', 'Featured', 'News']);
+    expect(initialState.displayedSources, [enabled]);
     controller.loadMore();
+    expect(controller.state.sources, same(initialState.sources));
+    expect(
+      controller.state.selectedSourceIds,
+      same(initialState.selectedSourceIds),
+    );
+    expect(controller.state.visibleSources, same(initialVisible));
+    expect(controller.state.availableGroups, same(initialGroups));
     expect(controller.state.displayedSources, [enabled, disabled]);
     controller.setFilter(BookSourceManagementFilter.disabled);
+    expect(controller.state.visibleSources, isNot(same(initialVisible)));
+    expect(controller.state.availableGroups, same(initialGroups));
     expect(controller.state.visibleSources, [disabled]);
     expect(controller.state.displayLimit, 1);
     controller.setFilter(BookSourceManagementFilter.all);
@@ -68,6 +173,13 @@ void main() {
       () => controller.state.selectedSourceIds.add('x'),
       throwsUnsupportedError,
     );
+    expect(() => controller.state.sources.add(enabled), throwsUnsupportedError);
+
+    final filtered = controller.state.visibleSources;
+    final groups = controller.state.availableGroups;
+    controller.replaceSources([enabled]);
+    expect(controller.state.visibleSources, isNot(same(filtered)));
+    expect(controller.state.availableGroups, isNot(same(groups)));
     controller.dispose();
   });
 
@@ -93,7 +205,7 @@ void main() {
 
   test(
     'duplicate scan ignores ORSP and keeps same-site variants for review',
-    () {
+    () async {
       final controller = BookSourceManagementController();
       final canonicalOld = _source(
         'canonical-old',
@@ -134,6 +246,14 @@ void main() {
         BookSourceDedupeConfidence.sameSite,
       );
       expect(site.result.groups.single.defaultSelectedIndices, hasLength(3));
+
+      final background = await controller.findDuplicateSourcesInBackground();
+      expect(background.result.groups, hasLength(1));
+      expect(
+        background.result.groups.single.confidence,
+        BookSourceDedupeConfidence.canonical,
+      );
+      expect(background.sourcesByIndex.keys, standard.sourcesByIndex.keys);
       controller.dispose();
     },
   );
@@ -177,13 +297,20 @@ void main() {
       controller.replaceSources([source]);
       controller.toggleSelectionMode();
       controller.toggleSourceSelection(source.id);
+      var notifications = 0;
+      controller.addListener(() => notifications++);
 
       final check = controller.checkSelectedSourcesHealth();
       health.onProgress?.call(1, 1);
       expect(controller.state.healthProgress?.completed, 1);
+      for (var completed = 2; completed <= 100; completed++) {
+        health.onProgress?.call(completed, 100);
+      }
+      expect(notifications, 2);
       final updated = source.copyWith(enabled: false);
       health.all.complete([updated]);
       expect(await check, [updated]);
+      expect(notifications, 3);
       expect(controller.state.sources.single.enabled, isFalse);
       expect(controller.state.healthProgress, isNull);
 
@@ -346,6 +473,125 @@ void main() {
 
     controller.dispose();
   });
+  test(
+    'background dedupe respects scope and prefers shelf references',
+    () async {
+      final controller = BookSourceManagementController();
+      addTearDown(controller.dispose);
+      controller.replaceSources([
+        _source(
+          'shelf',
+          protocol: BookSourceProtocolKind.readingSource,
+          sourceUrl: 'https://same.example',
+        ),
+        _source(
+          'new',
+          protocol: BookSourceProtocolKind.readingSource,
+          sourceUrl: 'https://same.example',
+        ),
+        _source(
+          'outside',
+          protocol: BookSourceProtocolKind.readingSource,
+          sourceUrl: 'https://same.example',
+        ),
+      ]);
+      final analysis = await controller.findDuplicateSourcesInBackground(
+        sourceIds: {'shelf', 'new'},
+        referencedSourceIds: {'shelf'},
+      );
+      expect(analysis.result.candidates, hasLength(2));
+      expect(
+        analysis
+            .sourcesByIndex[analysis.result.groups.single.recommendedIndex]!
+            .id,
+        'shelf',
+      );
+      expect(analysis.result.candidates.first.isReferenced, isTrue);
+    },
+  );
+
+  test(
+    'background dedupe returns current snapshot after source edits',
+    () async {
+      final controller = BookSourceManagementController();
+      addTearDown(controller.dispose);
+      controller.replaceSources([
+        for (var i = 0; i < 1000; i++)
+          _source(
+            'old-$i',
+            protocol: BookSourceProtocolKind.readingSource,
+            sourceUrl: 'https://same.example',
+          ),
+      ]);
+      final pending = controller.findDuplicateSourcesInBackground();
+      controller.replaceSources([
+        _source(
+          'current',
+          protocol: BookSourceProtocolKind.readingSource,
+          sourceUrl: 'https://current.example',
+        ),
+      ]);
+      final result = await pending;
+      expect(result.sourcesByIndex.values.single.id, 'current');
+      expect(result.result.groups, isEmpty);
+    },
+  );
+
+  test(
+    'merging external health evidence preserves edits and removed sources',
+    () {
+      final controller = BookSourceManagementController();
+      addTearDown(controller.dispose);
+      final current = _source(
+        'kept',
+        enabled: false,
+        group: 'New group',
+        protocol: BookSourceProtocolKind.readingSource,
+        sourceUrl: 'https://same.example',
+      );
+      controller.replaceSources([current]);
+      final result = SourceHealthCheckResult(
+        checked: {SourceHealthCapability.search},
+        failed: {},
+        checkedAt: DateTime.utc(2026),
+      );
+      controller.mergeExternalHealthResults([
+        withSourceHealthCheckResult(
+          current.copyWith(
+            enabled: true,
+            sourceConfig: {
+              ...current.sourceConfig!,
+              'bookSourceGroup': 'Old group',
+            },
+          ),
+          result,
+        ),
+        withSourceHealthCheckResult(_source('removed'), result),
+      ]);
+      expect(controller.state.sources, hasLength(1));
+      final updated = controller.state.sources.single;
+      expect(updated.enabled, isFalse);
+      expect(updated.sourceConfig!['bookSourceGroup'], 'New group');
+      expect(sourceHealthCheckResultOf(updated)!.checked, {
+        SourceHealthCapability.search,
+      });
+      final edited = current.copyWith(
+        sourceConfig: {...current.sourceConfig!, 'searchUrl': '/new-rule'},
+      );
+      controller.replaceSources([edited]);
+      controller.mergeExternalHealthResults([
+        withSourceHealthCheckResult(current, result),
+      ]);
+      expect(
+        sourceHealthCheckResultOf(controller.state.sources.single),
+        isNull,
+      );
+      expect(
+        controller.state.sources.single.sourceConfig!['searchUrl'],
+        '/new-rule',
+      );
+    },
+  );
 }
 
 RegisteredBookSource _source(
@@ -394,6 +640,11 @@ Map<String, dynamic>? _sourceConfig(
 }
 
 class _Registry extends BookSourceRegistry {
+  List<String> groupOrder = const [];
+
+  @override
+  Future<List<String>> loadGroups() async => groupOrder;
+
   final List<Completer<List<RegisteredBookSource>>> loads = [];
   final List<Completer<List<RegisteredBookSource>>> refreshes = [];
   Set<String> lastEnabledIds = const {};
@@ -442,6 +693,8 @@ class _HealthService extends BookSourceHealthCheckService {
     List<RegisteredBookSource> sources, {
     SourceHealthCheckProgress? onProgress,
     bool Function()? isCancelled,
+    SourceHealthCheckItemCompleted? onItemCompleted,
+    SourceHealthCheckItemError? onItemError,
   }) {
     cleanupOnProgress = onProgress;
     cleanupIsCancelled = isCancelled;

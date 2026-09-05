@@ -111,8 +111,8 @@ RegisteredBookSource withSourceHealthCheckResult(
 /// search, discover, and the info → catalog → content reading chain — and
 /// reports which ones actually work right now. Unlike [SourceVerifier]
 /// (which screens many *candidate* sources down to a usable set at import
-/// time), this checks one *already added* source in depth, the way legado's
-/// "校验书源" does, so a broken `content` rule doesn't hide that search still
+/// time), this checks one *already added* source in depth, like an interactive
+/// "校验书源" action, so a broken `content` rule doesn't hide that search still
 /// works.
 class SourceHealthChecker {
   const SourceHealthChecker({

@@ -2,10 +2,20 @@
 
 本目录保存可长期复用的 Open Reading 宣传素材，避免成品只留在个人桌面或临时目录。
 
+## 上架入口
+
+- [上架对接与待办](../../docs/app-store-release.md)：真实后台状态、账号配置、签名上传步骤及审核缺口。
+- [商店文案](metadata.json)：简体中文与美式英文草稿；隐私政策 URL 留空表示尚未落实，不能作为已完成申报。
+- [审核说明与隐私核对表](review-notes.md)：提审时需要提供的操作路径与资料。
+
+2026-09-05 核查：下述六张宣传图尺寸合格，但画面包含 Android 状态栏，
+不能直接作为 iOS 截图提交。它们保留作宣传参考，正式提交前须重新采集真实
+iPhone 和 iPad 界面，并核对示例书籍、封面及正文的展示授权。
+
 ## 目录
 
 - `screenshots/`：六张精选原始应用截图，统一为 1216×2640，保留真实状态栏和应用界面。
-- `promotional/iphone-6.5/`：六张 1242×2688 的 App Store 宣传图及整套预览，符合 iPhone 6.5 英寸截图槽位要求。
+- `promotional/iphone-6.5/`：六张 1242×2688 的宣传图及整套预览；尺寸符合 iPhone 6.5 英寸槽位，画面仍需替换为 iOS 实际界面。
 - 正式应用图标继续使用 [`assets/images/app_icon.png`](../../assets/images/app_icon.png)，不在本目录重复保存。
 - 官网加载的压缩 WebP 位于独立仓库 `miloquinn/open-reading-web` 的 `app/static/product/`，由本目录的精选截图派生。
 

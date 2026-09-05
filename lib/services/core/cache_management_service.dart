@@ -8,6 +8,8 @@ import '../../book_sources/caching/book_source_chapter_cache.dart';
 import '../../book_sources/caching/book_source_response_cache.dart';
 import '../../book_sources/caching/source_cover_cache.dart';
 import '../account/account_avatar_cache.dart';
+import '../books/native_reader_cache_store.dart';
+import '../books/pagination_cache_dao.dart';
 import 'database_service.dart';
 
 enum AppCacheCategory { sourceCovers, sourceData, readingCache, temporaryFiles }
@@ -33,6 +35,8 @@ class AppCacheManager {
     SourceCoverCache? sourceImagePageCache,
     AccountAvatarCache? accountAvatarCache,
     BookSourceResponseCache? sourceResponseCache,
+    PaginationCacheDao? paginationCacheDao,
+    NativeReaderCacheStore? nativeReaderCache,
     this._temporaryDirectory,
     this._applicationSupportDirectory,
     Future<Directory> Function()? legacyPaginationCacheDirectory,
@@ -44,6 +48,9 @@ class AppCacheManager {
        _accountAvatarCache = accountAvatarCache ?? AccountAvatarCache.instance,
        _sourceResponseCache =
            sourceResponseCache ?? BookSourceResponseCache.instance,
+       _paginationCacheDao = paginationCacheDao ?? PaginationCacheDao(),
+       _nativeReaderCache =
+           nativeReaderCache ?? NativeReaderCacheStore.instance,
        _legacyPaginationCacheDirectory =
            legacyPaginationCacheDirectory ??
            _defaultLegacyPaginationCacheDirectory,
@@ -64,6 +71,8 @@ class AppCacheManager {
   final SourceCoverCache _sourceImagePageCache;
   final AccountAvatarCache _accountAvatarCache;
   final BookSourceResponseCache _sourceResponseCache;
+  final PaginationCacheDao _paginationCacheDao;
+  final NativeReaderCacheStore _nativeReaderCache;
   final Directory? _temporaryDirectory;
   final Directory? _applicationSupportDirectory;
   final Future<Directory> Function() _legacyPaginationCacheDirectory;
@@ -80,13 +89,18 @@ class AppCacheManager {
         bytesByCategory[AppCacheCategory.sourceCovers]! +
         _sourceCoverCache.memorySizeBytes +
         _sourceImagePageCache.memorySizeBytes +
+        await _sourceImagePageCache.diskSizeBytes() +
         _accountAvatarCache.memorySizeBytes +
         await _accountAvatarCache.diskSizeBytes() +
         _imageCacheBytesReader();
     bytesByCategory[AppCacheCategory.sourceData] =
         bytesByCategory[AppCacheCategory.sourceData]! +
+        BookSourceChapterCache.memorySizeBytes +
         _sourceResponseCache.memorySizeBytes +
         await _sourceResponseCache.diskSizeBytes();
+    bytesByCategory[AppCacheCategory.readingCache] =
+        bytesByCategory[AppCacheCategory.readingCache]! +
+        await _paginationCacheDao.payloadSizeBytes();
     return AppCacheUsage(bytesByCategory);
   }
 
@@ -103,6 +117,12 @@ class AppCacheManager {
         await _sourceResponseCache.clear();
         break;
       case AppCacheCategory.readingCache:
+        await _paginationCacheDao.clearAll();
+        final directories = (await _directories())[category]!;
+        for (final directory in directories) {
+          await _nativeReaderCache.clearDirectory(directory);
+        }
+        return;
       case AppCacheCategory.temporaryFiles:
         break;
     }

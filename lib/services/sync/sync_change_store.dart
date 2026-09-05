@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../core/database_service.dart';
+import 'reading_progress_event.dart';
 import 'sync_clock.dart';
 import 'sync_protocol.dart';
 
@@ -79,6 +80,63 @@ class SyncChangeStore {
       'key': key,
       'value': value,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteState(String key) async {
+    final db = await _db;
+    await db.delete('sync_local_state', where: 'key = ?', whereArgs: [key]);
+  }
+
+  Future<Map<String, String>> statesWithPrefix(String prefix) async {
+    final db = await _db;
+    final rows = await db.query(
+      'sync_local_state',
+      columns: ['key', 'value'],
+      where: 'substr(key, 1, ?) = ?',
+      whereArgs: [prefix.length, prefix],
+    );
+    return {
+      for (final row in rows) row['key']! as String: row['value']! as String,
+    };
+  }
+
+  /// Detaches protocol state from the previous WebDAV space.
+  ///
+  /// Local books, explicit progress events and frozen identities survive. All
+  /// remote cursors, materialization markers, conflict candidates and legacy
+  /// remote file paths are removed so they cannot leak into another account.
+  Future<void> resetRemoteMirrorForNewSpace() async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      final bindings = await txn.query(
+        'sync_book_files',
+        columns: ['book_uid', 'local_book_id'],
+      );
+      for (final binding in bindings) {
+        final bookId = binding['local_book_id'] as int?;
+        final uid = binding['book_uid'] as String?;
+        if (bookId == null || uid == null || uid.isEmpty) continue;
+        await txn.insert('sync_local_state', {
+          'key': 'frozen_book_uid:$bookId',
+          'value': uid,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await txn.delete('sync_records');
+      await txn.delete('sync_device_cursors');
+      await txn.delete('sync_book_files');
+      await txn.delete(
+        'sync_local_state',
+        where:
+            'key NOT GLOB ? AND key NOT GLOB ? AND key NOT GLOB ? '
+            'AND key NOT GLOB ?',
+        whereArgs: [
+          'frozen_book_uid:*',
+          'progress_event:*',
+          'progress_head:*',
+          'progress_device_sequence:*',
+        ],
+      );
+    });
   }
 
   Future<int> cursorFor(String deviceId) async {
@@ -281,7 +339,27 @@ class SyncChangeStore {
               ? current?.payload
               : operation.payload,
         );
+        var forceProgressWinner = false;
+        if (operation.dataset == 'progress' &&
+            !operation.deleted &&
+            current != null) {
+          final relation = compareReadingProgressEvents(
+            current.payload?['position_event'],
+            operation.payload?['position_event'],
+          );
+          if (relation == ReadingProgressEventRelation.currentDominates) {
+            continue;
+          }
+          if (relation == ReadingProgressEventRelation.concurrent ||
+              relation == ReadingProgressEventRelation.unknown) {
+            await _storeProgressCandidate(txn, operation);
+            continue;
+          }
+          forceProgressWinner =
+              relation == ReadingProgressEventRelation.incomingDominates;
+        }
         if (current == null ||
+            forceProgressWinner ||
             HybridLogicalTimestamp.parse(current.hlc).compareTo(
                   HybridLogicalTimestamp.parse(effectiveOperation.hlc),
                 ) <
@@ -309,6 +387,7 @@ class SyncChangeStore {
           }
         }
         if (normalizedCurrent != null &&
+            !forceProgressWinner &&
             HybridLogicalTimestamp.parse(normalizedCurrent.hlc).compareTo(
                   HybridLogicalTimestamp.parse(effectiveOperation.hlc),
                 ) >=
@@ -388,4 +467,38 @@ class SyncChangeStore {
       }
     });
   }
+}
+
+Future<void> _storeProgressCandidate(
+  Transaction txn,
+  SyncOperation operation,
+) async {
+  final event = operation.payload?['position_event'];
+  final eventId = readingProgressEventId(event) == null
+      ? 'legacy-${operation.hlc}'
+      : readingProgressCandidateId(event);
+  await txn.insert('sync_local_state', {
+    'key': readingProgressCandidateKey(operation.entityKey, eventId),
+    'value': jsonEncode({
+      'snapshot': _progressSnapshot(operation.payload),
+      'received_at': DateTime.now().toUtc().toIso8601String(),
+    }),
+  }, conflictAlgorithm: ConflictAlgorithm.replace);
+}
+
+Map<String, Object?> _progressSnapshot(Map<String, dynamic>? payload) {
+  final event = payload?['position_event'];
+  return {
+    'current_page': (payload?['current_page'] as num?)?.toInt() ?? 0,
+    'reading_progress': (payload?['reading_progress'] as num?)?.toDouble(),
+    'canonical_locator': payload?['canonical_locator'] == null
+        ? null
+        : jsonEncode(payload!['canonical_locator']),
+    if (event is Map) 'event_id': event['event_id'],
+    if (event is Map) 'saved_at': event['saved_at'],
+    if (event is Map) 'device_id': event['device_id'],
+    if (event is Map) 'device_sequence': event['device_sequence'],
+    if (event is Map) 'vector': event['vector'],
+    if (event is Map) 'locator_revision': event['locator_revision'],
+  };
 }

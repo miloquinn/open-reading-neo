@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +12,51 @@ import 'package:xxread/pages/book_sources/widgets/sourced_book_widgets.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 
 void main() {
+  testWidgets('summary stays visible after an incomplete detail response', (
+    tester,
+  ) async {
+    final response = Completer<BookSourceBook>();
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => DownloadTaskController(),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SourcedBookDetailsLoader(
+              result: SourcedBook(
+                source: _source(),
+                book: _book(title: 'Summary title'),
+              ),
+              gateway: _DetailsClient(response: response.future),
+              shelfService: _ShelfService(),
+              onRead: (_) async {},
+              onDownloadContinuesInBackground: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Description'), findsOneWidget);
+    expect(find.text('Author · Source'), findsOneWidget);
+
+    response.complete(
+      const BookSourceBook(
+        id: 'book',
+        title: 'Detailed title',
+        author: '',
+        description: '',
+        categories: [],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detailed title'), findsOneWidget);
+    expect(find.text('Description'), findsOneWidget);
+    expect(find.text('Author · Source'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('actions present provider-backed details with reduced motion', (
     tester,
   ) async {
@@ -64,12 +111,16 @@ void main() {
 }
 
 class _DetailsClient extends BookSourceClient {
+  _DetailsClient({this.response});
+
+  final Future<BookSourceBook>? response;
+
   @override
   Future<BookSourceBook> getBook(
     RegisteredBookSource source,
     String bookId, {
     Map<String, String> sourceVariables = const {},
-  }) async => _book(title: 'Detailed title');
+  }) async => response ?? _book(title: 'Detailed title');
 }
 
 class _ShelfService extends BookSourceShelfService {}

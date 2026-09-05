@@ -344,6 +344,7 @@ extension _NativeReaderHorizontalPaging on _NativeReaderPageState {
       onNotification: (notification) {
         if (notification is ScrollStartNotification &&
             notification.dragDetails != null) {
+          _markReadingPositionChanged();
           _markReaderAloudForManualPageTurn();
         }
         if (notification is! ScrollEndNotification) return false;

@@ -8,6 +8,7 @@ import 'package:xxread/services/core/database_service.dart';
 import 'package:xxread/services/books/book_image_map_service.dart';
 import 'package:xxread/services/books/book_import_models.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
+import 'package:xxread/services/sync/reading_progress_sync_service.dart';
 
 class BookDao implements BookImportStore {
   final _dbService = DatabaseService();
@@ -119,6 +120,7 @@ class BookDao implements BookImportStore {
     int bookId,
     int currentPage, {
     double? readingProgress,
+    bool emitSyncEvent = true,
   }) async {
     try {
       final db = await _dbService.database;
@@ -134,6 +136,9 @@ class BookDao implements BookImportStore {
       );
       if (result == 0) {
         throw Exception('书籍不存在');
+      }
+      if (emitSyncEvent) {
+        await ReadingProgressSyncService.instance.recordLocalPosition(bookId);
       }
     } catch (e) {
       throw Exception('更新阅读进度失败: $e');
@@ -433,6 +438,7 @@ class BookDao implements BookImportStore {
     String? layoutSignature,
     int currentPage, {
     double? readingProgress,
+    bool emitSyncEvent = true,
   }) async {
     try {
       final db = await _dbService.database;
@@ -458,8 +464,62 @@ class BookDao implements BookImportStore {
       if (result == 0) {
         throw Exception('书籍不存在');
       }
+      if (emitSyncEvent) {
+        await ReadingProgressSyncService.instance.recordLocalPosition(bookId);
+      }
     } catch (e) {
       throw Exception('更新 CanonicalLocator 进度失败: $e');
     }
+  }
+
+  /// Replaces every persisted component of the reading position.
+  ///
+  /// Unlike [updateBookCanonicalLocator], this can intentionally clear a
+  /// canonical locator when the user returns to a pre-sync legacy position.
+  Future<void> replaceBookProgress(
+    int bookId, {
+    required int currentPage,
+    required double? readingProgress,
+    required String? canonicalLocator,
+    int? totalPages,
+    bool emitSyncEvent = true,
+  }) async {
+    final db = await _dbService.database;
+    final values = <String, Object?>{
+      'currentPage': currentPage,
+      'reading_progress': readingProgress?.clamp(0.0, 1.0),
+      'last_canonical_locator': canonicalLocator,
+      'last_rendered_locator': null,
+      'layout_signature': null,
+      'totalPages': ?totalPages,
+    };
+    final result = await db.update(
+      'books',
+      values,
+      where: 'id = ?',
+      whereArgs: [bookId],
+    );
+    if (result == 0) throw Exception('书籍不存在');
+    if (emitSyncEvent) {
+      await ReadingProgressSyncService.instance.recordLocalPosition(bookId);
+    }
+  }
+
+  /// Invalidates layout-dependent locators after a text revision could not be
+  /// mapped exactly. The normalized percentage remains available as a safe
+  /// fallback and no synthetic reading event is emitted.
+  Future<void> clearBookLocatorAfterContentChange(int bookId) async {
+    final db = await _dbService.database;
+    final result = await db.update(
+      'books',
+      {
+        'last_canonical_locator': null,
+        'last_rendered_locator': null,
+        'layout_signature': null,
+      },
+      where: 'id = ?',
+      whereArgs: [bookId],
+    );
+    if (result == 0) throw Exception('书籍不存在');
   }
 }

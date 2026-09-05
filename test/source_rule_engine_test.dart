@@ -37,7 +37,7 @@ void main() {
           engine.evaluateString(
             document,
             items.single,
-            'a@text&&span@text##第二##第 2###',
+            'a@text&&span@text##第二##第 2',
           ),
           '第 2本乙',
         );
@@ -300,17 +300,17 @@ void main() {
         await engine.evaluateStringAsync(
           document,
           null,
-          'id.Context@article@p@html##Chapter.*',
+          'id.Context@article@p@html##<p>Chapter.*',
           joinSeparator: '\n',
           regexDotAll: false,
         ),
-        'Readable body',
+        '<p>Readable body</p>',
       );
       expect(
         await engine.evaluateStringAsync(
           document,
           null,
-          r'id.Context@article@p@html##Chapter[\s\S]*',
+          r'id.Context@article@p@html##<p>Chapter[\s\S]*',
           joinSeparator: '\n',
           regexDotAll: false,
         ),

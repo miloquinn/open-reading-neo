@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,9 +7,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../book_sources/models/registered_book_source.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
 import '../../book_sources/services/book_source_import_analyzer.dart';
+import '../../book_sources/services/book_source_registry.dart';
 import '../../book_sources/services/book_source_maintenance_coordinator.dart';
+import '../../book_sources/services/book_source_usage_service.dart';
 import '../../book_sources/source_engine/source_health_checker.dart';
-import '../../book_sources/source_engine/source_import_service.dart';
 import '../../services/core/app_settings_service.dart';
 import '../../utils/layout_helper.dart';
 import '../../utils/localization_extension.dart';
@@ -20,25 +20,34 @@ import 'controllers/book_source_add_controller.dart';
 import 'controllers/book_source_management_controller.dart';
 import 'source_debug_page.dart';
 import 'source_login_page.dart';
-import 'widgets/book_source_add_panel.dart';
+import 'widgets/book_source_add_flow.dart';
 import 'widgets/book_source_cleanup_review_sheet.dart';
 import 'widgets/book_source_dedupe_review_sheet.dart';
 import 'widgets/book_source_group_picker.dart';
+import 'widgets/book_source_organization_actions.dart';
 import 'widgets/book_source_information_sheet.dart';
 import 'widgets/book_source_management_list.dart';
 import 'widgets/book_source_management_source_card.dart';
 import 'widgets/book_source_maintenance_sheet.dart';
 
 part 'book_source_management_add_source.dart';
+part 'book_source_management_maintenance.dart';
 
 /// Low-frequency configuration for online content providers.
 ///
 /// Discovery remains user-facing; adding, enabling and removing providers lives
 /// here so technical configuration does not interrupt the book-browsing flow.
 class BookSourceManagementPage extends StatefulWidget {
-  const BookSourceManagementPage({super.key, this.maintenance});
+  const BookSourceManagementPage({
+    super.key,
+    this.maintenance,
+    this.registry,
+    this.readReferencedSourceIds = referencedBookSourceIds,
+  });
 
   final BookSourceMaintenanceCoordinator? maintenance;
+  final BookSourceRegistry? registry;
+  final Future<Set<String>> Function() readReferencedSourceIds;
 
   @override
   State<BookSourceManagementPage> createState() =>
@@ -55,47 +64,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   late final bool _ownsMaintenance;
   int _handledMaintenanceRunId = 0;
   bool _maintenanceProgressOpen = false;
-
-  // `visibleSources`/`availableGroups` re-filter every source and regex-parse
-  // each one's group tags; this page rebuilds on every controller
-  // notification (a single health-check progress tick among thousands
-  // included), so recomputing them unconditionally on every build is what
-  // made this page feel like it never finished loading with a large library.
-  int? _cachedVisibleSourcesRevision;
-  String? _cachedVisibleSourcesQuery;
-  BookSourceManagementFilter? _cachedVisibleSourcesFilter;
-  String? _cachedVisibleSourcesGroup;
-  List<RegisteredBookSource>? _cachedVisibleSources;
-  int? _cachedAvailableGroupsRevision;
-  List<String>? _cachedAvailableGroups;
-
-  List<RegisteredBookSource> _memoizedVisibleSources() {
-    final state = _controller.state;
-    if (_cachedVisibleSourcesRevision == state.sourcesRevision &&
-        _cachedVisibleSourcesQuery == state.query &&
-        _cachedVisibleSourcesFilter == state.filter &&
-        _cachedVisibleSourcesGroup == state.selectedGroup) {
-      return _cachedVisibleSources!;
-    }
-    final visible = state.visibleSources;
-    _cachedVisibleSourcesRevision = state.sourcesRevision;
-    _cachedVisibleSourcesQuery = state.query;
-    _cachedVisibleSourcesFilter = state.filter;
-    _cachedVisibleSourcesGroup = state.selectedGroup;
-    _cachedVisibleSources = visible;
-    return visible;
-  }
-
-  List<String> _memoizedAvailableGroups() {
-    final state = _controller.state;
-    if (_cachedAvailableGroupsRevision == state.sourcesRevision) {
-      return _cachedAvailableGroups!;
-    }
-    final groups = state.availableGroups;
-    _cachedAvailableGroupsRevision = state.sourcesRevision;
-    _cachedAvailableGroups = groups;
-    return groups;
-  }
+  bool _dedupeRunning = false;
+  BookSourceMaintenanceStatus? _lastMaintenanceStatus;
 
   @override
   void initState() {
@@ -116,8 +86,10 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     _handledMaintenanceRunId = _maintenance.state.isRunning
         ? _maintenance.state.runId - 1
         : _maintenance.state.runId;
+    _lastMaintenanceStatus = _maintenance.state.status;
     _maintenance.addListener(_onMaintenanceChanged);
-    _controller = BookSourceManagementController()..addListener(_onChanged);
+    _controller = BookSourceManagementController(registry: widget.registry)
+      ..addListener(_onChanged);
     _scrollController.addListener(_loadMoreSourcesIfNeeded);
     unawaited(_controller.load());
   }
@@ -129,35 +101,42 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   void _onMaintenanceChanged() {
     if (!mounted) return;
     final state = _maintenance.state;
+    final statusChanged = state.status != _lastMaintenanceStatus;
+    _lastMaintenanceStatus = state.status;
     if (!state.isRunning && state.runId > _handledMaintenanceRunId) {
       _handledMaintenanceRunId = state.runId;
       final result = state.result;
       if (result != null) {
-        _controller.mergeExternalSources([
-          ...result.fullyAvailable,
-          ...result.needsAttention,
+        final remainingIds = state.remainingSources
+            .map((source) => source.id)
+            .toSet();
+        _controller.mergeExternalHealthResults([
+          for (final source in result.allSources)
+            if (!remainingIds.contains(source.id)) source,
         ]);
-        if (!_maintenanceProgressOpen) {
-          showSideToast(
-            context,
-            state.status == BookSourceMaintenanceStatus.cancelled
-                ? context.l10n.bookSourcesCleanupCancelledSummary(result.total)
-                : context.l10n.bookSourcesMaintenanceFinishedSummary(
-                    result.total,
-                    result.needsAttention.length,
-                  ),
-            kind: state.status == BookSourceMaintenanceStatus.cancelled
-                ? SideToastKind.info
-                : result.needsAttention.isEmpty
-                ? SideToastKind.success
-                : SideToastKind.warning,
-          );
-        }
-      } else if (state.failure != null) {
+      }
+      if (!_maintenanceProgressOpen && state.failure != null) {
         showSideToast(context, '${state.failure}', kind: SideToastKind.error);
+      } else if (!_maintenanceProgressOpen && result != null) {
+        showSideToast(
+          context,
+          state.status == BookSourceMaintenanceStatus.cancelled
+              ? context.l10n.bookSourcesCleanupCancelledSummary(
+                  state.progress?.completed ?? result.total,
+                )
+              : context.l10n.bookSourcesMaintenanceFinishedSummary(
+                  state.progress?.completed ?? result.total,
+                  result.needsAttention.length,
+                ),
+          kind: state.status == BookSourceMaintenanceStatus.cancelled
+              ? SideToastKind.info
+              : result.needsAttention.isEmpty
+              ? SideToastKind.success
+              : SideToastKind.warning,
+        );
       }
     }
-    setState(() {});
+    if (statusChanged) setState(() {});
   }
 
   void _loadMoreSourcesIfNeeded() {
@@ -228,23 +207,36 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
               ),
             ),
             FloatingSubpageMenuItem(
+              value: _BookSourceHeaderAction.groups,
+              itemKey: const Key('bookSourcesManageGroupsButton'),
+              child: ListTile(
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: Text(
+                  BookSourceOrganizationCopy.of(context).manageGroups,
+                ),
+              ),
+            ),
+            FloatingSubpageMenuItem(
               value: _BookSourceHeaderAction.maintenance,
               itemKey: const Key('bookSourcesMaintenanceButton'),
               startsSection: true,
               iconColor: Theme.of(context).colorScheme.tertiary,
-              child: ListTile(
-                leading: Icon(
-                  _maintenance.state.isRunning
-                      ? Icons.monitor_heart_rounded
-                      : Icons.home_repair_service_outlined,
-                ),
-                title: Text(
-                  _maintenance.state.isRunning
-                      ? context.l10n.bookSourcesMaintenanceRunningMenuLabel(
-                          _maintenance.state.progress?.completed ?? 0,
-                          _maintenance.state.progress?.total ?? 0,
-                        )
-                      : context.l10n.bookSourcesMaintenanceTitle,
+              child: AnimatedBuilder(
+                animation: _maintenance,
+                builder: (context, _) => ListTile(
+                  leading: Icon(
+                    _maintenance.state.isRunning
+                        ? Icons.monitor_heart_rounded
+                        : Icons.home_repair_service_outlined,
+                  ),
+                  title: Text(
+                    _maintenance.state.isRunning
+                        ? context.l10n.bookSourcesMaintenanceRunningMenuLabel(
+                            _maintenance.state.progress?.completed ?? 0,
+                            _maintenance.state.progress?.total ?? 0,
+                          )
+                        : context.l10n.bookSourcesMaintenanceTitle,
+                  ),
                 ),
               ),
             ),
@@ -264,6 +256,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
                 unawaited(_showAddSourceDialog());
               case _BookSourceHeaderAction.select:
                 _controller.toggleSelectionMode();
+              case _BookSourceHeaderAction.groups:
+                unawaited(_showGroupManager());
               case _BookSourceHeaderAction.maintenance:
                 unawaited(_showMaintenanceMenu());
               case _BookSourceHeaderAction.information:
@@ -278,8 +272,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           constraints: const BoxConstraints(maxWidth: 920),
           child: BookSourceManagementList(
             state: state,
-            visibleSources: _memoizedVisibleSources(),
-            availableGroups: _memoizedAvailableGroups(),
+            visibleSources: state.visibleSources,
+            availableGroups: state.availableGroups,
             searchController: _searchController,
             scrollController: _scrollController,
             additionalProtocolsEnabled: additionalProtocolsEnabled,
@@ -308,6 +302,12 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             onDisableSelected: () =>
                 unawaited(_controller.setSelectedSourcesEnabled(false)),
             onCheckSelected: () => unawaited(_checkSelectedSourcesHealth()),
+            onGroupSelected: () => unawaited(
+              _editSourceGroups([
+                for (final source in state.sources)
+                  if (state.selectedSourceIds.contains(source.id)) source,
+              ]),
+            ),
             onRemoveSelected: () => unawaited(_removeSelectedSources()),
             onToggleSourceSelection: (source) =>
                 _controller.toggleSourceSelection(source.id),
@@ -327,7 +327,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (context) => BookSourceGroupPicker(
-        groups: _memoizedAvailableGroups(),
+        groups: state.availableGroups,
         selected: state.selectedGroup,
       ),
     );
@@ -338,11 +338,47 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     _resetScroll();
   }
 
+  Future<void> _showGroupManager() async {
+    await showBookSourceGroupManager(context, registry: _controller.registry);
+    if (!mounted) return;
+    await _reloadOrganization();
+  }
+
+  Future<void> _editSourceGroups(List<RegisteredBookSource> sources) async {
+    final changed = await showBookSourceGroupEditor(
+      context,
+      registry: _controller.registry,
+      sources: sources,
+    );
+    if (!mounted || !changed) return;
+    await _reloadOrganization();
+  }
+
+  Future<void> _reloadOrganization() async {
+    try {
+      await _controller.reloadOrganization();
+    } on Object catch (error) {
+      if (mounted) showSideToast(context, '$error', kind: SideToastKind.error);
+    }
+  }
+
+  Future<void> _toggleFavorite(RegisteredBookSource source) async {
+    try {
+      await _controller.setSourceFavorite(source);
+    } on Object catch (error) {
+      if (mounted) showSideToast(context, '$error', kind: SideToastKind.error);
+    }
+  }
+
   void _handleSourceAction(
     RegisteredBookSource source,
     BookSourceManagementSourceAction action,
   ) {
     switch (action) {
+      case BookSourceManagementSourceAction.favorite:
+        unawaited(_toggleFavorite(source));
+      case BookSourceManagementSourceAction.groups:
+        unawaited(_editSourceGroups([source]));
       case BookSourceManagementSourceAction.refresh:
         unawaited(_refreshSource(source));
       case BookSourceManagementSourceAction.rights:
@@ -424,26 +460,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     }
   }
 
-  Future<void> _showMaintenanceMenu() async {
-    final action = await showModalBottomSheet<BookSourceMaintenanceAction>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) =>
-          BookSourceMaintenanceSheet(maintenance: _maintenance),
-    );
-    if (!mounted || action == null) return;
-    switch (action) {
-      case BookSourceMaintenanceAction.healthCheck:
-        await _openHealthMaintenance();
-      case BookSourceMaintenanceAction.dedupe:
-        await _reviewInstalledDuplicates();
-      case BookSourceMaintenanceAction.reviewHealthResult:
-        await _reviewHealthResult();
-    }
-  }
-
   Future<void> _showInformationMenu() async {
     final action = await showModalBottomSheet<BookSourceInformationAction>(
       context: context,
@@ -460,117 +476,6 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
       case BookSourceInformationAction.rightsReport:
         await _openRightsReport();
     }
-  }
-
-  Future<void> _openHealthMaintenance() async {
-    if (!_maintenance.state.isRunning) {
-      unawaited(_maintenance.start(_controller.state.sources));
-    }
-    await _showMaintenanceProgress();
-  }
-
-  Future<void> _showMaintenanceProgress() async {
-    if (_maintenanceProgressOpen || !mounted) return;
-    _maintenanceProgressOpen = true;
-    var reviewAfterClose = false;
-    final continuedInBackground = await showModalBottomSheet<bool>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => BookSourceMaintenanceProgressSheet(
-        maintenance: _maintenance,
-        onReview: () {
-          reviewAfterClose = true;
-          Navigator.pop(sheetContext, false);
-        },
-      ),
-    );
-    _maintenanceProgressOpen = false;
-    if (!mounted) return;
-    if (reviewAfterClose) {
-      await _reviewHealthResult();
-      return;
-    }
-    if (continuedInBackground != false && _maintenance.state.isRunning) {
-      showSideToast(
-        context,
-        context.l10n.bookSourcesMaintenanceBackgroundToast,
-        kind: SideToastKind.info,
-      );
-    }
-  }
-
-  Future<void> _reviewHealthResult() async {
-    final result = _maintenance.state.result;
-    if (result == null) return;
-    if (result.total == 0) {
-      showSideToast(
-        context,
-        context.l10n.bookSourcesCleanupNoCheckableSources,
-        kind: SideToastKind.info,
-      );
-      return;
-    }
-    if (result.needsAttention.isEmpty) {
-      showSideToast(
-        context,
-        context.l10n.bookSourcesCleanupAllFullyAvailable(
-          result.fullyAvailable.length,
-        ),
-        kind: SideToastKind.success,
-      );
-      return;
-    }
-    final toDisable = await showModalBottomSheet<Set<String>>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => BookSourceCleanupReviewSheet(
-        fullyAvailableCount: result.fullyAvailable.length,
-        needsAttention: result.needsAttention,
-      ),
-    );
-    if (toDisable == null || toDisable.isEmpty || !mounted) return;
-    await _controller.disableSources(toDisable);
-    if (!mounted) return;
-    _maintenance.clearResult();
-    showSideToast(
-      context,
-      context.l10n.bookSourcesCleanupDisabledSummary(toDisable.length),
-      kind: SideToastKind.success,
-    );
-  }
-
-  Future<void> _reviewInstalledDuplicates() async {
-    final analysis = _controller.findDuplicateSources();
-    if (analysis.result.groups.isEmpty) {
-      showSideToast(
-        context,
-        context.l10n.bookSourcesDedupeNone,
-        kind: SideToastKind.info,
-      );
-      return;
-    }
-    final toDisable = await showModalBottomSheet<Set<String>>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => BookSourceInstalledDedupeReviewSheet(
-        result: analysis.result,
-        sourcesByIndex: analysis.sourcesByIndex,
-      ),
-    );
-    if (toDisable == null || toDisable.isEmpty || !mounted) return;
-    await _controller.disableSources(toDisable);
-    if (!mounted) return;
-    showSideToast(
-      context,
-      context.l10n.bookSourcesDedupeDisabledSummary(toDisable.length),
-      kind: SideToastKind.success,
-    );
   }
 
   String _sourceHealthIssueSummary(SourceHealthCheckResult? result) {
@@ -711,4 +616,4 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   }
 }
 
-enum _BookSourceHeaderAction { add, select, maintenance, information }
+enum _BookSourceHeaderAction { add, select, groups, maintenance, information }

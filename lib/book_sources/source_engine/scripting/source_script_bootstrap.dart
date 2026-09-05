@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'source_script_contract.dart';
+import 'source_script_java_compatibility.dart';
 import 'source_script_network_guard.dart';
 import 'source_script_state.dart';
 
@@ -260,13 +261,14 @@ class SourceScriptBootstrap {
       __state[prefix + String(name)] = value;
       return value;
     };
-    // Legado's RuleDataInterface.getVariable() returns a non-null String,
+    // The compatible RuleDataInterface.getVariable() contract returns a
+    // non-null String,
     // falling back to "" when the key was never set (see
     // RuleDataInterface.kt: `variableMap[key] ?: getBigVariable(key) ?:
     // ""`). Source scripts commonly do `String(book.getVariable(x))` and
     // guard only against the literal "null" a real null would stringify to
-    // — never against "undefined", since Legado never produces that. Match
-    // Legado's contract so those guards keep working here too.
+    // — never against "undefined", since the compatible contract never
+    // produces that. Preserve that behavior so those guards keep working.
     entity.getVariable = (name) => __state[prefix + String(name)] ?? '';
     entity.setReverseToc = (value) => {
       __state[prefix + 'reverseToc'] = value;
@@ -297,127 +299,29 @@ class SourceScriptBootstrap {
     getCookie: (url) => __host('cookieGet', [String(url)]),
     setCookie: (url, value) => __host('cookieSet', [String(url), String(value)])
   };
-  const __symmetricCrypto = (transformation, keyValue, ivValue) => ({
-    decrypt: (data) => Array.from(__host('symmetricCrypto', [
-      'decryptBytes', transformation, keyValue, ivValue, data
-    ]) || []),
-    decryptStr: (data) => __host('symmetricCrypto', [
-      'decryptString', transformation, keyValue, ivValue, data
-    ]),
-    encrypt: (data) => Array.from(__host('symmetricCrypto', [
-      'encryptBytes', transformation, keyValue, ivValue, data
-    ]) || []),
-    encryptBase64: (data) => __host('symmetricCrypto', [
-      'encryptBase64', transformation, keyValue, ivValue, data
-    ]),
-    encryptHex: (data) => __host('symmetricCrypto', [
-      'encryptHex', transformation, keyValue, ivValue, data
-    ])
-  });
-  if (!String.prototype.getBytes) {
-    Object.defineProperty(String.prototype, 'getBytes', {
-      value: function() { return Array.from(__host('utf8Bytes', [String(this)]) || []); },
-      enumerable: false
-    });
-  }
-  const __Base64 = {
-    NO_WRAP: 2,
-    DEFAULT: 0,
-    decode: (value) => Array.from(__host('base64DecodeBytes', [String(value)]) || []),
-    encodeToString: (value) => __host('base64EncodeBytes', [value]),
-    getDecoder: () => ({
-      decode: (value) => Array.from(__host('base64DecodeBytes', [String(value)]) || [])
-    }),
-    getEncoder: () => ({
-      encodeToString: (value) => __host('base64EncodeBytes', [value])
-    })
-  };
-  const __SecretKeySpec = function(bytes, algorithm) {
-    return { bytes: Array.from(bytes || []), algorithm: String(algorithm || '') };
-  };
-  const __IvParameterSpec = function(bytes) {
-    return { bytes: Array.from(bytes || []) };
-  };
-  const __Cipher = {
-    ENCRYPT_MODE: 1,
-    DECRYPT_MODE: 2,
-    getInstance: (transformation) => {
-      let mode = 2;
-      let keySpec = { bytes: [] };
-      let ivSpec = { bytes: [] };
-      return {
-        init: (nextMode, nextKey, nextIv) => {
-          mode = Number(nextMode);
-          keySpec = nextKey || keySpec;
-          ivSpec = nextIv || ivSpec;
-        },
-        doFinal: (data) => {
-          const operation = mode === 1 ? 'encryptBytes' : 'decryptBytes';
-          return Array.from(__host('symmetricCrypto', [
-            operation,
-            String(transformation),
-            keySpec.bytes || keySpec,
-            ivSpec.bytes || ivSpec,
-            data
-          ]) || []);
-        }
-      };
-    }
-  };
-  const __Mac = {
-    getInstance: (algorithm) => {
-      let keySpec = { bytes: [] };
-      return {
-        init: (nextKey) => { keySpec = nextKey || keySpec; },
-        doFinal: (data) => Array.from(__host('hmacBytes', [
-          data, String(algorithm), keySpec.bytes || keySpec
-        ]) || [])
-      };
-    }
-  };
-  const __MessageDigest = {
-    getInstance: (algorithm) => ({
-      digest: (data) => Array.from(__host('digestBytes', [data, String(algorithm)]) || [])
-    })
-  };
-  const __JavaString = (value) => Array.isArray(value)
-    ? __host('bytesToUtf8', [value])
-    : String(value == null ? '' : value);
-  const __javaImports = {
-    String: __JavaString,
-    Base64: __Base64,
-    SecretKeySpec: __SecretKeySpec,
-    IvParameterSpec: __IvParameterSpec,
-    Cipher: __Cipher,
-    Mac: __Mac,
-    MessageDigest: __MessageDigest
-  };
-  globalThis.JavaImporter = function() {
-    return Object.assign({ importPackage: () => null }, __javaImports);
-  };
-  const __packageProxy = new Proxy({}, {
-    get: (target, name) => name in __javaImports ? __javaImports[name] : __packageProxy
-  });
-  globalThis.Packages = __packageProxy;
-  if (!Array.prototype.toArray) {
-    Object.defineProperty(Array.prototype, 'toArray', {
-      value: function() { return Array.from(this); }, enumerable: false
-    });
-  }
+  $sourceScriptJavaCompatibility
   const __responseObject = (response, requestedUrl) => {
     const data = response || {};
     const bodyText = data.body == null ? '' : String(data.body);
     const finalUrl = data.finalUrl || String(requestedUrl || '');
     const responseHeaders = Object.assign({}, data.headers || {});
+    const headerValues = Object.fromEntries(Object.entries(responseHeaders).map(([name, value]) => [name.toLowerCase(), value]));
+    const header = (name) => headerValues[String(name).toLowerCase()] || '';
     const responseCookies = Object.assign({}, data.cookies || {});
     return {
       body: () => bodyText,
       code: () => Number(data.statusCode || 200),
       statusCode: () => Number(data.statusCode || 200),
       url: () => finalUrl,
+      header,
+      contentType: () => header('content-type'),
+      charset: () => {
+        const match = /charset\\s*=\\s*["']?([^;"'\\s]+)/i.exec(header('content-type'));
+        return match ? match[1] : null;
+      },
       headers: (name) => name === undefined
-        ? responseHeaders
-        : (responseHeaders[String(name)] || responseHeaders[String(name).toLowerCase()] || ''),
+        ? __javaMap(responseHeaders)
+        : header(name),
       cookies: () => responseCookies,
       raw: () => ({ request: () => ({ url: () => finalUrl }) }),
       toJSON: () => ({
@@ -455,9 +359,11 @@ class SourceScriptBootstrap {
     },
     md5Encode: (value) => __host('md5', [String(value)]),
     md5Encode16: (value) => __host('md5', [String(value)]).substring(8, 24),
-    base64Encode: (value) => __host('base64Encode', [String(value)]),
-    base64Decode: (value) => __host('base64Decode', [String(value)]),
-    base64DecodeToByteArray: (value) => Array.from(__host('base64DecodeBytes', [String(value)]) || []),
+    base64Encode: (value, flags) => __host('base64Encode', [String(value), flags]),
+    base64Decode: (value, charsetOrFlags) => __host('base64Decode', [String(value), charsetOrFlags]),
+    base64DecodeToByteArray: (value, flags) => Array.from(__host('base64DecodeBytes', [String(value), flags]) || []),
+    hexDecodeToByteArray: (value) => __host('hexDecodeToBytes', [String(value)]),
+    hexEncodeToString: (value) => __host('hexEncodeToString', [String(value)]),
     hexDecodeToString: (value) => __host('hexDecodeToString', [String(value)]),
     aesBase64DecodeToString: (data, key, transformation, iv) => __host(
       'aesBase64DecodeToString',
@@ -479,11 +385,11 @@ class SourceScriptBootstrap {
       'digestHex', [String(value), String(algorithm)]
     ),
     toNumChapter: (value) => __host('toNumChapter', [String(value)]),
-    strToBytes: (value) => Array.from(__host('utf8Bytes', [String(value)]) || []),
+    strToBytes: (value, charset) => Array.from(__host('strToBytes', [String(value), charset || 'UTF-8']) || []),
     htmlFormat: (value) => __host('htmlFormat', [String(value)]),
     t2s: (value) => __host('traditionalToSimplified', [String(value)]),
     s2t: (value) => __host('simplifiedToTraditional', [String(value)]),
-    bytesToStr: (value) => __host('bytesToUtf8', [value]),
+    bytesToStr: (value, charset) => __host('bytesToStr', [value, charset || 'UTF-8']),
     getWebViewUA: () => (__payload.sourceHeader || {})['User-Agent'] ||
       (__payload.sourceHeader || {})['user-agent'] ||
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
@@ -514,14 +420,14 @@ class SourceScriptBootstrap {
       if (!target) target = String(globalThis.baseUrl || __payload.sourceUrl || '');
       return __sourceNetwork('WEBVIEW', target, html, null, js).body || '';
     },
-    encodeURI: (value) => encodeURIComponent(String(value)),
-    decodeURI: (value) => decodeURIComponent(String(value)),
+    encodeURI: __urlEncoder.encode,
+    decodeURI: __urlDecoder.decode,
     ajax: (url) => (__sourceNetwork('GET', url, null, null).body || ''),
     ajaxAll: (urls) => Array.from(urls || []).map(
       (url) => __responseObject(__sourceNetwork('GET', url, null, null), url)
     ),
-    connect: (url) => __responseObject(
-      __sourceNetwork('GET', url, null, null), url
+    connect: (url, headers) => __responseObject(
+      __sourceNetwork('GET', url, null, headers), url
     ),
     post: (url, body, headers) => __responseObject(
       __sourceNetwork('POST', url, body, headers), url
@@ -557,6 +463,12 @@ class SourceScriptBootstrap {
       'verificationCode', imageUrl, '', false, null
     ).value || ''
   };
+  globalThis.java.lang = __package('java.lang');
+  globalThis.java.util = __package('java.util');
+  globalThis.java.net = __package('java.net');
+  globalThis.java.security = __package('java.security');
+  globalThis.javax = __package('javax');
+  globalThis.android = __package('android');
   globalThis.sleep = () => null;
   const __jsoupParse = (value) => {
     let outer = String(value == null ? '' : value);
@@ -567,13 +479,14 @@ class SourceScriptBootstrap {
       }),
       html: () => outer,
       outerHtml: () => outer,
-      text: () => java.htmlFormat(outer),
+      text: () => __host('htmlText', [outer]),
       toString: () => outer
     };
   };
   globalThis.org = {
     jsoup: { Jsoup: { parse: __jsoupParse, parseBodyFragment: __jsoupParse } }
   };
+  __javaClasses['org.jsoup.Jsoup'] = globalThis.org.jsoup.Jsoup;
   globalThis.traditionalToSimplified = (value) => java.t2s(value);
   globalThis.simplifiedToTraditional = (value) => java.s2t(value);
   function __sourceInteraction(kind, url, title, refetchAfterSuccess, html) {
@@ -611,6 +524,7 @@ class SourceScriptBootstrap {
     return reply.value || {};
   }
   function __sourceNetwork(method, url, body, headers, webJs) {
+    if (typeof headers === 'string') headers = JSON.parse(headers);
     const reply = __host('network', [method, String(url), body, headers, webJs]);
     if (!reply || reply.cached !== true) {
       const request = reply && reply.request ? reply.request : {
@@ -632,6 +546,7 @@ class SourceScriptBootstrap {
     (__payload.sharedScript || '') +
     '\\n' + ${jsonEncode(sharedFunctionExports)} +
     '\\nreturn eval(' + JSON.stringify(__payload.script) + ');\\n})()';
+  try {
   let __value = (0, eval)(__program);
   if (__value === undefined || typeof __value === 'function') __value = '';
   return JSON.stringify({
@@ -644,12 +559,19 @@ class SourceScriptBootstrap {
     loginHeaders: __loginHeaders,
     state: __state
   });
+  } finally {
+    for (const [name, descriptor] of __importedGlobals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
 })()
 ''';
   }
 
-  // Legado exposes shared jsLib functions on the script context object. Keep
-  // the library lexically scoped to avoid `let`/`const` collisions between
+  // Compatible source scripts expose shared jsLib functions on the script
+  // context object. Keep the library lexically scoped to avoid `let`/`const`
+  // collisions between
   // invocations, then export its top-level functions so source code using
   // `this.getToken()` or `this.getVariable()` keeps working.
   static String _sharedFunctionExports(Object? sharedScript) {

@@ -20,6 +20,46 @@ void main() {
       await server?.close(force: true);
     });
 
+    test(
+      'sends structured source JSON as UTF-8 bytes with its media type',
+      () async {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final received = Completer<({String body, ContentType? type})>();
+        server!.listen((request) async {
+          received.complete((
+            body: await utf8.decoder.bind(request).join(),
+            type: request.headers.contentType,
+          ));
+          request.response.write('accepted');
+          await request.response.close();
+        });
+        final transport = SourceHttpTransport(
+          networkPolicy: const BookSourceNetworkPolicy(
+            allowPrivateNetwork: true,
+          ),
+        );
+        addTearDown(transport.close);
+        final payload = {
+          'query': '剑来',
+          'items': [
+            {'id': 1},
+            {'id': 2},
+          ],
+        };
+        final response = await transport.send(
+          SourceRequestTemplate.parse(
+            '/search,${jsonEncode({'method': 'POST', 'body': payload})}',
+            baseUri: Uri.parse('http://127.0.0.1:${server!.port}'),
+          ),
+        );
+        final request = await received.future;
+        expect(jsonDecode(request.body), payload);
+        expect(request.type?.mimeType, 'application/json');
+        expect(request.type?.charset, 'utf-8');
+        expect(response.body, 'accepted');
+      },
+    );
+
     test('exposes the isolated cookie jar to source scripts', () {
       final transport = SourceHttpTransport(
         networkPolicy: const BookSourceNetworkPolicy(allowPrivateNetwork: true),

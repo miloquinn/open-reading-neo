@@ -3,11 +3,13 @@ class SourceRuleTransform {
     required this.selector,
     this.pattern,
     this.replacement = '',
+    this.extractFirst = false,
   });
 
   final String selector;
   final String? pattern;
   final String replacement;
+  final bool extractFirst;
 }
 
 class SourceScriptRule {
@@ -147,10 +149,12 @@ SourceScriptRule? splitSourceScriptRule(String rule) {
   ).firstMatch(rule);
   if (atIndex < 0 && tag == null) return null;
   if (atIndex >= 0 && (tag == null || atIndex < tag.start)) {
+    final remainder = rule.substring(atIndex + 4);
+    final suffixStart = _scriptRuleBoundary(remainder, 0);
     return SourceScriptRule(
       selector: rule.substring(0, atIndex),
-      script: rule.substring(atIndex + 4),
-      suffix: '',
+      script: suffixStart < 0 ? remainder : remainder.substring(0, suffixStart),
+      suffix: suffixStart < 0 ? '' : remainder.substring(suffixStart),
     );
   }
   return SourceScriptRule(
@@ -159,6 +163,148 @@ SourceScriptRule? splitSourceScriptRule(String rule) {
     suffix: rule.substring(tag.end),
   );
 }
+
+// Find a rule delimiter outside JavaScript strings, comments, regex literals
+// and nested expressions. Template interpolations use the same scanner to
+// locate their closing brace without confusing embedded backticks with EOF.
+int _scriptRuleBoundary(String text, int start, {bool interpolation = false}) {
+  var depth = 0;
+  var regexAllowed = true;
+  var statementAllowed = !interpolation;
+  var controlParenthesis = false;
+  final parentheses = <bool>[];
+  final braces = <bool>[];
+  for (var index = start; index < text.length; index++) {
+    final char = text[index];
+    if (char.trim().isEmpty) continue;
+    if (char == '"' || char == "'" || char == '`') {
+      index = _scriptQuoteEnd(text, index);
+      regexAllowed = false;
+      statementAllowed = false;
+      continue;
+    }
+    if (text.startsWith('//', index)) {
+      final end = text.indexOf('\n', index + 2);
+      if (end < 0) return -1;
+      index = end;
+      continue;
+    }
+    if (text.startsWith('/*', index)) {
+      final end = text.indexOf('*/', index + 2);
+      if (end < 0) return -1;
+      index = end + 1;
+      continue;
+    }
+    if (char == '/' && regexAllowed) {
+      var inClass = false;
+      for (index++; index < text.length; index++) {
+        final next = text[index];
+        if (next == '\\') {
+          index++;
+        } else if (next == '[') {
+          inClass = true;
+        } else if (next == ']') {
+          inClass = false;
+        } else if (next == '/' && !inClass) {
+          break;
+        }
+      }
+      regexAllowed = false;
+      statementAllowed = false;
+      continue;
+    }
+    if (_scriptIdentifierStart.hasMatch(char)) {
+      final begin = index;
+      while (index + 1 < text.length &&
+          _scriptIdentifierPart.hasMatch(text[index + 1])) {
+        index++;
+      }
+      final identifier = text.substring(begin, index + 1);
+      controlParenthesis = const {
+        'if',
+        'while',
+        'for',
+        'with',
+        'switch',
+        'catch',
+      }.contains(identifier);
+      statementAllowed = const {
+        'else',
+        'do',
+        'try',
+        'finally',
+      }.contains(identifier);
+      regexAllowed =
+          statementAllowed ||
+          const {
+            'return',
+            'throw',
+            'case',
+            'delete',
+            'void',
+            'typeof',
+            'new',
+            'in',
+            'instanceof',
+            'yield',
+            'await',
+          }.contains(identifier);
+      continue;
+    }
+    if (depth == 0) {
+      if (interpolation && char == '}') return index;
+      if (!interpolation && text.startsWith('##', index)) return index;
+    }
+    if (text.startsWith('++', index) || text.startsWith('--', index)) {
+      index++;
+      statementAllowed = false;
+      continue;
+    }
+    if (text.startsWith('=>', index)) {
+      index++;
+      regexAllowed = true;
+      statementAllowed = true;
+      continue;
+    }
+    if (char == '(') {
+      parentheses.add(controlParenthesis);
+      controlParenthesis = false;
+    }
+    if (char == '{') braces.add(statementAllowed || !regexAllowed);
+    if ('([{'.contains(char)) depth++;
+    if (')]}'.contains(char)) depth--;
+    if (char == ')' && parentheses.isNotEmpty) {
+      statementAllowed = parentheses.removeLast();
+      regexAllowed = statementAllowed;
+    } else if (char == '}' && braces.isNotEmpty) {
+      statementAllowed = braces.removeLast();
+      regexAllowed = statementAllowed;
+    } else {
+      statementAllowed = char == ';' || (char == '{' && braces.last);
+      regexAllowed = '=(:,[!&|?{;+-*%~^<>/'.contains(char);
+    }
+  }
+  return -1;
+}
+
+int _scriptQuoteEnd(String text, int start) {
+  final quote = text[start];
+  for (var index = start + 1; index < text.length; index++) {
+    if (text[index] == '\\') {
+      index++;
+    } else if (text[index] == quote) {
+      return index;
+    } else if (quote == '`' && text.startsWith(r'${', index)) {
+      final end = _scriptRuleBoundary(text, index + 2, interpolation: true);
+      if (end < 0) return text.length;
+      index = end;
+    }
+  }
+  return text.length;
+}
+
+final _scriptIdentifierStart = RegExp(r'[A-Za-z_$]');
+final _scriptIdentifierPart = RegExp(r'[A-Za-z0-9_$]');
 
 SourceRuleTransform splitSourceRuleTransform(String rule) {
   final parts = rule.split('##');
@@ -169,6 +315,9 @@ SourceRuleTransform splitSourceRuleTransform(String rule) {
     replacement: parts.length > 2
         ? parts[2].replaceFirst(RegExp(r'###$'), '')
         : '',
+    // A terminal ### selects only the first regex match, discarding the
+    // surrounding text before expanding the replacement (OnlyOne).
+    extractFirst: parts.length > 3 && rule.trimRight().endsWith('###'),
   );
 }
 

@@ -435,7 +435,7 @@ void main() {
   });
 
   test(
-    'online reading progress is restored through the progress dataset',
+    'online reading progress is staged until an explicit continuation',
     () async {
       final source = _source();
       await database.insert('books', {
@@ -488,12 +488,15 @@ void main() {
         sourceId: source.id,
         bookId: 'book-1',
       );
-      expect(restored?.chapterId, 'chapter-3');
-      expect(restored?.chapterIndex, 2);
-      expect(restored?.chapterProgress, 0.4);
+      expect(restored, isNull);
       final row = (await database.query('books')).single;
-      expect(row['currentPage'], 2400);
-      expect(row['totalPages'], 12000);
+      expect(row['currentPage'], 0);
+      expect(row['totalPages'], 1);
+      final candidates = await store.statesWithPrefix(
+        'progress_candidate:$bookUid:',
+      );
+      expect(candidates, hasLength(1));
+      expect(candidates.values.single, contains('chapter-3'));
 
       await store.applyRemoteBatch(
         SyncBatch.create(
@@ -519,6 +522,10 @@ void main() {
         isNull,
       );
       expect((await database.query('books')).single['currentPage'], 0);
+      expect(
+        await store.statesWithPrefix('progress_candidate:$bookUid:'),
+        isEmpty,
+      );
     },
   );
 
@@ -589,5 +596,7 @@ RegisteredBookSource _source() => RegisteredBookSource(
   capabilities: const {'search', 'detail', 'catalog', 'content'},
   maxCatalogPageSize: 200,
   enabled: true,
+  isFavorite: true,
+  groups: const ['常用', '英文'],
   addedAt: DateTime.utc(2026, 7, 11),
 );

@@ -4,11 +4,13 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/reader/reader_layout.dart';
+import '../core/reader/reader_auto_page_turn_controller.dart';
 import '../core/reader/reader_margin_settings.dart';
 import '../core/reader/reader_settings.dart';
 import '../core/reader/reader_custom_theme.dart';
 import '../core/reader/reader_system_ui.dart';
 import '../utils/reader_themes.dart';
+import '../utils/localization_extension.dart';
 import 'reader_theme_background.dart';
 
 @immutable
@@ -107,6 +109,9 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.onThemeChanged,
     required this.onCustomThemeTap,
     required this.onPageModeTap,
+    this.autoPageTurnController,
+    this.autoPageTurnIsVertical = false,
+    this.onAutoPageTurnSettings,
     required this.onTopBarStyleTap,
     required this.onTapZonesTap,
     required this.onFontSizeChanged,
@@ -197,6 +202,9 @@ class ReaderSettingsSheet extends StatefulWidget {
   final ValueChanged<String> onThemeChanged;
   final VoidCallback onCustomThemeTap;
   final VoidCallback onPageModeTap;
+  final ReaderAutoPageTurnController? autoPageTurnController;
+  final bool autoPageTurnIsVertical;
+  final VoidCallback? onAutoPageTurnSettings;
   final VoidCallback onTopBarStyleTap;
   final VoidCallback onTapZonesTap;
   final ValueChanged<double> onFontSizeChanged;
@@ -247,6 +255,7 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
   late bool _tabletTwoPageEnabled = widget.tabletTwoPageEnabled;
   late bool? _txtChapterTitlePageEnabled = widget.txtChapterTitlePageEnabled;
   _ReaderSettingsTab _tab = _ReaderSettingsTab.theme;
+  int _tabDirection = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -286,17 +295,64 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
               ),
             ],
             selected: {_tab},
-            onSelectionChanged: (selection) =>
-                setState(() => _tab = selection.first),
+            onSelectionChanged: (selection) {
+              final nextTab = selection.first;
+              if (nextTab == _tab) return;
+              setState(() {
+                _tabDirection = nextTab.index > _tab.index ? 1 : -1;
+                _tab = nextTab;
+              });
+            },
           ),
           const SizedBox(height: 16),
-          ...switch (_tab) {
-            _ReaderSettingsTab.theme => _themeTabChildren(theme),
-            _ReaderSettingsTab.text => _textTabChildren(context),
-            _ReaderSettingsTab.layout => _layoutTabChildren(),
-            _ReaderSettingsTab.paging => _pagingTabChildren(),
-          },
+          _buildAnimatedTabContent(context, theme),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAnimatedTabContent(BuildContext context, ThemeData theme) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 300);
+    final children = switch (_tab) {
+      _ReaderSettingsTab.theme => _themeTabChildren(theme),
+      _ReaderSettingsTab.text => _textTabChildren(context),
+      _ReaderSettingsTab.layout => _layoutTabChildren(),
+      _ReaderSettingsTab.paging => _pagingTabChildren(),
+    };
+    return AnimatedSize(
+      key: const ValueKey('reader-settings-tab-animated-size'),
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.hardEdge,
+      child: AnimatedSwitcher(
+        key: const ValueKey('reader-settings-tab-switcher'),
+        duration: duration,
+        reverseDuration: duration,
+        layoutBuilder: _readerSettingsTabLayout,
+        transitionBuilder: (child, animation) {
+          final childTab = (child.key! as ValueKey<_ReaderSettingsTab>).value;
+          final incoming = childTab == _tab;
+          final direction = incoming ? _tabDirection : -_tabDirection;
+          return _ReaderSettingsTabTransition(
+            animation: animation,
+            interactiveWhenCompleted: incoming,
+            horizontalOffset: direction * (incoming ? 0.045 : 0.025),
+            child: child,
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey<_ReaderSettingsTab>(_tab),
+          child: Column(
+            key: ValueKey('reader-settings-tab-content-${_tab.name}'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
+        ),
       ),
     );
   }
@@ -543,6 +599,29 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
       trailing: const Icon(Icons.chevron_right),
       onTap: widget.onPageModeTap,
     ),
+    if (widget.onAutoPageTurnSettings != null)
+      if (widget.autoPageTurnController case final controller?)
+        AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) => _autoPageTurnTile(context, controller),
+        )
+      else
+        _autoPageTurnTile(context, null),
+    if (widget.onAutoPageTurnSettings != null)
+      if (widget.autoPageTurnController case final controller?)
+        AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) => SwitchListTile(
+            key: const ValueKey('reader-auto-page-turn-shortcut-switch'),
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.touch_app_rounded),
+            value: controller.shortcutVisible,
+            title: Text(context.l10n.readerAutoPageTurnShortcutTitle),
+            subtitle: Text(context.l10n.readerAutoPageTurnShortcutHint),
+            onChanged: (value) =>
+                unawaited(controller.setShortcutVisible(value)),
+          ),
+        ),
     if (widget.showTabletTwoPageToggle)
       SwitchListTile(
         key: const ValueKey('reader-tablet-two-page-switch'),
@@ -590,9 +669,103 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
       },
     ),
   ];
+
+  Widget _autoPageTurnTile(
+    BuildContext context,
+    ReaderAutoPageTurnController? controller,
+  ) => ListTile(
+    key: const ValueKey('reader-auto-page-turn-tile'),
+    contentPadding: EdgeInsets.zero,
+    leading: const Icon(Icons.av_timer_rounded),
+    title: Text(context.l10n.readerAutoPageTurnTitle),
+    subtitle: Text(
+      controller == null
+          ? context.l10n.readerAutoPageTurnOff
+          : _autoPageTurnSummary(context, controller),
+    ),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: widget.onAutoPageTurnSettings,
+  );
+
+  String _autoPageTurnSummary(
+    BuildContext context,
+    ReaderAutoPageTurnController controller,
+  ) {
+    final mode = controller.modeFor(widget.autoPageTurnIsVertical);
+    final label = switch (mode) {
+      ReaderAutoPageTurnMode.timed => context.l10n.readerAutoPageTurnModeTimed,
+      ReaderAutoPageTurnMode.sweep => context.l10n.readerAutoPageTurnModeSweep,
+      ReaderAutoPageTurnMode.continuous =>
+        context.l10n.readerAutoPageTurnModeContinuous,
+      ReaderAutoPageTurnMode.interval =>
+        context.l10n.readerAutoPageTurnModeInterval,
+    };
+    return context.l10n.readerAutoPageTurnModeValue(
+      label,
+      controller.secondsFor(mode).round(),
+    );
+  }
 }
 
 enum _ReaderSettingsTab { theme, text, layout, paging }
+
+Widget _readerSettingsTabLayout(
+  Widget? currentChild,
+  List<Widget> previousChildren,
+) => Stack(
+  alignment: Alignment.topLeft,
+  clipBehavior: Clip.hardEdge,
+  children: [
+    for (final child in previousChildren)
+      Positioned(left: 0, right: 0, top: 0, child: child),
+    ?currentChild,
+  ],
+);
+
+class _ReaderSettingsTabTransition extends StatelessWidget {
+  const _ReaderSettingsTabTransition({
+    required this.animation,
+    required this.interactiveWhenCompleted,
+    required this.horizontalOffset,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final bool interactiveWhenCompleted;
+  final double horizontalOffset;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = animation.drive(CurveTween(curve: Curves.easeOutCubic));
+    final fadeCurve = interactiveWhenCompleted
+        ? const Interval(0.18, 1, curve: Curves.easeOutCubic)
+        : const Interval(0.6, 1, curve: Curves.easeOutCubic);
+    final opacity = animation.drive(CurveTween(curve: fadeCurve));
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final transitioning =
+            !interactiveWhenCompleted ||
+            animation.status != AnimationStatus.completed;
+        return IgnorePointer(
+          ignoring: transitioning,
+          child: ExcludeSemantics(excluding: transitioning, child: child),
+        );
+      },
+      child: FadeTransition(
+        opacity: opacity,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset(horizontalOffset, 0),
+            end: Offset.zero,
+          ).animate(motion),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
 
 class ReaderTopBarStyleSheet extends StatelessWidget {
   const ReaderTopBarStyleSheet({

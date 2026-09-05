@@ -7,8 +7,13 @@ import 'package:provider/provider.dart';
 
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
+import 'package:xxread/book_sources/services/book_source_maintenance_coordinator.dart';
+import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_source_management_page.dart';
+import 'package:xxread/pages/book_sources/widgets/book_source_management_source_card.dart';
+import 'package:xxread/pages/book_sources/widgets/book_source_cleanup_review_sheet.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 
 void main() {
@@ -285,11 +290,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Import link'), findsOneWidget);
-    expect(find.text('Add from JSON file'), findsOneWidget);
+    expect(find.text('JSON file'), findsOneWidget);
     final urlField = tester.widget<TextField>(
       find.byKey(const Key('bookSourceUnifiedUrlField')),
     );
     expect(urlField.autofocus, isFalse);
+
+    await tester.tap(find.byKey(const Key('bookSourceImportUsageNotice')));
+    await tester.pumpAndSettle();
 
     expect(
       find.textContaining('OpenReading includes no sources'),
@@ -495,4 +503,178 @@ void main() {
     expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('a background maintenance failure is not announced as success', (
+    tester,
+  ) async {
+    unmountPage(tester);
+    final maintenance = _EmittingMaintenance();
+    addTearDown(maintenance.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceManagementPage(maintenance: maintenance),
+      ),
+    );
+    await tester.pumpAndSettle();
+    maintenance.emit(
+      const BookSourceMaintenanceState(
+        status: BookSourceMaintenanceStatus.failed,
+        runId: 1,
+        progress: BookSourceMaintenanceProgress(completed: 0, total: 5),
+        result: BookSourceMaintenanceResult.empty(),
+        failure: 'Storage write failed',
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(find.text('Storage write failed'), findsOneWidget);
+    expect(find.textContaining('Checked 0'), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'unsaved health evidence does not make later checks skip a source',
+    (tester) async {
+      unmountPage(tester);
+      final source = ReadingSourceConfig.fromJson({
+        'bookSourceName': 'Pending save',
+        'bookSourceUrl': 'https://pending.example',
+        'searchUrl': '/search?q={{key}}',
+        'ruleSearch': {'bookList': '.book'},
+        'ruleToc': {'chapterList': '.chapter'},
+        'ruleContent': {'content': '#content'},
+      }).toRegisteredSource();
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+      });
+      final checked = withSourceHealthCheckResult(
+        source,
+        SourceHealthCheckResult(
+          checked: SourceHealthCapability.values.toSet(),
+          failed: {},
+          checkedAt: DateTime.now().toUtc(),
+        ),
+      );
+      final maintenance = _EmittingMaintenance();
+      addTearDown(maintenance.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: BookSourceManagementPage(maintenance: maintenance),
+        ),
+      );
+      await tester.pumpAndSettle();
+      maintenance.emit(
+        BookSourceMaintenanceState(
+          status: BookSourceMaintenanceStatus.failed,
+          runId: 1,
+          result: BookSourceMaintenanceResult(
+            allSources: [checked],
+            assessments: [bookSourceMaintenanceAssessment(checked)],
+            remainingSources: [checked],
+          ),
+          failure: 'Storage write failed',
+        ),
+      );
+      await tester.pump();
+      final card = tester.widget<BookSourceManagementSourceCard>(
+        find.byType(BookSourceManagementSourceCard),
+      );
+      expect(sourceHealthCheckResultOf(card.source), isNull);
+      await tester.pump(const Duration(seconds: 5));
+    },
+  );
+  testWidgets('all-scope review retains diagnoses for disabled sources', (
+    tester,
+  ) async {
+    unmountPage(tester);
+    final source = ReadingSourceConfig.fromJson({
+      'bookSourceName': 'Disabled diagnosis',
+      'bookSourceUrl': 'https://disabled.example',
+      'searchUrl': '/search',
+    }).toRegisteredSource().copyWith(enabled: false);
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+    });
+    final maintenance = _EmittingMaintenance()
+      ..emit(
+        BookSourceMaintenanceState(
+          status: BookSourceMaintenanceStatus.completed,
+          runId: 1,
+          progress: const BookSourceMaintenanceProgress(completed: 1, total: 1),
+          result: BookSourceMaintenanceResult(
+            allSources: [source],
+            assessments: [bookSourceMaintenanceAssessment(source)],
+            remainingSources: const [],
+          ),
+        ),
+      );
+    addTearDown(maintenance.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookSourceManagementPage(
+          maintenance: maintenance,
+          readReferencedSourceIds: () async => {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourcesMaintenanceButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('bookSourcesMaintenanceReviewAction')),
+    );
+    await tester.pumpAndSettle();
+    final review = tester.widget<BookSourceCleanupReviewSheet>(
+      find.byType(BookSourceCleanupReviewSheet),
+    );
+    expect(review.needsAttention.single.id, source.id);
+    expect(review.needsAttention.single.enabled, isFalse);
+    expect(find.text('Disabled diagnosis').hitTestable(), findsOneWidget);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).onChanged, isNull);
+    Navigator.of(
+      tester.element(find.byType(BookSourceCleanupReviewSheet)),
+    ).pop();
+    await tester.pumpAndSettle();
+    maintenance.emit(
+      BookSourceMaintenanceState(
+        status: BookSourceMaintenanceStatus.completed,
+        runId: 1,
+        result: maintenance.state.result!.withReviewedSourceIds({source.id}),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourcesMaintenanceButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('bookSourcesMaintenanceReviewAction')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<BookSourceCleanupReviewSheet>(
+            find.byType(BookSourceCleanupReviewSheet),
+          )
+          .needsAttention,
+      isEmpty,
+    );
+  });
+}
+
+class _EmittingMaintenance extends BookSourceMaintenanceCoordinator {
+  BookSourceMaintenanceState _current = const BookSourceMaintenanceState();
+  @override
+  BookSourceMaintenanceState get state => _current;
+  void emit(BookSourceMaintenanceState state) {
+    _current = state;
+    notifyListeners();
+  }
 }

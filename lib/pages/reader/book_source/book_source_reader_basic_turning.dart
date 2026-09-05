@@ -2,6 +2,7 @@ part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
   void _handleDesktopNextPage() {
+    _cancelAutoSweepOrPause();
     if (_annotationInteractionActive) return;
     if (_pageMode == BookSourcePageMode.verticalScroll) {
       unawaited(_scrollVerticalByViewport(forward: true));
@@ -11,6 +12,7 @@ extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
   }
 
   void _handleDesktopPreviousPage() {
+    _cancelAutoSweepOrPause();
     if (_annotationInteractionActive) return;
     if (_pageMode == BookSourcePageMode.verticalScroll) {
       unawaited(_scrollVerticalByViewport(forward: false));
@@ -20,12 +22,12 @@ extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
   }
 
   Future<void> _scrollVerticalByViewport({required bool forward}) async {
-    final itemController = _scrollByChapter
+    final itemController = _effectiveScrollByChapter
         ? _verticalPageScrollController
         : _verticalChapterScrollController;
     if (!itemController.isAttached || _verticalViewportSize.isEmpty) return;
     _hideControlsForPageTurn();
-    final offsetController = _scrollByChapter
+    final offsetController = _effectiveScrollByChapter
         ? _verticalPageOffsetController
         : _verticalChapterOffsetController;
     final distance = math
@@ -62,7 +64,8 @@ extension _BookSourceReaderBasicTurning on _BookSourceReaderPageState {
   void _openAdjacentChapter(int delta) {
     final target = _chapterIndex + delta;
     if (target < 0 || target >= _chapters.length) return;
-    if (_pageMode == BookSourcePageMode.verticalScroll && !_scrollByChapter) {
+    if (_pageMode == BookSourcePageMode.verticalScroll &&
+        !_effectiveScrollByChapter) {
       unawaited(_jumpToVerticalChapter(target));
     } else {
       unawaited(_loadChapter(target));

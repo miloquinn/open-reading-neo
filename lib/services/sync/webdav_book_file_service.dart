@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -10,6 +11,8 @@ import '../books/book_import_models.dart';
 import '../books/book_import_service.dart';
 import '../core/database_service.dart';
 import 'adapters/metadata_sync_adapters.dart';
+import 'book_sync_identity.dart';
+import 'mutable_txt_sync_service.dart';
 import 'secure_sync_config.dart';
 import 'sync_dataset_catalog.dart';
 import 'sync_engine.dart';
@@ -25,6 +28,8 @@ class WebDavBookFileService {
     Future<Directory> Function()? temporaryDirectory,
     Future<Directory> Function()? documentsDirectory,
     Future<Database> Function()? database,
+    MutableTxtSyncService? mutableTxtSyncService,
+    Future<Directory> Function()? mutableStateDirectory,
   }) : _configStore = configStore ?? SecureSyncConfigStore(),
        _databaseService = databaseService ?? DatabaseService(),
        _clientFactory = clientFactory ?? WebDavClient.standard,
@@ -32,7 +37,17 @@ class WebDavBookFileService {
        _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory,
        _documentsDirectory =
            documentsDirectory ?? getApplicationDocumentsDirectory,
-       _databaseProvider = database;
+       _databaseProvider = database {
+    _mutableTxtSyncService =
+        mutableTxtSyncService ??
+        MutableTxtSyncService(
+          configStore: _configStore,
+          databaseService: _databaseService,
+          clientFactory: _clientFactory,
+          database: database,
+          stateDirectory: mutableStateDirectory,
+        );
+  }
 
   static const int maxRecoverableFileBytes = 100 * 1024 * 1024;
   static const int maxCoverFileBytes = 10 * 1024 * 1024;
@@ -44,6 +59,7 @@ class WebDavBookFileService {
   final Future<Directory> Function() _temporaryDirectory;
   final Future<Directory> Function() _documentsDirectory;
   final Future<Database> Function()? _databaseProvider;
+  late final MutableTxtSyncService _mutableTxtSyncService;
 
   Future<Database> get _database =>
       _databaseProvider?.call() ?? _databaseService.database;
@@ -51,6 +67,7 @@ class WebDavBookFileService {
   Future<RemoteBookDescriptor> upload(
     Book book, {
     void Function(BookFileTransferProgress progress)? onProgress,
+    bool incrementalTxt = false,
   }) async {
     if (book.isOnline) {
       throw const WebDavSyncFailure(
@@ -73,10 +90,19 @@ class WebDavBookFileService {
       );
     }
     final size = await source.length();
-    if (size > maxRecoverableFileBytes) {
+    final mutableTxt = book.format.toLowerCase() == 'txt';
+    if (!mutableTxt && size > maxRecoverableFileBytes) {
       throw const WebDavSyncFailure(
         WebDavSyncErrorCode.invalidConfiguration,
-        'This release can safely restore book files up to 100 MiB.',
+        'This release can safely sync non-TXT book files up to 100 MiB.',
+      );
+    }
+    if (mutableTxt) {
+      return _uploadMutableTxt(
+        book,
+        size: size,
+        onProgress: onProgress,
+        incremental: incrementalTxt,
       );
     }
     final credentials = await _credentials();
@@ -135,6 +161,79 @@ class WebDavBookFileService {
       blobSha256: hash,
       remotePath: remotePath,
       fileName: fileName,
+      sourceId: book.sourceId,
+      sourceBookId: book.sourceBookId,
+      coverAvailable: cover != null,
+      coverSizeBytes: cover?.sizeBytes,
+      coverBlobSha256: cover?.sha256,
+      coverRemotePath: cover?.remotePath,
+      coverFileName: cover?.fileName,
+    );
+  }
+
+  Future<RemoteBookDescriptor> _uploadMutableTxt(
+    Book book, {
+    required int size,
+    void Function(BookFileTransferProgress progress)? onProgress,
+    bool incremental = false,
+  }) async {
+    final db = await _database;
+    final uid = await stableBookUidForMap(db, book.toMap());
+    await _mutableTxtSyncService.join(
+      book,
+      bookUid: uid,
+      incremental: incremental,
+    );
+    await _mutableTxtSyncService.setEnabled(uid, true);
+    final result = await _mutableTxtSyncService.reconcile(bookUid: uid);
+    final states = await _mutableTxtSyncService.listStates();
+    final state = states.where((candidate) => candidate.bookUid == uid).single;
+    if (result.failed > 0 || state.status == MutableTxtSyncStatus.failed) {
+      throw WebDavSyncFailure(
+        WebDavSyncErrorCode.network,
+        state.error ?? 'The TXT file could not be published to WebDAV.',
+      );
+    }
+    if (state.status == MutableTxtSyncStatus.conflict) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'The cloud TXT has another version that needs review.',
+      );
+    }
+    onProgress?.call(
+      BookFileTransferProgress(
+        transferredBytes: incremental ? result.uploadedBytes : size,
+        totalBytes: incremental ? result.uploadedBytes : size,
+      ),
+    );
+    final cover = await _uploadCover(
+      _clientFactory(await _credentials()),
+      book,
+    );
+    if (cover != null) {
+      await db.update(
+        'sync_book_files',
+        {
+          'cover_blob_sha256': cover.sha256,
+          'cover_file_name': cover.fileName,
+          'cover_file_size': cover.sizeBytes,
+          'cover_remote_path': cover.remotePath,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        where: 'book_uid = ?',
+        whereArgs: [uid],
+      );
+    }
+    return RemoteBookDescriptor(
+      bookUid: uid,
+      title: book.title,
+      author: book.author,
+      format: book.format,
+      fileAvailable: true,
+      sizeBytes: size,
+      blobSha256: state.localHash,
+      remotePath: state.remotePath,
+      fileName: path.basename(book.filePath),
       sourceId: book.sourceId,
       sourceBookId: book.sourceBookId,
       coverAvailable: cover != null,
@@ -277,10 +376,14 @@ class WebDavBookFileService {
       );
     }
     final size = descriptor.sizeBytes;
-    if (size != null && size > maxRecoverableFileBytes) {
+    final mutableTxt =
+        descriptor.format.toLowerCase() == 'txt' &&
+        (remotePath.startsWith('v2:') || remotePath.startsWith('v3:'));
+    final incrementalTxt = mutableTxt && remotePath.startsWith('v3:');
+    if (!mutableTxt && size != null && size > maxRecoverableFileBytes) {
       throw const WebDavSyncFailure(
         WebDavSyncErrorCode.invalidConfiguration,
-        'This release can safely restore book files up to 100 MiB.',
+        'This release can safely restore non-TXT book files up to 100 MiB.',
       );
     }
     final credentials = await _credentials();
@@ -295,21 +398,44 @@ class WebDavBookFileService {
     );
     File? coverPartial;
     try {
-      await client.downloadFile(
-        client.path(
-          remotePath
-              .split('/')
-              .where((segment) => segment.isNotEmpty)
-              .toList(growable: false),
-        ),
-        partial,
-        onProgress: (received, total) => onProgress?.call(
+      String? incrementalEncoding;
+      if (incrementalTxt) {
+        if (size == null) {
+          throw const WebDavSyncFailure(
+            WebDavSyncErrorCode.corruptRemoteData,
+            'The chunked cloud TXT is missing its expected size.',
+          );
+        }
+        incrementalEncoding = await _mutableTxtSyncService
+            .downloadIncrementalFile(
+              client: client,
+              bookUid: descriptor.bookUid,
+              expectedHash: expectedHash,
+              expectedSize: size,
+              destination: partial,
+            );
+        onProgress?.call(
           BookFileTransferProgress(
-            transferredBytes: received,
-            totalBytes: total > 0 ? total : size ?? 0,
+            transferredBytes: await partial.length(),
+            totalBytes: size,
           ),
-        ),
-      );
+        );
+      } else {
+        await client.downloadFile(
+          _storedRemoteUri(
+            client,
+            remotePath,
+            expectedBookUid: descriptor.bookUid,
+          ),
+          partial,
+          onProgress: (received, total) => onProgress?.call(
+            BookFileTransferProgress(
+              transferredBytes: received,
+              totalBytes: total > 0 ? total : size ?? 0,
+            ),
+          ),
+        );
+      }
       final actualSize = await partial.length();
       if (size != null && actualSize != size) {
         throw const WebDavSyncFailure(
@@ -324,7 +450,65 @@ class WebDavBookFileService {
           'The downloaded book checksum does not match its metadata.',
         );
       }
+      final mutableRemoteEncoding =
+          incrementalEncoding ??
+          (mutableTxt
+              ? await _mutableTxtSyncService.validatedRemoteRevisionEncoding(
+                  client: client,
+                  bookUid: descriptor.bookUid,
+                  contentHash: actualHash,
+                  file: partial,
+                )
+              : null);
       coverPartial = await _downloadCover(client, descriptor, temporaryRoot);
+      if (mutableTxt) {
+        final existing = await _existingBookForUid(descriptor.bookUid);
+        if (existing != null) {
+          final restoredCoverPath = await _restoreCover(
+            existing,
+            descriptor,
+            coverPartial,
+          );
+          final updated = existing.copyWith(
+            title: descriptor.title.trim().isEmpty
+                ? existing.title
+                : descriptor.title.trim(),
+            author: descriptor.author.trim().isEmpty
+                ? existing.author
+                : descriptor.author.trim(),
+            coverImagePath: restoredCoverPath,
+          );
+          final db = await _database;
+          await db.update(
+            'books',
+            {
+              'title': updated.title,
+              'author': updated.author,
+              'cover_image_path': ?restoredCoverPath,
+            },
+            where: 'id = ?',
+            whereArgs: [updated.id],
+          );
+          await _mutableTxtSyncService.join(
+            updated,
+            bookUid: descriptor.bookUid,
+            incremental: incrementalTxt,
+          );
+          try {
+            await _mutableTxtSyncService.reconcile(bookUid: descriptor.bookUid);
+          } catch (_) {
+            // The existing library item remains available and any divergent
+            // local/remote versions stay in the durable conflict workflow.
+          }
+          final refreshed = await db.query(
+            'books',
+            where: 'id = ?',
+            whereArgs: [updated.id],
+            limit: 1,
+          );
+          return refreshed.isEmpty ? updated : Book.fromMap(refreshed.single);
+        }
+      }
       final extension = path.extension(safeFileName).replaceFirst('.', '');
       final result = await _importer.importFile(
         BookImportSource(
@@ -353,12 +537,19 @@ class WebDavBookFileService {
         title: restoredTitle,
         author: restoredAuthor,
         coverImagePath: restoredCoverPath,
+        textEncoding: mutableRemoteEncoding,
       );
       final db = await _database;
       final bookUpdates = <String, Object?>{
         'title': restoredTitle,
         'author': restoredAuthor,
         'cover_image_path': ?restoredCoverPath,
+        if (mutableRemoteEncoding != null) ...{
+          'text_encoding': mutableRemoteEncoding,
+          'cached_content': null,
+          'cached_pages': null,
+          'table_of_contents': null,
+        },
       };
       if (descriptor.sourceId != null && descriptor.sourceBookId != null) {
         restoredBook = restoredBook.copyWith(
@@ -392,6 +583,19 @@ class WebDavBookFileService {
         'sync_enabled': 1,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+      if (restoredBook.format.toLowerCase() == 'txt') {
+        await _mutableTxtSyncService.join(
+          restoredBook,
+          bookUid: descriptor.bookUid,
+          incremental: incrementalTxt,
+        );
+        try {
+          await _mutableTxtSyncService.reconcile(bookUid: descriptor.bookUid);
+        } catch (_) {
+          // The verified download is already usable. Keep its durable pending
+          // binding so a later automatic cycle can establish the baseline.
+        }
+      }
       return restoredBook;
     } finally {
       if (await partial.exists()) await partial.delete();
@@ -534,12 +738,75 @@ class WebDavBookFileService {
     }
     return credentials;
   }
+
+  Future<Book?> _existingBookForUid(String bookUid) async {
+    final db = await _database;
+    final direct = await db.rawQuery(
+      '''
+      SELECT b.*
+      FROM sync_book_files f
+      JOIN books b ON b.id = f.local_book_id
+      WHERE f.book_uid = ?
+      LIMIT 1
+    ''',
+      [bookUid],
+    );
+    if (direct.isNotEmpty) {
+      try {
+        return Book.fromMap(direct.single);
+      } catch (_) {
+        return null;
+      }
+    }
+    final rows = await db.query('books');
+    for (final row in rows) {
+      try {
+        if (await stableBookUidForMap(db, row) == bookUid) {
+          return Book.fromMap(row);
+        }
+      } catch (_) {
+        // A provider-owned or incomplete row cannot be updated as local TXT.
+      }
+    }
+    return null;
+  }
 }
 
 List<String> _remotePathSegments(String remotePath) => remotePath
     .split('/')
     .where((segment) => segment.isNotEmpty)
     .toList(growable: false);
+
+Uri _storedRemoteUri(
+  WebDavClient client,
+  String remotePath, {
+  required String expectedBookUid,
+}) {
+  final mutableV2 = remotePath.startsWith('v2:');
+  final mutableV3 = remotePath.startsWith('v3:');
+  final mutable = mutableV2 || mutableV3;
+  final value = mutable ? remotePath.substring(3) : remotePath;
+  final segments = _remotePathSegments(value);
+  if (mutable) {
+    final expectedSegment = base64Url
+        .encode(utf8.encode(expectedBookUid))
+        .replaceAll('=', '');
+    final expectedLeaf = mutableV3 ? 'current.json' : 'current.txt';
+    if (segments.length != 3 ||
+        segments.first != 'books' ||
+        segments[1] != expectedSegment ||
+        segments.last != expectedLeaf) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.corruptRemoteData,
+        'The mutable TXT path does not match its stable book identity.',
+      );
+    }
+    return mutableV3
+        ? client.incrementalMutablePath(segments)
+        : client.mutablePath(segments);
+  }
+  return client.path(segments);
+}
 
 String _remoteBookFolderName(Book book, String fileName) {
   final fallbackTitle = path.basenameWithoutExtension(fileName);

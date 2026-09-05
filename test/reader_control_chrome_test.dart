@@ -36,6 +36,68 @@ void main() {
     expect(_iconBackground(tester), ReaderThemes.day.controlFill);
   });
 
+  testWidgets('moving control bars keep glass outside opacity layers', (
+    tester,
+  ) async {
+    final visible = ValueNotifier(false);
+    addTearDown(visible.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ValueListenableBuilder<bool>(
+            valueListenable: visible,
+            builder: (context, shown, _) => ReaderChromeOverlay(
+              palette: ReaderThemes.day,
+              visible: shown,
+              title: 'Chapter',
+              statusBottom: 8,
+              statusBuilder: (context, style, key) =>
+                  Text('1 / 2', key: key, style: style),
+              onBack: () {},
+              onBookmark: () {},
+              onTableOfContents: () {},
+              onSettings: () {},
+              backTooltip: 'Back',
+              bookmarkTooltip: 'Bookmark',
+              tableOfContentsTooltip: 'Contents',
+              settingsTooltip: 'Settings',
+              bookmarked: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    final bars = find.byType(ReaderControlBar);
+    final hiddenTop = tester.getTopLeft(bars.first).dy;
+    visible.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.getTopLeft(bars.first).dy, greaterThan(hiddenTop));
+    void expectGlass() {
+      expect(find.byType(BackdropFilter), findsNWidgets(2));
+      expect(
+        find.ancestor(of: bars, matching: find.byType(AnimatedOpacity)),
+        findsNothing,
+      );
+      for (final fade in tester.widgetList<FadeTransition>(
+        find.ancestor(of: bars, matching: find.byType(FadeTransition)),
+      )) {
+        expect(fade.opacity.value, 1);
+      }
+    }
+
+    expectGlass();
+    await tester.pump(const Duration(milliseconds: 220));
+    final restingTop = tester.getTopLeft(bars.first).dy;
+    visible.value = false;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.getTopLeft(bars.first).dy, lessThan(restingTop));
+    expectGlass();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(bars.first).dy, hiddenTop);
+  });
+
   testWidgets('reader-owned top information shows time title and battery', (
     tester,
   ) async {

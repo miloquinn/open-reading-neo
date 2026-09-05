@@ -10,6 +10,78 @@ import 'package:xxread/pages/book_sources/widgets/sourced_book_widgets.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 
 void main() {
+  for (final description in ['', ' \n ', '<p>&nbsp;<br>\u200b</p>']) {
+    test('empty detail metadata preserves the summary: $description', () async {
+      final gateway = _DetailGateway();
+      final downloads = _DownloadPort();
+      final controller = _controller(gateway: gateway, downloads: downloads);
+      addTearDown(controller.dispose);
+
+      final loading = controller.loadDetails();
+      expect(controller.state.result.book.description, 'Description');
+      gateway.requests.single.complete(
+        BookSourceBook(
+          id: 'book',
+          title: 'Detailed title',
+          author: ' \n ',
+          description: description,
+          categories: const [],
+          sourceVariables: const {'tocUrl': '/chapters'},
+        ),
+      );
+      await loading;
+
+      final book = controller.state.result.book;
+      expect(book.title, 'Detailed title');
+      expect(book.author, 'Author');
+      expect(book.description, 'Description');
+      expect(book.sourceVariables, {'tocUrl': '/chapters'});
+      controller.startDownload();
+      expect(downloads.task!.book.description, 'Description');
+      controller.showDetails();
+      expect(controller.beginOpeningReader()!.description, 'Description');
+    });
+  }
+
+  test('nonempty details replace summary metadata', () async {
+    final gateway = _DetailGateway();
+    final controller = _controller(gateway: gateway);
+    addTearDown(controller.dispose);
+    final details = BookSourceBook(
+      id: 'book',
+      title: 'Detailed title',
+      author: 'Detailed author',
+      description: '<p>Full description</p>',
+      categories: const ['Fantasy'],
+      type: 2,
+      coverUrl: Uri.parse('https://example.org/cover.jpg'),
+      coverHeaders: const {'Referer': 'https://example.org/'},
+      status: 'Completed',
+      latestChapter: 'Final chapter',
+      updatedAt: DateTime.utc(2026, 9, 5),
+      sourceVariables: const {'tocUrl': '/chapters'},
+    );
+
+    final loading = controller.loadDetails();
+    gateway.requests.single.complete(details);
+    await loading;
+
+    expect(controller.state.result.book.toJson(), details.toJson());
+  });
+
+  test('failed details leave the summary usable', () async {
+    final gateway = _DetailGateway();
+    final controller = _controller(gateway: gateway);
+    addTearDown(controller.dispose);
+    final summary = controller.state.result;
+
+    final loading = controller.loadDetails();
+    gateway.requests.single.completeError(StateError('offline'));
+    await loading;
+
+    expect(controller.state.result, same(summary));
+  });
+
   test(
     'detail loading ignores stale completions and disposed controllers',
     () async {

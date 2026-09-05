@@ -1,6 +1,7 @@
 import '../protocol/book_source_protocol.dart';
 import 'rules/source_rule_engine.dart';
 import 'scripting/source_script_contract.dart';
+import 'source_request_template.dart';
 
 abstract interface class SourceRuntimeRulePort {
   SourceRuleDocument document(
@@ -27,6 +28,13 @@ abstract interface class SourceRuntimeRulePort {
   });
 
   Future<String> url(
+    SourceRuleDocument document,
+    Object? context,
+    Map<String, dynamic> rules,
+    String key,
+  );
+
+  Future<List<String>> urls(
     SourceRuleDocument document,
     Object? context,
     Map<String, dynamic> rules,
@@ -100,6 +108,44 @@ class SourceRuntimeRules implements SourceRuntimeRulePort {
     final rule = optionalRule(rules, key);
     if (rule.isEmpty) return '';
     return evaluateUrl(document, context, rule);
+  }
+
+  @override
+  Future<List<String>> urls(
+    SourceRuleDocument document,
+    Object? context,
+    Map<String, dynamic> rules,
+    String key,
+  ) async {
+    final rule = optionalRule(rules, key);
+    if (rule.isEmpty) return const [];
+    final values = await _engine.evaluateStringAsync(
+      document,
+      context,
+      rule,
+      joinSeparator: '\n',
+    );
+    final urls = <String>[];
+    final seen = <String>{};
+    for (final value in values.split(RegExp(r'[\r\n]+'))) {
+      if (value.trim().isEmpty) continue;
+      try {
+        final resolved = resolveSourceRequestUrl(
+          document.baseUri,
+          value.trim(),
+        );
+        final urlText = resolved.split(RegExp(r',\s*\{')).first.trim();
+        final uri = Uri.tryParse(urlText);
+        if (uri != null &&
+            (uri.scheme == 'http' || uri.scheme == 'https') &&
+            seen.add(urlText)) {
+          urls.add(resolved);
+        }
+      } on FormatException {
+        // One malformed candidate must not discard valid sibling page URLs.
+      }
+    }
+    return urls;
   }
 
   @override

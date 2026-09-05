@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +16,63 @@ import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 
 void main() {
+  setUpAll(() async {
+    for (final entry in {
+      'SyncPreview': const String.fromEnvironment('SYNC_PREVIEW_FONT'),
+      'MaterialIcons': const String.fromEnvironment('SYNC_PREVIEW_ICON_FONT'),
+    }.entries) {
+      if (entry.value.isEmpty) continue;
+      final bytes = await File(entry.value).readAsBytes();
+      await (FontLoader(
+        entry.key,
+      )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
+    }
+  });
+  testWidgets('续读首页在宽屏可操作且连接参数不占据首屏', (tester) async {
+    final store = SecureSyncConfigStore(
+      secretStorage: _MemorySecrets(),
+      preferences: _MemoryPreferences(),
+    );
+    final controller = _ScopeController(store);
+    addTearDown(controller.dispose);
+    await tester.binding.setSurfaceSize(const Size(1080, 980));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final previewKey = GlobalKey();
+    await tester.pumpWidget(
+      _testApp(
+        controller,
+        RepaintBoundary(key: previewKey, child: const WebDavSyncPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final resume = find.widgetWithText(SwitchListTile, '打开书籍自动接续');
+    expect(tester.widget<SwitchListTile>(resume).value, isTrue);
+    await tester.tap(resume);
+    await tester.pumpAndSettle();
+    expect(await store.readAutoResume(), isFalse);
+    expect(tester.widget<SwitchListTile>(resume).value, isFalse);
+    await tester.tap(resume);
+    await tester.pumpAndSettle();
+    expect(await store.readAutoResume(), isTrue);
+    expect(find.text('跨设备续读'), findsOneWidget);
+    expect(find.text('WebDAV 地址'), findsNothing);
+    expect(tester.takeException(), isNull);
+    const previewDir = String.fromEnvironment('SYNC_PREVIEW_DIR');
+    if (previewDir.isNotEmpty) {
+      await tester.runAsync(() async {
+        final boundary =
+            previewKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 1);
+        final png = await image.toByteData(format: ui.ImageByteFormat.png);
+        await Directory(previewDir).create(recursive: true);
+        await File(
+          '$previewDir/cloud-sync-wide.png',
+        ).writeAsBytes(png!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
+  });
   testWidgets('未配置概览在窄屏展示安全的主操作', (tester) async {
     final controller = WebDavSyncController();
     addTearDown(controller.dispose);
@@ -20,9 +82,11 @@ void main() {
     await tester.pumpWidget(_testApp(controller, const WebDavSyncPage()));
     await tester.pumpAndSettle();
 
-    expect(find.text('WebDAV 同步'), findsWidgets);
+    expect(find.text('云端同步'), findsWidgets);
     expect(find.text('尚未配置'), findsWidgets);
     expect(find.text('设置 WebDAV'), findsOneWidget);
+    expect(find.text('跨设备续读'), findsOneWidget);
+    expect(find.text('打开书籍自动接续'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -89,6 +153,11 @@ Widget _testApp(WebDavSyncController controller, Widget home) {
   return ChangeNotifierProvider<WebDavSyncController>.value(
     value: controller,
     child: MaterialApp(
+      theme: ThemeData(
+        fontFamily: const String.fromEnvironment('SYNC_PREVIEW_FONT').isEmpty
+            ? null
+            : 'SyncPreview',
+      ),
       locale: const Locale('zh'),
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -129,7 +198,7 @@ class _MemorySecrets implements SyncSecretStorage {
 }
 
 class _ScopeController extends WebDavSyncController {
-  _ScopeController(this.store);
+  _ScopeController(this.store) : super(configStore: store);
 
   final SecureSyncConfigStore store;
   WebDavSyncScope value = const WebDavSyncScope();

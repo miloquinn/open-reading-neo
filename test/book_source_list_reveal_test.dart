@@ -4,6 +4,7 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_list_directory.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_list_reveal.dart';
+import 'package:xxread/pages/book_sources/widgets/book_source_pill.dart';
 
 void main() {
   testWidgets('new lazy rows pop in and release their animation wrapper', (
@@ -102,9 +103,74 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('bookSourceListLazyChannels')), findsOneWidget);
-    expect(find.byType(ActionChip).evaluate().length, lessThan(30));
+    expect(
+      find.byType(BookSourcePill).evaluate().length,
+      inExclusiveRange(0, 30),
+    );
     expect(find.text('Category 000'), findsOneWidget);
     expect(find.text('Category 499'), findsNothing);
+  });
+
+  testWidgets('large category sets use multiple columns on a phone', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 700);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: _DirectoryHarness(channelCount: 30)),
+    );
+    await tester.tap(
+      find.byKey(const Key('bookSourceListSourceToggle-source')),
+    );
+    await tester.pumpAndSettle();
+
+    final first = tester.getTopLeft(find.text('Category 000'));
+    final second = tester.getTopLeft(find.text('Category 001'));
+    final third = tester.getTopLeft(find.text('Category 002'));
+    final fourth = tester.getTopLeft(find.text('Category 003'));
+    expect(second.dy, closeTo(first.dy, 0.5));
+    expect(third.dy, closeTo(first.dy, 0.5));
+    expect(first.dx, lessThan(second.dx));
+    expect(second.dx, lessThan(third.dx));
+    expect(fourth.dy, greaterThan(first.dy));
+  });
+
+  testWidgets('selection header keeps the change pill at the right edge', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 220);
+    addTearDown(tester.view.reset);
+
+    final category = SourcedBookCategory(
+      source: _DirectoryHarnessState._source,
+      id: 'category',
+      name: 'A category with a long name',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.8)),
+          child: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: BookSourceListSelectionHeader(
+                category: category,
+                changeLabel: 'Change',
+                onChange: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final pill = find.byKey(const Key('bookSourceListChangeChannel'));
+    expect(pill, findsOneWidget);
+    expect(tester.getTopRight(pill).dx, closeTo(370, 0.5));
+    expect(tester.takeException(), isNull);
   });
 }
 

@@ -33,6 +33,8 @@ class WebDavClient {
 
   Uri get protocolRoot => _pathUri([..._rootSegments, 'v1']);
 
+  Uri get mutableProtocolRoot => _pathUri([..._rootSegments, 'v2']);
+
   List<String> get _rootSegments => _credentials.configuration.rootPath
       .split('/')
       .map((part) => part.trim())
@@ -41,6 +43,14 @@ class WebDavClient {
 
   Uri path(List<String> relativeSegments) =>
       _pathUri([..._rootSegments, 'v1', ...relativeSegments]);
+
+  Uri mutablePath(List<String> relativeSegments) =>
+      _pathUri([..._rootSegments, 'v2', ...relativeSegments]);
+
+  /// Namespace for explicitly enabled content-addressed TXT synchronization.
+  /// Existing v2 bindings continue to use [mutablePath].
+  Uri incrementalMutablePath(List<String> relativeSegments) =>
+      _pathUri([..._rootSegments, 'v3', ...relativeSegments]);
 
   Uri _pathUri(List<String> segments) {
     final baseSegments = _origin.pathSegments.where((part) => part.isNotEmpty);
@@ -127,6 +137,165 @@ class WebDavClient {
 
   Future<void> ensureProtocolPath(List<String> relativeSegments) async {
     await ensureCollection([..._rootSegments, 'v1', ...relativeSegments]);
+  }
+
+  Future<void> ensureMutableProtocolPath(List<String> relativeSegments) async {
+    await ensureCollection([..._rootSegments, 'v2', ...relativeSegments]);
+  }
+
+  Future<void> ensureIncrementalMutableProtocolPath(
+    List<String> relativeSegments,
+  ) async {
+    await ensureCollection([..._rootSegments, 'v3', ...relativeSegments]);
+  }
+
+  Future<WebDavResourceState> resourceState(Uri uri) async {
+    try {
+      final response = await _request('HEAD', uri);
+      return WebDavResourceState(
+        exists: true,
+        etag: response.headers.value('etag'),
+        contentLength: int.tryParse(
+          response.headers.value(Headers.contentLengthHeader) ?? '',
+        ),
+      );
+    } on WebDavSyncFailure catch (error) {
+      if (error.statusCode == 404) return const WebDavResourceState.missing();
+      rethrow;
+    }
+  }
+
+  /// Writes a mutable resource without allowing an unobserved overwrite.
+  ///
+  /// Callers must provide exactly one precondition: [ifMatch] for an existing
+  /// resource or [ifNoneMatch] for first publication. A server that omits ETag
+  /// after the write is rejected because subsequent safe updates would be
+  /// impossible.
+  Future<WebDavConditionalWriteResult> putFileConditionally(
+    Uri uri,
+    File file, {
+    String? ifMatch,
+    bool ifNoneMatch = false,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    if ((ifMatch == null) == !ifNoneMatch) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.invalidConfiguration,
+        'A mutable WebDAV write requires exactly one version precondition.',
+      );
+    }
+    if (!_sameOrigin(uri, _origin)) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.serverIncompatible,
+        'Book files can only be uploaded to the configured WebDAV origin.',
+      );
+    }
+    final total = await file.length();
+    final requestHeaders = <String, Object?>{
+      'Authorization': _authorization,
+      Headers.contentLengthHeader: total,
+      Headers.contentTypeHeader: 'text/plain; charset=utf-8',
+    };
+    if (ifMatch case final value?) {
+      requestHeaders['If-Match'] = value;
+    }
+    if (ifNoneMatch) requestHeaders['If-None-Match'] = '*';
+    try {
+      final response = await _dio.request<void>(
+        uri.toString(),
+        data: file.openRead(),
+        onSendProgress: onProgress,
+        options: Options(
+          method: 'PUT',
+          followRedirects: false,
+          validateStatus: (_) => true,
+          headers: requestHeaders,
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      if (status < 200 || status >= 300) throw _statusFailure(status);
+      var etag = response.headers.value('etag');
+      if (etag == null || etag.trim().isEmpty) {
+        etag = (await resourceState(uri)).etag;
+      }
+      if (etag == null || etag.trim().isEmpty) {
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.serverIncompatible,
+          'The WebDAV server did not provide an ETag for a mutable file.',
+        );
+      }
+      return WebDavConditionalWriteResult(etag: etag, contentLength: total);
+    } on DioException catch (error) {
+      throw _dioFailure(error);
+    }
+  }
+
+  /// Probes conditional writes in an isolated protocol folder.
+  ///
+  /// Advertising ETags is insufficient: some WebDAV frontends accept but
+  /// ignore precondition headers. This probe requires both stale If-Match and
+  /// existing If-None-Match writes to fail while preserving the seed bytes.
+  Future<void> verifyMutableWritePreconditions() async {
+    final suffix =
+        '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
+    const seed = 'open-reading-conditional-seed';
+    final root = await Directory.systemTemp.createTemp(
+      'open-reading-dav-probe-',
+    );
+    final seedFile = File('${root.path}/seed.txt');
+    final replacementFile = File('${root.path}/replacement.txt');
+    await seedFile.writeAsString(seed, flush: true);
+    await replacementFile.writeAsString('must-not-replace-seed', flush: true);
+    final relativeDirectory = ['.capabilities'];
+    final remote = mutablePath([
+      ...relativeDirectory,
+      'conditional-$suffix.txt',
+    ]);
+    try {
+      await ensureMutableProtocolPath(relativeDirectory);
+      await putFileConditionally(remote, seedFile, ifNoneMatch: true);
+      await _expectPreconditionRejection(() async {
+        await putFileConditionally(remote, replacementFile, ifNoneMatch: true);
+      });
+      await _expectPreconditionRejection(() async {
+        await putFileConditionally(
+          remote,
+          replacementFile,
+          ifMatch: '"open-reading-intentionally-stale"',
+        );
+      });
+      if (await getText(remote) != seed) {
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.serverIncompatible,
+          'The WebDAV server ignored mutable-write preconditions.',
+        );
+      }
+    } finally {
+      try {
+        await delete(remote);
+      } catch (_) {
+        // A failed cleanup does not change the capability result.
+      }
+      if (await root.exists()) await root.delete(recursive: true);
+    }
+  }
+
+  Future<void> _expectPreconditionRejection(
+    Future<void> Function() operation,
+  ) async {
+    try {
+      await operation();
+    } on WebDavSyncFailure catch (error) {
+      if (error.code == WebDavSyncErrorCode.conflict) return;
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.serverIncompatible,
+        'The WebDAV server could not verify mutable-write preconditions.',
+      );
+    }
+    throw const WebDavSyncFailure(
+      WebDavSyncErrorCode.serverIncompatible,
+      'The WebDAV server ignored mutable-write preconditions.',
+    );
   }
 
   Future<void> ensureCollection(List<String> segments) async {
@@ -234,14 +403,20 @@ class WebDavClient {
       final sink = target.openWrite();
       var received = 0;
       try {
-        await for (final chunk in body.stream) {
-          sink.add(chunk);
-          received += chunk.length;
-          onProgress?.call(received, total);
-        }
+        await sink.addStream(
+          body.stream.map((chunk) {
+            received += chunk.length;
+            onProgress?.call(received, total);
+            return chunk;
+          }),
+        );
         await sink.flush();
-      } finally {
         await sink.close();
+      } catch (_) {
+        try {
+          await sink.close();
+        } catch (_) {}
+        rethrow;
       }
     } on DioException catch (error) {
       throw _dioFailure(error);
@@ -400,6 +575,33 @@ class WebDavClient {
 
   String get _authorization =>
       'Basic ${base64Encode(utf8.encode('${_credentials.configuration.username}:${_credentials.password}'))}';
+}
+
+class WebDavResourceState {
+  const WebDavResourceState({
+    required this.exists,
+    this.etag,
+    this.contentLength,
+  });
+
+  const WebDavResourceState.missing()
+    : exists = false,
+      etag = null,
+      contentLength = null;
+
+  final bool exists;
+  final String? etag;
+  final int? contentLength;
+}
+
+class WebDavConditionalWriteResult {
+  const WebDavConditionalWriteResult({
+    required this.etag,
+    required this.contentLength,
+  });
+
+  final String etag;
+  final int contentLength;
 }
 
 const _propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>

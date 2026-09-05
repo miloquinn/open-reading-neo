@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import '../protocol/book_source_protocol.dart';
 import '../source_engine/source_explore.dart';
 
@@ -19,14 +21,24 @@ class RegisteredBookSource {
   final List<String> languages;
   final Set<String> capabilities;
   final bool enabled;
+  final bool isFavorite;
   final DateTime addedAt;
   final BookSourceProtocolKind sourceProtocol;
   final Map<String, dynamic>? sourceConfig;
+  final List<String>? _groups;
+
+  /// User-owned organization labels. Older compatible sources inherit their
+  /// imported `bookSourceGroup` value until an explicit group list is saved.
+  List<String> get groups => List.unmodifiable(
+    _normalizeGroups(_groups ?? _legacyGroups(sourceConfig)),
+  );
 
   /// Largest `pageSize` this source accepts on the chapter-catalog endpoint.
   /// Absent means the protocol default of 100 applies.
   final int? maxCatalogPageSize;
 
+  // `groups` intentionally initializes a private nullable field so omission
+  // can remain distinguishable from an explicitly empty list.
   const RegisteredBookSource({
     required this.id,
     required this.name,
@@ -38,6 +50,8 @@ class RegisteredBookSource {
     required this.capabilities,
     required this.enabled,
     required this.addedAt,
+    this.isFavorite = false,
+    List<String>? groups,
     this.iconUrl,
     this.websiteUrl,
     this.operatorName = '',
@@ -47,7 +61,7 @@ class RegisteredBookSource {
     this.maxCatalogPageSize,
     this.sourceProtocol = BookSourceProtocolKind.orsp,
     this.sourceConfig,
-  });
+  }) : _groups = groups;
 
   factory RegisteredBookSource.fromManifest({
     required BookSourceManifest manifest,
@@ -146,6 +160,8 @@ class RegisteredBookSource {
       capabilities: capabilities,
       maxCatalogPageSize: maxCatalogPageSize,
       enabled: json['enabled'] as bool? ?? true,
+      isFavorite: json['isFavorite'] as bool? ?? false,
+      groups: json.containsKey('groups') ? _storedGroups(json['groups']) : null,
       addedAt:
           DateTime.tryParse(json['addedAt'] as String? ?? '') ?? DateTime.now(),
       sourceProtocol: sourceProtocol,
@@ -170,6 +186,8 @@ class RegisteredBookSource {
     'capabilities': capabilities.toList()..sort(),
     if (maxCatalogPageSize != null) 'maxCatalogPageSize': maxCatalogPageSize,
     'enabled': enabled,
+    'isFavorite': isFavorite,
+    'groups': groups,
     'addedAt': addedAt.toIso8601String(),
     'sourceProtocol': sourceProtocol.name,
     if (sourceConfig != null) 'sourceConfig': sourceConfig,
@@ -177,6 +195,8 @@ class RegisteredBookSource {
 
   RegisteredBookSource copyWith({
     bool? enabled,
+    bool? isFavorite,
+    List<String>? groups,
     Map<String, dynamic>? sourceConfig,
   }) {
     return RegisteredBookSource(
@@ -196,11 +216,34 @@ class RegisteredBookSource {
       capabilities: capabilities,
       maxCatalogPageSize: maxCatalogPageSize,
       enabled: enabled ?? this.enabled,
+      isFavorite: isFavorite ?? this.isFavorite,
+      groups: groups ?? this.groups,
       addedAt: addedAt,
       sourceProtocol: sourceProtocol,
       sourceConfig: sourceConfig ?? this.sourceConfig,
     );
   }
+}
+
+List<String> _storedGroups(Object? value) {
+  if (value is! List) return const [];
+  return _normalizeGroups(value.whereType<String>());
+}
+
+List<String> _legacyGroups(Map<String, dynamic>? sourceConfig) {
+  final raw = sourceConfig?['bookSourceGroup'];
+  if (raw is! String || raw.trim().isEmpty) return const [];
+  return _normalizeGroups(raw.split(RegExp(r'[,;，；\n]')));
+}
+
+List<String> _normalizeGroups(Iterable<String> groups) {
+  final normalized = <String>[];
+  final seen = <String>{};
+  for (final group in groups) {
+    final value = group.trim();
+    if (value.isNotEmpty && seen.add(value)) normalized.add(value);
+  }
+  return normalized;
 }
 
 String _requiredStoredString(Map<String, dynamic> json, String key) {

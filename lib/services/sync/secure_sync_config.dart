@@ -69,6 +69,7 @@ class SecureSyncConfigStore {
   static const _newBookUploadPolicyKey =
       'webdav_sync_new_book_upload_policy_v1';
   static const _passwordKey = 'open_reading.webdav.password';
+  static const _autoResumeKey = 'webdav_auto_resume_v1';
 
   final SyncSecretStorage _secretStorage;
   final SyncPreferences _preferences;
@@ -116,7 +117,11 @@ class SecureSyncConfigStore {
 
   Future<WebDavSyncScope> readScope() async {
     final raw = await _preferences.read(_scopeKey);
-    if (raw == null) return const WebDavSyncScope();
+    if (raw == null) {
+      // Existing connections retain their historical default. New connections
+      // keep typography local unless the user explicitly opts in.
+      return WebDavSyncScope(readerSettings: await readConfiguration() != null);
+    }
     return WebDavSyncScope.fromJson(
       (jsonDecode(raw) as Map).cast<String, dynamic>(),
     );
@@ -124,6 +129,12 @@ class SecureSyncConfigStore {
 
   Future<void> saveScope(WebDavSyncScope scope) =>
       _preferences.write(_scopeKey, jsonEncode(scope));
+
+  Future<bool> readAutoResume() async =>
+      await _preferences.read(_autoResumeKey) != 'false';
+
+  Future<void> saveAutoResume(bool enabled) =>
+      _preferences.write(_autoResumeKey, enabled.toString());
 
   Future<WebDavNewBookUploadPolicy> readNewBookUploadPolicy() async =>
       WebDavNewBookUploadPolicy.fromStorage(
@@ -145,6 +156,7 @@ class SecureSyncConfigStore {
     await _preferences.delete(_configurationKey);
     await _preferences.delete(_scopeKey);
     await _preferences.delete(_newBookUploadPolicyKey);
+    await _preferences.delete(_autoResumeKey);
   }
 }
 

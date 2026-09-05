@@ -5,6 +5,7 @@ import '../../../utils/localization_extension.dart';
 import '../../../widgets/floating_subpage_scaffold.dart';
 import '../controllers/book_source_management_controller.dart';
 import 'book_source_management_source_card.dart';
+import 'book_source_organization_copy.dart';
 
 class BookSourceManagementList extends StatelessWidget {
   const BookSourceManagementList({
@@ -24,6 +25,7 @@ class BookSourceManagementList extends StatelessWidget {
     required this.onEnableSelected,
     required this.onDisableSelected,
     required this.onCheckSelected,
+    required this.onGroupSelected,
     required this.onRemoveSelected,
     required this.onToggleSourceSelection,
     required this.onSourceEnabledChanged,
@@ -45,6 +47,7 @@ class BookSourceManagementList extends StatelessWidget {
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
   final VoidCallback onCheckSelected;
+  final VoidCallback onGroupSelected;
   final VoidCallback onRemoveSelected;
   final ValueChanged<RegisteredBookSource> onToggleSourceSelection;
   final void Function(RegisteredBookSource source, bool enabled)
@@ -58,17 +61,27 @@ class BookSourceManagementList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visible = visibleSources;
-    final allOrsp = visible
-        .where((source) => source.sourceProtocol == BookSourceProtocolKind.orsp)
-        .toList(growable: false);
-    final allAdditional = visible
-        .where((source) => source.sourceProtocol != BookSourceProtocolKind.orsp)
-        .toList(growable: false);
-    final orsp = allOrsp.take(state.displayLimit).toList(growable: false);
+    var orspCount = 0;
+    var additionalCount = 0;
+    final orsp = <RegisteredBookSource>[];
+    final additionalCandidates = <RegisteredBookSource>[];
+    for (final source in visible) {
+      if (source.sourceProtocol == BookSourceProtocolKind.orsp) {
+        orspCount++;
+        if (orsp.length < state.displayLimit) orsp.add(source);
+      } else {
+        additionalCount++;
+        if (additionalCandidates.length < state.displayLimit) {
+          additionalCandidates.add(source);
+        }
+      }
+    }
     final remaining = state.displayLimit - orsp.length;
-    final additional = allAdditional
-        .take(remaining > 0 ? remaining : 0)
-        .toList(growable: false);
+    final additional = remaining <= 0
+        ? const <RegisteredBookSource>[]
+        : additionalCandidates.length <= remaining
+        ? additionalCandidates
+        : additionalCandidates.sublist(0, remaining);
     final displayedCount = orsp.length + additional.length;
 
     return Scrollbar(
@@ -102,6 +115,7 @@ class BookSourceManagementList extends StatelessWidget {
                 onEnableSelected: onEnableSelected,
                 onDisableSelected: onDisableSelected,
                 onCheckSelected: onCheckSelected,
+                onGroupSelected: onGroupSelected,
                 onRemoveSelected: onRemoveSelected,
               ),
             ),
@@ -123,14 +137,14 @@ class BookSourceManagementList extends StatelessWidget {
                 context,
                 title: context.l10n.bookSourcesProtocolGroupOrsp,
                 sources: orsp,
-                totalCount: allOrsp.length,
+                totalCount: orspCount,
               ),
             if (additional.isNotEmpty)
               ..._sourceGroupSlivers(
                 context,
                 title: context.l10n.bookSourcesProtocolGroupAdditional,
                 sources: additional,
-                totalCount: allAdditional.length,
+                totalCount: additionalCount,
               ),
             if (displayedCount < visible.length)
               const SliverPadding(
@@ -227,6 +241,7 @@ class _HeaderAndFilters extends StatelessWidget {
     required this.onEnableSelected,
     required this.onDisableSelected,
     required this.onCheckSelected,
+    required this.onGroupSelected,
     required this.onRemoveSelected,
   });
 
@@ -243,6 +258,7 @@ class _HeaderAndFilters extends StatelessWidget {
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
   final VoidCallback onCheckSelected;
+  final VoidCallback onGroupSelected;
   final VoidCallback onRemoveSelected;
 
   @override
@@ -313,6 +329,7 @@ class _HeaderAndFilters extends StatelessWidget {
             onEnableSelected: onEnableSelected,
             onDisableSelected: onDisableSelected,
             onCheckSelected: onCheckSelected,
+            onGroupSelected: onGroupSelected,
             onRemoveSelected: onRemoveSelected,
           ),
         ],
@@ -344,6 +361,9 @@ class _HeaderAndFilters extends StatelessWidget {
     BookSourceManagementFilter filter,
   ) => switch (filter) {
     BookSourceManagementFilter.all => context.l10n.statsRangeAll,
+    BookSourceManagementFilter.favorites => BookSourceOrganizationCopy.of(
+      context,
+    ).favorites,
     BookSourceManagementFilter.enabled => context.l10n.bookSourcesEnabled,
     BookSourceManagementFilter.disabled => context.l10n.bookSourcesDisabled,
     BookSourceManagementFilter.runnable => context.l10n.bookSourcesRunnable,
@@ -362,6 +382,7 @@ class _BulkActions extends StatelessWidget {
     required this.onEnableSelected,
     required this.onDisableSelected,
     required this.onCheckSelected,
+    required this.onGroupSelected,
     required this.onRemoveSelected,
   });
 
@@ -371,6 +392,7 @@ class _BulkActions extends StatelessWidget {
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
   final VoidCallback onCheckSelected;
+  final VoidCallback onGroupSelected;
   final VoidCallback onRemoveSelected;
 
   @override
@@ -393,6 +415,12 @@ class _BulkActions extends StatelessWidget {
                 ? context.l10n.bookSourcesClearSelection
                 : context.l10n.bookSourcesSelectAll,
           ),
+        ),
+        OutlinedButton.icon(
+          key: const Key('bookSourceGroupSelected'),
+          onPressed: selected ? onGroupSelected : null,
+          icon: const Icon(Icons.create_new_folder_outlined),
+          label: Text(BookSourceOrganizationCopy.of(context).editGroups),
         ),
         FilledButton.tonalIcon(
           onPressed: selected ? onEnableSelected : null,

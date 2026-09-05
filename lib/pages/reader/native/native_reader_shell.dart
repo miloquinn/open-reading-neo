@@ -73,14 +73,26 @@ extension _NativeReaderShell on _NativeReaderPageState {
       _verticalViewportSize = viewport;
       _verticalTextDirection = Directionality.of(context);
       _verticalTextScaler = readerBodyTextScaler;
-      if (!_scrollByChapter) {
+      final verticalReader = !_usesChapterScopedVerticalList
+          ? _buildVerticalBook(chapters, viewport)
+          : _buildVerticalPageList(chapter, pages, viewport);
+      if (_retainWholeBookAfterAutoScroll ||
+          (_autoPageTurnController.isActive &&
+              _autoPageTurnController.mode ==
+                  ReaderAutoPageTurnMode.continuous)) {
         return _buildVerticalReadingWindow(
-          _buildVerticalBook(chapters, viewport),
+          ReaderAutoScrollSurface(
+            controller: _autoPageTurnController,
+            ready:
+                _initialPositionRestored &&
+                (_chapterIndex >= chapters.length - 1 ||
+                    chapters[_chapterIndex + 1].hasLoadedText),
+            onBoundary: _handleContinuousAutoScrollBoundary,
+            child: verticalReader,
+          ),
         );
       }
-      return _buildVerticalReadingWindow(
-        _buildVerticalPageList(chapter, pages, viewport),
-      );
+      return _buildVerticalReadingWindow(verticalReader);
     }
     if (_pageMode == NativePageMode.instantPage) {
       _scheduleNearbyChapterPageImages(
@@ -95,12 +107,34 @@ extension _NativeReaderShell on _NativeReaderPageState {
         usesTwoPageLayout: usesTwoPageLayout,
       );
     }
+    Widget withAutoSweep(Widget base) {
+      if (!_autoPageTurnController.isActive ||
+          _autoPageTurnController.mode != ReaderAutoPageTurnMode.sweep) {
+        return base;
+      }
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          IgnorePointer(child: base),
+          Positioned.fill(
+            child: _buildAutoSweepSurface(
+              chapters: chapters,
+              bookPages: bookPages,
+              usesTwoPageLayout: usesTwoPageLayout,
+            ),
+          ),
+        ],
+      );
+    }
+
     if (_pageMode == NativePageMode.horizontalSlide) {
-      return _buildHorizontalSlideSurface(
-        chapters,
-        bookPages,
-        viewport,
-        usesTwoPageLayout: usesTwoPageLayout,
+      return withAutoSweep(
+        _buildHorizontalSlideSurface(
+          chapters,
+          bookPages,
+          viewport,
+          usesTwoPageLayout: usesTwoPageLayout,
+        ),
       );
     }
     if (_pageMode == NativePageMode.coverSlide) {
@@ -109,13 +143,15 @@ extension _NativeReaderShell on _NativeReaderPageState {
             page.chapterIndex == _chapterIndex && page.pageIndex == _pageIndex,
       );
       if (currentIndex < 0) {
-        return _buildPageLeaf(
-          chapter,
-          pages[_pageIndex],
-          chapterIndex: _chapterIndex,
-          pageIndex: _pageIndex,
-          pageCount: pages.length,
-          layoutFingerprint: layoutFingerprint,
+        return withAutoSweep(
+          _buildPageLeaf(
+            chapter,
+            pages[_pageIndex],
+            chapterIndex: _chapterIndex,
+            pageIndex: _pageIndex,
+            pageCount: pages.length,
+            layoutFingerprint: layoutFingerprint,
+          ),
         );
       }
       final paginationSize = _paginationSize(viewport, usesTwoPageLayout);
@@ -138,23 +174,33 @@ extension _NativeReaderShell on _NativeReaderPageState {
         final spreadStart = _spreadStartForPage(currentIndex);
         final hasForward = spreadStart + 2 < bookPages.length;
         final hasBackward = spreadStart >= 2;
-        return ReaderCoverPageTurn(
-          key: coverKey,
-          controller: _coverPageTurnController,
-          currentPage: _buildCoverSpreadSnapshot(
-            chapters,
-            bookPages,
-            spreadStart,
+        return withAutoSweep(
+          ReaderCoverPageTurn(
+            key: coverKey,
+            controller: _coverPageTurnController,
+            currentPage: _buildCoverSpreadSnapshot(
+              chapters,
+              bookPages,
+              spreadStart,
+            ),
+            forwardPage: hasForward
+                ? _buildCoverSpreadSnapshot(
+                    chapters,
+                    bookPages,
+                    spreadStart + 2,
+                  )
+                : null,
+            backwardPage: hasBackward
+                ? _buildCoverSpreadSnapshot(
+                    chapters,
+                    bookPages,
+                    spreadStart - 2,
+                  )
+                : null,
+            onTurnForward: () => commitTurn(spreadStart + 2),
+            onTurnBackward: () => commitTurn(spreadStart - 2),
+            paperColor: _readerTheme.background,
           ),
-          forwardPage: hasForward
-              ? _buildCoverSpreadSnapshot(chapters, bookPages, spreadStart + 2)
-              : null,
-          backwardPage: hasBackward
-              ? _buildCoverSpreadSnapshot(chapters, bookPages, spreadStart - 2)
-              : null,
-          onTurnForward: () => commitTurn(spreadStart + 2),
-          onTurnBackward: () => commitTurn(spreadStart - 2),
-          paperColor: _readerTheme.background,
         );
       }
       final current = bookPages[currentIndex];
@@ -162,19 +208,21 @@ extension _NativeReaderShell on _NativeReaderPageState {
           ? bookPages[currentIndex + 1]
           : null;
       final backward = currentIndex > 0 ? bookPages[currentIndex - 1] : null;
-      return ReaderCoverPageTurn(
-        key: coverKey,
-        controller: _coverPageTurnController,
-        currentPage: _buildBookPageSnapshot(chapters, current),
-        forwardPage: forward != null
-            ? _buildBookPageSnapshot(chapters, forward)
-            : null,
-        backwardPage: backward != null
-            ? _buildBookPageSnapshot(chapters, backward)
-            : null,
-        onTurnForward: () => commitTurn(currentIndex + 1),
-        onTurnBackward: () => commitTurn(currentIndex - 1),
-        paperColor: _readerTheme.background,
+      return withAutoSweep(
+        ReaderCoverPageTurn(
+          key: coverKey,
+          controller: _coverPageTurnController,
+          currentPage: _buildBookPageSnapshot(chapters, current),
+          forwardPage: forward != null
+              ? _buildBookPageSnapshot(chapters, forward)
+              : null,
+          backwardPage: backward != null
+              ? _buildBookPageSnapshot(chapters, backward)
+              : null,
+          onTurnForward: () => commitTurn(currentIndex + 1),
+          onTurnBackward: () => commitTurn(currentIndex - 1),
+          paperColor: _readerTheme.background,
+        ),
       );
     }
     if (_pageMode == NativePageMode.pageCurl) {
@@ -183,17 +231,21 @@ extension _NativeReaderShell on _NativeReaderPageState {
             page.chapterIndex == _chapterIndex && page.pageIndex == _pageIndex,
       );
       if (currentIndex < 0) {
-        return _buildPageLeaf(
-          chapter,
-          pages[_pageIndex],
-          chapterIndex: _chapterIndex,
-          pageIndex: _pageIndex,
-          pageCount: pages.length,
-          layoutFingerprint: layoutFingerprint,
+        return withAutoSweep(
+          _buildPageLeaf(
+            chapter,
+            pages[_pageIndex],
+            chapterIndex: _chapterIndex,
+            pageIndex: _pageIndex,
+            pageCount: pages.length,
+            layoutFingerprint: layoutFingerprint,
+          ),
         );
       }
       if (usesTwoPageLayout) {
-        return _buildPageCurlSpread(context, chapters, bookPages, currentIndex);
+        return withAutoSweep(
+          _buildPageCurlSpread(context, chapters, bookPages, currentIndex),
+        );
       }
       final current = bookPages[currentIndex];
       final forward = currentIndex + 1 < bookPages.length
@@ -213,64 +265,70 @@ extension _NativeReaderShell on _NativeReaderPageState {
         );
       }
 
-      return ReaderShaderPageCurl(
-        key: ValueKey('native-curl:${widget.book.id ?? _bookCacheKey}'),
-        controller: _pageCurlController,
-        currentPage: _buildBookPageSnapshot(chapters, current),
-        forwardPage: forward != null
-            ? _buildBookPageSnapshot(chapters, forward)
-            : null,
-        backwardPage: backward != null
-            ? _buildBookPageSnapshot(chapters, backward)
-            : null,
-        preparePages: () => _precacheBookPageImages(context, chapters, [
-          current,
-          ?forward,
-          ?backward,
-        ]),
-        onTurnForward: () => expandsEpubWindowAfterCurl
-            ? commitCurlTurn(currentIndex + 1)
-            : _onBookPageChanged(currentIndex + 1, bookPages, chapters),
-        onTurnBackward: () => expandsEpubWindowAfterCurl
-            ? commitCurlTurn(currentIndex - 1)
-            : _onBookPageChanged(currentIndex - 1, bookPages, chapters),
-        paperColor: _readerTheme.background,
+      return withAutoSweep(
+        ReaderShaderPageCurl(
+          key: ValueKey('native-curl:${widget.book.id ?? _bookCacheKey}'),
+          controller: _pageCurlController,
+          currentPage: _buildBookPageSnapshot(chapters, current),
+          forwardPage: forward != null
+              ? _buildBookPageSnapshot(chapters, forward)
+              : null,
+          backwardPage: backward != null
+              ? _buildBookPageSnapshot(chapters, backward)
+              : null,
+          preparePages: () => _precacheBookPageImages(context, chapters, [
+            current,
+            ?forward,
+            ?backward,
+          ]),
+          onTurnForward: () => expandsEpubWindowAfterCurl
+              ? commitCurlTurn(currentIndex + 1)
+              : _onBookPageChanged(currentIndex + 1, bookPages, chapters),
+          onTurnBackward: () => expandsEpubWindowAfterCurl
+              ? commitCurlTurn(currentIndex - 1)
+              : _onBookPageChanged(currentIndex - 1, bookPages, chapters),
+          paperColor: _readerTheme.background,
+        ),
       );
     }
     if (usesTwoPageLayout) {
       final spreadStart = _spreadStartForPage(_pageIndex);
-      return _buildSpread(
-        left: _buildPageLeaf(
-          chapter,
-          pages[spreadStart],
-          chapterIndex: _chapterIndex,
-          pageIndex: spreadStart,
-          pageCount: pages.length,
-          layoutFingerprint: layoutFingerprint,
-          pageNumberPlacement: ReaderPageNumberPlacement.bottomLeft,
-          topInformationLayout: ReaderTopInformationLayout.spreadLeft,
+      return withAutoSweep(
+        _buildSpread(
+          left: _buildPageLeaf(
+            chapter,
+            pages[spreadStart],
+            chapterIndex: _chapterIndex,
+            pageIndex: spreadStart,
+            pageCount: pages.length,
+            layoutFingerprint: layoutFingerprint,
+            pageNumberPlacement: ReaderPageNumberPlacement.bottomLeft,
+            topInformationLayout: ReaderTopInformationLayout.spreadLeft,
+          ),
+          right: spreadStart + 1 < pages.length
+              ? _buildPageLeaf(
+                  chapter,
+                  pages[spreadStart + 1],
+                  chapterIndex: _chapterIndex,
+                  pageIndex: spreadStart + 1,
+                  pageCount: pages.length,
+                  layoutFingerprint: layoutFingerprint,
+                  pageNumberPlacement: ReaderPageNumberPlacement.bottomRight,
+                  topInformationLayout: ReaderTopInformationLayout.spreadRight,
+                )
+              : null,
         ),
-        right: spreadStart + 1 < pages.length
-            ? _buildPageLeaf(
-                chapter,
-                pages[spreadStart + 1],
-                chapterIndex: _chapterIndex,
-                pageIndex: spreadStart + 1,
-                pageCount: pages.length,
-                layoutFingerprint: layoutFingerprint,
-                pageNumberPlacement: ReaderPageNumberPlacement.bottomRight,
-                topInformationLayout: ReaderTopInformationLayout.spreadRight,
-              )
-            : null,
       );
     }
-    return _buildPageLeaf(
-      chapter,
-      pages[_pageIndex],
-      chapterIndex: _chapterIndex,
-      pageIndex: _pageIndex,
-      pageCount: pages.length,
-      layoutFingerprint: layoutFingerprint,
+    return withAutoSweep(
+      _buildPageLeaf(
+        chapter,
+        pages[_pageIndex],
+        chapterIndex: _chapterIndex,
+        pageIndex: _pageIndex,
+        pageCount: pages.length,
+        layoutFingerprint: layoutFingerprint,
+      ),
     );
   }
 
@@ -327,6 +385,8 @@ extension _NativeReaderShell on _NativeReaderPageState {
               ),
             ),
             ReaderChromeOverlay(
+              autoPageTurnController: _autoPageTurnController,
+              onResumeAutoPageTurn: () => unawaited(_resumeAutoPageTurn()),
               palette: _readerTheme,
               visible: _controlsVisible,
               title: widget.book.title,

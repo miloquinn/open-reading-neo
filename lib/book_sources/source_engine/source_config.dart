@@ -138,6 +138,17 @@ class ReadingSourceConfig {
     return false;
   }
 
+  Set<String> get runnableCapabilities => <String>{
+    if (searchUrl.isNotEmpty && rule('ruleSearch').isNotEmpty) 'search',
+    if (rule('ruleBookInfo').isNotEmpty) 'detail',
+    if (rule('ruleToc').isNotEmpty) 'catalog',
+    if (rule('ruleContent').isNotEmpty) 'content',
+    if (exploreUrl.isNotEmpty || exploreCatalog.canBrowse) ...{
+      'categories',
+      'browse',
+    },
+  };
+
   RegisteredBookSource toRegisteredSource({
     String? id,
     bool? enabled,
@@ -148,23 +159,15 @@ class ReadingSourceConfig {
     final report =
         compatibilityReport ?? const SourceCompatibilityScanner().scan(this);
     final shouldEnable = enabled ?? this.enabled;
-    final capabilities = <String>{
-      if (searchUrl.isNotEmpty && rule('ruleSearch').isNotEmpty) 'search',
-      if (rule('ruleBookInfo').isNotEmpty) 'detail',
-      if (rule('ruleToc').isNotEmpty) 'catalog',
-      if (rule('ruleContent').isNotEmpty) 'content',
-      if (exploreUrl.isNotEmpty || exploreCatalog.canBrowse) ...{
-        'categories',
-        'browse',
-      },
-    };
+    final capabilities = runnableCapabilities;
+    final resolvedBaseUri = baseUri;
     return RegisteredBookSource(
       id: id ?? stableId,
       name: name,
       description: comment,
-      manifestUrl: baseUri,
-      apiBaseUrl: baseUri,
-      websiteUrl: baseUri,
+      manifestUrl: resolvedBaseUri,
+      apiBaseUrl: resolvedBaseUri,
+      websiteUrl: resolvedBaseUri,
       protocolVersion: 'reading-source-1',
       languages: const [],
       // Import is deliberately optimistic: available rule groups decide which
@@ -207,6 +210,21 @@ class SourceCompatibilityReport {
 class SourceCompatibilityScanner {
   const SourceCompatibilityScanner();
 
+  // Native case-insensitive matchers avoid a whole-script lowercase copy.
+  // Stop at the first occurrence; repeated markers in large libraries do not
+  // allocate a Match for every occurrence.
+  static final _advisoryMarkers = {
+    SourceCompatibilityIssue.webView: RegExp(
+      'webview|webjs',
+      caseSensitive: false,
+    ),
+    SourceCompatibilityIssue.customDns: RegExp('"dnsip"', caseSensitive: false),
+    SourceCompatibilityIssue.customProxy: RegExp(
+      '"proxy"',
+      caseSensitive: false,
+    ),
+  };
+
   SourceCompatibilityReport scan(ReadingSourceConfig source) {
     final issues = <SourceCompatibilityIssue>{};
     final typeIssue = switch (source.type) {
@@ -239,23 +257,18 @@ class SourceCompatibilityScanner {
     _walk(coreConfiguration, (key, value) {
       if (value is! String || value.trim().isEmpty) return;
       final field = key.toLowerCase();
-      final text = value.toLowerCase();
       if (field == 'loginurl' ||
           field == 'loginui' ||
           field == 'logincheckjs') {
         issues.add(SourceCompatibilityIssue.login);
       }
-      if (field.contains('webview') ||
-          field == 'webjs' ||
-          text.contains('webview') ||
-          text.contains('webjs')) {
+      if (field.contains('webview') || field == 'webjs') {
         issues.add(SourceCompatibilityIssue.webView);
       }
-      if (text.contains('"dnsip"')) {
-        issues.add(SourceCompatibilityIssue.customDns);
-      }
-      if (text.contains('"proxy"')) {
-        issues.add(SourceCompatibilityIssue.customProxy);
+      for (final entry in _advisoryMarkers.entries) {
+        if (!issues.contains(entry.key) && entry.value.hasMatch(value)) {
+          issues.add(entry.key);
+        }
       }
     });
 
@@ -297,7 +310,7 @@ class SourceImportResult {
 
 SourceImportResult parseReadingSources(
   String input, {
-  int maxSources = 10000,
+  int? maxSources,
   int maxNestedUrls = 50,
 }) {
   final text = input.replaceFirst('\ufeff', '').trim();
@@ -311,7 +324,7 @@ SourceImportResult parseReadingSources(
 
 SourceImportResult parseReadingSourcePayload(
   Object? decoded, {
-  int maxSources = 10000,
+  int? maxSources,
   int maxNestedUrls = 50,
 }) {
   final sourceUrls = <Uri>[];
@@ -349,7 +362,7 @@ SourceImportResult parseReadingSourcePayload(
   } else {
     throw const FormatException('Expected a source object or array.');
   }
-  if (candidates.length > maxSources) {
+  if (maxSources != null && candidates.length > maxSources) {
     throw FormatException('Too many sources (max $maxSources).');
   }
   final byUrl = <String, ReadingSourceConfig>{};

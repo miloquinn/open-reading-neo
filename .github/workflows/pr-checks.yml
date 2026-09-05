@@ -72,8 +72,10 @@ jobs:
           mapfile -d '' test_files < <(
             find test -type f -name '*_test.dart' \
               ! -name 'book_source_management_page_test.dart' \
+              ! -name 'book_source_management_organization_test.dart' \
               ! -name 'book_source_reader_page_test.dart' \
               ! -name 'book_source_discovery_page_test.dart' \
+              ! -name 'native_reader_auto_page_turn_test.dart' \
               ! -name 'source_response_codec_test.dart' \
               -print0
           )
@@ -101,6 +103,37 @@ jobs:
               --plain-name "$test_name"
           done
 
+          organization_tests=(
+            'favorite and single-source group controls work on a narrow screen'
+            'bulk grouping retains selection and empty folders remain filterable'
+          )
+          for test_name in "${organization_tests[@]}"; do
+            flutter test test/book_source_management_organization_test.dart \
+              --plain-name "$test_name"
+          done
+
+          # Native auto-turn cases own timers, platform controllers, EPUB
+          # isolates, and process-global reader state. The final EPUB case is
+          # deterministic alone but can inherit unfinished asynchronous work
+          # from the earlier ten cases, so keep every assertion in a fresh VM.
+          native_auto_turn_tests=(
+            'starts auto page turn from paging settings and advances a page'
+            'opening reader controls pauses auto page turn'
+            'backgrounding pauses auto page turn without automatic resume'
+            'auto page turn stops when the last page is reached'
+            'auto page turn advances across an EPUB chapter boundary'
+            'auto page turn scrolls a vertical reader by one viewport'
+            'sweep uses the ten second default and resumes from a paused midpoint'
+            'two-page sweep scans both leaves before committing the spread'
+            'continuous mode scrolls smoothly with chapter paging enabled'
+            'dragging takes over a smooth continuous pause immediately'
+            'continuous mode crosses an EPUB chapter without changing mode'
+          )
+          for test_name in "${native_auto_turn_tests[@]}"; do
+            flutter test test/native_reader_auto_page_turn_test.dart \
+              --plain-name "$test_name"
+          done
+
           # The image-reader case deliberately leaves a page load pending so
           # it can assert the reader shell before image decoding. Run the
           # remaining stateful source-reader cases separately to keep that
@@ -110,6 +143,12 @@ jobs:
             'cover opening skips a brief loader and fades directly to content'
             'a genuinely slow opening never overlaps loader and content'
             'loads source chapters and navigates to the next chapter'
+            'automatic page turning advances source text and pauses on touch'
+            'automatic page turning advances a vertical source viewport'
+            'automatic page turning stops at the end of a source book'
+            'source sweep uses ten seconds and resumes its reveal'
+            'source continuous scroll preserves chapter preference and pauses'
+            'source continuous scroll crosses chapters without changing its layout preference'
             'replacement rules clean source chapter titles and content'
             'restores the last source chapter on reopen'
             'uses the shared reader settings with independent margins'
@@ -140,7 +179,11 @@ jobs:
           # registries. Isolate each case so a pending animation or registry
           # mutation cannot make later pumpAndSettle calls time out.
           discovery_tests=(
+            'favorite then create and select a group without leaving discovery'
+            'list favorite keeps expanded channels and filters with an undoable removal'
             'discover scope defaults to all and filters every section'
+            'reading source scope shows channels without ORSP tabs'
+            'rapid source and layout changes settle on the newest view'
             'latest aggregation interleaves sources and caps each contribution'
             'pull to refresh invalidates cached responses before reloading'
             'pull to refresh keeps content instead of showing another loader'
@@ -148,6 +191,7 @@ jobs:
             'list layout expands one source and focuses the chosen channel'
             'list layout ignores duplicate channel ids from a source'
             'list layout searches sources and expands the first match'
+            'list source search stays fixed while the directory scrolls'
             'list category selection starts below the header and restores directory scroll'
             'large source libraries start scoped and build source chips lazily'
             'cross-source discovery uses bounded concurrency'

@@ -1,10 +1,17 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
 import 'package:xxread/pages/book_sources/models/sourced_book.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_cards.dart';
+
+import 'book_source_pill.dart';
+import 'package:xxread/widgets/floating_subpage_scaffold.dart';
+import 'package:xxread/widgets/glass_control_surface.dart';
 
 class BookSourceRailHeader extends StatelessWidget {
   final String title;
@@ -45,28 +52,26 @@ class BookSourceRailHeader extends StatelessWidget {
               ),
             ),
           ),
-          IconButton.filledTonal(
+          FloatingSubpageAction(
             key: const Key('bookSourceDiscoverLayoutToggle'),
             tooltip: layoutTooltip,
             onPressed: onToggleLayout,
-            icon: Icon(
-              standardLayout
-                  ? Icons.view_list_rounded
-                  : Icons.dashboard_outlined,
-            ),
+            icon: standardLayout
+                ? Icons.view_list_rounded
+                : Icons.dashboard_outlined,
           ),
           const SizedBox(width: 8),
-          IconButton.filledTonal(
+          FloatingSubpageAction(
             key: const Key('bookSourceSearchEntry'),
             tooltip: searchTooltip,
             onPressed: onSearch,
-            icon: const Icon(Icons.search_rounded),
+            icon: Icons.search_rounded,
           ),
           const SizedBox(width: 8),
-          IconButton.filledTonal(
+          FloatingSubpageAction(
             tooltip: managementTooltip,
             onPressed: onManage,
-            icon: const Icon(Icons.tune_rounded),
+            icon: Icons.tune_rounded,
           ),
         ],
       ),
@@ -118,46 +123,22 @@ class BookSourceDiscoveryControls extends StatelessWidget {
         if (sources.isNotEmpty && sections.length > 1)
           const SizedBox(height: 8),
         if (sections.length > 1)
-          SegmentedButton<BookSourcesSection>(
-            showSelectedIcon: false,
-            segments: sections
-                .map(
-                  (section) => switch (section) {
-                    BookSourcesSection.recommended => ButtonSegment(
-                      value: section,
-                      icon: const Icon(Icons.auto_awesome_outlined),
-                      label: Text(recommendedLabel),
-                    ),
-                    BookSourcesSection.categories => ButtonSegment(
-                      value: section,
-                      icon: const Icon(Icons.category_outlined),
-                      label: Text(categoriesLabel),
-                    ),
-                    BookSourcesSection.latest => ButtonSegment(
-                      value: section,
-                      icon: const Icon(Icons.update_rounded),
-                      label: Text(latestLabel),
-                    ),
-                  },
-                )
-                .toList(growable: false),
-            selected: {selectedSection},
-            onSelectionChanged: (selection) {
-              if (selection.isNotEmpty) onSectionSelected(selection.first);
+          _SectionTrack(
+            sections: sections,
+            selectedSection: selectedSection,
+            labels: {
+              BookSourcesSection.recommended: recommendedLabel,
+              BookSourcesSection.categories: categoriesLabel,
+              BookSourcesSection.latest: latestLabel,
             },
-            style: ButtonStyle(
-              minimumSize: const WidgetStatePropertyAll(Size(44, 48)),
-              side: WidgetStatePropertyAll(
-                BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-              ),
-            ),
+            onSelected: onSectionSelected,
           ),
       ],
     );
   }
 }
 
-class _SourceScope extends StatelessWidget {
+class _SourceScope extends StatefulWidget {
   final List<RegisteredBookSource> sources;
   final bool includeAll;
   final String? selectedSourceId;
@@ -173,30 +154,108 @@ class _SourceScope extends StatelessWidget {
   });
 
   @override
+  State<_SourceScope> createState() => _SourceScopeState();
+}
+
+class _SourceScopeState extends State<_SourceScope> {
+  final Map<String, GlobalKey> _itemKeys = {};
+  final ItemScrollController _itemScrollController = ItemScrollController();
+
+  GlobalKey _itemKey(String id) => _itemKeys.putIfAbsent(id, GlobalKey.new);
+
+  @override
+  void didUpdateWidget(covariant _SourceScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSourceId != widget.selectedSourceId) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_revealSelected()),
+      );
+    }
+  }
+
+  Future<void> _revealSelected() async {
+    if (!mounted) return;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final selectedId = widget.selectedSourceId ?? '__all__';
+    final selectedContext = _itemKeys[selectedId]?.currentContext;
+    if (selectedContext == null && _itemScrollController.isAttached) {
+      final matchingSourceIndex = widget.sources.indexWhere(
+        (source) => source.id == widget.selectedSourceId,
+      );
+      final sourceIndex = widget.selectedSourceId == null
+          ? 0
+          : matchingSourceIndex < 0
+          ? -1
+          : matchingSourceIndex + (widget.includeAll ? 1 : 0);
+      if (sourceIndex >= 0 && itemCount > 1) {
+        if (reduceMotion) {
+          _itemScrollController.jumpTo(index: sourceIndex, alignment: 0.5);
+        } else {
+          await _itemScrollController.scrollTo(
+            index: sourceIndex,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      }
+      return;
+    }
+    if (selectedContext == null || !selectedContext.mounted) return;
+    final renderObject = selectedContext.findRenderObject();
+    if (renderObject == null) return;
+    final position = Scrollable.of(selectedContext).position;
+    final leading = RenderAbstractViewport.of(
+      renderObject,
+    ).getOffsetToReveal(renderObject, 0).offset;
+    await position.ensureVisible(
+      renderObject,
+      alignmentPolicy: leading < position.pixels
+          ? ScrollPositionAlignmentPolicy.keepVisibleAtStart
+          : ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  int get itemCount => widget.sources.length + (widget.includeAll ? 1 : 0);
+
+  @override
   Widget build(BuildContext context) {
-    final itemCount = sources.length + (includeAll ? 1 : 0);
+    final textHeight = MediaQuery.textScalerOf(context).scale(14) * 1.35;
     return SizedBox(
       key: const Key('bookSourceDiscoverScopeControl'),
-      height: 42,
-      child: ListView.separated(
+      height: math.max(48.0, textHeight + 22),
+      child: ScrollablePositionedList.separated(
+        itemScrollController: _itemScrollController,
         scrollDirection: Axis.horizontal,
         itemCount: itemCount,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          if (includeAll && index == 0) {
-            return ChoiceChip(
+          if (widget.includeAll && index == 0) {
+            final selected = widget.selectedSourceId == null;
+            return KeyedSubtree(
               key: const Key('bookSourceDiscoverScopeAll'),
-              selected: selectedSourceId == null,
-              label: Text(allLabel),
-              onSelected: (_) => onSelected(null),
+              child: BookSourcePill(
+                key: _itemKey('__all__'),
+                label: widget.allLabel,
+                selected: selected,
+                onPressed: () => widget.onSelected(null),
+              ),
             );
           }
-          final source = sources[index - (includeAll ? 1 : 0)];
-          return ChoiceChip(
+          final source = widget.sources[index - (widget.includeAll ? 1 : 0)];
+          final selected = widget.selectedSourceId == source.id;
+          return KeyedSubtree(
             key: Key('bookSourceDiscoverScope-${source.id}'),
-            selected: selectedSourceId == source.id,
-            label: Text(source.name),
-            onSelected: (_) => onSelected(source.id),
+            child: BookSourcePill(
+              key: _itemKey(source.id),
+              label: source.name,
+              selected: selected,
+              onPressed: () => widget.onSelected(source.id),
+            ),
           );
         },
       ),
@@ -204,12 +263,111 @@ class _SourceScope extends StatelessWidget {
   }
 }
 
+class _SectionTrack extends StatelessWidget {
+  const _SectionTrack({
+    required this.sections,
+    required this.selectedSection,
+    required this.labels,
+    required this.onSelected,
+  });
+
+  final List<BookSourcesSection> sections;
+  final BookSourcesSection selectedSection;
+  final Map<BookSourcesSection, String> labels;
+  final ValueChanged<BookSourcesSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final glassEnabled = GlassControlSurface.usesGlass(context);
+    final selectedIndex = sections
+        .indexOf(selectedSection)
+        .clamp(0, sections.length - 1);
+    final alignmentX = sections.length == 1
+        ? 0.0
+        : (-1 + (selectedIndex * 2 / (sections.length - 1))).toDouble();
+    final textHeight = MediaQuery.textScalerOf(context).scale(14) * 1.35;
+    final height = math.max(52.0, textHeight + 26);
+    return GlassControlSurface(
+      key: const Key('bookSourceSectionTrackSurface'),
+      color: scheme.surfaceContainerLow,
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Stack(
+            children: [
+              AnimatedAlign(
+                key: const Key('bookSourceSectionSelectionPill'),
+                alignment: AlignmentDirectional(alignmentX, 0),
+                duration: reduceMotion
+                    ? Duration.zero
+                    : BookSourcePill.selectionDuration,
+                curve: Curves.easeOutCubic,
+                child: FractionallySizedBox(
+                  widthFactor: 1 / sections.length,
+                  heightFactor: 1,
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(
+                      color: glassEnabled ? null : scheme.surface,
+                      gradient: glassEnabled
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                scheme.surface.withValues(alpha: 0.76),
+                                scheme.primaryContainer.withValues(alpha: 0.48),
+                              ],
+                            )
+                          : null,
+                      shadows: [
+                        BoxShadow(
+                          color: scheme.shadow.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      shape: const StadiumBorder(),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (final section in sections)
+                    Expanded(
+                      child: BookSourcePill(
+                        label: labels[section]!,
+                        enableSurface: false,
+                        selected: section == selectedSection,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        maxLabelWidth: null,
+                        backgroundColor: Colors.transparent,
+                        selectedBackgroundColor: Colors.transparent,
+                        foregroundColor: scheme.onSurface,
+                        selectedForegroundColor: scheme.primary,
+                        onPressed: () => onSelected(section),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class BookSourceDiscoveryShelfSection extends StatelessWidget {
+  final Widget? sourceActions;
   final BookSourceDiscoveryShelf shelf;
   final FutureOr<void> Function(SourcedBook book) onBookTap;
 
   const BookSourceDiscoveryShelfSection({
     super.key,
+    this.sourceActions,
     required this.shelf,
     required this.onBookTap,
   });
@@ -232,41 +390,60 @@ class BookSourceDiscoveryShelfSection extends StatelessWidget {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: scheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(999),
-                ),
+              const SizedBox(width: 12),
+              Flexible(
                 child: Text(
                   shelf.source.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: scheme.onSecondaryContainer,
-                    fontSize: 11,
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+              ?sourceActions,
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 242,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: shelf.items.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final result = SourcedBook(
-                  source: shelf.source,
-                  book: shelf.items[index],
-                );
-                return SourcedBookCard(
-                  result: result,
-                  onTap: () => onBookTap(result),
-                );
-              },
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth = constraints.hasBoundedWidth
+                  ? constraints.maxWidth
+                  : 420.0;
+              final cardWidth = ((availableWidth - 24) / 3)
+                  .clamp(100.0, 132.0)
+                  .toDouble();
+              final scaler = MediaQuery.textScalerOf(context);
+              final railHeight = math.max(
+                242.0,
+                (cardWidth * 1.5) +
+                    (scaler.scale(16) * 1.2) +
+                    (scaler.scale(14) * 1.2) +
+                    24,
+              );
+              return SizedBox(
+                height: railHeight,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: shelf.items.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final result = SourcedBook(
+                      source: shelf.source,
+                      book: shelf.items[index],
+                    );
+                    return SourcedBookCard(
+                      result: result,
+                      editorial: true,
+                      width: cardWidth,
+                      onTap: () => onBookTap(result),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -274,7 +451,7 @@ class BookSourceDiscoveryShelfSection extends StatelessWidget {
   }
 }
 
-class BookSourceCategoryChannels extends StatelessWidget {
+class BookSourceCategoryChannels extends StatefulWidget {
   final List<SourcedBookCategory> categories;
   final SourcedBookCategory selectedCategory;
   final String pickerLabel;
@@ -291,40 +468,110 @@ class BookSourceCategoryChannels extends StatelessWidget {
   });
 
   @override
+  State<BookSourceCategoryChannels> createState() =>
+      _BookSourceCategoryChannelsState();
+}
+
+class _BookSourceCategoryChannelsState
+    extends State<BookSourceCategoryChannels> {
+  final Map<String, GlobalKey> _itemKeys = {};
+  final ItemScrollController _itemScrollController = ItemScrollController();
+
+  String _categoryKey(SourcedBookCategory category) =>
+      '${category.source.id}\u0000${category.id}';
+
+  GlobalKey _itemKey(SourcedBookCategory category) =>
+      _itemKeys.putIfAbsent(_categoryKey(category), GlobalKey.new);
+
+  @override
+  void didUpdateWidget(covariant BookSourceCategoryChannels oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedCategory != widget.selectedCategory) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_revealSelected()),
+      );
+    }
+  }
+
+  Future<void> _revealSelected() async {
+    if (!mounted) return;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final categoryKey = _categoryKey(widget.selectedCategory);
+    final selectedContext = _itemKeys[categoryKey]?.currentContext;
+    if (selectedContext == null && _itemScrollController.isAttached) {
+      final selectedIndex = widget.categories.indexOf(widget.selectedCategory);
+      if (selectedIndex >= 0 && widget.categories.length > 1) {
+        if (reduceMotion) {
+          _itemScrollController.jumpTo(index: selectedIndex, alignment: 0.5);
+        } else {
+          await _itemScrollController.scrollTo(
+            index: selectedIndex,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      }
+      return;
+    }
+    if (selectedContext == null || !selectedContext.mounted) return;
+    final renderObject = selectedContext.findRenderObject();
+    if (renderObject == null) return;
+    final position = Scrollable.of(selectedContext).position;
+    final leading = RenderAbstractViewport.of(
+      renderObject,
+    ).getOffsetToReveal(renderObject, 0).offset;
+    await position.ensureVisible(
+      renderObject,
+      alignmentPolicy: leading < position.pixels
+          ? ScrollPositionAlignmentPolicy.keepVisibleAtStart
+          : ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ordered = [
-      selectedCategory,
-      ...categories.where((category) => category != selectedCategory),
-    ];
+    final textHeight = MediaQuery.textScalerOf(context).scale(14) * 1.35;
     return SizedBox(
       key: const Key('bookSourceDiscoveryChannels'),
-      height: 42,
+      height: math.max(48.0, textHeight + 22),
       child: Row(
         children: [
           Expanded(
-            child: ListView.separated(
+            child: ScrollablePositionedList.separated(
+              itemScrollController: _itemScrollController,
               scrollDirection: Axis.horizontal,
-              itemCount: ordered.length,
+              itemCount: widget.categories.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
-                final category = ordered[index];
-                return ChoiceChip(
+                final category = widget.categories[index];
+                final selected = category == widget.selectedCategory;
+                return KeyedSubtree(
                   key: Key(
                     'bookSourceDiscoveryChannel-${category.source.id}-${category.id}',
                   ),
-                  selected: category == selectedCategory,
-                  label: Text(category.name),
-                  onSelected: (_) => onSelected(category),
+                  child: BookSourcePill(
+                    key: _itemKey(category),
+                    label: category.name,
+                    selected: selected,
+                    onPressed: () => widget.onSelected(category),
+                  ),
                 );
               },
             ),
           ),
           const SizedBox(width: 8),
-          ActionChip(
+          BookSourcePill(
             key: const Key('bookSourceCategoryPickerButton'),
-            avatar: const Icon(Icons.tune_rounded, size: 18),
-            label: Text(pickerLabel),
-            onPressed: onOpenPicker,
+            icon: Icons.grid_view_rounded,
+            label: widget.pickerLabel,
+            selected: false,
+            maxLabelWidth: 96,
+            onPressed: widget.onOpenPicker,
           ),
         ],
       ),

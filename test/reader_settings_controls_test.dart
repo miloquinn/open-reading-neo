@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xxread/core/reader/reader_auto_page_turn_controller.dart';
 import 'package:xxread/core/reader/reader_system_ui.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
+import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
   testWidgets(
     'typography sliders expose discrete values and rounded callbacks',
     (tester) async {
@@ -22,9 +30,20 @@ void main() {
       bool? tabletTwoPage;
       bool? txtChapterTitlePage;
       var fontPickerOpened = false;
+      final autoPageTurnController = ReaderAutoPageTurnController(
+        onAdvance: () async => true,
+      );
+      addTearDown(autoPageTurnController.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ReaderSettingsSheet(
             title: 'Reading settings',
             tabThemeLabel: 'Theme tab',
@@ -109,6 +128,8 @@ void main() {
             onThemeChanged: (_) {},
             onCustomThemeTap: () {},
             onPageModeTap: () {},
+            autoPageTurnController: autoPageTurnController,
+            onAutoPageTurnSettings: () {},
             onTopBarStyleTap: () {},
             onTapZonesTap: () {},
             onFontSizeChanged: (_) {},
@@ -132,8 +153,43 @@ void main() {
         ),
       );
 
+      final animatedSizeFinder = find.byKey(
+        const ValueKey('reader-settings-tab-animated-size'),
+      );
+      final themeContentHeight = tester.getSize(animatedSizeFinder).height;
       await tester.tap(find.text('Text tab'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-text')),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is IgnorePointer && widget.ignoring,
+          ),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is ExcludeSemantics && widget.excluding,
+          ),
+        ),
+        findsWidgets,
+      );
       await tester.pumpAndSettle();
+      expect(
+        tester.getSize(animatedSizeFinder).height,
+        greaterThan(themeContentHeight),
+      );
       expect(
         find.byKey(const ValueKey('reader-font-choice-tile')),
         findsOneWidget,
@@ -283,12 +339,74 @@ void main() {
       final tabletSwitch = tester.widget<SwitchListTile>(
         find.byKey(const ValueKey('reader-tablet-two-page-switch')),
       );
+      final shortcutSwitch = tester.widget<SwitchListTile>(
+        find.byKey(const ValueKey('reader-auto-page-turn-shortcut-switch')),
+      );
+      expect(shortcutSwitch.value, isTrue);
       pullSwitch.onChanged!(true);
       animationSwitch.onChanged!(false);
       tabletSwitch.onChanged!(false);
+      shortcutSwitch.onChanged!(false);
+      await tester.pump();
       expect(pullBookmark, isTrue);
       expect(tapAnimation, isFalse);
       expect(tabletTwoPage, isFalse);
+      expect(autoPageTurnController.shortcutVisible, isFalse);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(
+                const ValueKey('reader-auto-page-turn-shortcut-switch'),
+              ),
+            )
+            .value,
+        isFalse,
+      );
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('reader-settings-tab-bar')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Text tab'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Slider>(textBrightnessFinder).value, 67);
+
+      await tester.tap(find.text('Layout tab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Paging tab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Theme tab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Text tab'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-text')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reader-settings-tab-content-theme')),
+        findsNothing,
+      );
+
+      tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pump();
+      expect(
+        tester.widget<AnimatedSize>(animatedSizeFinder).duration,
+        Duration.zero,
+      );
+      expect(
+        tester
+            .widget<AnimatedSwitcher>(
+              find.byKey(const ValueKey('reader-settings-tab-switcher')),
+            )
+            .duration,
+        Duration.zero,
+      );
     },
   );
 

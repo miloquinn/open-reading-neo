@@ -86,6 +86,8 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     Object? context,
     String rule, {
     bool resolveUrl = false,
+    String joinSeparator = '',
+    bool regexDotAll = true,
   }) {
     final putRule = splitSourcePutRule(rule);
     if (putRule != null) {
@@ -94,6 +96,8 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
         context,
         putRule,
         resolveUrl: resolveUrl,
+        joinSeparator: joinSeparator,
+        regexDotAll: regexDotAll,
       );
     }
     final scripted = splitSourceScriptRule(rule);
@@ -103,12 +107,17 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
         context,
         scripted,
         resolveUrl: resolveUrl,
+        joinSeparator: joinSeparator,
+        regexDotAll: regexDotAll,
       );
     }
     final transformed = splitSourceRuleTransform(rule);
     final selected = transformed.selector.trim().isEmpty
         ? _rawValues(document, context)
-        : _interpolation(document).evaluateAlternatives(
+        : _interpolation(
+            document,
+            allAttributes: joinSeparator.isNotEmpty && !resolveUrl,
+          ).evaluateAlternatives(
             context,
             transformed.selector,
             listMode: false,
@@ -117,17 +126,15 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
         .map(sourceRuleStringValue)
         .where((value) => value.isNotEmpty)
         .toList();
-    var result = values.join();
+    var result = values.join(joinSeparator);
     if (transformed.pattern != null) {
       try {
         final pattern = RegExp(
           transformed.pattern!,
           multiLine: true,
-          dotAll: true,
+          dotAll: regexDotAll,
         );
-        result =
-            transformed.selector.trim().isEmpty &&
-                transformed.replacement.isNotEmpty
+        result = transformed.extractFirst
             ? extractSourceRegex(result, pattern, transformed.replacement)
             : replaceSourceRegex(result, pattern, transformed.replacement);
       } on FormatException {
@@ -181,7 +188,10 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     final transformed = splitSourceRuleTransform(rule);
     final selected = transformed.selector.trim().isEmpty
         ? _rawValues(document, context)
-        : await _interpolation(document).evaluateAlternativesAsync(
+        : await _interpolation(
+            document,
+            allAttributes: joinSeparator.isNotEmpty && !resolveUrl,
+          ).evaluateAlternativesAsync(
             context,
             transformed.selector,
             listMode: false,
@@ -198,9 +208,7 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
           multiLine: true,
           dotAll: regexDotAll,
         );
-        result =
-            transformed.selector.trim().isEmpty &&
-                transformed.replacement.isNotEmpty
+        result = transformed.extractFirst
             ? extractSourceRegex(result, pattern, transformed.replacement)
             : replaceSourceRegex(result, pattern, transformed.replacement);
       } on FormatException {
@@ -246,12 +254,26 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     }
   }
 
-  SourceRuleInterpolation _interpolation(SourceRuleDocument document) {
+  SourceRuleInterpolation _interpolation(
+    SourceRuleDocument document, {
+    bool allAttributes = false,
+  }) {
     return SourceRuleInterpolation(
-      evaluateSingle: (context, rule, {required listMode}) =>
-          _evaluateSingle(document, context, rule, listMode: listMode),
+      evaluateSingle: (context, rule, {required listMode}) => _evaluateSingle(
+        document,
+        context,
+        rule,
+        listMode: listMode,
+        allAttributes: allAttributes,
+      ),
       evaluateSingleAsync: (context, rule, {required listMode}) =>
-          _evaluateSingleAsync(document, context, rule, listMode: listMode),
+          _evaluateSingleAsync(
+            document,
+            context,
+            rule,
+            listMode: listMode,
+            allAttributes: allAttributes,
+          ),
       evaluateScript: (context, script) =>
           _scripts.evaluateInline(document, context, script),
       evaluateScriptAsync: (context, script) =>
@@ -264,6 +286,7 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     Object? context,
     String rule, {
     required bool listMode,
+    bool allAttributes = false,
   }) {
     var normalized = _normalizeSelector(rule);
     if (normalized.isEmpty) return const [];
@@ -295,7 +318,12 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     }
     final nodes = _htmlRoots(root);
     if (nodes == null) return [root];
-    return evaluateSourceHtmlRule(nodes, normalized, listMode: listMode);
+    return evaluateSourceHtmlRule(
+      nodes,
+      normalized,
+      listMode: listMode,
+      allAttributes: allAttributes,
+    );
   }
 
   Future<List<Object?>> _evaluateSingleAsync(
@@ -303,6 +331,7 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     Object? context,
     String rule, {
     required bool listMode,
+    bool allAttributes = false,
   }) async {
     var normalized = _normalizeSelector(rule);
     if (normalized.isEmpty) return const [];
@@ -336,7 +365,12 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     }
     final nodes = _htmlRoots(root);
     if (nodes == null) return [root];
-    return evaluateSourceHtmlRule(nodes, normalized, listMode: listMode);
+    return evaluateSourceHtmlRule(
+      nodes,
+      normalized,
+      listMode: listMode,
+      allAttributes: allAttributes,
+    );
   }
 
   String _normalizeSelector(String rule) {
@@ -369,6 +403,10 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
   }
 
   List<Object?> _rawValues(SourceRuleDocument document, Object? context) {
+    if ((context == null || identical(context, document.value)) &&
+        document.rawText != null) {
+      return [document.rawText];
+    }
     final value = context ?? document.value;
     return switch (value) {
       Document document => [document.outerHtml],

@@ -193,14 +193,27 @@ class SourceRuntime {
     RegisteredBookSource registered, {
     Map<String, String> loginInfo = const {},
     Map<String, String> loginHeaders = const {},
-  }) => _login.saveLoginSession(
-    registered,
-    loginInfo: loginInfo,
-    loginHeaders: loginHeaders,
-  );
+  }) async {
+    final source = sourceFromRegistered(registered);
+    try {
+      await _login.saveLoginSession(
+        registered,
+        loginInfo: loginInfo,
+        loginHeaders: loginHeaders,
+      );
+    } finally {
+      _state.clearSource(source);
+    }
+  }
 
-  Future<void> clearLoginSession(RegisteredBookSource registered) =>
-      _login.clearLoginSession(registered);
+  Future<void> clearLoginSession(RegisteredBookSource registered) async {
+    final source = sourceFromRegistered(registered);
+    try {
+      await _login.clearLoginSession(registered);
+    } finally {
+      _state.clearSource(source);
+    }
+  }
 
   Future<List<SourceLoginField>> loadLoginFields(
     RegisteredBookSource registered,
@@ -209,5 +222,15 @@ class SourceRuntime {
   Future<void> login(
     RegisteredBookSource registered,
     Map<String, String> values,
-  ) => _login.login(registered, values);
+  ) async {
+    final source = sourceFromRegistered(registered);
+    try {
+      await _login.login(registered, values);
+    } finally {
+      // Login persists the submitted session before running the source script,
+      // which can also mutate cookies before throwing. Either outcome changes
+      // the authentication context of remembered source responses.
+      _state.clearSource(source);
+    }
+  }
 }

@@ -115,6 +115,10 @@ extension _NativeReaderControls on _NativeReaderPageState {
     final active = _readerAloudController?.isActive ?? false;
     final highlight = _readerAloudController?.highlight;
     if (!mounted) return;
+    if (_readerAloudController?.state == ReaderAloudPlaybackState.playing ||
+        _readerAloudController?.state == ReaderAloudPlaybackState.loading) {
+      _pauseAutoPageTurn();
+    }
     final error = _readerAloudController?.lastError;
     if (error != null) {
       showSideToast(context, '朗读启动失败：$error', kind: SideToastKind.error);
@@ -146,6 +150,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
       progression: chapter.plainText.isEmpty
           ? 0
           : offset / chapter.plainText.length,
+      contentSignature: _currentContentSignature,
     );
     final revealsWithinCurrentChapter = chapterIndex == _chapterIndex;
     await _jumpToBookmark(
@@ -168,6 +173,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
   Future<void> _persistReaderAloudPosition(ReaderAloudPosition position) async {
     final bookId = widget.book.id;
     if (bookId == null || _loadedChapters.isEmpty) return;
+    _markReadingPositionChanged();
     final chapterIndex = position.chapterIndex.clamp(
       0,
       _loadedChapters.length - 1,
@@ -184,6 +190,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
       progression: chapter.plainText.isEmpty
           ? 0
           : offset / chapter.plainText.length,
+      contentSignature: _currentContentSignature,
     );
     _anchorOffset = offset;
     final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
@@ -229,6 +236,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
   /// Starts or resumes read-aloud on the first toolbar tap. Once playback is
   /// active, the same button becomes the entry point for its settings panel.
   Future<void> _handleReaderAloudButtonPressed() async {
+    _pauseAutoPageTurn();
     final controller = _ensureReaderAloudController();
     if (controller == null) return;
     if (controller.state == ReaderAloudPlaybackState.playing ||
@@ -319,11 +327,15 @@ extension _NativeReaderControls on _NativeReaderPageState {
   }
 
   Future<void> _showReadingSettings() async {
+    _pauseAutoPageTurn();
     final selectedMode = await showModalBottomSheet<NativePageMode>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) => ReaderSettingsSheet(
+        autoPageTurnController: _autoPageTurnController,
+        autoPageTurnIsVertical: _pageMode == NativePageMode.verticalScroll,
+        onAutoPageTurnSettings: () => unawaited(_showAutoPageTurnSettings()),
         title: context.l10n.readingSettings,
         tabThemeLabel: context.l10n.readerSettingsTabTheme,
         tabTextLabel: context.l10n.readerSettingsTabText,

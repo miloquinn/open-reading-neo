@@ -265,7 +265,7 @@ void main() {
         bookId: book.id,
         chapterId: chapters.single.id,
       );
-      expect(content.content, '<p>正文</p>');
+      expect(content.content, '<article id="content"><p>正文</p></article>');
       expect(content.contentType, 'text/html');
       expect(
         transport.requests
@@ -1027,7 +1027,7 @@ void main() {
           'https://reader.test/chapter/7/9.html',
         );
         expect(transport.requests.last.useWebView, isTrue);
-        expect(content.content, 'Readable body');
+        expect(content.content, '<p>\n<p>Readable body</p>');
 
         final reopenedTransport = _FakeTransport({
           'https://api.test/books/7':
@@ -1052,7 +1052,7 @@ void main() {
 
         expect(reopenedChapters.single.id, chapters.single.id);
         expect(reopenedTransport.requests.last.useWebView, isTrue);
-        expect(reopenedContent.content, 'Readable after reopen');
+        expect(reopenedContent.content, '<p>\n<p>Readable after reopen</p>');
       },
     );
 

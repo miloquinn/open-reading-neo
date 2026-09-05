@@ -4,6 +4,7 @@ import 'package:xxread/core/reader/reader_safe_area.dart';
 import 'package:xxread/core/reader/reader_system_ui.dart';
 import 'package:xxread/core/reader/reader_vertical_paging.dart';
 import 'package:xxread/widgets/reader_vertical_paging_surface.dart';
+import 'package:xxread/widgets/reader_chapter_title_page.dart';
 
 void main() {
   test('viewport chrome reserves fixed title and status slots', () {
@@ -157,7 +158,16 @@ void main() {
             width: 180,
             child: KeyedSubtree(
               key: key,
-              child: const Text('alpha beta gamma'),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ReaderInlineChapterTitle(
+                    title: 'Chapter heading',
+                    bodyStyle: TextStyle(fontSize: 16),
+                  ),
+                  Text('alpha beta gamma'),
+                ],
+              ),
             ),
           ),
         ),
@@ -165,6 +175,7 @@ void main() {
     );
 
     final paragraph = readerParagraphForKey(key)!;
+    expect(paragraph.text.toPlainText(), 'alpha beta gamma');
     final globalTop = paragraph.localToGlobal(Offset.zero).dy;
     final centerY = globalTop + paragraph.size.height / 2;
     final expectedTextOffset = paragraph

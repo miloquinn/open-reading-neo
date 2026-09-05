@@ -9,6 +9,22 @@ import 'package:xxread/book_sources/caching/book_source_response_cache.dart';
 import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/services/account/account_avatar_cache.dart';
 import 'package:xxread/services/core/cache_management_service.dart';
+import 'package:xxread/services/books/pagination_cache_dao.dart';
+import 'package:xxread/services/books/native_reader_cache_store.dart';
+
+class _PaginationCache extends PaginationCacheDao {
+  int bytes = 13;
+  int clears = 0;
+
+  @override
+  Future<int> payloadSizeBytes() async => bytes;
+
+  @override
+  Future<void> clearAll() async {
+    clears++;
+    bytes = 0;
+  }
+}
 
 void main() {
   test('reports and clears only allowlisted cache categories', () async {
@@ -81,6 +97,10 @@ void main() {
     final book = File(path.join(userDocuments.path, 'book.epub'));
     await book.writeAsBytes(List.filled(17, 1));
     var imageCacheClears = 0;
+    var nativeMemoryClears = 0;
+    final pagination = _PaginationCache();
+    final nativeCache = NativeReaderCacheStore()
+      ..registerMemoryClearer(() => nativeMemoryClears++);
     final coverCache = SourceCoverCache(
       cacheDirectory: covers,
       loader: (_) async => Uint8List.fromList([2, 3, 4]),
@@ -101,6 +121,8 @@ void main() {
       sourceImagePageCache: imagePageCache,
       accountAvatarCache: avatarCache,
       sourceResponseCache: BookSourceResponseCache(cacheDirectory: responses),
+      paginationCacheDao: pagination,
+      nativeReaderCache: nativeCache,
       temporaryDirectory: root,
       applicationSupportDirectory: support,
       legacyPaginationCacheDirectory: () async => legacyPaginationCache,
@@ -109,11 +131,11 @@ void main() {
     );
 
     final usage = await manager.usage();
-    expect(usage.bytesFor(AppCacheCategory.sourceCovers), 38);
+    expect(usage.bytesFor(AppCacheCategory.sourceCovers), 42);
     expect(usage.bytesFor(AppCacheCategory.sourceData), 10);
-    expect(usage.bytesFor(AppCacheCategory.readingCache), 43);
+    expect(usage.bytesFor(AppCacheCategory.readingCache), 56);
     expect(usage.bytesFor(AppCacheCategory.temporaryFiles), 13);
-    expect(usage.totalBytes, 104);
+    expect(usage.totalBytes, 121);
 
     await manager.clear(AppCacheCategory.sourceCovers);
     expect(await covers.exists(), isFalse);
@@ -122,6 +144,8 @@ void main() {
     expect(imageCacheClears, 1);
     expect(await chapters.exists(), isTrue);
     expect(await book.exists(), isTrue);
+    expect(pagination.clears, 0);
+    expect(nativeMemoryClears, 0);
 
     await manager.clearAll();
     expect(await chapters.exists(), isFalse);
@@ -131,6 +155,8 @@ void main() {
     expect(await responses.exists(), isFalse);
     expect(await updates.exists(), isFalse);
     expect(await book.exists(), isTrue);
+    expect(pagination.clears, 1);
+    expect(nativeMemoryClears, greaterThan(0));
   });
 
   test('formats exact bytes and megabytes', () {

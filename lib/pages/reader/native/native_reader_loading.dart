@@ -6,7 +6,12 @@ extension _NativeReaderLoading on _NativeReaderPageState {
 
   void _initializeReaderDependencies() {
     if (_readerDependenciesInitialized) return;
+    NativeReaderCacheStore.instance.registerMemoryClearer(
+      clearNativeReaderMemoryCaches,
+    );
     final cacheKey = _bookCacheKey;
+    _readerMemoryCacheKey = cacheKey;
+    NativeReaderCacheStore.instance.retainFrom(this, cacheKey);
     _paginationCacheLoadFuture = _loadPersistedPaginationCache();
     if (_shouldBypassReaderMemoryCaches) {
       // Large books already retain substantial parsed chapter and image data
@@ -22,23 +27,28 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         _bookMemoryCache.length >= 2) {
       final oldestKey = _bookMemoryCache.keys.first;
       _bookMemoryCache.remove(oldestKey);
+      unawaited(NativeReaderCacheStore.instance.release(oldestKey));
       _navigationMemoryCache.removeWhere(
         (key, _) => key == oldestKey || key.startsWith('$oldestKey:'),
       );
       _paginationMemoryCache.remove(oldestKey);
     }
     _pageCache = _paginationMemoryCache.putIfAbsent(cacheKey, () => {});
-    final cachedChapters = _bookMemoryCache.putIfAbsent(
-      cacheKey,
-      () => _loadBook().onError((error, stackTrace) {
-        _bookMemoryCache.remove(cacheKey);
-        _paginationMemoryCache.remove(cacheKey);
+    final cachedChapters = _bookMemoryCache.putIfAbsent(cacheKey, () {
+      late final Future<List<_NativeChapter>> loading;
+      loading = _loadBook().onError((error, stackTrace) {
+        if (identical(_bookMemoryCache[cacheKey], loading)) {
+          _bookMemoryCache.remove(cacheKey);
+          _paginationMemoryCache.remove(cacheKey);
+          unawaited(NativeReaderCacheStore.instance.release(cacheKey));
+        }
         Error.throwWithStackTrace(
           error ?? StateError('Unknown reader loading error'),
           stackTrace,
         );
-      }),
-    );
+      });
+      return loading;
+    });
     _chaptersFuture = _prepareLoadedChapters(cachedChapters);
     _readerDependenciesInitialized = true;
   }
@@ -49,6 +59,8 @@ extension _NativeReaderLoading on _NativeReaderPageState {
     await _paginationCacheLoadFuture;
     await _replaceRules.load();
     final chapters = await chaptersFuture;
+    if (!mounted) return const <_NativeChapter>[];
+    NativeReaderCacheStore.instance.retainFrom(this, _bookCacheKey);
     if (chapters.isEmpty) return chapters;
     for (final chapter in chapters) {
       chapter.configureReplacement(widget.book.title);
@@ -175,6 +187,11 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         .where((chapter) => !chapter.hasLoadedText && !chapter.hasPendingLoad)
         .toList(growable: false);
     if (missing.isNotEmpty) {
+      final operation = Object();
+      NativeReaderCacheStore.instance.retain(
+        operation,
+        missing.first.epubLoadArguments['cacheDirectory'] as String,
+      );
       final completers = <_NativeChapter, Completer<void>>{
         for (final chapter in missing) chapter: Completer<void>(),
       };
@@ -191,6 +208,9 @@ extension _NativeReaderLoading on _NativeReaderPageState {
                   .toList(growable: false),
             });
         final results = (parsed['results'] as List<dynamic>).cast<Map>();
+        NativeReaderCacheStore.instance.scheduleMaintenance(
+          Directory(first.epubLoadArguments['cacheDirectory'] as String).parent,
+        );
         final fonts = <String, String>{};
         for (final result in results) {
           fonts.addAll(
@@ -217,35 +237,50 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         for (final chapter in missing) {
           chapter.clearPendingLoad();
         }
+        unawaited(NativeReaderCacheStore.instance.release(operation));
       }
     }
     await Future.wait<void>(pending);
   }
 
   Future<List<_NativeChapter>> _loadBook() async {
+    final operation = Object();
+    final generation = NativeReaderCacheStore.instance.generation;
+    try {
+      return await _loadBookWithCacheOwner(operation, generation);
+    } finally {
+      unawaited(NativeReaderCacheStore.instance.release(operation));
+    }
+  }
+
+  Future<List<_NativeChapter>> _loadBookWithCacheOwner(
+    Object operation,
+    int cacheGeneration,
+  ) async {
     final l10n = context.l10n;
     await _replaceRules.load();
-    final format = widget.book.format.toLowerCase();
+    final format = _activeBook.format.toLowerCase();
     final webBytes = kIsWeb
-        ? await WebBookFileStore().read(widget.book.filePath)
+        ? await WebBookFileStore().read(_activeBook.filePath)
         : null;
     if (kIsWeb && webBytes == null) {
       throw StateError('Web 书籍文件不存在');
     }
     if (format == 'txt') {
+      if (!kIsWeb) await TxtEditService().recoverInterruptedEdit(_activeBook);
       if (webBytes != null) {
         final decoded = EnhancedTxtImportService().decodeWithOverride(
           webBytes,
-          encodingOverride: widget.book.textEncoding,
+          encodingOverride: _activeBook.textEncoding,
           verifyEncodingOverride: true,
         );
         return _parseTxtChapters(
           decoded,
-          widget.book.title,
+          _activeBook.title,
           l10n.readerPrefaceTitle,
         );
       }
-      final sourceFile = File(widget.book.filePath);
+      final sourceFile = File(_activeBook.filePath);
       final fileSize = await sourceFile.length();
       final useParsedCache = fileSize <= _largeTxtFileThreshold;
       final cacheDirectory = Directory(
@@ -256,6 +291,17 @@ extension _NativeReaderLoading on _NativeReaderPageState {
       );
       final cacheName = sha1.convert(utf8.encode(_bookCacheKey)).toString();
       final cachePath = path.join(cacheDirectory.path, '$cacheName.json');
+      final cacheStore = NativeReaderCacheStore.instance;
+      await cacheStore.acquire(operation, cachePath);
+      if (cacheGeneration != cacheStore.generation) {
+        cacheStore.discardWhenReleased(cachePath);
+      }
+      if (mounted) cacheStore.retain(this, cachePath);
+      if (cacheGeneration == cacheStore.generation &&
+          _bookMemoryCache.containsKey(_bookCacheKey)) {
+        cacheStore.retain(_bookCacheKey, cachePath);
+      }
+      cacheStore.scheduleMaintenance(cacheDirectory);
       if (useParsedCache) {
         final cached = await compute(_readParsedChapterCache, cachePath);
         if (cached != null) {
@@ -263,7 +309,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
               .map(
                 (chapter) => _nativeChapterFromMap(
                   chapter,
-                  bookTitle: widget.book.title,
+                  bookTitle: _activeBook.title,
                 ),
               )
               .toList(growable: false);
@@ -272,8 +318,8 @@ extension _NativeReaderLoading on _NativeReaderPageState {
 
       final parseArguments = <String, dynamic>{
         'path': sourceFile.path,
-        'encoding': widget.book.textEncoding,
-        'title': widget.book.title,
+        'encoding': _activeBook.textEncoding,
+        'title': _activeBook.title,
         'prefaceTitle': l10n.readerPrefaceTitle,
       };
       if (!useParsedCache) {
@@ -290,7 +336,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
         if (cachedIndex != null) {
           return _nativeChaptersFromFileIndex(
             cachedIndex,
-            bookTitle: widget.book.title,
+            bookTitle: _activeBook.title,
           );
         }
 
@@ -302,13 +348,6 @@ extension _NativeReaderLoading on _NativeReaderPageState {
           return const <_NativeChapter>[];
         }
 
-        unawaited(
-          compute(
-            _deleteOversizedParsedChapterCaches,
-            cacheDirectory.path,
-          ).catchError((_) {}),
-        );
-
         // The worker writes normalized UTF-8 chapter data to disk and returns
         // only offsets/titles. The UI isolate loads one chapter at a time.
         final indexed = await compute(
@@ -319,26 +358,34 @@ extension _NativeReaderLoading on _NativeReaderPageState {
             'dataPath': dataPath,
           },
         );
+        cacheStore.scheduleMaintenance(cacheDirectory, force: true);
         return _nativeChaptersFromFileIndex(
           indexed,
-          bookTitle: widget.book.title,
+          bookTitle: _activeBook.title,
         );
       }
 
       // Small TXT books can keep using the JSON chapter cache.
       final parsed = await compute(_parseTxtFileInBackground, parseArguments);
-      if (useParsedCache) {
+      if (cacheGeneration == cacheStore.generation) {
+        final writer = Object();
+        cacheStore.retain(writer, cachePath);
         unawaited(
           compute(_writeParsedChapterCache, <String, dynamic>{
-            'path': cachePath,
-            'chapters': parsed,
-          }).catchError((_) {}),
+                'path': cachePath,
+                'chapters': parsed,
+              })
+              .then((_) => cacheStore.maintain(cacheDirectory, force: true))
+              .whenComplete(() => cacheStore.release(writer))
+              .catchError((Object error) {
+                debugPrint('TXT cache persistence failed: $error');
+              }),
         );
       }
       return parsed
           .map(
             (chapter) =>
-                _nativeChapterFromMap(chapter, bookTitle: widget.book.title),
+                _nativeChapterFromMap(chapter, bookTitle: _activeBook.title),
           )
           .toList(growable: false);
     }
@@ -351,6 +398,17 @@ extension _NativeReaderLoading on _NativeReaderPageState {
       );
       final cacheKey = sha1.convert(utf8.encode(_bookCacheKey)).toString();
       final cacheRoot = path.join(cacheDirectory.path, cacheKey);
+      final cacheStore = NativeReaderCacheStore.instance;
+      await cacheStore.acquire(operation, cacheRoot);
+      if (cacheGeneration != cacheStore.generation) {
+        cacheStore.discardWhenReleased(cacheRoot);
+      }
+      if (mounted) cacheStore.retain(this, cacheRoot);
+      if (cacheGeneration == cacheStore.generation &&
+          _bookMemoryCache.containsKey(_bookCacheKey)) {
+        cacheStore.retain(_bookCacheKey, cacheRoot);
+      }
+      cacheStore.scheduleMaintenance(cacheDirectory);
       final indexPath = path.join(cacheRoot, 'index.json');
       final sourceSize = await sourceFile.length();
       final sourceModifiedMillis =
@@ -373,6 +431,7 @@ extension _NativeReaderLoading on _NativeReaderPageState {
           await staleCache.delete(recursive: true);
         }
         index = await compute(buildEpubNativeIndex, arguments);
+        cacheStore.scheduleMaintenance(cacheDirectory, force: true);
       }
       final chapters = (index['chapters'] as List<dynamic>? ?? const [])
           .map(

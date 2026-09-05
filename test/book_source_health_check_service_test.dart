@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
@@ -91,15 +93,19 @@ void main() {
         config.toRegisteredSource(id: 'fresh-source', enabled: true),
         freshResult,
       );
+      await registry.applySynced(fresh);
+      await registry.applySynced(stale);
       final service = BookSourceHealthCheckService(
         checker: SourceHealthChecker(transport: transport),
         registry: registry,
       );
 
       final progressCalls = <List<int>>[];
+      final completedIds = <String>[];
       final updated = await service.checkAllForCleanup(
         [fresh, stale],
         onProgress: (completed, total) => progressCalls.add([completed, total]),
+        onItemCompleted: (source) => completedIds.add(source.id),
       );
 
       // The fresh source keeps its exact stored result untouched — proof it
@@ -114,11 +120,24 @@ void main() {
       // Progress starts already counting the skipped source as done.
       expect(progressCalls.first, [1, 2]);
       expect(progressCalls.last, [2, 2]);
+      expect(completedIds.toSet(), {fresh.id, stale.id});
 
-      // Only the actually re-checked source is written back to storage.
+      // The persisted registry keeps both existing records while only the
+      // stale source receives a newly checked result.
       final reloaded = await registry.load();
-      expect(reloaded, hasLength(1));
-      expect(reloaded.single.id, stale.id);
+      expect(reloaded, hasLength(2));
+      expect(
+        sourceHealthCheckResultOf(
+          reloaded.firstWhere((source) => source.id == fresh.id),
+        )?.checkedAt,
+        freshResult.checkedAt,
+      );
+      expect(
+        sourceHealthCheckResultOf(
+          reloaded.firstWhere((source) => source.id == stale.id),
+        )?.fullyAvailable,
+        isTrue,
+      );
     },
   );
 
@@ -146,6 +165,66 @@ void main() {
 
       expect(updated, isEmpty);
       expect(await registry.load(), isEmpty);
+    },
+  );
+
+  test(
+    'cleanup rejects a fresh cached result when its rules change mid-sweep',
+    () async {
+      final storage = _MemoryRegistryStorage();
+      final registry = BookSourceRegistry(storage: storage);
+      final config = _fixtureSource();
+      final fresh = withSourceHealthCheckResult(
+        config.toRegisteredSource(id: 'fresh-source', enabled: true),
+        SourceHealthCheckResult(
+          checked: SourceHealthCheckResult.fullAvailabilityCapabilities,
+          failed: const {},
+          checkedAt: DateTime.now().toUtc(),
+        ),
+      );
+      final blocking = config.toRegisteredSource(
+        id: 'blocking-source',
+        enabled: true,
+      );
+      await registry.applySynced(fresh);
+      await registry.applySynced(blocking);
+      final transport = _BlockingTransport();
+      final service = BookSourceHealthCheckService(
+        checker: SourceHealthChecker(transport: transport),
+        registry: registry,
+      );
+      final errors = <Object>[];
+
+      final sweep = service.checkAllForCleanup([
+        fresh,
+        blocking,
+      ], onItemError: (_, error, _) => errors.add(error));
+      await transport.started.future;
+      final changedConfig = {...?fresh.sourceConfig}
+        ..remove('_openReadingHealthCheck')
+        ..['ruleSearch'] = {'bookList': 'changed-rule'};
+      await registry.applySynced(fresh.copyWith(sourceConfig: changedConfig));
+      transport.response.complete(
+        SourceResponse(
+          body: '<html></html>',
+          finalUri: Uri.parse('https://books.test/search'),
+        ),
+      );
+      final updated = await sweep;
+
+      final freshAfter = updated.firstWhere((source) => source.id == fresh.id);
+      expect(sourceHealthCheckResultOf(freshAfter), isNull);
+      expect(freshAfter.sourceConfig?['ruleSearch'], {
+        'bookList': 'changed-rule',
+      });
+      expect(
+        errors.whereType<SourceHealthCheckConfigurationChangedException>(),
+        hasLength(1),
+      );
+      final storedFresh = (await registry.load()).firstWhere(
+        (source) => source.id == fresh.id,
+      );
+      expect(sourceHealthCheckResultOf(storedFresh), isNull);
     },
   );
 
@@ -209,6 +288,20 @@ class _FakeTransport implements SourceTransport {
       throw StateError('Missing fake response for ${request.url}');
     }
     return SourceResponse(body: body, finalUri: request.url);
+  }
+}
+
+class _BlockingTransport implements SourceTransport {
+  final started = Completer<void>();
+  final response = Completer<SourceResponse>();
+
+  @override
+  Future<SourceResponse> send(
+    SourceRequestTemplate request, {
+    BookDownloadCancellation? cancellation,
+  }) {
+    if (!started.isCompleted) started.complete();
+    return response.future;
   }
 }
 

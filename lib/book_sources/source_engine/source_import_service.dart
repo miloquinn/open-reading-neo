@@ -12,18 +12,32 @@ import '../protocol/book_source_protocol.dart';
 import '../networking/book_source_network_policy.dart';
 import 'source_config.dart';
 
+class SourceImportCancelledException implements Exception {
+  const SourceImportCancelledException([
+    this.message = 'Source import cancelled.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class SourceImportPreview {
   factory SourceImportPreview({
     required List<ReadingSourceConfig> sources,
     required List<String> errors,
+    List<Uri> sourceUrls = const [],
     BookSourceDedupeMode mode = BookSourceDedupeMode.standard,
     Set<int>? selectedIndices,
   }) {
     final analysis = _analyzeSources(sources, mode);
     return SourceImportPreview._(
       analysis.reports,
+      analysis.candidates,
       candidates: List.unmodifiable(sources),
       errors: errors,
+      sourceUrls: List.unmodifiable(sourceUrls),
       mode: mode,
       dedupeResult: analysis.result,
       selectedIndices: Set.unmodifiable(
@@ -33,9 +47,11 @@ class SourceImportPreview {
   }
 
   SourceImportPreview._(
-    this._reports, {
+    this._reports,
+    this._dedupeCandidates, {
     required this.candidates,
     required this.errors,
+    required this.sourceUrls,
     required this.mode,
     required this.dedupeResult,
     required this.selectedIndices,
@@ -43,46 +59,76 @@ class SourceImportPreview {
 
   final List<ReadingSourceConfig> candidates;
   final List<String> errors;
+  final List<Uri> sourceUrls;
   final BookSourceDedupeMode mode;
   final BookSourceDedupeResult dedupeResult;
+  final List<BookSourceDedupeCandidate> _dedupeCandidates;
   final Set<int> selectedIndices;
   final Map<int, SourceCompatibilityReport> _reports;
 
-  Iterable<(int, ReadingSourceConfig)> get _selectedEntries =>
-      candidates.indexed.where((entry) => selectedIndices.contains(entry.$1));
+  late final List<int> _selectedIndexList = selectedIndices
+      .where((index) => index >= 0 && index < candidates.length)
+      .toList(growable: false);
 
-  List<ReadingSourceConfig> get sources =>
-      List.unmodifiable(_selectedEntries.map((entry) => entry.$2));
-  int get duplicates => candidates.length - sources.length;
+  Iterable<(int, ReadingSourceConfig)> get _selectedEntries =>
+      _selectedIndexList.map((index) => (index, candidates[index]));
+
+  late final List<ReadingSourceConfig> sources = List.unmodifiable(
+    _selectedIndexList.map((index) => candidates[index]),
+  );
+  late final int duplicates = candidates.length - sources.length;
   int get duplicateGroups => dedupeResult.groups.length;
 
-  SourceImportPreview withMode(BookSourceDedupeMode value) =>
-      SourceImportPreview(sources: candidates, errors: errors, mode: value);
+  SourceImportPreview withMode(BookSourceDedupeMode value) {
+    if (value == mode) return this;
+    final result = const BookSourceDedupeEngine().analyze(
+      _dedupeCandidates,
+      mode: value,
+    );
+    return SourceImportPreview._(
+      _reports,
+      _dedupeCandidates,
+      candidates: candidates,
+      errors: errors,
+      sourceUrls: sourceUrls,
+      mode: value,
+      dedupeResult: result,
+      selectedIndices: result.defaultSelectedIndices,
+    );
+  }
 
-  SourceImportPreview withSelectedIndices(Set<int> value) =>
-      SourceImportPreview(
-        sources: candidates,
-        errors: errors,
-        mode: mode,
-        selectedIndices: value,
-      );
+  SourceImportPreview withSelectedIndices(Set<int> value) {
+    if (setEquals(value, selectedIndices)) return this;
+    return SourceImportPreview._(
+      _reports,
+      _dedupeCandidates,
+      candidates: candidates,
+      errors: errors,
+      sourceUrls: sourceUrls,
+      mode: mode,
+      dedupeResult: dedupeResult,
+      selectedIndices: Set.unmodifiable(value),
+    );
+  }
 
-  int get supported => _count(SourceCompatibilityLevel.supported);
-  int get partial => _count(SourceCompatibilityLevel.partial);
-  int get unsupported => _count(SourceCompatibilityLevel.unsupported);
-  int get imageSources =>
-      _selectedEntries.where((entry) => entry.$2.isImageSource).length;
-  int get textSources =>
-      _selectedEntries.where((entry) => !entry.$2.isImageSource).length;
-  int get runnableImageSources => _selectedEntries.where((entry) {
+  late final int supported = _count(SourceCompatibilityLevel.supported);
+  late final int partial = _count(SourceCompatibilityLevel.partial);
+  late final int unsupported = _count(SourceCompatibilityLevel.unsupported);
+  late final int imageSources = _selectedEntries
+      .where((entry) => entry.$2.isImageSource)
+      .length;
+  late final int textSources = _selectedEntries
+      .where((entry) => !entry.$2.isImageSource)
+      .length;
+  late final int runnableImageSources = _selectedEntries.where((entry) {
     return entry.$2.isImageSource &&
         _reports[entry.$1]?.level != SourceCompatibilityLevel.unsupported;
   }).length;
-  int get runnableTextSources => _selectedEntries.where((entry) {
+  late final int runnableTextSources = _selectedEntries.where((entry) {
     return !entry.$2.isImageSource &&
         _reports[entry.$1]?.level != SourceCompatibilityLevel.unsupported;
   }).length;
-  int get skipped => errors.length + duplicates;
+  late final int skipped = errors.length + duplicates;
 
   int _count(SourceCompatibilityLevel level) =>
       selectedIndices.where((index) => _reports[index]?.level == level).length;
@@ -107,49 +153,54 @@ class SourceImportPreview {
   /// The preview already contains compatibility reports, so pass those across
   /// instead of scanning every source again during the commit tap.
   Future<List<RegisteredBookSource>> toRegisteredSourcesAsync() {
+    final entries = _selectedEntries.toList(growable: false);
     final request = <String, Object?>{
-      'sources': _selectedEntries
-          .map((entry) => entry.$2.raw)
+      'sources': entries.map((entry) => entry.$2.raw).toList(growable: false),
+      'reports': entries
+          .map(
+            (entry) => <String, Object?>{
+              'level': _reports[entry.$1]!.level.name,
+              'issues': _reports[entry.$1]!.issues
+                  .map((issue) => issue.name)
+                  .toList(growable: false),
+            },
+          )
           .toList(growable: false),
-      'reports': <String, Map<String, Object?>>{
-        for (final entry in _selectedEntries)
-          entry.$2.stableId: {
-            'level': _reports[entry.$1]!.level.name,
-            'issues': _reports[entry.$1]!.issues
-                .map((issue) => issue.name)
-                .toList(growable: false),
-          },
-      },
     };
-    return compute(_materializeRegisteredSources, request).then(
-      (maps) => maps.map(RegisteredBookSource.fromJson).toList(growable: false),
-    );
+    return compute(_materializeRegisteredSources, request);
   }
 }
 
-({BookSourceDedupeResult result, Map<int, SourceCompatibilityReport> reports})
+({
+  BookSourceDedupeResult result,
+  Map<int, SourceCompatibilityReport> reports,
+  List<BookSourceDedupeCandidate> candidates,
+})
 _analyzeSources(List<ReadingSourceConfig> sources, BookSourceDedupeMode mode) {
   final reports = <int, SourceCompatibilityReport>{};
-  final candidates = sources.indexed.map((entry) {
+  for (final entry in sources.indexed) {
     final report = const SourceCompatibilityScanner().scan(entry.$2);
     reports[entry.$1] = report;
-    return BookSourceDedupeCandidate(
-      index: entry.$1,
-      rawConfig: entry.$2.raw,
-      compatibilityRank: switch (report.level) {
-        SourceCompatibilityLevel.supported => 2,
-        SourceCompatibilityLevel.partial => 1,
-        SourceCompatibilityLevel.unsupported => 0,
-      },
-      runnableCapabilities: entry.$2
-          .toRegisteredSource(compatibilityReport: report)
-          .capabilities
-          .length,
-    );
-  });
+  }
+  final candidates = sources.indexed
+      .map((entry) {
+        final report = reports[entry.$1]!;
+        return BookSourceDedupeCandidate(
+          index: entry.$1,
+          rawConfig: entry.$2.raw,
+          compatibilityRank: switch (report.level) {
+            SourceCompatibilityLevel.supported => 2,
+            SourceCompatibilityLevel.partial => 1,
+            SourceCompatibilityLevel.unsupported => 0,
+          },
+          runnableCapabilities: entry.$2.runnableCapabilities.length,
+        );
+      })
+      .toList(growable: false);
   return (
     result: const BookSourceDedupeEngine().analyze(candidates, mode: mode),
     reports: Map.unmodifiable(reports),
+    candidates: List.unmodifiable(candidates),
   );
 }
 
@@ -184,48 +235,53 @@ class SourceImportService {
              ),
            );
 
-  /// Large aggregate source lists commonly exceed 20 MiB. Keep a finite
-  /// boundary for malformed or hostile responses without rejecting normal
-  /// community-maintained collections.
-  static const int maxImportBytes = 64 * 1024 * 1024;
-  static const int maxSources = 10000;
   static const int maxNestedUrls = 50;
   static const int maxNestedDepth = 2;
 
   final Dio _dio;
   final Dio _systemDio;
   final BookSourceNetworkPolicy _networkPolicy;
+  final Set<CancelToken> _activeDownloads = {};
+  var _operationGeneration = 0;
+  var _closed = false;
+
+  void cancelActiveDownloads([String reason = 'Source import cancelled.']) {
+    _operationGeneration++;
+    for (final token in _activeDownloads.toList(growable: false)) {
+      token.cancel(reason);
+    }
+  }
 
   void close({bool force = true}) {
+    if (_closed) return;
+    _closed = true;
+    cancelActiveDownloads();
     _dio.close(force: force);
     if (!identical(_systemDio, _dio)) _systemDio.close(force: force);
   }
 
   Future<Uint8List> downloadBytes(String input) async {
+    final operationGeneration = _startOperation();
     final uri = Uri.tryParse(input.trim());
     if (uri == null ||
         !uri.hasAuthority ||
         (uri.scheme != 'http' && uri.scheme != 'https')) {
       throw const FormatException('Import URL must use HTTP or HTTPS.');
     }
-    return _download(uri);
+    return _download(uri, operationGeneration);
   }
 
   SourceImportPreview parseBytes(Uint8List bytes) {
     return _collect(_parseBytes(bytes));
   }
 
-  Future<SourceImportPreview> parseBytesAsync(Uint8List bytes) async {
-    return _collect(await compute(_parseSourceImportBytes, bytes));
+  Future<SourceImportPreview> parseBytesAsync(Uint8List bytes) {
+    return compute(_parseSourceImportPreview, bytes);
   }
 
   SourceImportPreview parseDecoded(Object? decoded) {
     return _collect(
-      parseReadingSourcePayload(
-        decoded,
-        maxSources: maxSources,
-        maxNestedUrls: maxNestedUrls,
-      ),
+      parseReadingSourcePayload(decoded, maxNestedUrls: maxNestedUrls),
     );
   }
 
@@ -238,20 +294,8 @@ class SourceImportService {
   }
 
   static SourceImportResult _parseSourceImportBytes(Uint8List bytes) {
-    if (bytes.length > maxImportBytes) {
-      throw const FormatException('Source file exceeds the 64 MiB limit.');
-    }
-    late final String text;
-    try {
-      text = utf8.decode(bytes, allowMalformed: false);
-    } on FormatException catch (error) {
-      throw FormatException(
-        'Source JSON must be valid UTF-8: ${error.message}',
-      );
-    }
-    return parseReadingSources(
-      text,
-      maxSources: maxSources,
+    return parseReadingSourcePayload(
+      decodeSourceImportBytes(bytes),
       maxNestedUrls: maxNestedUrls,
     );
   }
@@ -259,7 +303,10 @@ class SourceImportService {
   Future<SourceImportPreview> loadUrl(
     String input, {
     Uint8List? initialBytes,
+    SourceImportPreview? initialPreview,
+    VoidCallback? onDownloadsComplete,
   }) async {
+    final operationGeneration = _startOperation();
     final uri = Uri.tryParse(input.trim());
     if (uri == null ||
         !uri.hasAuthority ||
@@ -272,11 +319,19 @@ class SourceImportService {
       depth: 0,
       visited: visited,
       initialBytes: initialBytes,
+      initialPreview: initialPreview,
+      operationGeneration: operationGeneration,
     );
-    return SourceImportPreview(
-      sources: List.unmodifiable(tree.sources),
-      errors: List.unmodifiable(tree.errors),
-    );
+    _throwIfCancelled(operationGeneration);
+    onDownloadsComplete?.call();
+    final preview = await compute(_buildSourceImportPreview, {
+      'sources': tree.sources
+          .map((source) => source.raw)
+          .toList(growable: false),
+      'errors': tree.errors,
+    });
+    _throwIfCancelled(operationGeneration);
+    return preview;
   }
 
   Future<_SourceImportTree> _loadRecursive(
@@ -284,7 +339,10 @@ class SourceImportService {
     required int depth,
     required Set<String> visited,
     Uint8List? initialBytes,
+    SourceImportPreview? initialPreview,
+    required int operationGeneration,
   }) async {
+    _throwIfCancelled(operationGeneration);
     if (depth > maxNestedDepth) {
       return _SourceImportTree(
         errors: ['$uri: nested import depth exceeds $maxNestedDepth.'],
@@ -294,23 +352,58 @@ class SourceImportService {
     if (visited.length > maxNestedUrls + 1) {
       throw const FormatException('Too many nested source URLs.');
     }
-    final bytes = initialBytes ?? await _download(uri);
-    final parsed = await _parseBytesAsync(bytes);
-    final sources = <ReadingSourceConfig>[...parsed.candidates];
-    final errors = <String>[...parsed.errors.map((error) => '$uri: $error')];
+    late final List<ReadingSourceConfig> candidates;
+    late final List<Uri> sourceUrls;
+    late final List<String> parseErrors;
+    if (initialPreview != null) {
+      candidates = initialPreview.candidates;
+      sourceUrls = initialPreview.sourceUrls;
+      parseErrors = initialPreview.errors;
+    } else {
+      final bytes = initialBytes ?? await _download(uri, operationGeneration);
+      final parsed = await _parseBytesAsync(bytes);
+      _throwIfCancelled(operationGeneration);
+      candidates = parsed.candidates;
+      sourceUrls = parsed.sourceUrls;
+      parseErrors = parsed.errors;
+    }
+    final sources = <ReadingSourceConfig>[...candidates];
+    final errors = <String>[...parseErrors.map((error) => '$uri: $error')];
     final nestedResults = await _mapWithConcurrency(
-      parsed.sourceUrls,
+      sourceUrls,
       _maxNestedConcurrent,
-      (nested) => _loadRecursive(nested, depth: depth + 1, visited: visited),
+      (nested) => _loadNestedSafely(
+        nested,
+        depth: depth + 1,
+        visited: visited,
+        operationGeneration: operationGeneration,
+      ),
     );
     for (final nested in nestedResults) {
       sources.addAll(nested.sources);
       errors.addAll(nested.errors);
     }
-    if (sources.length > maxSources) {
-      throw const FormatException('Too many sources in import.');
-    }
     return _SourceImportTree(sources: sources, errors: errors);
+  }
+
+  Future<_SourceImportTree> _loadNestedSafely(
+    Uri uri, {
+    required int depth,
+    required Set<String> visited,
+    required int operationGeneration,
+  }) async {
+    try {
+      return await _loadRecursive(
+        uri,
+        depth: depth,
+        visited: visited,
+        operationGeneration: operationGeneration,
+      );
+    } on SourceImportCancelledException {
+      rethrow;
+    } on Object catch (error) {
+      return _SourceImportTree(errors: ['$uri: $error']);
+    }
   }
 
   Future<List<T>> _mapWithConcurrency<T>(
@@ -335,10 +428,12 @@ class SourceImportService {
     return results.cast<T>();
   }
 
-  Future<Uint8List> _download(Uri initial) async {
+  Future<Uint8List> _download(Uri initial, int operationGeneration) async {
     var current = initial;
     for (var redirects = 0; redirects <= 5; redirects++) {
+      _throwIfCancelled(operationGeneration);
       final resolvedAddresses = await _networkPolicy.resolve(current);
+      _throwIfCancelled(operationGeneration);
       // Mirrors SourceHttpTransport: virtual-DNS clients (Surge/Clash/etc.)
       // route the reserved 198.18.0.0/15 range through a local tunnel that
       // the pinned connection factory bypasses, turning valid responses into
@@ -348,6 +443,7 @@ class SourceImportService {
           ? _systemDio
           : _dio;
       final cancelToken = CancelToken();
+      _activeDownloads.add(cancelToken);
       try {
         final response = await client.getUri<List<int>>(
           current,
@@ -358,21 +454,14 @@ class SourceImportService {
                 status != null && status >= 200 && status < 400,
           ),
           cancelToken: cancelToken,
-          onReceiveProgress: (received, total) {
-            if (received > maxImportBytes || total > maxImportBytes) {
-              cancelToken.cancel(
-                'Source import exceeds $maxImportBytes bytes.',
-              );
-            }
-          },
         );
+        _throwIfCancelled(operationGeneration);
         final status = response.statusCode ?? 0;
         if (status < 300) {
-          final bytes = Uint8List.fromList(response.data ?? const []);
-          if (bytes.length > maxImportBytes) {
-            throw const FormatException('Source import exceeds 64 MiB.');
-          }
-          return bytes;
+          final data = response.data;
+          return data is Uint8List
+              ? data
+              : Uint8List.fromList(data ?? const []);
         }
         if (redirects == 5) {
           throw const BookSourceProtocolException(
@@ -385,18 +474,34 @@ class SourceImportService {
         );
       } on DioException catch (error) {
         if (CancelToken.isCancel(error)) {
-          throw const FormatException('Source import exceeds 64 MiB.');
+          throw SourceImportCancelledException(
+            error.error?.toString() ?? 'Source import cancelled.',
+          );
         }
         rethrow;
+      } finally {
+        _activeDownloads.remove(cancelToken);
       }
     }
     throw const BookSourceProtocolException('Source import failed.');
+  }
+
+  int _startOperation() {
+    if (_closed) throw const SourceImportCancelledException();
+    return _operationGeneration;
+  }
+
+  void _throwIfCancelled(int operationGeneration) {
+    if (_closed || operationGeneration != _operationGeneration) {
+      throw const SourceImportCancelledException();
+    }
   }
 
   SourceImportPreview _collect(SourceImportResult result) {
     return SourceImportPreview(
       sources: result.candidates,
       errors: result.errors,
+      sourceUrls: result.sourceUrls,
     );
   }
 }
@@ -410,17 +515,32 @@ class _SourceImportTree {
   final List<String> errors;
 }
 
-List<Map<String, dynamic>> _materializeRegisteredSources(
+SourceImportPreview _buildSourceImportPreview(Map<String, Object?> request) {
+  final sources = (request['sources']! as List)
+      .map(
+        (raw) => ReadingSourceConfig.fromJson(
+          (raw as Map).map((key, value) => MapEntry('$key', value)),
+        ),
+      )
+      .toList(growable: false);
+  return SourceImportPreview(
+    sources: sources,
+    errors: List<String>.from(request['errors']! as List),
+  );
+}
+
+List<RegisteredBookSource> _materializeRegisteredSources(
   Map<String, Object?> request,
 ) {
   final rawSources = request['sources']! as List;
-  final reports = request['reports']! as Map;
-  return rawSources
-      .map((raw) {
+  final reports = request['reports']! as List;
+  return rawSources.indexed
+      .map((entry) {
+        final raw = entry.$2;
         final source = ReadingSourceConfig.fromJson(
           (raw as Map).map((key, value) => MapEntry('$key', value)),
         );
-        final reportData = reports[source.stableId] as Map;
+        final reportData = reports[entry.$1] as Map;
         final report = SourceCompatibilityReport(
           level: SourceCompatibilityLevel.values.byName(
             '${reportData['level']}',
@@ -429,7 +549,22 @@ List<Map<String, dynamic>> _materializeRegisteredSources(
               .map((issue) => SourceCompatibilityIssue.values.byName('$issue'))
               .toSet(),
         );
-        return source.toRegisteredSource(compatibilityReport: report).toJson();
+        return source.toRegisteredSource(compatibilityReport: report);
       })
       .toList(growable: false);
+}
+
+// On the Dart VM, fusing parses JSON directly from UTF-8 bytes without an
+// additional whole-document String allocation. Web uses the SDK fallback.
+Object? decodeSourceImportBytes(Uint8List bytes) => const Utf8Decoder(
+  allowMalformed: false,
+).fuse(const JsonDecoder()).convert(bytes);
+
+SourceImportPreview _parseSourceImportPreview(Uint8List bytes) {
+  final result = SourceImportService._parseSourceImportBytes(bytes);
+  return SourceImportPreview(
+    sources: result.candidates,
+    errors: result.errors,
+    sourceUrls: result.sourceUrls,
+  );
 }

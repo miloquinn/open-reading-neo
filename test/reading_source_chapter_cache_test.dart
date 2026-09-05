@@ -122,6 +122,41 @@ void main() {
     expect(runtime.loginCalls, 1);
     expect(runtime.contentLoads, 2);
   });
+
+  test('reading source download reuses fresh chapter content', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'reading-source-download-cache-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final runtime = _CachingRuntime();
+    final backend = ReadingSourceBackend(
+      () => runtime,
+      chapterCache: BookSourceChapterCache(cacheDirectory: directory),
+      additionalProtocolsEnabled: () async => true,
+    );
+    final source = _readingSource();
+
+    await backend.getChapters(source, 'book');
+    final downloadedCatalog = await backend.getChaptersForDownload(
+      source,
+      'book',
+    );
+    await backend.getChapterContent(
+      source,
+      bookId: 'book',
+      chapterId: 'chapter',
+    );
+    final downloaded = await backend.getChapterContentForDownload(
+      source,
+      bookId: 'book',
+      chapterId: 'chapter',
+    );
+
+    expect(downloadedCatalog.single.id, 'chapter');
+    expect(runtime.catalogLoads, 1);
+    expect(downloaded.content, 'cached body');
+    expect(runtime.contentLoads, 1);
+  });
 }
 
 RegisteredBookSource _readingSource() => RegisteredBookSource(

@@ -1,9 +1,79 @@
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
+import 'package:xxread/book_sources/services/book_source_text_paginator.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/core/reader/reader_pagination_cache_codec.dart';
 
 void main() {
+  testWidgets('online compact boundaries restore visible text and offsets', (
+    tester,
+  ) async {
+    final text = List.filled(25, '第一段 abc def。\n\n第二段 内容。').join('\n');
+    final pages = paginateBookSourceText(
+      text,
+      width: 180,
+      firstPageHeight: 160,
+      pageHeight: 160,
+      style: const TextStyle(fontSize: 18),
+      textDirection: TextDirection.ltr,
+      firstLineIndent: 2,
+      paragraphSpacing: 1,
+    );
+    final payload = ReaderPaginationCacheCodec.encodeTextPages(pages);
+    final restored = ReaderPaginationCacheCodec.restoreTextPages(
+      payload,
+      text: text,
+      firstLineIndent: 2,
+      paragraphSpacing: 1,
+    );
+    expect(restored, isNotNull);
+    expect(
+      restored!
+          .map(
+            (p) => (
+              p.text,
+              p.startOffset,
+              p.endOffset,
+              p.displayStart,
+              p.displayEnd,
+              p.isChapterTitle,
+            ),
+          )
+          .toList(),
+      pages
+          .map(
+            (p) => (
+              p.text,
+              p.startOffset,
+              p.endOffset,
+              p.displayStart,
+              p.displayEnd,
+              p.isChapterTitle,
+            ),
+          )
+          .toList(),
+    );
+    expect(
+      ReaderPaginationCacheCodec.restoreTextPages(
+        payload,
+        text: 'short',
+        firstLineIndent: 2,
+        paragraphSpacing: 1,
+      ),
+      isNull,
+    );
+    expect(
+      ReaderPaginationCacheCodec.restoreTextPages(
+        Uint8List.fromList([1, 2]),
+        text: text,
+        firstLineIndent: 2,
+        paragraphSpacing: 1,
+      ),
+      isNull,
+    );
+  });
+
   test('round-trips every native pagination boundary field', () {
     const pages = <ReaderPaginationCachePage>[
       ReaderPaginationCachePage(

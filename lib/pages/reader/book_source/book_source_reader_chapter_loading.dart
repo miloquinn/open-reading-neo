@@ -188,6 +188,7 @@ extension _BookSourceReaderChapterLoading on _BookSourceReaderPageState {
               _bookSourceReadableChapterTextLimit) {
             _readableChapterText.remove(_readableChapterText.keys.first);
           }
+          await _loadOnlinePagination(index);
           _prefetchedContent[index] = content;
           _trimChapterMemoryCaches();
           if (!mounted) {

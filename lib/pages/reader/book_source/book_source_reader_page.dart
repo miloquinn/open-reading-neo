@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:xxread/services/books/pagination_cache_dao.dart';
+import 'package:xxread/core/reader/reader_pagination_cache_codec.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -90,6 +95,7 @@ part 'book_source_reader_basic_turning.dart';
 part 'book_source_reader_curl_rendering.dart';
 part 'book_source_reader_catalog_loading.dart';
 part 'book_source_reader_chapter_loading.dart';
+part 'book_source_reader_pagination_cache.dart';
 part 'book_source_reader_navigation.dart';
 part 'book_source_reader_settings.dart';
 part 'book_source_reader_aloud_actions.dart';
@@ -115,6 +121,8 @@ class BookSourceReaderPage extends StatefulWidget {
   shelfServiceFactory;
   final ReaderThemePalette? initialTheme;
   final SourceCoverCache? remoteImageCache;
+  final PaginationCacheDao? paginationCacheDao;
+  final ValueChanged<int>? onPaginationCacheMiss;
 
   const BookSourceReaderPage({
     super.key,
@@ -128,6 +136,8 @@ class BookSourceReaderPage extends StatefulWidget {
     this.shelfServiceFactory,
     this.initialTheme,
     this.remoteImageCache,
+    this.paginationCacheDao,
+    this.onPaginationCacheMiss,
   }) : assert(client == null || clientFactory == null),
        assert(shelfService == null || shelfServiceFactory == null);
 
@@ -148,6 +158,19 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
           (client) => BookSourceShelfService(client: client))(_client);
   late final SourceCoverCache _remoteImageCache =
       widget.remoteImageCache ?? SourceCoverCache.imagePageInstance;
+  late final PaginationCacheDao _paginationCacheDao =
+      widget.paginationCacheDao ?? PaginationCacheDao();
+  int _paginationCacheEpoch = PaginationCacheDao.epoch;
+  final Map<
+    int,
+    ({
+      String revision,
+      int revisionEpoch,
+      String text,
+      Map<String, Uint8List> layouts,
+    })
+  >
+  _persistedOnlinePagination = {};
   PageController _pageController = PageController();
   final ItemScrollController _verticalPageScrollController =
       ItemScrollController();

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,8 +18,23 @@ import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 import 'package:xxread/widgets/reader_shader_page_curl.dart';
 
+import 'support/reader_cache_test_utils.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory supportDirectory;
   late ReplaceRuleService replaceRuleService;
+
+  setUpAll(() {
+    supportDirectory = Directory.systemTemp.createTempSync(
+      'open-reading-epub-transition-support-',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (_) async => supportDirectory.path,
+        );
+  });
 
   setUp(() {
     replaceRuleService = ReplaceRuleService();
@@ -26,6 +42,15 @@ void main() {
 
   tearDown(() async {
     await replaceRuleService.close();
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          null,
+        );
+    supportDirectory.deleteSync(recursive: true);
   });
 
   test('reader font overrides EPUB font except for the platform default', () {
@@ -107,6 +132,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);
@@ -257,6 +283,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);
@@ -357,6 +384,7 @@ void main() {
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
+      await drainReaderCache(tester);
       await tester.binding.setSurfaceSize(null);
       debugDefaultTargetPlatformOverride = null;
       directory.deleteSync(recursive: true);
@@ -447,6 +475,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);
@@ -605,6 +634,7 @@ void main() {
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
+      await drainReaderCache(tester);
       await tester.binding.setSurfaceSize(null);
       debugDefaultTargetPlatformOverride = null;
       directory.deleteSync(recursive: true);
@@ -702,6 +732,7 @@ void main() {
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
+        await drainReaderCache(tester);
         await tester.binding.setSurfaceSize(null);
         debugDefaultTargetPlatformOverride = null;
         directory.deleteSync(recursive: true);

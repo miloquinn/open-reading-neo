@@ -10,6 +10,7 @@ import 'package:dio/io.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import '../../services/core/cache_disk_budget.dart';
 import '../networking/book_source_network_policy.dart';
 import '../source_engine/source_webview_loader.dart';
 
@@ -49,11 +50,15 @@ class SourceCoverCache {
     this.maxDiskAge = const Duration(days: 7),
     this.maxImageBytes = 8 * 1024 * 1024,
     this.maxMemoryBytes = 24 * 1024 * 1024,
+    this.maxDiskBytes = 96 * 1024 * 1024,
+    this.diskMaintenanceInterval = const Duration(minutes: 5),
+    this._beforeDiskRename,
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(),
     this._platformLoader = const SourceWebViewLoader(),
   }) : assert(maxConcurrent > 0),
        assert(maxImageBytes > 0),
        assert(maxMemoryBytes > 0),
+       assert(maxDiskBytes >= 0),
        _networkPolicy = networkPolicy {
     _dio =
         dio ??
@@ -82,6 +87,7 @@ class SourceCoverCache {
     maxDiskAge: const Duration(days: 30),
     maxImageBytes: 24 * 1024 * 1024,
     maxMemoryBytes: 64 * 1024 * 1024,
+    maxDiskBytes: 512 * 1024 * 1024,
   );
   static const String directoryName = 'source_covers';
   static const String imagePageDirectoryName = 'source_image_pages';
@@ -92,6 +98,9 @@ class SourceCoverCache {
   final Duration maxDiskAge;
   final int maxImageBytes;
   final int maxMemoryBytes;
+  final int maxDiskBytes;
+  final Duration diskMaintenanceInterval;
+  final Future<void> Function()? _beforeDiskRename;
   final Directory? _cacheDirectory;
   final BookSourceNetworkPolicy _networkPolicy;
   final SourceWebViewLoaderPort _platformLoader;
@@ -100,6 +109,7 @@ class SourceCoverCache {
   late final SourceCoverLoader _loader;
   final LinkedHashMap<String, Uint8List> _memory = LinkedHashMap();
   final Map<String, Future<Uint8List>> _inFlight = {};
+  final Map<String, Future<void>> _diskWriteQueues = {};
   final Queue<_SourceImageWaiter> _visibleWaiters = Queue();
   final Queue<_SourceImageWaiter> _preloadWaiters = Queue();
   final Map<String, int> _keyEpochs = {};
@@ -178,7 +188,7 @@ class SourceCoverCache {
         _validateBytes(bytes);
         if (_isCurrent(key, epoch)) {
           _remember(key, bytes);
-          await _writeDisk(key, bytes);
+          await _writeDisk(key, bytes, epoch);
         }
         return bytes;
       } catch (error, stackTrace) {
@@ -431,26 +441,72 @@ class SourceCoverCache {
     try {
       final file = await _fileFor(key);
       if (!await file.exists()) return null;
-      if (DateTime.now().difference(await file.lastModified()) > maxDiskAge) {
+      final budget = await _diskBudget();
+      if (await budget.isExpired(file)) {
         await file.delete();
         return null;
       }
       final bytes = await file.readAsBytes();
       _validateBytes(bytes);
+      unawaited(budget.touch(file));
+      unawaited(budget.maintain().catchError((_) {}));
       return bytes;
     } catch (_) {
       return null;
     }
   }
 
-  Future<void> _writeDisk(String key, Uint8List bytes) async {
+  Future<void> _writeDisk(String key, Uint8List bytes, (int, int) epoch) async {
+    final previous = _diskWriteQueues[key] ?? Future<void>.value();
+    late final Future<void> next;
+    next = previous.then((_) => _writeDiskNow(key, bytes, epoch)).whenComplete(
+      () {
+        if (identical(_diskWriteQueues[key], next)) {
+          _diskWriteQueues.remove(key);
+        }
+      },
+    );
+    _diskWriteQueues[key] = next;
+    await next;
+  }
+
+  Future<void> _writeDiskNow(
+    String key,
+    Uint8List bytes,
+    (int, int) epoch,
+  ) async {
     try {
+      if (!_isCurrent(key, epoch)) return;
       final file = await _fileFor(key);
       await file.parent.create(recursive: true);
-      final temporary = File('${file.path}.part');
+      final temporary = File('${file.path}.part-${epoch.$1}-${epoch.$2}');
       await temporary.writeAsBytes(bytes, flush: true);
-      if (await file.exists()) await file.delete();
+      if (!_isCurrent(key, epoch)) {
+        if (await temporary.exists()) await temporary.delete();
+        return;
+      }
+      await _beforeDiskRename?.call();
+      if (!_isCurrent(key, epoch)) {
+        if (await temporary.exists()) await temporary.delete();
+        return;
+      }
+      if (await file.exists()) {
+        if (!_isCurrent(key, epoch)) {
+          if (await temporary.exists()) await temporary.delete();
+          return;
+        }
+        await file.delete();
+      }
+      if (!_isCurrent(key, epoch)) {
+        if (await temporary.exists()) await temporary.delete();
+        return;
+      }
       await temporary.rename(file.path);
+      if (!_isCurrent(key, epoch)) {
+        if (await file.exists()) await file.delete();
+        return;
+      }
+      await (await _diskBudget()).recordWrite(bytes.lengthInBytes);
     } catch (_) {
       // A cache write must never turn a valid network image into a UI failure.
     }
@@ -464,6 +520,16 @@ class SourceCoverCache {
 
   Future<File> _fileFor(String key) async =>
       File(path.join((await directory()).path, '$key.img'));
+
+  Future<CacheDiskBudget> _diskBudget() async => CacheDiskBudget(
+    directory: await directory(),
+    maxBytes: maxDiskBytes,
+    maxAge: maxDiskAge,
+    maintenanceInterval: diskMaintenanceInterval,
+  );
+
+  Future<void> maintainDisk({bool force = false}) async =>
+      (await _diskBudget()).maintain(force: force);
 
   String _key(Uri uri, [Map<String, String> headers = const {}]) {
     final entries = headers.entries.toList()
@@ -504,6 +570,7 @@ class SourceCoverCache {
   Future<void> clearDisk() async {
     _cacheEpoch++;
     _keyEpochs.clear();
+    _inFlight.clear();
     final cacheDirectory = await directory();
     if (await cacheDirectory.exists()) {
       await cacheDirectory.delete(recursive: true);
@@ -515,25 +582,7 @@ class SourceCoverCache {
     await clearDisk();
   }
 
-  Future<int> diskSizeBytes() async => _directorySize(await directory());
-
-  Future<int> _directorySize(Directory directory) async {
-    if (!await directory.exists()) return 0;
-    var total = 0;
-    await for (final entity in directory.list(
-      recursive: true,
-      followLinks: false,
-    )) {
-      if (entity is File) {
-        try {
-          total += await entity.length();
-        } catch (_) {
-          // Ignore files removed concurrently by the OS or cache cleanup.
-        }
-      }
-    }
-    return total;
-  }
+  Future<int> diskSizeBytes() async => (await _diskBudget()).sizeBytes();
 }
 
 class _SourceImageWaiter {

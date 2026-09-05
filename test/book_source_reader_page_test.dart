@@ -22,6 +22,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/pages/reader/image/paged_image_reader.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
+import 'package:xxread/services/books/pagination_cache_dao.dart';
 import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_chapter_title_page.dart';
@@ -56,6 +57,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -96,6 +98,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -132,6 +135,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -186,6 +190,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -225,6 +230,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -301,12 +307,14 @@ void main() {
       categories: [],
     );
     final client = _FakeBookSourceClient();
+    final paginationCache = _MemoryPaginationCacheDao();
 
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: paginationCache,
           replaceRuleService: _replaceRules,
           source: source,
           book: book,
@@ -346,6 +354,12 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(client.requestedChapterIds, contains('chapter-2'));
+    expect(
+      paginationCache.readCount,
+      0,
+      reason:
+          'continuous scrolling does not need persisted pagination boundaries',
+    );
   });
 
   testWidgets('replacement rules clean source chapter titles and content', (
@@ -385,6 +399,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -437,6 +452,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: source,
           book: book,
@@ -473,6 +489,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: source,
           book: book,
@@ -544,6 +561,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -618,6 +636,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -668,6 +687,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -915,6 +935,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -964,6 +985,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -1005,6 +1027,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -1063,6 +1086,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              paginationCacheDao: _MemoryPaginationCacheDao(),
               replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
@@ -1366,6 +1390,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              paginationCacheDao: _MemoryPaginationCacheDao(),
               replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
@@ -1492,6 +1517,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: BookSourceReaderPage(
+              paginationCacheDao: _MemoryPaginationCacheDao(),
               replaceRuleService: _replaceRules,
               source: _testSource(),
               book: const BookSourceBook(
@@ -1764,6 +1790,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -1802,6 +1829,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BookSourceReaderPage(
+          paginationCacheDao: _MemoryPaginationCacheDao(),
           replaceRuleService: _replaceRules,
           source: _testSource(),
           book: const BookSourceBook(
@@ -1846,6 +1874,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: BookSourceReaderPage(
+            paginationCacheDao: _MemoryPaginationCacheDao(),
             replaceRuleService: _replaceRules,
             source: _testSource(),
             book: const BookSourceBook(
@@ -1999,6 +2028,7 @@ Widget _buildTabletSourceReader(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    paginationCacheDao: _MemoryPaginationCacheDao(),
     replaceRuleService: _replaceRules,
     source: _testSource(),
     book: const BookSourceBook(
@@ -2374,6 +2404,43 @@ class _LongFakeBookSourceClient extends _FakeBookSourceClient {
         (index) => 'Paragraph $index keeps both tablet leaves populated.',
       ).join('\n'),
       contentType: 'text/plain',
+    );
+  }
+}
+
+/// UI behavior tests own their storage; SQLite persistence has separate coverage.
+class _MemoryPaginationCacheDao extends PaginationCacheDao {
+  final Map<String, Map<String, Uint8List>> _layouts = {};
+  int readCount = 0;
+
+  @override
+  Future<Map<String, Uint8List>> loadForIdentity(
+    String identity,
+    String bookRevision,
+  ) async {
+    readCount++;
+    return Map.of(_layouts['$identity:$bookRevision'] ?? {});
+  }
+
+  @override
+  Future<void> upsertForIdentity({
+    required String identity,
+    int? localBookId,
+    required String bookRevision,
+    required String layoutFingerprint,
+    required int chapterIndex,
+    required Uint8List payload,
+    int? expectedEpoch,
+    int? expectedRevisionEpoch,
+  }) async {
+    if (expectedEpoch != null && expectedEpoch != PaginationCacheDao.epoch) {
+      return;
+    }
+    _layouts.putIfAbsent(
+      '$identity:$bookRevision',
+      () => {},
+    )[layoutFingerprint] = Uint8List.fromList(
+      payload,
     );
   }
 }

@@ -401,17 +401,6 @@ Map<String, dynamic>? _readLargeTxtIndexCache(String indexPath) {
   }
 }
 
-void _deleteOversizedParsedChapterCaches(String cacheDirectoryPath) {
-  final directory = Directory(cacheDirectoryPath);
-  if (!directory.existsSync()) return;
-  for (final entry in directory.listSync().whereType<File>()) {
-    if (entry.path.endsWith('.json') &&
-        entry.lengthSync() > _largeTxtFileThreshold) {
-      entry.deleteSync();
-    }
-  }
-}
-
 List<Map<String, dynamic>>? _readParsedChapterCache(String cachePath) {
   try {
     final file = File(cachePath);
@@ -449,17 +438,6 @@ void _writeParsedChapterCache(Map<String, dynamic> arguments) {
   );
   if (file.existsSync()) file.deleteSync();
   temporary.renameSync(cachePath);
-
-  final cachedFiles =
-      file.parent
-          .listSync()
-          .whereType<File>()
-          .where((entry) => entry.path.endsWith('.json'))
-          .toList()
-        ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
-  for (final stale in cachedFiles.skip(3)) {
-    stale.deleteSync();
-  }
 }
 
 /// 携带面向用户文案的书籍加载异常；错误页直接展示 [message]。

@@ -82,6 +82,7 @@ extension _BookSourceReaderVerticalPaging on _BookSourceReaderPageState {
     BookSourceChapterContent content,
     Size viewport,
   ) {
+    _checkOnlinePaginationEpoch();
     final chrome = _verticalChrome;
     final width = readerTextContentWidth(viewport.width, _horizontalMargin);
     final height = _verticalPageExtentFor(viewport);

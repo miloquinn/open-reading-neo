@@ -60,6 +60,7 @@ import 'package:xxread/services/books/enhanced_txt_import_service.dart';
 import 'package:xxread/services/books/epub_native_parser.dart';
 import 'package:xxread/services/books/kindle_book_parser.dart';
 import 'package:xxread/services/books/pagination_cache_dao.dart';
+import 'package:xxread/services/books/native_reader_cache_store.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
 import 'package:xxread/services/books/txt_content_change_bus.dart';
 import 'package:xxread/services/books/txt_edit_service.dart';
@@ -153,8 +154,14 @@ final Map<String, Future<void>> _epubFontLoads = <String, Future<void>>{};
 /// Active readers keep their loaded chapters through their State fields and
 /// can rebuild pagination entries on demand.
 void clearNativeReaderMemoryCaches() {
+  for (final key in _bookMemoryCache.keys) {
+    unawaited(NativeReaderCacheStore.instance.release(key));
+  }
   _bookMemoryCache.clear();
   _navigationMemoryCache.clear();
+  for (final layouts in _paginationMemoryCache.values) {
+    layouts.clear();
+  }
   _paginationMemoryCache.clear();
 }
 
@@ -249,6 +256,7 @@ class NativeReaderPage extends StatefulWidget {
 class _NativeReaderPageState extends State<NativeReaderPage>
     with WidgetsBindingObserver {
   late Book _activeBook;
+  String? _readerMemoryCacheKey;
   late final ReplaceRuleService _replaceRules = widget.replaceRuleService;
   late Future<List<_NativeChapter>> _chaptersFuture;
   PageController? _pageController;
@@ -297,6 +305,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   late final PaginationCacheDao _paginationCacheDao =
       widget.paginationCacheDao ?? PaginationCacheDao();
   final Map<String, Uint8List> _persistedPaginationPayloads = {};
+  int _paginationCacheEpoch = PaginationCacheDao.epoch;
   Future<void> _paginationCacheLoadFuture = Future<void>.value();
   Future<void> _paginationCacheWriteQueue = Future<void>.value();
   List<_NativeChapter> _loadedChapters = const [];
@@ -636,17 +645,16 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   String get _bookCacheKey =>
       '${widget.book.format.toLowerCase() == 'txt' ? 'txt-parser-v6:' : ''}'
       '${_activeBook.contentHash ?? _activeBook.filePath}:'
-      '${_activeBook.fileModifiedTime ?? _sourceModifiedForCache}:'
+      '$_sourceFileRevisionForCache:'
       '${_activeBook.textEncoding ?? 'auto'}:edit-$_contentEditRevision';
 
-  int get _sourceModifiedForCache {
-    if (kIsWeb) return 0;
+  String get _sourceFileRevisionForCache {
+    if (kIsWeb) return '${_activeBook.fileModifiedTime ?? 0}';
     try {
-      return File(
-        _activeBook.filePath,
-      ).lastModifiedSync().millisecondsSinceEpoch;
+      final stat = File(_activeBook.filePath).statSync();
+      return '${stat.modified.microsecondsSinceEpoch}:${stat.size}';
     } on FileSystemException {
-      return 0;
+      return '${_activeBook.fileModifiedTime ?? 0}';
     }
   }
 
@@ -678,6 +686,20 @@ class _NativeReaderPageState extends State<NativeReaderPage>
 
   @override
   void dispose() {
+    final cacheKey = _readerMemoryCacheKey;
+    if (widget.book.format.toLowerCase() == 'epub' && cacheKey != null) {
+      // Lazy EPUB chapters reference extracted files. Once this reader closes,
+      // retain disk pagination but let the resource budget reclaim those files.
+      _bookMemoryCache.remove(cacheKey);
+      _paginationMemoryCache.remove(cacheKey);
+      _navigationMemoryCache.removeWhere(
+        (key, _) => key == cacheKey || key.startsWith('$cacheKey:'),
+      );
+      unawaited(NativeReaderCacheStore.instance.release(cacheKey));
+    }
+    unawaited(
+      NativeReaderCacheStore.instance.release(this, enforceBudget: true),
+    );
     _autoPageTurnStartRequest++;
     _autoPageTurnController.removeListener(_onAutoPageTurnChanged);
     _autoPageTurnController.dispose();

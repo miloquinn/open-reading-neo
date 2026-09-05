@@ -23,7 +23,7 @@ class DatabaseService {
 
   static Database? _database;
   static const String _dbName = 'xxread_v2.db';
-  static const int _dbVersion = 23;
+  static const int _dbVersion = 24;
   static Future<Database>? _openingDatabase;
 
   Future<Database> get database async {
@@ -366,7 +366,7 @@ class DatabaseService {
     if (oldVersion < 21) {
       await db.execute('ALTER TABLE books ADD COLUMN reading_progress REAL');
     }
-    if (oldVersion < 22) {
+    if (oldVersion < PaginationCacheSchemaMigration.migrationVersion) {
       await PaginationCacheSchemaMigration.migrate(db);
     }
     if (oldVersion < 23) {

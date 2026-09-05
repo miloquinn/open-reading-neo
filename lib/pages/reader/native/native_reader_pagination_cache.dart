@@ -1,17 +1,26 @@
 part of 'native_reader_page.dart';
 
 extension _NativeReaderPersistentPaginationCache on _NativeReaderPageState {
+  void _checkPaginationCacheEpoch() {
+    if (_paginationCacheEpoch == PaginationCacheDao.epoch) return;
+    _paginationCacheEpoch = PaginationCacheDao.epoch;
+    _persistedPaginationPayloads.clear();
+    _pageCache.clear();
+  }
+
   String get _paginationBookRevision =>
       sha1.convert(utf8.encode(_bookCacheKey)).toString();
 
   Future<void> _loadPersistedPaginationCache() async {
     final bookId = widget.book.id;
     if (bookId == null) return;
+    final generation = PaginationCacheDao.epoch;
     try {
       final restored = await _paginationCacheDao.loadForBook(
         bookId,
         _paginationBookRevision,
       );
+      if (generation != PaginationCacheDao.epoch) return;
       _persistedPaginationPayloads
         ..clear()
         ..addAll(restored);
@@ -29,16 +38,30 @@ extension _NativeReaderPersistentPaginationCache on _NativeReaderPageState {
     final bookId = widget.book.id;
     if (bookId == null || pages.isEmpty) return;
     try {
+      final generation = PaginationCacheDao.epoch;
+      final revision = _paginationBookRevision;
+      final revisionToken = PaginationCacheDao.revisionEpochFor(
+        'local:$bookId',
+        revision,
+      );
       final payload = _encodeNativePagination(pages);
       _persistedPaginationPayloads[layoutFingerprint] = payload;
+      while (_persistedPaginationPayloads.length >
+          PaginationCacheDao.maxLayoutsPerBook) {
+        _persistedPaginationPayloads.remove(
+          _persistedPaginationPayloads.keys.first,
+        );
+      }
       _paginationCacheWriteQueue = _paginationCacheWriteQueue
           .then(
             (_) => _paginationCacheDao.upsert(
               bookId: bookId,
-              bookRevision: _paginationBookRevision,
+              bookRevision: revision,
               layoutFingerprint: layoutFingerprint,
               chapterIndex: chapterIndex,
               payload: payload,
+              expectedEpoch: generation,
+              expectedRevisionEpoch: revisionToken,
             ),
           )
           .catchError((Object error, StackTrace stackTrace) {

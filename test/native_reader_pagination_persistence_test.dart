@@ -18,6 +18,8 @@ import 'package:xxread/services/books/pagination_cache_dao.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
+import 'support/reader_cache_test_utils.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -157,6 +159,55 @@ void main() {
     },
   );
 
+  testWidgets(
+    'external same-length TXT edits invalidate parsing and pagination despite unchanged book metadata',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await tester.binding.setSurfaceSize(const Size(480, 800));
+      try {
+        final firstMisses = <int>[];
+        await _openReader(
+          tester,
+          replaceRuleService: replaceRuleService,
+          book: book,
+          cacheDao: cacheDao,
+          misses: firstMisses,
+        );
+        expect(firstMisses, isNotEmpty);
+        await _waitForStoredRows(tester, database, minimum: 1);
+        await _closeReader(tester);
+        final oldHash = book.contentHash;
+        final oldModified = book.fileModifiedTime;
+        final oldLength = bookFile.lengthSync();
+        bookFile.writeAsStringSync(
+          bookFile.readAsStringSync().replaceAll('缓存', '更新'),
+        );
+        bookFile.setLastModifiedSync(
+          DateTime.fromMillisecondsSinceEpoch(oldModified! + 2000),
+        );
+        expect(bookFile.lengthSync(), oldLength);
+        expect(book.contentHash, oldHash);
+        expect(book.fileModifiedTime, oldModified);
+        final changedMisses = <int>[];
+        await _openReader(
+          tester,
+          replaceRuleService: replaceRuleService,
+          book: book,
+          cacheDao: cacheDao,
+          misses: changedMisses,
+        );
+        expect(changedMisses, isNotEmpty);
+        expect(find.textContaining('分页更新必须', findRichText: true), findsWidgets);
+        expect(find.textContaining('分页缓存必须', findRichText: true), findsNothing);
+        await _closeReader(tester);
+      } finally {
+        await _closeReader(tester);
+        await tester.binding.setSurfaceSize(null);
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
   testWidgets('restores EPUB rich text and image boundaries from disk', (
     tester,
   ) async {
@@ -235,6 +286,7 @@ Future<void> _openReader(
 Future<void> _closeReader(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
+  await drainReaderCache(tester);
 }
 
 Future<void> _waitForStoredRows(

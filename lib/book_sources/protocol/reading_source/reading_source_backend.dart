@@ -187,10 +187,16 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   }) async {
     cancellation?.throwIfCancelled();
     await _ensureEnabled();
-    final chapters = await _runtime().getChapters(
-      source,
-      bookId,
-      sourceVariables: sourceVariables,
+    final chapters = await _chapterCache.getChapterCatalogOrLoad(
+      sourceId: source.id,
+      sourceRevision: await _cacheRevision(source, sourceVariables),
+      bookId: bookId,
+      staleWhileRevalidate: false,
+      loader: () => _runtime().getChapters(
+        source,
+        bookId,
+        sourceVariables: sourceVariables,
+      ),
     );
     cancellation?.throwIfCancelled();
     return chapters;
@@ -228,11 +234,18 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   }) async {
     cancellation?.throwIfCancelled();
     await _ensureEnabled();
-    final content = await _runtime().getChapterContent(
-      source,
+    final content = await _chapterCache.getOrLoad(
+      sourceId: source.id,
+      sourceRevision: await _cacheRevision(source, sourceVariables),
       bookId: bookId,
       chapterId: chapterId,
-      sourceVariables: sourceVariables,
+      staleWhileRevalidate: false,
+      loader: () => _runtime().getChapterContent(
+        source,
+        bookId: bookId,
+        chapterId: chapterId,
+        sourceVariables: sourceVariables,
+      ),
     );
     cancellation?.throwIfCancelled();
     return content;

@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import 'reader_text_layout.dart';
+import 'reader_text_pagination.dart';
+
 @immutable
 class ReaderPaginationCachePage {
   const ReaderPaginationCachePage({
@@ -36,6 +39,101 @@ abstract final class ReaderPaginationCacheCodec {
   static const int _integersPerPage = 10;
   static const int _recordBytes = _integersPerPage * 4;
   static const int _maxPageCount = 100000;
+
+  static Uint8List encodeTextPages(List<ReaderTextPage> pages) => encode([
+    for (final page in pages)
+      ReaderPaginationCachePage(
+        isChapterTitle: page.isChapterTitle,
+        showsInlineChapterTitle: false,
+        imageBlockIndex: null,
+        layoutSourceStart: page.layout?.sourceOffset ?? -1,
+        layoutSourceEnd: page.layout == null
+            ? -1
+            : page.layout!.sourceOffset + page.layout!.sourceText.length,
+        layoutStart: page.layoutStart,
+        layoutEnd: page.layoutEnd,
+        displayStart: page.displayStart,
+        displayEnd: page.displayEnd,
+        sourceStart: page.startOffset,
+        sourceEnd: page.endOffset,
+      ),
+  ]);
+
+  /// Reconstructs the cheap text mapping, without running line measurement.
+  /// The caller must verify the text revision and the full layout fingerprint.
+  static List<ReaderTextPage>? restoreTextPages(
+    Uint8List payload, {
+    required String text,
+    required int firstLineIndent,
+    required int paragraphSpacing,
+  }) {
+    final boundaries = decode(payload);
+    if (boundaries == null || boundaries.isEmpty) return null;
+    final layout = ReaderTextLayout.build(
+      text,
+      firstLineIndent: firstLineIndent,
+      paragraphSpacing: paragraphSpacing,
+      normalizeParagraphBreaks: true,
+    );
+    final pages = <ReaderTextPage>[];
+    var sourceEnd = 0;
+    var layoutEnd = 0;
+    for (final page in boundaries) {
+      if (page.imageBlockIndex != null ||
+          page.showsInlineChapterTitle ||
+          page.sourceStart != sourceEnd ||
+          page.sourceEnd < sourceEnd ||
+          page.sourceEnd > text.length) {
+        return null;
+      }
+      if (page.isChapterTitle) {
+        if (pages.isNotEmpty ||
+            page.sourceEnd != 0 ||
+            page.layoutSourceStart != -1 ||
+            page.layoutSourceEnd != -1 ||
+            page.layoutStart != 0 ||
+            page.layoutEnd != 0 ||
+            page.displayStart != 0 ||
+            page.displayEnd != 0) {
+          return null;
+        }
+        pages.add(const ReaderTextPage.chapterTitle());
+        continue;
+      }
+      if (page.layoutSourceStart != 0 ||
+          page.layoutSourceEnd != text.length ||
+          page.layoutStart != layoutEnd ||
+          page.layoutEnd < page.layoutStart ||
+          page.layoutEnd > layout.text.length ||
+          page.displayStart < page.layoutStart ||
+          page.displayEnd < page.displayStart ||
+          page.displayEnd > page.layoutEnd ||
+          layout.sourceOffsetForDisplayOffset(page.layoutStart) !=
+              page.sourceStart ||
+          layout.sourceOffsetForDisplayOffset(page.layoutEnd) !=
+              page.sourceEnd) {
+        return null;
+      }
+      pages.add(
+        ReaderTextPage(
+          text: layout.text.substring(page.layoutStart, page.layoutEnd),
+          startOffset: page.sourceStart,
+          endOffset: page.sourceEnd,
+          layout: layout,
+          layoutStart: page.layoutStart,
+          layoutEnd: page.layoutEnd,
+          displayStart: page.displayStart,
+          displayEnd: page.displayEnd,
+        ),
+      );
+      sourceEnd = page.sourceEnd;
+      layoutEnd = page.layoutEnd;
+    }
+    if (sourceEnd != text.length || layoutEnd != layout.text.length) {
+      return null;
+    }
+    return List<ReaderTextPage>.unmodifiable(pages);
+  }
 
   static Uint8List encode(List<ReaderPaginationCachePage> pages) {
     final data = ByteData(_headerBytes + pages.length * _recordBytes);

@@ -240,6 +240,207 @@ void main() {
     },
   );
 
+  test(
+    'clear prevents an active loader from reviving memory or disk',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'source-chapter-clear-loader-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final loaderStarted = Completer<void>();
+      final allowLoader = Completer<void>();
+      final cache = BookSourceChapterCache(cacheDirectory: directory);
+
+      final oldLoad = cache.getOrLoad(
+        sourceId: 'source',
+        bookId: 'book',
+        chapterId: 'chapter',
+        loader: () async {
+          loaderStarted.complete();
+          await allowLoader.future;
+          return const BookSourceChapterContent(
+            bookId: 'book',
+            chapterId: 'chapter',
+            title: '旧章节',
+            content: '旧正文',
+            contentType: 'text/plain',
+          );
+        },
+      );
+      await loaderStarted.future;
+      BookSourceChapterCache.clearMemory();
+      allowLoader.complete();
+      expect((await oldLoad).content, '旧正文');
+
+      var freshLoads = 0;
+      final fresh = await cache.getOrLoad(
+        sourceId: 'source',
+        bookId: 'book',
+        chapterId: 'chapter',
+        loader: () async {
+          freshLoads++;
+          return const BookSourceChapterContent(
+            bookId: 'book',
+            chapterId: 'chapter',
+            title: '新章节',
+            content: '新正文',
+            contentType: 'text/plain',
+          );
+        },
+      );
+
+      expect(fresh.content, '新正文');
+      expect(freshLoads, 1);
+    },
+  );
+
+  test(
+    'clear during a disk miss keeps the old call outside the new cache epoch',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'source-chapter-clear-read-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final readStarted = Completer<void>();
+      final allowRead = Completer<void>();
+      var loads = 0;
+      final cache = BookSourceChapterCache(
+        cacheDirectory: directory,
+        beforeDiskRead: () {
+          if (!readStarted.isCompleted) readStarted.complete();
+          return allowRead.future;
+        },
+      );
+
+      final oldLoad = cache.getOrLoad(
+        sourceId: 'source',
+        bookId: 'book',
+        chapterId: 'chapter',
+        loader: () async => _chapter('old-${++loads}'),
+      );
+      await readStarted.future;
+      BookSourceChapterCache.clearMemory();
+      allowRead.complete();
+      expect((await oldLoad).content, 'old-1');
+
+      final fresh = await cache.getOrLoad(
+        sourceId: 'source',
+        bookId: 'book',
+        chapterId: 'chapter',
+        loader: () async => _chapter('fresh-${++loads}'),
+      );
+      expect(fresh.content, 'fresh-2');
+    },
+  );
+
+  test('bounds chapter memory by bytes', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-chapter-memory-bytes-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final cache = BookSourceChapterCache(
+      cacheDirectory: directory,
+      maxMemoryBytes: 120,
+    );
+
+    for (var index = 0; index < 3; index++) {
+      await cache.getOrLoad(
+        sourceId: 'source',
+        bookId: 'book',
+        chapterId: 'chapter-$index',
+        loader: () async => BookSourceChapterContent(
+          bookId: 'book',
+          chapterId: 'chapter-$index',
+          title: '章节',
+          content: '正文' * 30,
+          contentType: 'text/plain',
+        ),
+      );
+    }
+
+    expect(BookSourceChapterCache.memorySizeBytes, lessThanOrEqualTo(120));
+  });
+
+  test('catalogs share the chapter memory byte budget', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-catalog-memory-bytes-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final allowWrite = Completer<void>();
+    addTearDown(() {
+      if (!allowWrite.isCompleted) allowWrite.complete();
+    });
+    var loads = 0;
+    final cache = BookSourceChapterCache(
+      cacheDirectory: directory,
+      maxMemoryBytes: 120,
+      beforeDiskWrite: () => allowWrite.future,
+    );
+    Future<List<BookSourceChapter>> loader() async {
+      loads++;
+      return List.generate(
+        20,
+        (index) => BookSourceChapter(
+          id: 'chapter-$index',
+          title: '很长的章节标题 $index',
+          order: index,
+        ),
+      );
+    }
+
+    await cache.getChapterCatalogOrLoad(
+      sourceId: 'source',
+      bookId: 'book',
+      loader: loader,
+    );
+    await cache.getChapterCatalogOrLoad(
+      sourceId: 'source',
+      bookId: 'book',
+      loader: loader,
+    );
+
+    expect(BookSourceChapterCache.memorySizeBytes, lessThanOrEqualTo(120));
+    expect(loads, 2);
+  });
+
+  test('prunes chapter files to the disk byte budget', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-chapter-disk-bytes-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final cache = BookSourceChapterCache(
+      cacheDirectory: directory,
+      maxDiskBytes: 450,
+      diskMaintenanceInterval: Duration.zero,
+    );
+
+    for (var index = 0; index < 3; index++) {
+      await cache.getOrLoad(
+        sourceId: 'source',
+        bookId: 'book',
+        chapterId: 'chapter-$index',
+        loader: () async => BookSourceChapterContent(
+          bookId: 'book',
+          chapterId: 'chapter-$index',
+          title: '章节 $index',
+          content: '正文' * 30,
+          contentType: 'text/plain',
+        ),
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await cache.maintainDisk(force: true);
+
+    expect(await cache.diskSizeBytes(), lessThanOrEqualTo(450));
+    expect(
+      await directory
+          .list(recursive: true)
+          .where((entry) => entry is File && entry.path.endsWith('.json'))
+          .length,
+      lessThan(3),
+    );
+  });
+
   test('memory pressure release preserves a pending disk write', () async {
     final directory = await Directory.systemTemp.createTemp(
       'source-chapter-memory-release-',
@@ -602,3 +803,11 @@ Future<void> _waitForJsonContent(Directory directory, String content) async {
   }
   fail('Timed out waiting for the newest cache content to be persisted.');
 }
+
+BookSourceChapterContent _chapter(String content) => BookSourceChapterContent(
+  bookId: 'book',
+  chapterId: 'chapter',
+  title: 'Chapter',
+  content: content,
+  contentType: 'text/plain',
+);

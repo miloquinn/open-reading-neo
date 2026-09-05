@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -117,6 +118,7 @@ void main() {
     expect(find.textContaining('AI'), findsNothing);
     expect(tester.takeException(), isNull);
 
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     await tester.pumpWidget(buildApp(const Size(1280, 800)));
     await tester.runAsync(
@@ -128,6 +130,7 @@ void main() {
     expect(find.text('今日阅读计划'), findsNothing);
     expect(find.textContaining('AI'), findsNothing);
     expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('首页收到刷新信号后自动显示新阅读内容', (tester) async {

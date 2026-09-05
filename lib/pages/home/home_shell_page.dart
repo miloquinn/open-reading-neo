@@ -38,6 +38,8 @@ import 'home_mobile_chrome.dart';
 import 'home_mobile_dashboard_page.dart';
 import 'widgets/home_bounce_navigation_item.dart';
 import 'widgets/home_mobile_top_bar.dart';
+import 'widgets/home_tablet_toolbar.dart';
+import 'widgets/home_tablet_top_backdrop.dart';
 import 'widgets/home_navigation_item.dart';
 import 'widgets/home_page_wrappers.dart';
 
@@ -48,7 +50,8 @@ part 'parts/home_shell_layout_part.dart';
 ///
 /// 1) HomeShellPage 只负责「导航壳」：
 ///    - 手机：底部药丸导航 + PageView
-///    - 平板/桌面：NavigationRail + 内容区
+///    - 平板：顶部悬浮导航 + 自适应内容区
+///    - 桌面：NavigationRail + 内容区
 ///
 /// 2) 真正的手机首页内容由 HomeMobileDashboardPage 渲染：
 ///    - 顶部毛玻璃标题栏

@@ -55,7 +55,7 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
     });
   }
 
-  /// 平板/桌面布局：左侧 NavigationRail + 右侧页面内容。
+  /// 桌面布局：左侧 NavigationRail + 右侧页面内容。
   ///
   /// 说明：
   /// - 这里不走 PageView，因为宽屏更适合“立刻切页”的应用范式。
@@ -210,7 +210,7 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
     );
   }
 
-  /// 手机布局：PageView + 底部悬浮药丸导航。
+  /// 触控布局：手机底置、平板顶置，共用悬浮药丸与页面状态。
   ///
   /// 说明：
   /// - PageView 负责横向切页手势。
@@ -222,6 +222,7 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
     double? customHorizontalMargin,
   }) {
     final mediaQuery = MediaQuery.of(context);
+    final tablet = LayoutHelper.usesTabletLayout(context);
     final scheme = Theme.of(context).colorScheme;
     final isLightTheme = scheme.brightness == Brightness.light;
     final stableSystemInsets = _mobileSystemInsets.resolve(
@@ -237,15 +238,16 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
       customHeight: customHeight,
       customHorizontalMargin: customHorizontalMargin,
     );
-    final metrics = HomeMobileChromeMetrics.fromMediaQuery(
-      mediaQuery,
-      systemInsets: stableSystemInsets,
-      floatingNavHeight: navDimensions.height,
-    );
-    final navWidth = navDimensions.width;
-    // 键盘可见性必须在 Scaffold 外层读取：resizeToAvoidBottomInset 会把
-    // 键盘 inset 从子树 MediaQuery 中消费掉，Scaffold 内读到的恒为 0。
-    final keyboardVisible = mediaQuery.viewInsets.bottom > 0;
+    final navWidth = tablet
+        ? (navigationCount * (showNavigationLabels ? 124.0 : 76.0) + 8)
+              .clamp(
+                0.0,
+                mediaQuery.size.width -
+                    mediaQuery.viewPadding.horizontal -
+                    (customHorizontalMargin ?? 32) * 2,
+              )
+              .toDouble()
+        : navDimensions.width;
     final visualSelectedIndex = _targetTabIndex ?? _selectedIndex;
     final activeDestination =
         _navigationItems[visualSelectedIndex.clamp(
@@ -257,6 +259,38 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
     final librarySelectionActive =
         activeDestination == HomeNavigationDestination.library &&
         librarySelection.isActive;
+    final metrics = HomeMobileChromeMetrics.fromMediaQuery(
+      mediaQuery,
+      systemInsets: stableSystemInsets,
+      navigationAtTop: tablet,
+      // Reserve the widest action group on every tab, so switching pages never
+      // moves the navigation or changes the content's top edge.
+      tabletToolbarInline:
+          tablet &&
+          (librarySelectionActive ||
+              (!homeTabletStacksNavigationLabels(mediaQuery.textScaler) &&
+                  mediaQuery.size.width -
+                          2 *
+                              LayoutHelper.tabletPageInsetForWidth(
+                                mediaQuery.size.width,
+                              ) >=
+                      navWidth + 2 * 224 + 32)),
+      topBarContentHeight: tablet
+          ? (mediaQuery.textScaler.scale(30) + 12).clamp(60.0, double.infinity)
+          : kHomeMobileTopBarContentHeight,
+      floatingNavHeight:
+          tablet &&
+              showNavigationLabels &&
+              homeTabletStacksNavigationLabels(mediaQuery.textScaler)
+          ? (mediaQuery.textScaler.scale(14) + 37).clamp(
+              navDimensions.height,
+              double.infinity,
+            )
+          : navDimensions.height,
+    );
+    // 键盘可见性必须在 Scaffold 外层读取：resizeToAvoidBottomInset 会把
+    // 键盘 inset 从子树 MediaQuery 中消费掉，Scaffold 内读到的恒为 0。
+    final keyboardVisible = mediaQuery.viewInsets.bottom > 0;
     final navBorderRadius = BorderRadius.circular(
       metrics.floatingNavHeight / 2,
     );
@@ -300,7 +334,7 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
                 },
                 // PageScrollPhysics 保留整页吸附，同时减少 Bouncing 在页面落位时
                 // 额外的回弹帧，让三页之间的切换更干净。
-                physics: librarySelectionActive
+                physics: librarySelectionActive || tablet
                     ? const NeverScrollableScrollPhysics()
                     : const PageScrollPhysics(parent: ClampingScrollPhysics()),
                 // 禁用页面捕捉以减少卡顿
@@ -308,25 +342,52 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
                 children: _mobilePages,
               ),
             ),
-            _buildMobileTopBarOverlay(),
+            if (tablet)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: HomeTabletTopBackdrop(
+                  height: metrics.pageTopPadding,
+                  controlsBottom: metrics.topBarHeight,
+                  blurEnabled: !_disableShellBlur,
+                ),
+              ),
+            _buildMobileTopBarOverlay(
+              tablet: tablet,
+              metrics: metrics,
+              navigationWidth: navWidth,
+            ),
             // 悬浮药丸导航栏（RepaintBoundary 隔离：避免 PageView 滑动时
             // 连带重绘毛玻璃导航栏，降低切页动画的每帧绘制成本）
             Positioned(
               left: 0,
               right: 0,
-              bottom: 0,
+              top: tablet && !librarySelectionActive
+                  ? metrics.navigationTopInset
+                  : null,
+              bottom: tablet && !librarySelectionActive ? null : 0,
               child: ValueListenableBuilder<bool>(
                 valueListenable: BookOpenTransition.navigationHiddenListenable,
                 builder: (context, readingActive, navigationBar) {
                   final reduceMotion = MediaQuery.of(context).disableAnimations;
                   // 键盘弹出时导航栏滑出隐藏，而不是被键盘顶起（AI 页输入等）。
-                  final hidden = readingActive || keyboardVisible;
+                  final hidden = readingActive || (!tablet && keyboardVisible);
                   return IgnorePointer(
                     key: const ValueKey('home-floating-navigation-pointer'),
                     ignoring: hidden,
                     child: AnimatedSlide(
                       key: const ValueKey('home-floating-navigation-motion'),
-                      offset: hidden ? const Offset(0, 1.15) : Offset.zero,
+                      offset: hidden
+                          ? Offset(
+                              0,
+                              tablet && !librarySelectionActive
+                                  ? -(metrics.navigationTopInset /
+                                            metrics.floatingNavHeight +
+                                        1.2)
+                                  : 1.15,
+                            )
+                          : Offset.zero,
                       duration: reduceMotion
                           ? Duration.zero
                           : hidden
@@ -344,8 +405,16 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
                           child: Center(
                             child: Padding(
                               padding: EdgeInsets.only(
-                                left: 18,
-                                right: 18,
+                                left: tablet
+                                    ? LayoutHelper.tabletPageInsetForWidth(
+                                        mediaQuery.size.width,
+                                      )
+                                    : 18,
+                                right: tablet
+                                    ? LayoutHelper.tabletPageInsetForWidth(
+                                        mediaQuery.size.width,
+                                      )
+                                    : 18,
                                 bottom: metrics.navBottomInset,
                               ),
                               child: SizedBox(
@@ -378,11 +447,13 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
                           ),
                         )
                       : SizedBox(
-                          height: metrics.navContainerHeight,
+                          height: tablet
+                              ? metrics.floatingNavHeight
+                              : metrics.navContainerHeight,
                           child: Center(
                             child: Padding(
                               padding: EdgeInsets.only(
-                                bottom: metrics.navBottomInset,
+                                bottom: tablet ? 0 : metrics.navBottomInset,
                               ),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
@@ -457,6 +528,7 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
                                                   isSelected: isSelected,
                                                   showLabel:
                                                       showNavigationLabels,
+                                                  horizontal: tablet,
                                                   onTap: () =>
                                                       _switchToTab(index),
                                                 ),
@@ -494,7 +566,11 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
     );
   }
 
-  Widget _buildMobileTopBarOverlay() {
+  Widget _buildMobileTopBarOverlay({
+    bool tablet = false,
+    required HomeMobileChromeMetrics metrics,
+    required double navigationWidth,
+  }) {
     if (_navigationItems.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -632,23 +708,37 @@ extension _HomeShellLayoutPart on _HomeShellPageState {
       return const SizedBox.shrink();
     }
 
+    final displayTitle =
+        currentPage is LibraryPage &&
+            _libraryController.selection.value.isActive
+        ? context.l10n.librarySelectedBooks(
+            _libraryController.selection.value.selectedCount,
+          )
+        : title;
     return Positioned(
-      top: 0,
+      top: tablet ? metrics.toolbarTopInset : 0,
       left: 0,
       right: 0,
       child: RepaintBoundary(
-        child: HomeMobileTopBar(
-          title:
-              currentPage is LibraryPage &&
-                  _libraryController.selection.value.isActive
-              ? context.l10n.librarySelectedBooks(
-                  _libraryController.selection.value.selectedCount,
-                )
-              : title,
-          leading: leading,
-          trailing: trailing,
-          titleFontSize: leading == null ? 34 : 22,
-        ),
+        child: tablet
+            ? HomeTabletToolbar(
+                title: displayTitle,
+                height: metrics.topBarContentHeight,
+                horizontalPadding: LayoutHelper.tabletPageInsetForWidth(
+                  MediaQuery.sizeOf(context).width,
+                ),
+                navigationWidth: metrics.tabletToolbarInline && leading == null
+                    ? navigationWidth
+                    : null,
+                leading: leading,
+                trailing: trailing,
+              )
+            : HomeMobileTopBar(
+                title: displayTitle,
+                leading: leading,
+                trailing: trailing,
+                titleFontSize: leading == null ? 34 : 22,
+              ),
       ),
     );
   }

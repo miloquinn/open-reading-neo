@@ -280,38 +280,83 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
     List<SourcedBook> books, {
     required double bottomPadding,
   }) {
-    return SliverPadding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, childIndex) {
-            if (childIndex.isOdd) return const SizedBox(height: 4);
-            final index = childIndex ~/ 2;
-            final result = books[index];
-            return BookSourceListReveal(
-              key: Key(
-                'bookSourceBookReveal-${result.source.id}-${result.book.id}',
-              ),
-              animate: _shouldAnimateBook(result),
-              order: index,
-              child: _centerSectionChild(
-                SourcedBookListTile(
-                  result: result,
-                  editorial: true,
-                  onTap: () => _actions.showBookDetails(result),
-                  onSourceTap:
-                      _state.section == BookSourcesSection.latest &&
-                          _state.selectedSourceId == null
-                      ? () => _showSourceActions(result.source)
-                      : null,
-                ),
-              ),
-            );
-          },
-          childCount: books.isEmpty ? 0 : (books.length * 2) - 1,
-          addAutomaticKeepAlives: false,
+    Widget buildBook(BuildContext context, int index) {
+      final result = books[index];
+      return BookSourceListReveal(
+        key: Key('bookSourceBookReveal-${result.source.id}-${result.book.id}'),
+        animate: _shouldAnimateBook(result),
+        order: index,
+        child: _centerSectionChild(
+          SourcedBookListTile(
+            result: result,
+            editorial: true,
+            onTap: () => _actions.showBookDetails(result),
+            onSourceTap:
+                _state.section == BookSourcesSection.latest &&
+                    _state.selectedSourceId == null
+                ? () => _showSourceActions(result.source)
+                : null,
+          ),
         ),
-      ),
+      );
+    }
+
+    final tabletGrid =
+        LayoutHelper.usesTabletLayout(context) &&
+        _layoutController.layout.value == BookSourceDiscoverLayout.standard;
+    if (!tabletGrid) {
+      final horizontalPadding = LayoutHelper.usesTabletLayout(context)
+          ? LayoutHelper.tabletPagePadding
+          : 16.0;
+      return SliverPadding(
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          0,
+          horizontalPadding,
+          bottomPadding,
+        ),
+        sliver: SliverList.separated(
+          itemCount: books.length,
+          itemBuilder: buildBook,
+          separatorBuilder: (_, _) => const SizedBox(height: 4),
+        ),
+      );
+    }
+
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        const horizontalPadding = LayoutHelper.tabletPagePadding;
+        final usableWidth = math.max(
+          0.0,
+          constraints.crossAxisExtent - horizontalPadding * 2,
+        );
+        final columns = ((usableWidth + 20) / (340 + 20))
+            .floor()
+            .clamp(2, 3)
+            .toInt();
+        return SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            0,
+            horizontalPadding,
+            bottomPadding,
+          ),
+          sliver: SliverGrid(
+            key: const Key('bookSourceTabletBookGrid'),
+            delegate: SliverChildBuilderDelegate(
+              buildBook,
+              childCount: books.length,
+              addAutomaticKeepAlives: false,
+            ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 4,
+              mainAxisExtent: 160,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -332,18 +377,29 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
     double topPadding = 8,
     required double bottomPadding,
   }) {
+    final horizontalPadding = LayoutHelper.usesTabletLayout(context)
+        ? LayoutHelper.tabletPagePadding
+        : 16.0;
     return SliverPadding(
-      padding: EdgeInsets.fromLTRB(16, topPadding, 16, bottomPadding),
+      padding: EdgeInsets.fromLTRB(
+        horizontalPadding,
+        topPadding,
+        horizontalPadding,
+        bottomPadding,
+      ),
       sliver: SliverToBoxAdapter(child: _centerSectionChild(child)),
     );
   }
 
-  Widget _centerSectionChild(Widget child) => Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1048),
-      child: child,
-    ),
-  );
+  Widget _centerSectionChild(Widget child) {
+    if (LayoutHelper.usesTabletLayout(context)) return child;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1048),
+        child: child,
+      ),
+    );
+  }
 
   Widget _buildUnsupportedMessage(String capability) {
     final hasEnabledSources = _state.sources.any((source) => source.enabled);

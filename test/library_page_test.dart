@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/library/library_page.dart';
+import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 
 void main() {
@@ -205,6 +207,129 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+
+  testWidgets(
+    'tablet library keeps floating chrome insets and adapts columns',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(768, 1024);
+      addTearDown(tester.view.reset);
+      final books = List.generate(
+        12,
+        (index) => Book(
+          id: index + 1,
+          title: 'Tablet Book $index',
+          author: 'Author',
+          filePath: '/tmp/tablet-$index.txt',
+          format: 'TXT',
+        ),
+      );
+      const chrome = HomeMobileChromeMetrics(
+        systemTopInset: 24,
+        systemBottomInset: 20,
+        navigationAtTop: true,
+      );
+      final controller = LibraryPageController();
+      final settings = AppSettingsNotifier();
+      addTearDown(controller.dispose);
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: HomeMobileChromeScope(
+              metrics: chrome,
+              child: LibraryPage(
+                controller: controller,
+                booksLoader: () async => books,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pump();
+
+      GridView grid = tester.widget(
+        find.byKey(const Key('library-cover-grid')),
+      );
+      var delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 4);
+      expect(tester.getTopLeft(find.text('Tablet Book 0')).dy, greaterThan(70));
+
+      await tester.longPress(find.text('Tablet Book 0'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select multiple'));
+      await tester.pumpAndSettle();
+      grid = tester.widget(find.byKey(const Key('library-cover-grid')));
+      expect(
+        (grid.padding! as EdgeInsets).bottom,
+        chrome.navContainerHeight + 10,
+      );
+      final scrollable = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byKey(const Key('library-cover-grid')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await tester.pump();
+      expect(
+        tester.getBottomLeft(find.text('Tablet Book 11')).dy,
+        lessThanOrEqualTo(1024 - chrome.navContainerHeight),
+      );
+      tester.view.physicalSize = const Size(1366, 900);
+      await tester.pumpAndSettle();
+      grid = tester.widget(find.byKey(const Key('library-cover-grid')));
+      delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 6);
+      expect(
+        tester.getSize(find.byKey(const Key('library-cover-grid'))).width,
+        1200,
+      );
+
+      await settings.setLibraryLayoutMode(LibraryLayoutMode.card);
+      await tester.pump();
+      final cardGrid = tester.widget<GridView>(
+        find.byKey(const Key('library-card-grid')),
+      );
+      expect(
+        (cardGrid.padding! as EdgeInsets).bottom,
+        chrome.navContainerHeight + 10,
+      );
+      final cardScrollable = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byKey(const Key('library-card-grid')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      cardScrollable.position.jumpTo(cardScrollable.position.maxScrollExtent);
+      await tester.pump();
+      expect(
+        tester.getBottomLeft(find.text('Tablet Book 11')).dy,
+        lessThanOrEqualTo(900 - chrome.navContainerHeight),
+      );
+      controller.exitSelection();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1300));
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 }
 
 class _CloseTrackingLibraryShelfService extends BookSourceShelfService {

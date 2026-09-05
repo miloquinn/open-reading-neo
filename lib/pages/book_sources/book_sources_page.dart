@@ -2,6 +2,7 @@
 // 技术要点：Flutter UI、按 Tab 缓存的书源请求、下拉刷新。
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/utils/localization_extension.dart';
+import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/page_style_helper.dart';
 
 import 'book_source_management_page.dart';
@@ -365,12 +367,16 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
   Widget build(BuildContext context) {
     final useRailNavigation =
         NavigationContext.of(context)?.useRailNavigation ?? false;
+    final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
     final mobileChrome = HomeMobileChromeScope.of(context);
     final bottomPadding = useRailNavigation
         ? 32.0
         : mobileChrome.pageBottomPadding;
     final listLayout =
         _layoutController.layout.value == BookSourceDiscoverLayout.list;
+    final pageHorizontalPadding = usesTabletLayout
+        ? LayoutHelper.tabletPagePadding
+        : 16.0;
     final discoverySources = _state.organizedDiscoverySources;
     final availableSections = _state.availableSections;
     final scrollView = CustomScrollView(
@@ -381,16 +387,18 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
         SliverToBoxAdapter(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1080),
+              constraints: BoxConstraints(
+                maxWidth: usesTabletLayout ? double.infinity : 1080,
+              ),
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  16,
+                  pageHorizontalPadding,
                   useRailNavigation
                       ? 16
                       : listLayout
                       ? 0
                       : mobileChrome.pageTopPadding,
-                  16,
+                  pageHorizontalPadding,
                   0,
                 ),
                 child: Column(
@@ -477,10 +485,17 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
               key: const Key('bookSourceOrganizationPinnedFilters'),
               color: PageStyleHelper.palette(context).backgroundStart,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: EdgeInsets.fromLTRB(
+                  pageHorizontalPadding,
+                  0,
+                  pageHorizontalPadding,
+                  12,
+                ),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1048),
+                    constraints: BoxConstraints(
+                      maxWidth: usesTabletLayout ? double.infinity : 1048,
+                    ),
                     child: _organizationFilters(),
                   ),
                 ),
@@ -496,7 +511,7 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
       ],
     );
 
-    return Container(
+    final page = Container(
       decoration: BoxDecoration(
         color: listLayout
             ? PageStyleHelper.palette(context).backgroundStart
@@ -544,6 +559,19 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
           ),
         ),
       ),
+    );
+    if (!usesTabletLayout) return page;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentWidth = math.min(
+          constraints.maxWidth,
+          LayoutHelper.tabletContentMaxWidth,
+        );
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(width: contentWidth, child: page),
+        );
+      },
     );
   }
 
@@ -713,6 +741,9 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     BookSourcesSectionCache cache,
     double bottomPadding,
   ) {
+    final horizontalPadding = LayoutHelper.usesTabletLayout(context)
+        ? LayoutHelper.tabletPagePadding
+        : 16.0;
     final shelves = (cache.shelves ?? const <BookSourceDiscoveryShelf>[])
         .where((shelf) => _state.matchesSelectedSource(shelf.source))
         .toList(growable: false);
@@ -728,7 +759,12 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     }
     return [
       SliverPadding(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          8,
+          horizontalPadding,
+          bottomPadding,
+        ),
         sliver: SliverList.builder(
           itemCount: shelves.length,
           itemBuilder: (context, index) =>

@@ -4,6 +4,33 @@ import 'package:xxread/pages/home/home_mobile_chrome.dart';
 
 void main() {
   group('HomeMobileChromeMetrics', () {
+    test(
+      'inline tablet controls share a center with custom navigation heights',
+      () {
+        for (final height in [52.0, 60.0, 72.0]) {
+          final metrics = HomeMobileChromeMetrics.fromMediaQuery(
+            const MediaQueryData(
+              viewPadding: EdgeInsets.only(top: 24, bottom: 20),
+            ),
+            navigationAtTop: true,
+            tabletToolbarInline: true,
+            floatingNavHeight: height,
+          );
+          expect(
+            metrics.navigationTopInset + height / 2,
+            metrics.toolbarTopInset + metrics.topBarContentHeight / 2,
+          );
+          expect(
+            metrics.pageTopPadding,
+            greaterThan(metrics.navigationTopInset + height),
+          );
+          expect(
+            metrics.pageTopPadding,
+            greaterThan(metrics.toolbarTopInset + metrics.topBarContentHeight),
+          );
+        }
+      },
+    );
     test('keeps floating chrome clear of iPhone system insets', () {
       final metrics = HomeMobileChromeMetrics.fromMediaQuery(
         const MediaQueryData(

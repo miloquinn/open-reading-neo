@@ -4,6 +4,7 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/pages/book_sources/controllers/book_sources_controller.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_list_reveal.dart';
 import 'package:xxread/pages/book_sources/widgets/sourced_book_cards.dart';
+import 'package:xxread/utils/layout_helper.dart';
 
 import 'book_source_pill.dart';
 import '../../../utils/page_style_helper.dart';
@@ -50,6 +51,11 @@ class BookSourceListDirectory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
+    final horizontalPadding = usesTabletLayout
+        ? LayoutHelper.tabletPagePadding
+        : 16.0;
+    final contentMaxWidth = usesTabletLayout ? double.infinity : 1048.0;
     final itemCount = filteredGroups.isEmpty ? 1 : filteredGroups.length;
     final childCount = (itemCount * 2) - 1;
     return SliverMainAxisGroup(
@@ -58,10 +64,15 @@ class BookSourceListDirectory extends StatelessWidget {
           child: ColoredBox(
             color: PageStyleHelper.palette(context).backgroundStart,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                8,
+                horizontalPadding,
+                10,
+              ),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1048),
+                  constraints: BoxConstraints(maxWidth: contentMaxWidth),
                   child: _SearchField(
                     controller: searchController,
                     groups: groups,
@@ -83,7 +94,12 @@ class BookSourceListDirectory extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            0,
+            horizontalPadding,
+            32,
+          ),
           sliver: SliverList(
             key: const Key('bookSourceListLayoutDirectory'),
             delegate: SliverChildBuilderDelegate(
@@ -109,7 +125,7 @@ class BookSourceListDirectory extends StatelessWidget {
                 };
                 return Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1048),
+                    constraints: BoxConstraints(maxWidth: contentMaxWidth),
                     child: child,
                   ),
                 );

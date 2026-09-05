@@ -21,6 +21,7 @@ extension _LibraryPageChrome on _LibraryPageState {
     );
     final palette = PageStyleHelper.palette(context);
     final mobileChrome = HomeMobileChromeScope.of(context);
+    final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
     // 手机模式：内容从屏幕顶端开始、滚动时穿过毛玻璃顶栏，
     // 顶栏的模糊层才有真实内容可以取样；用内边距避开首屏遮挡。
     final mobileTopInset = mobileChrome.pageTopPadding;
@@ -67,13 +68,24 @@ extension _LibraryPageChrome on _LibraryPageState {
         ),
       ],
     );
+    final centeredContent = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: usesTabletLayout
+              ? LayoutHelper.tabletContentMaxWidth
+              : double.infinity,
+        ),
+        child: content,
+      ),
+    );
     return Container(
       decoration: BoxDecoration(
         gradient: PageStyleHelper.backgroundGradient(context),
       ),
       child: useRailNavigation
-          ? SafeArea(bottom: false, child: content)
-          : content,
+          ? SafeArea(bottom: false, child: centeredContent)
+          : centeredContent,
     );
   }
 
@@ -328,7 +340,11 @@ extension _LibraryPageChrome on _LibraryPageState {
     final palette = PageStyleHelper.palette(context);
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: LayoutHelper.usesTabletLayout(context)
+            ? LayoutHelper.tabletPagePadding
+            : 16,
+      ),
       child: Container(
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -372,19 +388,11 @@ extension _LibraryPageChrome on _LibraryPageState {
   }
 
   Widget _buildFloatingActionButton() {
-    final isTablet = LayoutHelper.isTablet(context);
-    final isDesktop = LayoutHelper.isDesktop(context);
-    final useRailNav = isTablet || isDesktop;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-    final mobileChrome = HomeMobileChromeScope.of(context);
     final scheme = Theme.of(context).colorScheme;
 
-    // 侧边导航栏模式：FAB 在右下角，边距较小
-    // 底部导航栏模式：FAB 需要避开导航栏
-    final double bottomMargin = useRailNav
-        ? bottomPadding +
-              16 // 侧边导航：只需避开安全区域
-        : mobileChrome.floatingActionBottomMargin; // 底部导航：避开悬浮导航栏
+    // 该按钮只由真正使用侧栏的桌面壳层展示；平板入口复用顶部悬浮栏。
+    final double bottomMargin = bottomPadding + 16;
 
     if (_isMaterial3Style) {
       return Container(

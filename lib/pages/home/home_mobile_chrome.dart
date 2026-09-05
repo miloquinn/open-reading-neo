@@ -9,6 +9,11 @@ import 'package:flutter/widgets.dart';
 /// 1) 避免魔法数字散落在多个页面文件
 /// 2) 让 HomeShell 与移动端首页内容页共享同一套尺寸基准
 /// 3) 后续改动时只改这一处
+/// Large accessibility labels stack above/below their icon instead of disappearing
+/// into a narrow horizontal slot. Shell and item share the same threshold.
+bool homeTabletStacksNavigationLabels(TextScaler scaler) =>
+    scaler.scale(14) > 22;
+
 const double kHomeMobileTopBarContentHeight = 60.0;
 const double kHomeMobileFloatingNavHeight = 56.0;
 const double kHomeMobileFloatingNavBottomGap = 10.0;
@@ -122,6 +127,8 @@ class HomeMobileChromeMetrics {
   /// Scaffold 的键盘避让会把 inset 从子树 MediaQuery 中消费掉，
   /// 页面内部无法自行判断（AI 页输入条等依赖此值收起底部留白）。
   final bool keyboardVisible;
+  final bool navigationAtTop;
+  final bool tabletToolbarInline;
 
   const HomeMobileChromeMetrics({
     required this.systemTopInset,
@@ -129,15 +136,23 @@ class HomeMobileChromeMetrics {
     this.topBarContentHeight = kHomeMobileTopBarContentHeight,
     this.floatingNavHeight = kHomeMobileFloatingNavHeight,
     this.keyboardVisible = false,
+    this.navigationAtTop = false,
+    this.tabletToolbarInline = false,
   });
 
   factory HomeMobileChromeMetrics.fromMediaQuery(
     MediaQueryData mediaQuery, {
     EdgeInsets? systemInsets,
+    bool navigationAtTop = false,
+    bool tabletToolbarInline = false,
+    double topBarContentHeight = kHomeMobileTopBarContentHeight,
     double floatingNavHeight = kHomeMobileFloatingNavHeight,
   }) {
     final resolvedInsets = systemInsets ?? mediaQuery.viewPadding;
     return HomeMobileChromeMetrics(
+      navigationAtTop: navigationAtTop,
+      tabletToolbarInline: tabletToolbarInline,
+      topBarContentHeight: topBarContentHeight,
       systemTopInset: resolvedInsets.top,
       systemBottomInset: resolvedInsets.bottom,
       floatingNavHeight: floatingNavHeight,
@@ -145,20 +160,50 @@ class HomeMobileChromeMetrics {
     );
   }
 
-  double get topBarHeight => systemTopInset + topBarContentHeight;
+  double get navigationTopInset =>
+      systemTopInset +
+      12 +
+      (tabletToolbarInline
+          ? ((topBarContentHeight - floatingNavHeight) / 2).clamp(
+              0.0,
+              double.infinity,
+            )
+          : 0);
 
-  double get pageTopPadding => topBarHeight + kHomeMobileContentTopExtra;
+  double get toolbarTopInset => !navigationAtTop
+      ? 0
+      : tabletToolbarInline
+      ? systemTopInset +
+            12 +
+            ((floatingNavHeight - topBarContentHeight) / 2).clamp(
+              0.0,
+              double.infinity,
+            )
+      : navigationTopInset + floatingNavHeight + 12;
+
+  double get topBarHeight => navigationAtTop
+      ? (tabletToolbarInline && floatingNavHeight > topBarContentHeight
+            ? navigationTopInset + floatingNavHeight
+            : toolbarTopInset + topBarContentHeight)
+      : systemTopInset + topBarContentHeight;
+
+  // Leave room for the tablet backdrop to fade below the controls before the
+  // first content card. Phone chrome keeps its existing compact inset.
+  double get pageTopPadding =>
+      topBarHeight + (navigationAtTop ? 40 : kHomeMobileContentTopExtra);
 
   double get navBottomInset =>
       systemBottomInset + kHomeMobileFloatingNavBottomGap;
 
   double get navContainerHeight => floatingNavHeight + navBottomInset;
 
-  double get pageBottomPadding =>
-      navContainerHeight + kHomeMobileContentBottomExtra;
+  double get pageBottomPadding => navigationAtTop
+      ? systemBottomInset + 20
+      : navContainerHeight + kHomeMobileContentBottomExtra;
 
-  double get floatingActionBottomMargin =>
-      navContainerHeight + kHomeMobileFloatingActionExtra;
+  double get floatingActionBottomMargin => navigationAtTop
+      ? systemBottomInset + kHomeMobileFloatingActionExtra
+      : navContainerHeight + kHomeMobileFloatingActionExtra;
 }
 
 /// 阅读器沉浸模式会暂时隐藏 Android 系统栏；预测性返回起步后，系统又可能
@@ -204,7 +249,9 @@ class HomeMobileChromeScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(HomeMobileChromeScope oldWidget) {
-    return oldWidget.metrics.systemTopInset != metrics.systemTopInset ||
+    return oldWidget.metrics.navigationAtTop != metrics.navigationAtTop ||
+        oldWidget.metrics.tabletToolbarInline != metrics.tabletToolbarInline ||
+        oldWidget.metrics.systemTopInset != metrics.systemTopInset ||
         oldWidget.metrics.systemBottomInset != metrics.systemBottomInset ||
         oldWidget.metrics.topBarContentHeight != metrics.topBarContentHeight ||
         oldWidget.metrics.floatingNavHeight != metrics.floatingNavHeight ||

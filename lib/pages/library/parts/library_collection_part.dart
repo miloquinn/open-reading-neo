@@ -10,21 +10,39 @@ extension _LibraryPageCollection on _LibraryPageState {
     required int mobileColumns,
     required bool showDetails,
   }) {
-    final useRail =
-        LayoutHelper.getNavigationType(context) == NavigationType.rail;
-    final spacing = useRail ? 14.0 : 10.0;
-    final horizontalPadding = useRail ? 16.0 : 12.0;
+    final useRail = NavigationContext.of(context)?.useRailNavigation ?? false;
+    final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
+    final spacing = useRail || usesTabletLayout ? 14.0 : 10.0;
+    final mobileChrome = HomeMobileChromeScope.of(context);
     final bottomPadding = useRail
         ? MediaQuery.viewPaddingOf(context).bottom +
               (_selection.isActive ? 104 : 24)
-        : HomeMobileChromeScope.of(context).pageBottomPadding;
+        : usesTabletLayout && _selection.isActive
+        ? mobileChrome.navContainerHeight + 10
+        : mobileChrome.pageBottomPadding;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = LayoutHelper.coverOnlyGridColumnsForWidth(
-          constraints.maxWidth,
-          mobileColumns: mobileColumns,
+        final horizontalPadding = usesTabletLayout
+            ? LayoutHelper.tabletPagePadding
+            : useRail
+            ? 16.0
+            : 12.0;
+        final normalizedMobileColumns = mobileColumns == 2 ? 2 : 3;
+        final usableWidth = math.max(
+          0.0,
+          constraints.maxWidth - horizontalPadding * 2,
         );
+        final targetExtent = normalizedMobileColumns == 2 ? 184.0 : 148.0;
+        final crossAxisCount = usesTabletLayout
+            ? ((usableWidth + spacing) / (targetExtent + spacing))
+                  .round()
+                  .clamp(normalizedMobileColumns, 8)
+                  .toInt()
+            : LayoutHelper.coverOnlyGridColumnsForWidth(
+                constraints.maxWidth,
+                mobileColumns: mobileColumns,
+              );
         final itemWidth =
             (constraints.maxWidth -
                 horizontalPadding * 2 -
@@ -137,9 +155,10 @@ extension _LibraryPageCollection on _LibraryPageState {
   }
 
   Widget _buildBooksGrid(List<Book> books, {required double topPadding}) {
-    final useRail =
-        LayoutHelper.getNavigationType(context) == NavigationType.rail;
-    if (!useRail) {
+    final useRail = NavigationContext.of(context)?.useRailNavigation ?? false;
+    final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
+    final mobileChrome = HomeMobileChromeScope.of(context);
+    if (!useRail && !usesTabletLayout) {
       return _buildBooksList(books, topPadding: topPadding);
     }
 
@@ -149,15 +168,19 @@ extension _LibraryPageCollection on _LibraryPageState {
       builder: (context, constraints) {
         // 列数由可用宽度和目标封面宽度推导：旋转屏幕时封面大小基本不变，
         // 只是列数重排，不再按断点写死列数。
-        const double horizontalPadding = 32.0;
-        final crossAxisCount = LayoutHelper.bookGridColumnsForWidth(
-          constraints.maxWidth,
-        );
-        final totalSpacing = spacing * (crossAxisCount - 1);
-        final availableWidth = math.max(
+        final horizontalPadding = usesTabletLayout
+            ? LayoutHelper.tabletPagePadding
+            : 16.0;
+        final usableGridWidth = math.max(
           0.0,
-          constraints.maxWidth - horizontalPadding - totalSpacing,
+          constraints.maxWidth - horizontalPadding * 2,
         );
+        final crossAxisCount = ((usableGridWidth + spacing) / (168 + spacing))
+            .floor()
+            .clamp(3, 8)
+            .toInt();
+        final totalSpacing = spacing * (crossAxisCount - 1);
+        final availableWidth = math.max(0.0, usableGridWidth - totalSpacing);
         final itemWidth = availableWidth / crossAxisCount;
         // 网格高度为 2:3 封面 + 文本区域预留高度（更接近常见书封比例）
         final itemHeight =
@@ -185,16 +208,21 @@ extension _LibraryPageCollection on _LibraryPageState {
             ),
           ),
           child: GridView.builder(
+            key: const ValueKey('library-card-grid'),
             scrollCacheExtent: const ScrollCacheExtent.pixels(720),
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
             padding: EdgeInsets.fromLTRB(
-              16,
-              12,
-              16,
-              MediaQuery.viewPaddingOf(context).bottom +
-                  (_selection.isActive ? 104 : 24),
+              horizontalPadding,
+              topPadding,
+              horizontalPadding,
+              useRail
+                  ? MediaQuery.viewPaddingOf(context).bottom +
+                        (_selection.isActive ? 104 : 24)
+                  : usesTabletLayout && _selection.isActive
+                  ? mobileChrome.navContainerHeight + 10
+                  : mobileChrome.pageBottomPadding,
             ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,

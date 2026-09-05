@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'home_navigation_item.dart';
+import '../home_mobile_chrome.dart';
 import 'package:xxread/utils/ui_style.dart';
 
 /// 底部导航单个按钮（带按压回弹动效）。
@@ -13,6 +14,7 @@ class HomeBounceNavigationItem extends StatefulWidget {
   final HomeNavigationItem item;
   final bool isSelected;
   final bool showLabel;
+  final bool horizontal;
   final VoidCallback onTap;
 
   const HomeBounceNavigationItem({
@@ -20,6 +22,7 @@ class HomeBounceNavigationItem extends StatefulWidget {
     required this.item,
     required this.isSelected,
     this.showLabel = false,
+    this.horizontal = false,
     required this.onTap,
   });
 
@@ -162,7 +165,9 @@ class _HomeBounceNavigationItemState extends State<HomeBounceNavigationItem>
               final indicatorScale = 0.92 + (selection * 0.08);
               final iconScale = 0.96 + (selection * 0.04);
               final renderedIconSize = _iconSize - labelProgress;
-              final iconOffsetY = (-1.25 * selection) - (8.5 * labelProgress);
+              final iconOffsetY = widget.horizontal
+                  ? 0.0
+                  : (-1.25 * selection) - (8.5 * labelProgress);
               final iconColor = Color.lerp(
                 unselectedForeground,
                 selectedForeground,
@@ -179,10 +184,14 @@ class _HomeBounceNavigationItemState extends State<HomeBounceNavigationItem>
                         54.0,
                         math.max(0, constraints.maxHeight - 2),
                       );
-                      final labeledIndicatorHeight = math.min(
-                        56.0,
-                        constraints.maxHeight,
-                      );
+                      final stackedLabels =
+                          widget.horizontal &&
+                          homeTabletStacksNavigationLabels(
+                            MediaQuery.textScalerOf(context),
+                          );
+                      final labeledIndicatorHeight = widget.horizontal
+                          ? constraints.maxHeight
+                          : math.min(56.0, constraints.maxHeight);
                       final hiddenIndicatorInset =
                           (constraints.maxHeight - hiddenIndicatorHeight) / 2;
                       final labeledIndicatorInset =
@@ -244,43 +253,87 @@ class _HomeBounceNavigationItemState extends State<HomeBounceNavigationItem>
                               ),
                             ),
                           ),
-                          Transform.translate(
-                            offset: Offset(0, iconOffsetY),
-                            child: Transform.scale(
-                              scale: iconScale,
-                              child: SizedBox.square(
-                                dimension: renderedIconSize,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Opacity(
-                                      key: ValueKey(
-                                        'home-nav-unselected-${widget.item.label}',
-                                      ),
-                                      opacity: 1 - selection,
-                                      child: Icon(
-                                        widget.item.icon,
-                                        color: iconColor,
-                                        size: renderedIconSize,
-                                      ),
+                          if (widget.horizontal)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              child: Flex(
+                                direction: stackedLabels
+                                    ? Axis.vertical
+                                    : Axis.horizontal,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    widget.isSelected
+                                        ? widget.item.selectedIcon
+                                        : widget.item.icon,
+                                    size: 23,
+                                    color: iconColor,
+                                  ),
+                                  if (widget.showLabel) ...[
+                                    SizedBox(
+                                      width: stackedLabels ? 0 : 8,
+                                      height: stackedLabels ? 4 : 0,
                                     ),
-                                    Opacity(
-                                      key: ValueKey(
-                                        'home-nav-selected-${widget.item.label}',
-                                      ),
-                                      opacity: selection,
-                                      child: Icon(
-                                        widget.item.selectedIcon,
-                                        color: iconColor,
-                                        size: renderedIconSize,
+                                    Flexible(
+                                      child: ExcludeSemantics(
+                                        child: Text(
+                                          widget.item.label,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: iconColor,
+                                            fontSize: 14,
+                                            height: 1,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
+                                ],
+                              ),
+                            )
+                          else
+                            Transform.translate(
+                              offset: Offset(0, iconOffsetY),
+                              child: Transform.scale(
+                                scale: iconScale,
+                                child: SizedBox.square(
+                                  dimension: renderedIconSize,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Opacity(
+                                        key: ValueKey(
+                                          'home-nav-unselected-${widget.item.label}',
+                                        ),
+                                        opacity: 1 - selection,
+                                        child: Icon(
+                                          widget.item.icon,
+                                          color: iconColor,
+                                          size: renderedIconSize,
+                                        ),
+                                      ),
+                                      Opacity(
+                                        key: ValueKey(
+                                          'home-nav-selected-${widget.item.label}',
+                                        ),
+                                        opacity: selection,
+                                        child: Icon(
+                                          widget.item.selectedIcon,
+                                          color: iconColor,
+                                          size: renderedIconSize,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          if (widget.showLabel || labelProgress > 0)
+                          if (!widget.horizontal &&
+                              (widget.showLabel || labelProgress > 0))
                             Positioned(
                               left: 2,
                               right: 2,

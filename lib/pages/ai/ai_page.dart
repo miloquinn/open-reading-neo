@@ -18,6 +18,7 @@ import 'package:xxread/services/ai/global_ai_reading_service.dart';
 import 'package:xxread/services/books/book_dao.dart';
 import 'package:xxread/services/books/book_note_dao.dart';
 import 'package:xxread/utils/glass_config.dart';
+import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/utils/ui_style.dart';
@@ -89,6 +90,7 @@ class _AiPageState extends State<AiPage> {
   String _bookContext = '';
   bool _bookContextLoading = false;
   bool _lastKeyboardVisible = false;
+  double _overlayHeight = 0;
 
   @override
   void initState() {
@@ -120,11 +122,28 @@ class _AiPageState extends State<AiPage> {
   }
 
   Future<void> _openHistory() async {
-    final session = await Navigator.of(context).push<AiChatHistorySession>(
-      MaterialPageRoute<AiChatHistorySession>(
-        builder: (_) => AiHistoryPage(store: _historyStore),
-      ),
-    );
+    final session = LayoutHelper.usesTabletLayout(context)
+        ? await showDialog<AiChatHistorySession>(
+            context: context,
+            builder: (dialogContext) {
+              final size = MediaQuery.sizeOf(dialogContext);
+              return Dialog(
+                clipBehavior: Clip.antiAlias,
+                insetPadding: const EdgeInsets.all(32),
+                child: SizedBox(
+                  key: const ValueKey('ai-history-tablet-dialog'),
+                  width: 720,
+                  height: (size.height - 96).clamp(520.0, 820.0),
+                  child: AiHistoryPage(store: _historyStore),
+                ),
+              );
+            },
+          )
+        : await Navigator.of(context).push<AiChatHistorySession>(
+            MaterialPageRoute<AiChatHistorySession>(
+              builder: (_) => AiHistoryPage(store: _historyStore),
+            ),
+          );
     if (session == null || !mounted || _sending) return;
     await _restoreSession(session);
   }
@@ -439,12 +458,22 @@ class _AiPageState extends State<AiPage> {
     });
   }
 
+  void _updateOverlayHeight(Size size) {
+    if ((size.height - _overlayHeight).abs() < 0.5) return;
+    final keepPinnedToBottom =
+        !_scrollController.hasClients ||
+        _scrollController.position.extentAfter < 24;
+    setState(() => _overlayHeight = size.height);
+    if (keepPinnedToBottom) _scrollToBottomSoon();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final useRailNavigation =
         NavigationContext.of(context)?.useRailNavigation ?? false;
+    final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
     final mobileChrome = HomeMobileChromeScope.of(context);
     final topPadding = useRailNavigation ? 16.0 : mobileChrome.pageTopPadding;
     // 键盘弹出时悬浮导航栏滑出隐藏，输入条收起为导航栏预留的底部留白，
@@ -464,6 +493,38 @@ class _AiPageState extends State<AiPage> {
     final listTopPadding = useRailNavigation || bannerVisible
         ? 10.0
         : topPadding + 10.0;
+    final emptyState = mobileChrome.keyboardVisible
+        ? const SizedBox.shrink()
+        : Padding(
+            key: const ValueKey('ai-page-empty-state'),
+            padding: EdgeInsets.fromLTRB(
+              32,
+              listTopPadding,
+              32,
+              _overlayHeight + 8,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome_outlined,
+                    size: 44,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    l10n.readerAiEmptyHint,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
 
     return Container(
       decoration: BoxDecoration(
@@ -474,7 +535,8 @@ class _AiPageState extends State<AiPage> {
         bottom: false,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
+            key: const ValueKey('ai-page-content'),
+            constraints: BoxConstraints(maxWidth: usesTabletLayout ? 760 : 860),
             child: Column(
               children: [
                 // 手机端标题与工具在壳层顶栏（工具在右）；宽屏保留页内大标题行。
@@ -545,43 +607,14 @@ class _AiPageState extends State<AiPage> {
                     children: [
                       Positioned.fill(
                         child: _entries.isEmpty && !_sending
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 32,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.auto_awesome_outlined,
-                                        size: 44,
-                                        color: scheme.onSurfaceVariant
-                                            .withValues(alpha: 0.5),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      Text(
-                                        l10n.readerAiEmptyHint,
-                                        textAlign: TextAlign.center,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                              color: scheme.onSurfaceVariant,
-                                              height: 1.5,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
+                            ? emptyState
                             : ListView(
                                 controller: _scrollController,
                                 padding: EdgeInsets.fromLTRB(
                                   16,
                                   listTopPadding,
                                   16,
-                                  _overlayReserve(bottomPadding),
+                                  _overlayHeight + 8,
                                 ),
                                 children: [
                                   for (final entry in _entries)
@@ -622,97 +655,103 @@ class _AiPageState extends State<AiPage> {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (_error != null)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  0,
-                                  16,
-                                  8,
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
+                        child: _MeasuredSize(
+                          onChanged: _updateOverlayHeight,
+                          child: Column(
+                            key: const ValueKey('ai-page-overlay'),
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (_error != null)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    0,
+                                    16,
+                                    8,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: scheme.errorContainer.withValues(
-                                      alpha: 0.92,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
                                     ),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Text(
-                                    _error!,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: scheme.onErrorContainer,
-                                        ),
-                                  ),
-                                ),
-                              ),
-                            // 已关联书籍时在输入条上方展示可移除的胶囊。
-                            if (_selectedBook != null)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  20,
-                                  0,
-                                  20,
-                                  6,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Flexible(
-                                      child: InputChip(
-                                        key: const ValueKey(
-                                          'ai-page-linked-book',
-                                        ),
-                                        avatar: Icon(
-                                          Icons.menu_book,
-                                          size: 16,
-                                          color: scheme.primary,
-                                        ),
-                                        label: Text(
-                                          _selectedBook!.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        onDeleted: _sending
-                                            ? null
-                                            : () => setState(() {
-                                                _selectedBook = null;
-                                                _bookContext = '';
-                                              }),
+                                    decoration: BoxDecoration(
+                                      color: scheme.errorContainer.withValues(
+                                        alpha: 0.92,
                                       ),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
-                                    if (_bookContextLoading)
-                                      const Padding(
-                                        padding: EdgeInsets.only(left: 8),
-                                        child: SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
+                                    child: Text(
+                                      _error!,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onErrorContainer,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              // 已关联书籍时在输入条上方展示可移除的胶囊。
+                              if (_selectedBook != null)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    0,
+                                    20,
+                                    6,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: InputChip(
+                                          key: const ValueKey(
+                                            'ai-page-linked-book',
+                                          ),
+                                          avatar: Icon(
+                                            Icons.menu_book,
+                                            size: 16,
+                                            color: scheme.primary,
+                                          ),
+                                          label: Text(
+                                            _selectedBook!.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          onDeleted: _sending
+                                              ? null
+                                              : () => setState(() {
+                                                  _selectedBook = null;
+                                                  _bookContext = '';
+                                                }),
+                                        ),
+                                      ),
+                                      if (_bookContextLoading)
+                                        const Padding(
+                                          padding: EdgeInsets.only(left: 8),
+                                          child: SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                              // 悬浮输入条：与悬浮导航栏同风格的玻璃胶囊。
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  16,
+                                  0,
+                                  16,
+                                  bottomPadding,
+                                ),
+                                child: _buildFloatingInputBar(context),
                               ),
-                            // 悬浮输入条：与悬浮导航栏同风格的玻璃胶囊。
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                16,
-                                0,
-                                16,
-                                bottomPadding,
-                              ),
-                              child: _buildFloatingInputBar(context),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -724,15 +763,6 @@ class _AiPageState extends State<AiPage> {
         ),
       ),
     );
-  }
-
-  /// 悬浮层为列表预留的底部空间：输入条（约 54）+ 间距 + 悬浮边距，
-  /// 以及可见时的书籍胶囊与错误条高度估算。
-  double _overlayReserve(double bottomPadding) {
-    var reserve = 62.0 + bottomPadding;
-    if (_selectedBook != null) reserve += 44;
-    if (_error != null) reserve += 58;
-    return reserve;
   }
 
   /// 悬浮输入条：玻璃胶囊（与悬浮导航栏同参数），加号、输入框与
@@ -840,6 +870,32 @@ class _AiPageState extends State<AiPage> {
   }
 }
 
+class _MeasuredSize extends StatefulWidget {
+  const _MeasuredSize({required this.onChanged, required this.child});
+
+  final ValueChanged<Size> onChanged;
+  final Widget child;
+
+  @override
+  State<_MeasuredSize> createState() => _MeasuredSizeState();
+}
+
+class _MeasuredSizeState extends State<_MeasuredSize> {
+  Size? _lastSize;
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final size = context.size;
+      if (size == null || size == _lastSize) return;
+      _lastSize = size;
+      widget.onChanged(size);
+    });
+    return widget.child;
+  }
+}
+
 class _AiChatBubble extends StatelessWidget {
   const _AiChatBubble({required this.entry});
 
@@ -849,12 +905,13 @@ class _AiChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isUser = entry.role == 'user';
+    final maxWidth = LayoutHelper.usesTabletLayout(context) ? 600.0 : 560.0;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: EdgeInsets.fromLTRB(13, 10, 13, isUser ? 10 : 0),
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         decoration: BoxDecoration(
           color: isUser
               ? scheme.primary.withValues(alpha: 0.12)

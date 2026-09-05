@@ -557,9 +557,8 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
         ),
         body: _buildContent(context, useRailNavigation: useRailNavigation),
-        // 手机端改为顶部“+”按钮入口，宽屏继续保留FAB
-        floatingActionButton:
-            LayoutHelper.getNavigationType(context) == NavigationType.rail
+        // 手机和平板复用顶部“+”入口，只有侧栏壳层保留 FAB。
+        floatingActionButton: useRailNavigation
             ? _buildFloatingActionButton()
             : null,
       ),

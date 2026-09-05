@@ -2,8 +2,26 @@
 // 技术要点：工具方法、Flutter。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 
 class LayoutHelper {
+  static const double tabletContentMaxWidth = 1200;
+  static const double tabletPagePadding = 28;
+
+  static double tabletPageInsetForWidth(double width) =>
+      ((width - tabletContentMaxWidth) / 2).clamp(0.0, double.infinity) +
+      tabletPagePadding;
+
+  /// 按当前触控窗口判断，兼容 iPad mini、横屏大 iPad 与分屏。
+  /// 桌面平台仍保留侧栏；手机横屏不会仅因宽度变大进入平板模式。
+  static bool usesTabletLayout(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final touchPlatform =
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android;
+    return touchPlatform && size.width >= 600 && size.height >= 500;
+  }
+
   // 屏幕尺寸断点
   static const double largeMobileBreakpoint = 414.0; // iPhone Plus/Pro Max等大屏手机
   static const double tabletBreakpoint = 820.0; // 降低断点以支持小尺寸平板(7-8英寸)和折叠屏
@@ -163,6 +181,10 @@ class LayoutHelper {
 
   // 获取导航栏类型
   static NavigationType getNavigationType(BuildContext context) {
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android) {
+      return NavigationType.bottom;
+    }
     if (isDesktop(context) || isTablet(context)) {
       return NavigationType.rail;
     } else {

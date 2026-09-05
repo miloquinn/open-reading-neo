@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -890,6 +891,119 @@ void main() {
         inExclusiveRange(0, 20),
       );
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'tablet discovery uses floating chrome and responsive result grid',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(768, 1024);
+      addTearDown(tester.view.reset);
+      final sourceA = _source('source-a', 'Source A');
+      final sourceB = _source('source-b', 'Source B');
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode(
+          [sourceA, sourceB].map((source) => source.toJson()).toList(),
+        ),
+      });
+      const chrome = HomeMobileChromeMetrics(
+        systemTopInset: 24,
+        systemBottomInset: 20,
+        navigationAtTop: true,
+      );
+      final layoutController = BookSourcesPageController();
+      addTearDown(layoutController.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeMobileChromeScope(
+            metrics: chrome,
+            child: Scaffold(
+              body: BookSourcesPage(
+                client: _DiscoveryClient(),
+                controller: layoutController,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getTopLeft(find.byKey(const Key('bookSourceDiscoverScopeControl')))
+            .dy,
+        greaterThanOrEqualTo(chrome.pageTopPadding),
+      );
+
+      await tester.tap(find.text('Latest'));
+      await tester.pumpAndSettle();
+      SliverGrid grid = tester.widget(
+        find.byKey(const Key('bookSourceTabletBookGrid')),
+      );
+      var delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 2);
+
+      tester.view.physicalSize = const Size(1366, 900);
+      await tester.pumpAndSettle();
+      const expectedContentLeft = (1366 - 1200) / 2 + 28;
+      expect(
+        tester
+            .getTopLeft(find.byKey(const Key('bookSourceDiscoverScopeControl')))
+            .dx,
+        expectedContentLeft,
+      );
+      grid = tester.widget(find.byKey(const Key('bookSourceTabletBookGrid')));
+      delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 3);
+      expect(
+        tester
+            .getSize(find.byKey(const Key('bookSourceDiscoverScrollView')))
+            .width,
+        1200,
+      );
+      final bookRects = find
+          .byWidgetPredicate((widget) {
+            final key = widget.key;
+            return key is ValueKey<String> &&
+                key.value.startsWith('bookSourceBookReveal-');
+          })
+          .evaluate()
+          .map((element) => tester.getRect(find.byWidget(element.widget)))
+          .toList();
+      final firstRowTop = bookRects
+          .map((rect) => rect.top)
+          .reduce((a, b) => a < b ? a : b);
+      final firstRow = bookRects
+          .where((rect) => (rect.top - firstRowTop).abs() < 0.1)
+          .toList();
+      expect(firstRow, hasLength(3));
+      expect(
+        firstRow.map((rect) => rect.left).reduce((a, b) => a < b ? a : b),
+        expectedContentLeft,
+      );
+      expect(
+        firstRow.map((rect) => rect.right).reduce((a, b) => a > b ? a : b),
+        1366 - expectedContentLeft,
+      );
+
+      await layoutController.setLayout(BookSourceDiscoverLayout.list);
+      await tester.pumpAndSettle();
+      final sourceSearch = find.byKey(const Key('bookSourceListSourceSearch'));
+      final firstSource = find.byKey(
+        const Key('bookSourceListSource-source-a'),
+      );
+      expect(tester.getTopLeft(sourceSearch).dx, expectedContentLeft);
+      expect(tester.getTopRight(sourceSearch).dx, 1366 - expectedContentLeft);
+      expect(tester.getTopLeft(firstSource).dx, expectedContentLeft);
+      expect(tester.getTopRight(firstSource).dx, 1366 - expectedContentLeft);
+      expect(tester.takeException(), isNull);
+      debugDefaultTargetPlatformOverride = null;
     },
   );
 

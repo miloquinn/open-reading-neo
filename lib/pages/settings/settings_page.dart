@@ -34,6 +34,7 @@ import 'package:xxread/utils/app_themes.dart';
 import 'package:xxread/utils/app_themes_translator.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
+import 'package:xxread/utils/layout_helper.dart';
 import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/utils/system_ui_helper.dart';
@@ -375,226 +376,66 @@ class _SettingsPageState extends State<SettingsPage> {
     final webDavSync = Provider.of<WebDavSyncController>(context);
     final useRailNavigation =
         NavigationContext.of(context)?.useRailNavigation ?? false;
+    final useTabletLayout = LayoutHelper.usesTabletLayout(context);
     final mobileChrome = HomeMobileChromeScope.of(context);
     final viewPadding = MediaQuery.viewPaddingOf(context);
+    final horizontalPadding = useTabletLayout
+        ? LayoutHelper.tabletPagePadding
+        : useRailNavigation
+        ? 28.0
+        : 16.0;
     return Container(
       decoration: BoxDecoration(
         gradient: PageStyleHelper.backgroundGradient(context),
       ),
-      child: ListView(
-        controller: _scrollController,
-        padding: EdgeInsets.fromLTRB(
-          16,
-          useRailNavigation ? viewPadding.top + 8 : mobileChrome.pageTopPadding,
-          16,
-          useRailNavigation
-              ? viewPadding.bottom + 24
-              : mobileChrome.pageBottomPadding,
-        ),
-        children: [
-          if (useRailNavigation) ...[
-            _buildSettingsTopRow(l10n, useRailNavigation),
-            const SizedBox(height: 24),
-          ],
-          const SettingsAccountCard(),
-          const SizedBox(height: 20),
-          _buildSectionCard(
-            title: l10n.settingsSectionAppearanceFonts,
-            icon: Icons.palette_outlined,
-            children: [
-              _buildUiStyleSelector(themeNotifier),
-              _buildThemeToggle(themeNotifier),
-              _buildAccentColorSelector(themeNotifier),
-              _buildAppFontSelector(appSettings),
-              _buildReaderFontSelector(appSettings),
-              _buildCustomFontsManager(appSettings),
-              _buildActionSetting(
-                title: l10n.settingsLibraryLayoutTitle,
-                subtitle: l10n.settingsCurrentValue(
-                  appSettings.libraryLayoutMode == LibraryLayoutMode.card
-                      ? l10n.settingsLibraryLayoutCard
-                      : l10n.settingsLibraryLayoutGrid,
-                ),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const LibraryLayoutSettingsPage(),
-                  ),
-                ),
-                icon: Icons.view_module_outlined,
-              ),
-              _buildActionSetting(
-                title: l10n.settingsFloatingNavigationTitle,
-                subtitle: l10n.settingsFloatingNavigationSubtitle,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const FloatingNavigationSettingsPage(),
-                  ),
-                ),
-                icon: Icons.dock_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSectionCard(
-            title: l10n.readingSettings,
-            icon: Icons.book_outlined,
-            children: [
-              _buildSwitchSetting(
-                title: l10n.settingsVolumeKeyTurnTitle,
-                subtitle: l10n.settingsVolumeKeyTurnSubtitle,
-                value: _enableVolumeKeyTurn,
-                onChanged: (value) =>
-                    setState(() => _enableVolumeKeyTurn = value),
-                icon: Icons.volume_up,
-              ),
-              _buildSwitchSetting(
-                title: l10n.settingsAutoResumeReadingTitle,
-                subtitle: l10n.settingsAutoResumeReadingSubtitle,
-                value: _autoResumeReading,
-                onChanged: (value) =>
-                    setState(() => _autoResumeReading = value),
-                icon: Icons.restore,
-              ),
-              _buildActionSetting(
-                title: l10n.readerTopBarStyleTitle,
-                subtitle: _readerTopBarStyleTitle(_readerTopBarStyle),
-                onTap: _showReaderTopBarStylePicker,
-                icon: Icons.vertical_align_top_rounded,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSectionCard(
-            title: l10n.settingsSectionDataServices,
-            icon: Icons.hub_outlined,
-            children: [
-              _buildActionSetting(
-                title: l10n.bookSourceManagementTitle,
-                subtitle: l10n.settingsContentSourcesSubtitle,
-                onTap: _openBookSourceManagement,
-                icon: Icons.travel_explore_outlined,
-              ),
-              _buildActionSetting(
-                title: l10n.replaceRulesTitle,
-                subtitle: l10n.replaceRulesSettingsSubtitle,
-                onTap: _openReplaceRules,
-                icon: Icons.find_replace_outlined,
-              ),
-              _buildActionSetting(
-                title: l10n.cloudSyncTitle,
-                badge: l10n.webDavBetaBadge,
-                subtitle: _webDavSyncSubtitle(webDavSync),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const WebDavSyncPage(),
-                  ),
-                ),
-                icon: Icons.cloud_outlined,
-                trailing: _webDavSyncTrailing(webDavSync),
-              ),
-              _buildActionSetting(
-                title: l10n.settingsCacheManagementTitle,
-                subtitle: l10n.settingsCacheManagementSubtitle(
-                  _loadingCacheUsage
-                      ? l10n.settingsCacheCalculating
-                      : AppCacheManager.formatBytes(
-                          _cacheUsage?.totalBytes ?? 0,
-                        ),
-                ),
-                onTap: () => unawaited(_openCacheManagement()),
-                icon: Icons.cleaning_services_outlined,
-              ),
-              _buildActionSetting(
-                title: l10n.settingsAiAssistantTitle,
-                subtitle: (_activeAiSettings?.isConfigured ?? false)
-                    ? l10n.settingsCurrentValue(_activeAiSettings!.model)
-                    : l10n.settingsAiApiKeyTapToConfigure,
-                onTap: () => unawaited(_openAiSettings()),
-                icon: Icons.auto_awesome_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSectionCard(
-            title: l10n.settingsSectionGeneral,
-            icon: Icons.tune_rounded,
-            children: [
-              _buildLanguageSelector(appSettings),
-              _buildSwitchSetting(
-                title: l10n.settingsKeepScreenOnTitle,
-                subtitle: l10n.settingsKeepScreenOnSubtitle,
-                value: _keepScreenOn,
-                onChanged: _setKeepScreenOn,
-                icon: Icons.stay_current_portrait,
-              ),
-              if (!kIsWeb &&
-                  (Theme.of(context).platform == TargetPlatform.android ||
-                      Theme.of(context).platform == TargetPlatform.iOS))
-                _buildSwitchSetting(
-                  key: const ValueKey('settings-power-saving-mode'),
-                  title: l10n.settingsPowerSavingModeTitle,
-                  subtitle: l10n.settingsPowerSavingModeSubtitle,
-                  value: appSettings.powerSavingMode,
-                  onChanged: appSettings.setPowerSavingMode,
-                  icon: Icons.battery_saver_outlined,
-                  persistPageSettings: false,
-                ),
-              _buildSwitchSetting(
-                title: l10n.settingsAutoSaveTitle,
-                subtitle: l10n.settingsAutoSaveSubtitle,
-                value: _enableAutoSave,
-                onChanged: (value) => setState(() => _enableAutoSave = value),
-                icon: Icons.save_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSectionCard(
-            title: l10n.settingsSectionAdvancedFeatures,
-            icon: Icons.science_outlined,
-            children: [
-              _buildSwitchSetting(
-                title: l10n.settingsAdditionalSourceProtocolsTitle,
-                subtitle: l10n.settingsAdditionalSourceProtocolsSubtitle,
-                value: appSettings.additionalSourceProtocolsEnabled,
-                onChanged: appSettings.setAdditionalSourceProtocolsEnabled,
-                icon: Icons.extension_outlined,
-              ),
-              _buildSwitchSetting(
-                title: l10n.settingsPrivateBookSourceNetworkTitle,
-                subtitle: l10n.settingsPrivateBookSourceNetworkSubtitle,
-                value: appSettings.privateBookSourceNetworkEnabled,
-                onChanged: appSettings.setPrivateBookSourceNetworkEnabled,
-                icon: Icons.lan_outlined,
-                persistPageSettings: false,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          KeyedSubtree(
-            key: _supportSectionKey,
-            child: _buildSectionCard(
-              title: l10n.settingsSectionAboutSupport,
-              icon: Icons.volunteer_activism_outlined,
-              children: [
-                DeveloperSupportCard(
-                  onWechatTap: () =>
-                      _showDonationDialog(DeveloperDonationMethod.wechat),
-                  onAlipayTap: () =>
-                      _showDonationDialog(DeveloperDonationMethod.alipay),
-                ),
-              ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = (constraints.maxWidth - horizontalPadding * 2)
+              .clamp(
+                0.0,
+                LayoutHelper.tabletContentMaxWidth -
+                    (useTabletLayout ? 2 * LayoutHelper.tabletPagePadding : 0),
+              )
+              .toDouble();
+          final useTwoColumns = availableWidth >= 840;
+          return ListView(
+            controller: _scrollController,
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              useRailNavigation
+                  ? viewPadding.top + 8
+                  : mobileChrome.pageTopPadding,
+              horizontalPadding,
+              useRailNavigation
+                  ? viewPadding.bottom + 24
+                  : mobileChrome.pageBottomPadding,
             ),
-          ),
-          const SizedBox(height: 20),
-          _buildAboutCard(),
-          const SizedBox(height: 20),
-          const ContributorsView(
-            repositoryOwner: 'miloquinn',
-            repositoryName: 'open-reading',
-          ),
-          const SizedBox(height: 100),
-        ],
+            children: [
+              if (useTwoColumns)
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: availableWidth,
+                    child: _buildSettingsLayout(
+                      l10n: l10n,
+                      themeNotifier: themeNotifier,
+                      appSettings: appSettings,
+                      webDavSync: webDavSync,
+                      useRailNavigation: useRailNavigation,
+                    ),
+                  ),
+                )
+              else
+                ..._buildSettingsSingleColumnChildren(
+                  l10n: l10n,
+                  themeNotifier: themeNotifier,
+                  appSettings: appSettings,
+                  webDavSync: webDavSync,
+                  useRailNavigation: useRailNavigation,
+                ),
+            ],
+          );
+        },
       ),
     );
   }

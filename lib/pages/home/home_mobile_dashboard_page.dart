@@ -239,6 +239,7 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
   _HomeContentMetrics _computeMetrics(
     MediaQueryData mediaQuery, {
     required bool useRailNavigation,
+    required bool useTabletLayout,
   }) {
     final mobileChrome = HomeMobileChromeScope.of(context);
     return _HomeContentMetrics(
@@ -247,10 +248,12 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
           : mobileChrome.topBarHeight,
       horizontalPadding: useRailNavigation
           ? (mediaQuery.size.width >= 1440 ? 36 : 28)
+          : useTabletLayout
+          ? LayoutHelper.tabletPagePadding
           : 18,
       contentTopPadding: useRailNavigation
           ? mediaQuery.viewPadding.top + 28
-          : mobileChrome.pageTopPadding + 6,
+          : mobileChrome.pageTopPadding + (useTabletLayout ? 0 : 6),
       contentBottomPadding: useRailNavigation
           ? mediaQuery.viewPadding.bottom + 36
           : mobileChrome.pageBottomPadding + 12,
@@ -375,13 +378,17 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
     final mediaQuery = MediaQuery.of(context);
     final useRailNavigation =
         LayoutHelper.getNavigationType(context) == NavigationType.rail;
+    final useTabletLayout = LayoutHelper.usesTabletLayout(context);
     final metrics = _computeMetrics(
       mediaQuery,
       useRailNavigation: useRailNavigation,
+      useTabletLayout: useTabletLayout,
     );
     final palette = _palette;
-    final maxWidth = useRailNavigation
-        ? (mediaQuery.size.width >= 1600 ? 1080.0 : 920.0)
+    final maxWidth = useTabletLayout
+        ? LayoutHelper.tabletContentMaxWidth - metrics.horizontalPadding * 2
+        : useRailNavigation
+        ? LayoutHelper.tabletContentMaxWidth
         : double.infinity;
 
     return DecoratedBox(
@@ -416,31 +423,80 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: maxWidth),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (useRailNavigation) ...[
-                            _buildPageHeading(),
-                            const SizedBox(height: 28),
-                          ],
-                          _buildContinueReadingCard(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final contentWidth = constraints.maxWidth;
+                          final useWideComposition = contentWidth >= 900;
+                          final useRecentBooksGrid =
+                              useRailNavigation ||
+                              useTabletLayout ||
+                              contentWidth >= 600;
+                          final continueReading = _buildContinueReadingCard(
                             _recentBooks.isEmpty ? null : _recentBooks.first,
-                            spacious: useRailNavigation,
-                          ),
-                          const SizedBox(height: 18),
-                          _buildReadingRhythmCard(_normalizedWeekBars()),
-                          if (_recentBooks.length > 1) ...[
-                            const SizedBox(height: 28),
-                            _buildSectionHeading(
-                              context.l10n.homeRecentReading,
-                            ),
-                            const SizedBox(height: 14),
-                            _buildRecentBooks(
-                              _recentBooks.skip(1).toList(growable: false),
-                              useGrid: useRailNavigation,
-                            ),
-                          ],
-                        ],
+                            spacious: useWideComposition,
+                          );
+                          final readingRhythm = _buildReadingRhythmCard(
+                            _normalizedWeekBars(),
+                          );
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (useRailNavigation) ...[
+                                _buildPageHeading(),
+                                const SizedBox(height: 28),
+                              ],
+                              if (useWideComposition)
+                                IntrinsicHeight(
+                                  child: Row(
+                                    key: const ValueKey(
+                                      'home-dashboard-wide-layout',
+                                    ),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(flex: 3, child: continueReading),
+                                      const SizedBox(width: 20),
+                                      Expanded(flex: 2, child: readingRhythm),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Column(
+                                  key: const ValueKey(
+                                    'home-dashboard-stacked-layout',
+                                  ),
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    continueReading,
+                                    const SizedBox(height: 18),
+                                    readingRhythm,
+                                  ],
+                                ),
+                              if (_recentBooks.length > 1) ...[
+                                const SizedBox(height: 28),
+                                _buildSectionHeading(
+                                  context.l10n.homeRecentReading,
+                                ),
+                                const SizedBox(height: 14),
+                                KeyedSubtree(
+                                  key: ValueKey(
+                                    useRecentBooksGrid
+                                        ? 'home-recent-books-grid'
+                                        : 'home-recent-books-carousel',
+                                  ),
+                                  child: _buildRecentBooks(
+                                    _recentBooks
+                                        .skip(1)
+                                        .toList(growable: false),
+                                    useGrid: useRecentBooksGrid,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -674,6 +730,7 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
           decoration: _cardDecoration(color: palette.cardColor, radius: 22),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -837,16 +894,21 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
       return LayoutBuilder(
         builder: (context, constraints) {
           const spacing = 14.0;
-          final columns = constraints.maxWidth >= 900 ? 5 : 4;
+          final columns = LayoutHelper.bookGridColumnsForWidth(
+            constraints.maxWidth,
+          );
           final width =
               (constraints.maxWidth - spacing * (columns - 1)) / columns;
           return Wrap(
             spacing: spacing,
             runSpacing: 18,
-            children: books
+            children: books.indexed
                 .map(
-                  (book) =>
-                      SizedBox(width: width, child: _buildRecentBookItem(book)),
+                  (entry) => SizedBox(
+                    key: ValueKey('home-recent-book-grid-item-${entry.$1}'),
+                    width: width,
+                    child: _buildRecentBookItem(entry.$2),
+                  ),
                 )
                 .toList(growable: false),
           );

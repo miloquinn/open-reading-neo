@@ -233,16 +233,18 @@ extension _SettingsAboutPart on _SettingsPageState {
     required String title,
     required String subtitle,
   }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 60,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minWidth: double.infinity,
+        minHeight: 60,
+      ),
       child: FilledButton(
         onPressed: onPressed,
         style:
             FilledButton.styleFrom(
               backgroundColor: backgroundColor,
               foregroundColor: foregroundColor,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),

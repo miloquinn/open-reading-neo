@@ -54,7 +54,7 @@ jobs:
 
       - name: Verify generated changelog is current
         run: |
-          python3 -m unittest test/test_generate_changelog.py
+          python3 -m unittest discover -s test -p 'test_generate_changelog.py'
           python3 tool/generate_changelog.py --check
 
       - name: Verify formatting

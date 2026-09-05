@@ -11,6 +11,8 @@ import 'package:xxread/pages/reader/book_source/book_source_reader_page.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
 
+import 'support/reader_cache_test_utils.dart';
+
 late ReplaceRuleService _replaceRules;
 
 void main() {
@@ -122,6 +124,7 @@ Widget _buildReader(_AdjacentPreviewClient client) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    paginationCacheDao: MemoryPaginationCacheDao(),
     replaceRuleService: _replaceRules,
     source: RegisteredBookSource(
       id: 'preview-source',

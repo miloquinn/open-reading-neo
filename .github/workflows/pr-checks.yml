@@ -54,7 +54,7 @@ jobs:
 
       - name: Verify generated changelog is current
         run: |
-          python3 -m unittest discover -s test -p 'test_generate_changelog.py'
+          python3 -m unittest discover -s test -p 'test_*.py'
           python3 tool/generate_changelog.py --check
 
       - name: Verify formatting
@@ -64,6 +64,9 @@ jobs:
         # Keep existing warnings visible without making them fatal. Analyzer
         # errors still fail the job.
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Validate QuickJS source compatibility
+        run: flutter test test/source_script_engine_test.dart test/source_script_compatibility_test.dart
 
       - name: Run tests with coverage
         shell: bash
@@ -76,6 +79,9 @@ jobs:
               ! -name 'book_source_reader_page_test.dart' \
               ! -name 'book_source_discovery_page_test.dart' \
               ! -name 'native_reader_auto_page_turn_test.dart' \
+              ! -name 'native_reader_txt_title_page_test.dart' \
+              ! -name 'native_reader_epub_chapter_transition_test.dart' \
+              ! -name 'native_reader_initial_progress_test.dart' \
               ! -name 'source_response_codec_test.dart' \
               -print0
           )
@@ -131,6 +137,48 @@ jobs:
           )
           for test_name in "${native_auto_turn_tests[@]}"; do
             flutter test test/native_reader_auto_page_turn_test.dart \
+              --plain-name "$test_name"
+          done
+
+          # Native reader suites share asynchronous disposal and platform state.
+          # Keep all cases active while giving each a fresh process.
+          native_txt_tests=(
+            'native TXT replacement rules clean title and content'
+            'TXT chapter title is a dedicated first page'
+            'native open failure keeps the seeded reader theme background'
+            'disabled TXT title page places the heading above body text'
+            'opening placeholder uses the seeded reader theme'
+            'waits for reader font restoration before revealing text'
+            'vertical paging preserves the dedicated TXT chapter title page'
+            'horizontal TOC jump mounts the target title on the first frame and keeps the previous page ready'
+            'TXT horizontal paging keeps its legacy delegate stable during a chapter turn'
+            'TXT initialization preloads behind the cover route'
+          )
+          for test_name in "${native_txt_tests[@]}"; do
+            flutter test test/native_reader_txt_title_page_test.dart \
+              --plain-name "$test_name"
+          done
+
+          native_epub_tests=(
+            'EPUB precaches adjacent horizontal images before the first turn'
+            'EPUB horizontal turns warm the next pagination window before a chapter boundary'
+            'EPUB horizontal paging continues past image-only front matter'
+            'EPUB horizontal paging does not bounce when turning again at a warming tail'
+            'EPUB backward turns keep one horizontal controller'
+            'EPUB page curl returns from a chapter first page to the previous last page'
+          )
+          for test_name in "${native_epub_tests[@]}"; do
+            flutter test test/native_reader_epub_chapter_transition_test.dart \
+              --plain-name "$test_name"
+          done
+
+          native_progress_tests=(
+            'EPUB horizontal reader paints the restored page on its first frame'
+            'EPUB continuous scroll hides the chapter opening until restore completes'
+            'EPUB system back persists the pending horizontal page before reopening'
+          )
+          for test_name in "${native_progress_tests[@]}"; do
+            flutter test test/native_reader_initial_progress_test.dart \
               --plain-name "$test_name"
           done
 

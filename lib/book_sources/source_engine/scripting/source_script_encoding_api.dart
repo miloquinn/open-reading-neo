@@ -65,8 +65,8 @@ String _charset(String value) {
 
 List<int> _encode(String text, String charset) {
   final name = _charset(charset);
-  if (name == 'utf8') return utf8.encode(text);
-  if (name == 'gbk') return gbk_bytes.encode(text);
+  if (name == 'utf8') return List<int>.from(utf8.encode(text));
+  if (name == 'gbk') return List<int>.from(gbk_bytes.encode(text));
   if (name == 'latin1' || name == 'ascii') {
     final max = name == 'ascii' ? 127 : 255;
     return text.runes.map((rune) => rune <= max ? rune : 63).toList();
@@ -170,8 +170,9 @@ String _base64Encode(List<int> bytes, Object? option) {
       newline;
 }
 
-List<int> _base64Decode(String value) =>
-    base64Decode(base64.normalize(value.replaceAll(RegExp(r'\s+'), '')));
+List<int> _base64Decode(String value) => List<int>.from(
+  base64Decode(base64.normalize(value.replaceAll(RegExp(r'\s+'), ''))),
+);
 
 List<int> _hexDecode(String value) {
   final text = value.replaceAll(RegExp(r'\s+'), '');

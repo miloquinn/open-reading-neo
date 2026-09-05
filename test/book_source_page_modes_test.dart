@@ -19,6 +19,8 @@ import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 
+import 'support/reader_cache_test_utils.dart';
+
 late ReplaceRuleService _replaceRules;
 
 void main() {
@@ -592,6 +594,7 @@ Widget _testApp({
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: BookSourceReaderPage(
+    paginationCacheDao: MemoryPaginationCacheDao(),
     replaceRuleService: _replaceRules,
     source: RegisteredBookSource(
       id: 'page-mode-source',

@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/book_sources/source_engine/source_config.dart';
+import 'package:xxread/book_sources/source_engine/scripting/source_script_encoding_api.dart';
 import 'package:xxread/book_sources/source_engine/scripting/source_script_engine.dart';
 
 void main() {
@@ -145,6 +148,27 @@ void main() {
       [63, 63, 63],
     );
     expect(evaluator.evaluate("java.base64Encode('a', 0)", context), 'YQ==\n');
+  });
+
+  test('encoding byte hosts return plain lists across the JS bridge', () {
+    const encoding = SourceScriptEncodingApi();
+    final hostBytes = encoding.handle('base64DecodeBytes', const ['AQID']);
+    for (final bytes in [
+      encoding.handle('strToBytes', const ['abc', 'UTF-8']),
+      encoding.handle('hexDecodeToBytes', const ['010203']),
+      hostBytes,
+    ]) {
+      expect(bytes, isA<List<int>>());
+      expect(bytes, isNot(isA<Uint8List>()));
+    }
+    expect(hostBytes, [1, 2, 3]);
+    expect(
+      evaluator.evaluate(
+        "java.base64DecodeToByteArray('AQID').join(',')",
+        context,
+      ),
+      '1,2,3',
+    );
   });
 
   test('constructs Java String and accesses named Java package classes', () {

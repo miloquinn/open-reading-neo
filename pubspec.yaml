@@ -42,7 +42,7 @@ dependencies:
 
   # 电子书格式支持
   epubx: ^4.0.0
-  pdfx: ^2.9.2
+  pdfx: ^2.11.0
   archive: ^3.6.1
   kindle_unpack: ^0.1.1
 
@@ -50,7 +50,7 @@ dependencies:
   url_launcher: ^6.3.2
 
   # 数据处理
-  html: ^0.15.6
+  html: ^0.15.7
   json_path: ^0.9.0
 
   # 阅读书源脚本运行时（Android/Windows/Linux 使用 QuickJS，Apple 使用 JavaScriptCore）
@@ -80,8 +80,8 @@ dependencies:
   audioplayers: ^6.8.1
   pointycastle: ^4.0.0
   in_app_purchase: ^3.3.0
-  passkeys: ^2.22.0
-  sign_in_with_apple: ^8.1.0
+  passkeys: ^2.22.3
+  sign_in_with_apple: ^8.2.0
 
 dev_dependencies:
   flutter_test:

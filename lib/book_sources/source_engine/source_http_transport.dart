@@ -9,6 +9,7 @@ import '../protocol/book_source_protocol.dart';
 import '../services/book_download_cancellation.dart';
 import '../networking/book_source_network_policy.dart';
 import 'source_cookie_jar.dart';
+import 'source_browser_session.dart';
 import 'source_request_template.dart';
 import 'source_response.dart';
 import 'source_response_codec.dart';
@@ -20,23 +21,53 @@ class SourceHttpTransport
         SourceTransport,
         SourceInteractionTransport,
         SourceCookieTransport,
+        SourceBrowserSessionTransport,
         SourceClosableTransport {
   SourceHttpTransport({
     Dio? dio,
     Dio? systemDio,
     this._webViewLoader = const SourceWebViewLoader(),
+    SourceBrowserSessionClient browserClient =
+        const SourceBrowserSessionClient(),
     BookSourceNetworkPolicy networkPolicy = const BookSourceNetworkPolicy(
       allowSyntheticDns: true,
     ),
     this.maxResponseBytes = 8 * 1024 * 1024,
     this.requestTimeout = const Duration(seconds: 8),
-  }) : _networkPolicy = networkPolicy,
+    // Keep the public injection name usable by integration tests.
+    // ignore: prefer_initializing_formals
+  }) : _browserClient = browserClient,
+       _networkPolicy = networkPolicy,
        _dio = dio ?? _createDio(networkPolicy, requestTimeout),
        _systemDio = systemDio ?? dio ?? _createDio(null, requestTimeout);
 
   final Dio _dio;
   final Dio _systemDio;
   final SourceWebViewLoaderPort _webViewLoader;
+  final SourceBrowserSessionClient _browserClient;
+  final Map<String, SourceBrowserSession> _browserSessions = {};
+  final Map<String, int> _browserRevisions = {};
+
+  @override
+  SourceBrowserSession browserSession(String sourceId) =>
+      (_browserSessions[sourceId] ?? const SourceBrowserSession()).copyWith(
+        cookies: _cookieJar.exportCookies(sourceId),
+      );
+
+  @override
+  void restoreBrowserSession(String sourceId, SourceBrowserSession session) {
+    _browserRevisions[sourceId] = (_browserRevisions[sourceId] ?? 0) + 1;
+    _browserSessions[sourceId] = session;
+    _cookieJar.restoreCookies(sourceId, session.cookies);
+  }
+
+  @override
+  void clearBrowserSession(String sourceId) {
+    _browserRevisions[sourceId] = (_browserRevisions[sourceId] ?? 0) + 1;
+    _browserSessions.remove(sourceId);
+    _cookieJar.clearSource(sourceId);
+  }
+
   final BookSourceNetworkPolicy _networkPolicy;
   final int maxResponseBytes;
   final Duration requestTimeout;
@@ -64,6 +95,7 @@ class SourceHttpTransport
   @override
   void close({bool force = true}) {
     _cookieJar.clear();
+    _browserSessions.clear();
     _dio.close(force: force);
     if (!identical(_systemDio, _dio)) {
       _systemDio.close(force: force);
@@ -160,6 +192,17 @@ class SourceHttpTransport
     SourceRequestTemplate request, {
     BookDownloadCancellation? cancellation,
   }) async {
+    final sessionId = request.cookieJarKey;
+    final sessionRevision = _browserRevisions[sessionId] ?? 0;
+    void checkSession() {
+      if (sessionId != null &&
+          (_browserRevisions[sessionId] ?? 0) != sessionRevision) {
+        throw const BookSourceProtocolException(
+          'The website session changed during this request.',
+        );
+      }
+    }
+
     final syntheticBody = request.syntheticBody;
     if (syntheticBody != null) {
       return SourceResponse(body: syntheticBody, finalUri: request.url);
@@ -181,6 +224,41 @@ class SourceHttpTransport
       if (mergedCookies != null) {
         browserHeaders[HttpHeaders.cookieHeader] = mergedCookies;
       }
+      final sourceId = request.cookieJarKey;
+      if (sourceId != null && _browserSessions[sourceId]?.active == true) {
+        final revision = _browserRevisions[sourceId] ?? 0;
+        final loaded = await _browserClient.load(
+          sourceId: sourceId,
+          url: request.url,
+          headers: browserHeaders,
+          session: browserSession(sourceId),
+          method: request.method.name.toUpperCase(),
+          body: request.body,
+          webJs: request.webJs,
+          html: request.webViewHtml,
+          cancellation: cancellation,
+        );
+        cancellation?.throwIfCancelled();
+        await _networkPolicy.validate(loaded.finalUri);
+        if (utf8.encode(loaded.body).length > maxResponseBytes) {
+          throw BookSourceProtocolException(
+            'Reading source response exceeds $maxResponseBytes bytes.',
+          );
+        }
+        if ((_browserRevisions[sourceId] ?? 0) != revision) {
+          throw const BookSourceProtocolException(
+            'The website session changed during this request.',
+          );
+        }
+        restoreBrowserSession(sourceId, loaded.session);
+        return SourceResponse(
+          body: loaded.body,
+          finalUri: loaded.finalUri,
+          cookies: SourceResponseCodec.cookieMapFromHeader(
+            _cookieJar.header(sourceId, loaded.finalUri),
+          ),
+        );
+      }
       final loaded = await _webViewLoader.load(
         url: request.url,
         method: request.method.name.toUpperCase(),
@@ -198,6 +276,7 @@ class SourceHttpTransport
           'Reading source response exceeds $maxResponseBytes bytes.',
         );
       }
+      checkSession();
       _cookieJar.storeBrowserCookies(
         request.cookieJarKey,
         loaded.finalUri,
@@ -248,10 +327,9 @@ class SourceHttpTransport
         String? redirectState;
         try {
           final requestHeaders = Map<String, String>.from(headers);
-          final storedCookieHeader = SourceCookieJar.mergeHeaders(
-            _cookieJar.header(request.cookieJarKey, current),
-            _cookieJar.headerFromJar(redirectCookies, current),
-          );
+          final storedCookieHeader = request.cookieJarKey == null
+              ? _cookieJar.headerFromJar(redirectCookies, current)
+              : _cookieJar.header(request.cookieJarKey, current);
           String? configuredCookie;
           requestHeaders.removeWhere((name, value) {
             if (name.toLowerCase() != HttpHeaders.cookieHeader) return false;
@@ -309,6 +387,7 @@ class SourceHttpTransport
               }
             },
           );
+          checkSession();
           final status = response.statusCode ?? 0;
           _cookieJar.storeInJar(redirectCookies, current, response.headers);
           _cookieJar.store(request.cookieJarKey, current, response.headers);
@@ -374,6 +453,17 @@ class SourceHttpTransport
           }
           current = next;
         } on DioException catch (error) {
+          checkSession();
+          if (error.response case final Response response) {
+            _cookieJar.store(request.cookieJarKey, current, response.headers);
+            if (response.statusCode == 401 &&
+                sessionId != null &&
+                _browserSessions[sessionId]?.active == true) {
+              throw const BookSourceProtocolException(
+                'The website requires login. Open this source’s login page to sign in again.',
+              );
+            }
+          }
           if (CancelToken.isCancel(error)) {
             cancellation?.throwIfCancelled();
             throw BookSourceProtocolException(
@@ -401,14 +491,28 @@ class SourceHttpTransport
             cancellation?.throwIfCancelled();
             await _networkPolicy.validate(current);
             final browserHeaders = Map<String, String>.from(headers);
-            final storedCookieHeader = SourceCookieJar.mergeHeaders(
-              _cookieJar.header(request.cookieJarKey, current),
-              _cookieJar.headerFromJar(redirectCookies, current),
-            );
+            final storedCookieHeader = request.cookieJarKey == null
+                ? _cookieJar.headerFromJar(redirectCookies, current)
+                : _cookieJar.header(request.cookieJarKey, current);
             if (storedCookieHeader != null) {
               browserHeaders[HttpHeaders.cookieHeader] = storedCookieHeader;
             }
             try {
+              checkSession();
+              if (sessionId != null &&
+                  _browserSessions[sessionId]?.active == true) {
+                return await send(
+                  SourceRequestTemplate(
+                    url: current,
+                    method: SourceRequestMethod.get,
+                    headers: browserHeaders,
+                    charset: request.charset,
+                    useWebView: true,
+                    cookieJarKey: sessionId,
+                  ),
+                  cancellation: cancellation,
+                );
+              }
               final loaded = await _webViewLoader.load(
                 url: current,
                 method: 'GET',
@@ -423,6 +527,7 @@ class SourceHttpTransport
                   'Reading source response exceeds $maxResponseBytes bytes.',
                 );
               }
+              checkSession();
               _cookieJar.storeBrowserCookies(
                 request.cookieJarKey,
                 loaded.finalUri,

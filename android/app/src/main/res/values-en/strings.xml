@@ -3,4 +3,5 @@
     <string name="app_name">OpenReading</string>
     <string name="source_browser_cancel">Cancel</string>
     <string name="source_browser_done">Verification complete</string>
+    <string name="source_browser_login_title">Source login</string>
 </resources>

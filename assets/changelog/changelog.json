@@ -8,6 +8,7 @@
                 "zh": [
                     "统一更多菜单的样式与开合动画，卡片内保留普通三点入口；重排书源卡片，改善长名称、分组和大字号显示。",
                     "新增书源编辑与独立书籍详情页面，完善书源更换和重新匹配流程。",
+                    "新增书源原网站登录（Android 9+、iOS、macOS），支持安全保存、恢复和清除 Cookie 与 Local Storage，后续书源请求可继续使用登录状态。",
                     "书源整理支持暂停、继续、结果筛选，以及批量停用或删除已检测书源。",
                     "新增书源书籍更新页面，可选择章节范围，查看版本差异并处理正文冲突。",
                     "优化听书播放器和设置布局，完善音量、音色、语速、定时与跨章节朗读，跳过空白朗读文本。",
@@ -20,6 +21,7 @@
                 "en": [
                     "Share menu styling and opening transitions while keeping plain three-dot buttons inside cards; improve source cards for long names, groups and larger text.",
                     "Add source editing and a dedicated book details page, and improve source switching and rematching.",
+                    "Add original-website source login on Android 9+, iOS and macOS, with secure saving, restoration and clearing of cookies and Local Storage for subsequent source requests.",
                     "Source maintenance supports pausing, resuming, result filtering and bulk disabling or removing checked sources.",
                     "Add source-book updates with chapter range selection, version comparison and content conflict handling.",
                     "Improve the read-aloud player and settings, including volume, voice, speed, sleep timers and cross-chapter reading; skip blank text.",

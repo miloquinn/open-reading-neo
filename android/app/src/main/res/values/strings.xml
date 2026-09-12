@@ -3,4 +3,5 @@
     <string name="app_name">开元阅读</string>
     <string name="source_browser_cancel">取消</string>
     <string name="source_browser_done">完成验证</string>
+    <string name="source_browser_login_title">书源登录</string>
 </resources>

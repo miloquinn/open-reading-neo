@@ -45,6 +45,8 @@ class SourceScriptBootstrap {
       'sourceValues': state.values,
       'loginInfo': loginInfo,
       'loginHeaders': loginHeaders,
+      'browserLocalStorage': context.browserLocalStorage,
+      'storageOrigin': (context.baseUrl ?? context.source.baseUri).origin,
       'sharedScript': context.source.jsLib,
       'state': state.javaState,
       'result': context.result is SourceScriptNetworkResult
@@ -85,6 +87,27 @@ class SourceScriptBootstrap {
   const __ruleValues = Object.assign({}, __payload.variables || {});
   let __loginInfo = Object.assign({}, __payload.loginInfo || {});
   let __loginHeaders = Object.assign({}, __payload.loginHeaders || {});
+  const __browserLocalStorage = Object.assign(Object.create(null), __payload.browserLocalStorage || {});
+  const __storageOrigin = __payload.storageOrigin;
+  const __clearedStorageOrigins = new Set();
+  function __storage(origin) {
+    const key = origin == null ? __storageOrigin : String(origin);
+    if (!Object.prototype.hasOwnProperty.call(__browserLocalStorage, key)) {
+      __browserLocalStorage[key] = Object.create(null);
+    }
+    return __browserLocalStorage[key];
+  }
+  globalThis.localStorage = {
+    getItem: (key) => Object.prototype.hasOwnProperty.call(__storage(), String(key))
+      ? String(__storage()[String(key)]) : null,
+    setItem: (key, value) => { Object.defineProperty(__storage(), String(key), {
+      value: String(value), writable: true, enumerable: true, configurable: true
+    }); },
+    removeItem: (key) => { delete __storage()[String(key)]; },
+    clear: () => { __browserLocalStorage[__storageOrigin] = Object.create(null); __clearedStorageOrigins.add(__storageOrigin); },
+    key: (index) => Object.keys(__storage())[Number(index)] ?? null,
+    get length() { return Object.keys(__storage()).length; }
+  };
   let __sourceVariable = __payload.sourceVariable || '';
   globalThis.result = __payload.result;
   globalThis.baseUrl = __payload.baseUrl;
@@ -132,6 +155,7 @@ class SourceScriptBootstrap {
       return value;
     },
     removeLoginHeader: () => { __loginHeaders = {}; return null; },
+    getLocalStorage: (origin) => __javaMap(__storage(origin)),
     getLoginInfo: () => JSON.stringify(__loginInfo),
     getLoginInfoMap: () => __javaMap(__loginInfo),
     putLoginInfo: (value) => {
@@ -612,7 +636,13 @@ class SourceScriptBootstrap {
       throw new Error('__OPEN_READING_INTERACTION__' +
         encodeURIComponent(JSON.stringify(request)));
     }
-    return reply.value || {};
+    const value = reply.value || {};
+    if (value.browserLocalStorage && !value.cancelled && !value.error) {
+      Object.keys(value.browserLocalStorage).forEach(origin => {
+        __browserLocalStorage[origin] = Object.assign(Object.create(null), value.browserLocalStorage[origin]);
+      });
+    }
+    return value;
   }
   function __sourceNetwork(method, url, body, headers, webJs) {
     if (typeof headers === 'string') headers = JSON.parse(headers);
@@ -657,6 +687,8 @@ class SourceScriptBootstrap {
     sourceValues: __sourceValues,
     loginInfo: __loginInfo,
     loginHeaders: __loginHeaders,
+    browserLocalStorage: __browserLocalStorage,
+    clearedStorageOrigins: Array.from(__clearedStorageOrigins),
     state: __state
   });
   } finally {

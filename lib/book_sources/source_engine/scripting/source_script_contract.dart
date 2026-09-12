@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../source_browser_session.dart';
+
 import 'package:xxread/book_sources/source_engine/source_config.dart';
 
 class SourceScriptContext {
@@ -18,6 +20,8 @@ class SourceScriptContext {
     this.cookieRemover,
     this.loginInfo = const {},
     this.loginHeaders = const {},
+    this.browserLocalStorage = const {},
+    this.localStorageWriter,
     this.loginInfoWriter,
     this.loginHeaderWriter,
     this.interactionHandler,
@@ -40,6 +44,12 @@ class SourceScriptContext {
   final void Function(Uri uri)? cookieRemover;
   final Map<String, String> loginInfo;
   final Map<String, String> loginHeaders;
+  final Map<String, Map<String, String>> browserLocalStorage;
+  final void Function(
+    Map<String, Map<String, String>> value,
+    Set<String> clearedOrigins,
+  )?
+  localStorageWriter;
   final void Function(Map<String, String> value)? loginInfoWriter;
   final void Function(Map<String, String> value)? loginHeaderWriter;
   final Future<SourceScriptInteractionResult> Function(
@@ -70,6 +80,8 @@ class SourceScriptContext {
     cookieRemover: cookieRemover,
     loginInfo: loginInfo,
     loginHeaders: loginHeaders,
+    browserLocalStorage: browserLocalStorage,
+    localStorageWriter: localStorageWriter,
     loginInfoWriter: loginInfoWriter,
     loginHeaderWriter: loginHeaderWriter,
     interactionHandler: interactionHandler,
@@ -88,6 +100,7 @@ class SourceScriptInteractionRequest {
     this.refetchAfterSuccess = false,
     this.headers = const {},
     this.imageBytes,
+    this.browserSession = const SourceBrowserSession(),
   });
 
   final String signature;
@@ -98,10 +111,12 @@ class SourceScriptInteractionRequest {
   final bool refetchAfterSuccess;
   final Map<String, String> headers;
   final Uint8List? imageBytes;
+  final SourceBrowserSession browserSession;
 
   SourceScriptInteractionRequest copyWith({
     Map<String, String>? headers,
     Uint8List? imageBytes,
+    SourceBrowserSession? browserSession,
   }) => SourceScriptInteractionRequest(
     signature: signature,
     kind: kind,
@@ -111,6 +126,7 @@ class SourceScriptInteractionRequest {
     refetchAfterSuccess: refetchAfterSuccess,
     headers: headers ?? this.headers,
     imageBytes: imageBytes ?? this.imageBytes,
+    browserSession: browserSession ?? this.browserSession,
   );
 }
 
@@ -120,6 +136,7 @@ class SourceScriptInteractionResult {
     this.body = '',
     this.finalUrl = '',
     this.cookieHeader,
+    this.browserSession,
     this.cancelled = false,
     this.error,
   });
@@ -128,6 +145,7 @@ class SourceScriptInteractionResult {
   final String body;
   final String finalUrl;
   final String? cookieHeader;
+  final SourceBrowserSession? browserSession;
   final bool cancelled;
   final String? error;
 
@@ -136,6 +154,8 @@ class SourceScriptInteractionResult {
     'body': body,
     'finalUrl': finalUrl,
     'cookieHeader': cookieHeader,
+    if (browserSession != null)
+      'browserLocalStorage': browserSession!.localStorage,
     'cancelled': cancelled,
     'error': error,
   };

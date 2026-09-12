@@ -2,4 +2,5 @@
 <resources>
     <string name="source_browser_cancel">キャンセル</string>
     <string name="source_browser_done">確認完了</string>
+    <string name="source_browser_login_title">ブックソースログイン</string>
 </resources>

@@ -32,8 +32,15 @@ class SourceCookieJar {
         final cookie = Cookie('${value['name']}', '${value['value']}')
           ..secure = value['secure'] == true
           ..httpOnly = value['httpOnly'] == true;
-        final domain = '${value['domain'] ?? ''}'.toLowerCase().replaceFirst(RegExp(r'^\.'), '');
-        if (domain.isEmpty || domain.contains('/') || domain.contains(RegExp(r'\s'))) continue;
+        final domain = '${value['domain'] ?? ''}'.toLowerCase().replaceFirst(
+          RegExp(r'^\.'),
+          '',
+        );
+        if (domain.isEmpty ||
+            domain.contains('/') ||
+            domain.contains(RegExp(r'\s'))) {
+          continue;
+        }
         final path = '${value['path'] ?? '/'}';
         final expires = value['expiresAt'];
         final expiresAt = expires is num
@@ -146,6 +153,10 @@ class SourceCookieJar {
           path: path,
           hostOnly: hostOnly,
           expiresAt: expiresAt,
+          sameSite: RegExp(
+            r'(?:^|;)\s*SameSite=([^;]+)',
+            caseSensitive: false,
+          ).firstMatch(value)?.group(1)?.trim(),
         );
       } on FormatException {
         // Ignore one malformed Set-Cookie without discarding the response.
@@ -173,14 +184,22 @@ class SourceCookieJar {
   }
 
   static String? mergeHeaders(String? configured, String? stored) {
-    final values = <String, String>{};
-    for (final header in [configured, stored]) {
-      values.addAll(parseSourceCookieHeader(header));
-    }
-    if (values.isEmpty) return null;
-    return values.entries
-        .map((entry) => '${entry.key}=${entry.value}')
-        .join('; ');
+    // A Cookie header can legitimately contain the same name for multiple
+    // paths. Keep the jar's most-specific-path-first ordering intact.
+    final storedPairs = [
+      for (final pair in (stored ?? '').split(';'))
+        if (pair.indexOf('=') > 0) pair.trim(),
+    ];
+    final storedNames = {
+      for (final pair in storedPairs)
+        pair.substring(0, pair.indexOf('=')).trim(),
+    };
+    final pairs = [
+      ...storedPairs,
+      for (final entry in parseSourceCookieHeader(configured).entries)
+        if (!storedNames.contains(entry.key)) '${entry.key}=${entry.value}',
+    ];
+    return pairs.isEmpty ? null : pairs.join('; ');
   }
 }
 
@@ -224,7 +243,8 @@ class SourceStoredCookie {
     final requestPath = uri.path.isEmpty ? '/' : uri.path;
     return requestPath == path ||
         (requestPath.startsWith(path) &&
-            (path.endsWith('/') || requestPath.substring(path.length).startsWith('/')));
+            (path.endsWith('/') ||
+                requestPath.substring(path.length).startsWith('/')));
   }
 }
 

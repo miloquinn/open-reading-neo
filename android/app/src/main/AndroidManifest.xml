@@ -84,6 +84,22 @@
             android:exported="false"
             android:screenOrientation="unspecified"
             android:theme="@style/SourceBrowserTheme" />
+        <activity
+            android:name=".SourceBrowserSessionActivity"
+            android:exported="false"
+            android:process=":sourceBrowser"
+            android:screenOrientation="unspecified"
+            android:theme="@style/SourceBrowserTheme" />
+        <service
+            android:name=".SourceBrowserSessionService"
+            android:exported="false"
+            android:process=":sourceBrowser" />
+        <provider
+            android:name=".SourceBrowserProcessInitializer"
+            android:authorities="${applicationId}.source_browser_initializer"
+            android:exported="false"
+            android:process=":sourceBrowser"
+            android:initOrder="100" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

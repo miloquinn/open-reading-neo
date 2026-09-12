@@ -99,6 +99,7 @@ final class AuthCallbackBridge {
   private var incomingBookBridge: IncomingBookBridge?
   private var readerAloudMediaBridge: ReaderAloudMediaBridge?
   private var applePurchaseSupportBridge: ApplePurchaseSupportBridge?
+  private var sourceBrowserSessionBridge: SourceBrowserSessionBridge?
 
   override func application(
     _ application: UIApplication,
@@ -199,6 +200,12 @@ final class AuthCallbackBridge {
     }
     if applePurchaseSupportBridge == nil {
       applePurchaseSupportBridge = ApplePurchaseSupportBridge(messenger: messenger)
+    }
+    if sourceBrowserSessionBridge == nil {
+      sourceBrowserSessionBridge = SourceBrowserSessionBridge(
+        messenger: messenger,
+        presenter: window?.rootViewController
+      )
     }
 
   }

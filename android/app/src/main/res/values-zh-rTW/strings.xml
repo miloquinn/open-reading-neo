@@ -2,4 +2,5 @@
 <resources>
     <string name="source_browser_cancel">取消</string>
     <string name="source_browser_done">完成驗證</string>
+    <string name="source_browser_login_title">書源登入</string>
 </resources>

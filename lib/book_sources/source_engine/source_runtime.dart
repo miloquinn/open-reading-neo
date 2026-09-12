@@ -2,6 +2,7 @@ import '../models/registered_book_source.dart';
 import '../protocol/book_source_protocol.dart';
 import '../services/book_download_cancellation.dart';
 import 'source_concurrency_limiter.dart';
+import 'source_browser_session.dart';
 import 'source_debug.dart';
 import 'source_http_transport.dart';
 import 'source_interaction_coordinator.dart';
@@ -26,7 +27,10 @@ class SourceRuntime {
     SourceConcurrencyLimiter? concurrencyLimiter,
     SourceDebugRecorder? debugRecorder,
     SourceInteractionCoordinatorPort? interactionCoordinator,
-  }) : _transport = transport ?? SourceHttpTransport(),
+    SourceBrowserSessionClient browserClient =
+        const SourceBrowserSessionClient(),
+  }) : _transport =
+           transport ?? SourceHttpTransport(browserClient: browserClient),
        _debugRecorder = debugRecorder {
     final interactionTransport = switch (_transport) {
       final SourceInteractionTransport value => value,
@@ -61,6 +65,7 @@ class SourceRuntime {
     _login = SourceRuntimeLogin(
       sessions: _sessions,
       contexts: _requests,
+      browser: browserClient,
       scripts: () => _scripts.evaluator,
     );
     _catalog = SourceRuntimeCatalog(

@@ -12,6 +12,7 @@ import 'source_transport.dart';
 
 abstract interface class SourceRuntimeSessionPort {
   Future<void> ensure(ReadingSourceConfig source);
+  int generation(ReadingSourceConfig source);
   SourceLoginSession current(ReadingSourceConfig source);
   Future<void> save(
     ReadingSourceConfig source, {
@@ -29,8 +30,17 @@ abstract interface class SourceRuntimeSessionPort {
   void setCookies(ReadingSourceConfig source, Uri uri, String cookie);
   void removeCookies(ReadingSourceConfig source, Uri uri);
   void clearMemory();
-  Future<void> saveBrowserSession(ReadingSourceConfig source, SourceBrowserSession session);
-  void updateLocalStorage(ReadingSourceConfig source, Map<String, Map<String, String>> storage);
+  Future<void> saveBrowserSession(
+    ReadingSourceConfig source,
+    SourceBrowserSession session, {
+    int? expectedGeneration,
+  });
+  void updateLocalStorage(
+    ReadingSourceConfig source,
+    Map<String, Map<String, String>> storage, {
+    Map<String, Map<String, String>>? initial,
+    Set<String> clearedOrigins = const {},
+  });
 }
 
 abstract interface class SourceRuntimeScriptContextPort {
@@ -53,21 +63,51 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
   final SourceCookieTransport? _cookieTransport;
   final Map<String, SourceLoginSession> _sessions = {};
   final Set<String> _dirty = {};
+  final Map<String, Future<void>> _writes = {};
+  final Map<String, Future<void>> _loads = {};
+  final Map<String, int> _revisions = {};
 
-  SourceBrowserSessionTransport? get _browserTransport => switch (_cookieTransport) {
-    final SourceBrowserSessionTransport value => value,
-    _ => null,
-  };
+  Future<void> _persist(String id, Future<void> Function() action) {
+    final write = (_writes[id] ?? Future<void>.value()).then((_) => action());
+    _writes[id] = write.then<void>((_) {}, onError: (Object _) {});
+    return write;
+  }
+
+  SourceBrowserSessionTransport? get _browserTransport =>
+      switch (_cookieTransport) {
+        final SourceBrowserSessionTransport value => value,
+        _ => null,
+      };
+
+  @override
+  int generation(ReadingSourceConfig source) =>
+      _revisions[source.stableId] ?? 0;
 
   @override
   Future<void> ensure(ReadingSourceConfig source) async {
     if (_sessions.containsKey(source.stableId)) return;
+    final id = source.stableId;
+    final pending = _loads[id];
+    if (pending != null) return pending;
+    final revision = _revisions[id] ?? 0;
+    final load = () async {
+      SourceLoginSession session;
+      try {
+        session = await _store.read(id);
+      } on Object {
+        // Public reading remains available when platform secure storage is
+        // unavailable. Explicit login writes still surface storage failures.
+        session = const SourceLoginSession();
+      }
+      if ((_revisions[id] ?? 0) != revision) return;
+      _sessions[id] = session;
+      _browserTransport?.restoreBrowserSession(id, session.browserSession);
+    }();
+    _loads[id] = load;
     try {
-      final session = await _store.read(source.stableId);
-      _sessions[source.stableId] = session;
-      _browserTransport?.restoreBrowserSession(source.stableId, session.browserSession);
-    } on Object {
-      _sessions[source.stableId] = const SourceLoginSession();
+      await load;
+    } finally {
+      _loads.remove(id);
     }
   }
 
@@ -88,7 +128,10 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
       browserSession: previous.browserSession,
     );
     _sessions[source.stableId] = session;
-    await _store.write(source.stableId, session);
+    await _persist(
+      source.stableId,
+      () => _store.write(source.stableId, session),
+    );
   }
 
   @override
@@ -127,7 +170,9 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
   Future<void> flush(ReadingSourceConfig source) async {
     final previous = current(source);
     final browser = _browserTransport?.browserSession(source.stableId);
-    if (browser != null && jsonEncode(browser.toJson()) != jsonEncode(previous.browserSession.toJson())) {
+    if (browser != null &&
+        jsonEncode(browser.toJson()) !=
+            jsonEncode(previous.browserSession.toJson())) {
       _sessions[source.stableId] = SourceLoginSession(
         loginInfo: previous.loginInfo,
         loginHeaders: previous.loginHeaders,
@@ -137,7 +182,11 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
     }
     if (!_dirty.remove(source.stableId)) return;
     try {
-      await _store.write(source.stableId, current(source));
+      final snapshot = current(source);
+      await _persist(
+        source.stableId,
+        () => _store.write(source.stableId, snapshot),
+      );
     } on Object {
       _dirty.add(source.stableId);
       rethrow;
@@ -146,16 +195,20 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
 
   @override
   Future<void> clear(ReadingSourceConfig source) async {
-    _sessions.remove(source.stableId);
-    await _store.clear(source.stableId);
-    _browserTransport?.clearBrowserSession(source.stableId);
+    final id = source.stableId;
+    _revisions[id] = (_revisions[id] ?? 0) + 1;
+    _sessions[id] = const SourceLoginSession();
+    _dirty.remove(id);
+    _browserTransport?.clearBrowserSession(id);
     removeCookies(source, source.baseUri);
+    await _persist(id, () => _store.clear(id));
   }
 
   @override
   String cookieHeader(ReadingSourceConfig source, Uri uri) {
     final cookieTransport = _cookieTransport;
-    if ((!source.enabledCookieJar && !current(source).browserSession.active) || cookieTransport == null) {
+    if ((!source.enabledCookieJar && !current(source).browserSession.active) ||
+        cookieTransport == null) {
       return '';
     }
     return cookieTransport.scriptCookieHeader(source.stableId, uri);
@@ -164,7 +217,8 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
   @override
   void setCookies(ReadingSourceConfig source, Uri uri, String cookie) {
     final cookieTransport = _cookieTransport;
-    if ((source.enabledCookieJar || current(source).browserSession.active) && cookieTransport != null) {
+    if ((source.enabledCookieJar || current(source).browserSession.active) &&
+        cookieTransport != null) {
       cookieTransport.setScriptCookies(source.stableId, uri, cookie);
     }
   }
@@ -172,13 +226,22 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
   @override
   void removeCookies(ReadingSourceConfig source, Uri uri) {
     final cookieTransport = _cookieTransport;
-    if ((source.enabledCookieJar || current(source).browserSession.active) && cookieTransport != null) {
+    if ((source.enabledCookieJar || current(source).browserSession.active) &&
+        cookieTransport != null) {
       cookieTransport.removeScriptCookies(source.stableId, uri);
     }
   }
 
   @override
-  Future<void> saveBrowserSession(ReadingSourceConfig source, SourceBrowserSession session) async {
+  Future<void> saveBrowserSession(
+    ReadingSourceConfig source,
+    SourceBrowserSession session, {
+    int? expectedGeneration,
+  }) async {
+    if (expectedGeneration != null &&
+        generation(source) != expectedGeneration) {
+      throw const SourceBrowserCancelled();
+    }
     final previous = current(source);
     final next = SourceLoginSession(
       loginInfo: previous.loginInfo,
@@ -187,16 +250,55 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
     );
     // Publish only after secure storage succeeds: a cancelled or failed login
     // must not silently replace the prior usable account.
-    await _store.write(source.stableId, next);
+    final revision = _revisions[source.stableId] ?? 0;
+    await _persist(source.stableId, () => _store.write(source.stableId, next));
+    if ((_revisions[source.stableId] ?? 0) != revision) {
+      throw const SourceBrowserCancelled();
+    }
     _sessions[source.stableId] = next;
     _browserTransport?.restoreBrowserSession(source.stableId, session);
   }
 
   @override
-  void updateLocalStorage(ReadingSourceConfig source, Map<String, Map<String, String>> storage) {
+  void updateLocalStorage(
+    ReadingSourceConfig source,
+    Map<String, Map<String, String>> storage, {
+    Map<String, Map<String, String>>? initial,
+    Set<String> clearedOrigins = const {},
+  }) {
     final previous = current(source);
-    final browser = (_browserTransport?.browserSession(source.stableId) ?? previous.browserSession)
-        .copyWith(localStorage: storage);
+    final merged = <String, Map<String, String>>{
+      for (final entry in previous.browserSession.localStorage.entries)
+        entry.key: Map<String, String>.from(entry.value),
+    };
+    if (initial != null) {
+      for (final origin in {
+        ...initial.keys,
+        ...storage.keys,
+        ...clearedOrigins,
+      }) {
+        final before = initial[origin] ?? const <String, String>{};
+        final after = storage[origin] ?? const <String, String>{};
+        if (clearedOrigins.contains(origin)) merged[origin] = {};
+        final currentValues = merged.putIfAbsent(origin, () => {});
+        for (final key in {...before.keys, ...after.keys}) {
+          if (!clearedOrigins.contains(origin) &&
+              before[key] == after[key] &&
+              before.containsKey(key) == after.containsKey(key)) {
+            continue;
+          }
+          if (after.containsKey(key)) {
+            currentValues[key] = after[key]!;
+          } else {
+            currentValues.remove(key);
+          }
+        }
+      }
+    }
+    final browser =
+        (_browserTransport?.browserSession(source.stableId) ??
+                previous.browserSession)
+            .copyWith(localStorage: initial == null ? storage : merged);
     _sessions[source.stableId] = SourceLoginSession(
       loginInfo: previous.loginInfo,
       loginHeaders: previous.loginHeaders,
@@ -221,13 +323,19 @@ class SourceRuntimeLogin {
     SourceBrowserSessionClient browser = const SourceBrowserSessionClient(),
   }) : this._(sessions, contexts, scripts, browser);
 
-  SourceRuntimeLogin._(this._sessions, this._contexts, this._scripts, this._browser);
+  SourceRuntimeLogin._(
+    this._sessions,
+    this._contexts,
+    this._scripts,
+    this._browser,
+  );
 
   final SourceRuntimeSessionPort _sessions;
   final SourceRuntimeScriptContextPort _contexts;
   final SourceScriptEvaluator Function() _scripts;
   final SourceBrowserSessionClient _browser;
   final Map<String, int> _loginRevisions = {};
+  final Set<String> _openBrowsers = {};
 
   Future<void> saveLoginSession(
     RegisteredBookSource registered, {
@@ -241,12 +349,24 @@ class SourceRuntimeLogin {
 
   Future<void> clearLoginSession(RegisteredBookSource registered) async {
     final source = sourceFromRegistered(registered);
-    _loginRevisions[source.stableId] = (_loginRevisions[source.stableId] ?? 0) + 1;
-    await _browser.clear(source.stableId);
-    await _sessions.clear(source);
+    _loginRevisions[source.stableId] =
+        (_loginRevisions[source.stableId] ?? 0) + 1;
+    await _sessions.ensure(source);
+    final hasBrowser =
+        _sessions.current(source).browserSession.active ||
+        _openBrowsers.contains(source.stableId);
+    try {
+      if (hasBrowser) await _browser.clear(source.stableId);
+    } finally {
+      await _sessions.clear(source);
+    }
   }
 
-  Future<void> browserLogin(ReadingSourceConfig source, Uri uri, {String? html}) async {
+  Future<void> browserLogin(
+    ReadingSourceConfig source,
+    Uri uri, {
+    String? html,
+  }) async {
     await _sessions.ensure(source);
     final revision = (_loginRevisions[source.stableId] ?? 0) + 1;
     _loginRevisions[source.stableId] = revision;
@@ -255,22 +375,46 @@ class SourceRuntimeLogin {
     Map? headers;
     if (rawHeaders is Map) headers = rawHeaders;
     if (rawHeaders is String) {
-      try { final value = jsonDecode(rawHeaders); if (value is Map) headers = value; }
-      on FormatException { /* Dynamic headers are evaluated by source requests. */ }
+      try {
+        final value = jsonDecode(rawHeaders);
+        if (value is Map) headers = value;
+      } on FormatException {
+        final body =
+            sourceScriptBody(rawHeaders) ?? 'JSON.stringify(($rawHeaders))';
+        Object? value = await _scripts().evaluateAsync(
+          body,
+          _contexts.scriptContext(source, includeSourceHeaders: false),
+        );
+        if (value is String) value = jsonDecode(value);
+        if (value is! Map) {
+          throw const BookSourceProtocolException(
+            'Website headers must return an object.',
+          );
+        }
+        headers = value;
+      }
     }
-    final result = await _browser.open(
-      sourceId: source.stableId,
-      url: uri,
-      title: source.name,
-      html: html,
-      headers: {
-        if (headers != null) for (final item in headers.entries) '${item.key}': '${item.value}',
-        ...previous.loginHeaders,
-      },
-      session: previous.browserSession,
-    );
-    if (_loginRevisions[source.stableId] != revision) throw const SourceBrowserCancelled();
-    await _sessions.saveBrowserSession(source, result.session);
+    _openBrowsers.add(source.stableId);
+    try {
+      final result = await _browser.open(
+        sourceId: source.stableId,
+        url: uri,
+        title: source.name,
+        html: html,
+        headers: {
+          if (headers != null)
+            for (final item in headers.entries) '${item.key}': '${item.value}',
+          ...previous.loginHeaders,
+        },
+        session: previous.browserSession,
+      );
+      if (_loginRevisions[source.stableId] != revision) {
+        throw const SourceBrowserCancelled();
+      }
+      await _sessions.saveBrowserSession(source, result.session);
+    } finally {
+      _openBrowsers.remove(source.stableId);
+    }
   }
 
   Future<List<SourceLoginField>> loadLoginFields(

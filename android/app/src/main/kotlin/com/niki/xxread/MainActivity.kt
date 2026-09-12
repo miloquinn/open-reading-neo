@@ -31,6 +31,7 @@ class MainActivity : FlutterActivity() {
     private var readerAloudBridge: ReaderAloudBridge? = null
     private var sourceWebViewBridge: SourceWebViewBridge? = null
     private var sourceInteractiveBrowserBridge: SourceInteractiveBrowserBridge? = null
+    private var sourceBrowserSessionBridge: SourceBrowserSessionBridge? = null
     @Volatile private var volumePagingEnabled: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -151,6 +152,10 @@ class MainActivity : FlutterActivity() {
             this,
             flutterEngine.dartExecutor.binaryMessenger,
         )
+        sourceBrowserSessionBridge = SourceBrowserSessionBridge(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
 
     }
 
@@ -160,6 +165,9 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (sourceBrowserSessionBridge?.onActivityResult(requestCode, resultCode, data) == true) {
+            return
+        }
         if (sourceInteractiveBrowserBridge?.onActivityResult(requestCode, resultCode, data) == true) {
             return
         }
@@ -230,6 +238,8 @@ class MainActivity : FlutterActivity() {
         sourceWebViewBridge = null
         sourceInteractiveBrowserBridge?.dispose()
         sourceInteractiveBrowserBridge = null
+        sourceBrowserSessionBridge?.dispose()
+        sourceBrowserSessionBridge = null
         super.onDestroy()
     }
 

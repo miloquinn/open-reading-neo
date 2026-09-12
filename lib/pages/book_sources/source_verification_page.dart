@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../book_sources/source_engine/source_interaction_coordinator.dart';
-import '../../book_sources/source_engine/source_interactive_browser.dart';
+import '../../book_sources/source_engine/source_browser_session.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
 import '../../book_sources/source_engine/scripting/source_script_contract.dart';
 import '../../utils/localization_extension.dart';
@@ -54,7 +54,10 @@ class _SourceVerificationPageState extends State<SourceVerificationPage> {
       if (url == null || !url.hasAuthority) {
         throw StateError('Invalid verification URL');
       }
-      final result = await const SourceInteractiveBrowser().open(
+      final result = await const SourceBrowserSessionClient().open(
+        sourceId: widget.ticket.sourceId,
+        session: _request.browserSession,
+        title: _request.title,
         url: url,
         headers: _request.headers,
         html: _request.html,
@@ -63,10 +66,10 @@ class _SourceVerificationPageState extends State<SourceVerificationPage> {
         SourceScriptInteractionResult(
           body: result.body,
           finalUrl: result.finalUri.toString(),
-          cookieHeader: result.cookieHeader,
+          browserSession: result.session,
         ),
       );
-    } on SourceInteractiveBrowserCancelled {
+    } on SourceBrowserCancelled {
       _cancel();
     } on Object catch (error) {
       if (!mounted || _completed) return;

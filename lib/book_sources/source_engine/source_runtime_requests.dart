@@ -4,6 +4,7 @@ import '../protocol/book_source_protocol.dart';
 import '../services/book_download_cancellation.dart';
 import 'source_concurrency_limiter.dart';
 import 'source_config.dart';
+import 'source_browser_session.dart';
 import 'source_interaction_coordinator.dart';
 import 'source_request_template.dart';
 import 'source_response.dart';
@@ -130,7 +131,11 @@ class SourceRuntimeRequests
       baseUri: source.baseUri,
       variables: variables,
       sourceHeaders: await sourceHeaders(source, cancellation: cancellation),
-      cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+      cookieJarKey:
+          (source.enabledCookieJar ||
+              _sessions.current(source).browserSession.active)
+          ? source.stableId
+          : null,
       defaultWebJs: defaultWebJs,
     );
     await _limiter.acquire(
@@ -145,9 +150,12 @@ class SourceRuntimeRequests
         cancellation: cancellation,
       );
       cancellation?.throwIfCancelled();
+      await _sessions.flush(source);
       _trace.networkSuccess(outgoing, response, stopwatch);
       return _applyLoginCheck(source, response, cancellation: cancellation);
     } catch (error) {
+      // Error responses can expire cookies too (for example a 401 logout).
+      await _sessions.flush(source);
       _trace.networkFailure(outgoing, error, stopwatch);
       rethrow;
     }
@@ -217,6 +225,13 @@ class SourceRuntimeRequests
   }) {
     cancellation?.throwIfCancelled();
     final loginSession = _sessions.current(source);
+    final generation = _sessions.generation(source);
+    void checkGeneration() {
+      if (_sessions.generation(source) != generation) {
+        throw const SourceBrowserCancelled();
+      }
+    }
+
     return SourceScriptContext(
       source: source,
       result: result,
@@ -233,12 +248,34 @@ class SourceRuntimeRequests
         cancellation: cancellation,
       ),
       cookieReader: (uri) => _sessions.cookieHeader(source, uri),
-      cookieWriter: (uri, cookie) => _sessions.setCookies(source, uri, cookie),
-      cookieRemover: (uri) => _sessions.removeCookies(source, uri),
+      cookieWriter: (uri, cookie) {
+        checkGeneration();
+        _sessions.setCookies(source, uri, cookie);
+      },
+      cookieRemover: (uri) {
+        checkGeneration();
+        _sessions.removeCookies(source, uri);
+      },
       loginInfo: loginSession.loginInfo,
       loginHeaders: loginSession.loginHeaders,
-      loginInfoWriter: (value) => _sessions.updateInfo(source, value),
-      loginHeaderWriter: (value) => _sessions.updateHeaders(source, value),
+      browserLocalStorage: loginSession.browserSession.localStorage,
+      localStorageWriter: (value, clearedOrigins) {
+        checkGeneration();
+        _sessions.updateLocalStorage(
+          source,
+          value,
+          initial: loginSession.browserSession.localStorage,
+          clearedOrigins: clearedOrigins,
+        );
+      },
+      loginInfoWriter: (value) {
+        checkGeneration();
+        _sessions.updateInfo(source, value);
+      },
+      loginHeaderWriter: (value) {
+        checkGeneration();
+        _sessions.updateHeaders(source, value);
+      },
       interactionHandler: (request) =>
           _handleScriptInteraction(source, request, cancellation: cancellation),
     );
@@ -250,6 +287,7 @@ class SourceRuntimeRequests
     BookDownloadCancellation? cancellation,
   }) async {
     cancellation?.throwIfCancelled();
+    final generation = _sessions.generation(source);
     var target = source.baseUri.resolve(request.url);
     var interaction = request;
     if (request.kind != SourceScriptInteractionKind.verificationCode &&
@@ -272,7 +310,10 @@ class SourceRuntimeRequests
       target,
       cancellation: cancellation,
     );
-    var prepared = interaction.copyWith(headers: headers);
+    var prepared = interaction.copyWith(
+      headers: headers,
+      browserSession: _sessions.current(source).browserSession,
+    );
     await _interactionTransport?.validateInteractionUri(target);
     cancellation?.throwIfCancelled();
     if (request.kind == SourceScriptInteractionKind.verificationCode) {
@@ -286,12 +327,19 @@ class SourceRuntimeRequests
       final bytes = await interactionTransport.fetchInteractionBytes(
         uri: target,
         headers: headers,
-        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+        cookieJarKey:
+            (source.enabledCookieJar ||
+                _sessions.current(source).browserSession.active)
+            ? source.stableId
+            : null,
       );
       cancellation?.throwIfCancelled();
       prepared = prepared.copyWith(imageBytes: bytes);
     }
     cancellation?.throwIfCancelled();
+    if (_sessions.generation(source) != generation) {
+      throw const SourceBrowserCancelled();
+    }
     final result = await _interactionCoordinator.request(
       sourceId: source.stableId,
       sourceName: source.name,
@@ -299,12 +347,25 @@ class SourceRuntimeRequests
       cancellation: cancellation,
     );
     cancellation?.throwIfCancelled();
+    if (_sessions.generation(source) != generation) {
+      throw const SourceBrowserCancelled();
+    }
     final finalUri = Uri.tryParse(result.finalUrl);
     if (finalUri != null) {
       await _interactionTransport?.validateInteractionUri(finalUri);
     }
     cancellation?.throwIfCancelled();
-    if (result.cookieHeader?.trim().isNotEmpty == true &&
+    if (result.browserSession != null &&
+        !result.cancelled &&
+        result.error == null) {
+      await _sessions.saveBrowserSession(
+        source,
+        result.browserSession!,
+        expectedGeneration: generation,
+      );
+    }
+    if (result.browserSession == null &&
+        result.cookieHeader?.trim().isNotEmpty == true &&
         source.enabledCookieJar) {
       cancellation?.throwIfCancelled();
       if (finalUri != null) {
@@ -563,7 +624,11 @@ class SourceRuntimeRequests
         request.url,
         baseUri: source.baseUri,
         sourceHeaders: headers,
-        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+        cookieJarKey:
+            (source.enabledCookieJar ||
+                _sessions.current(source).browserSession.active)
+            ? source.stableId
+            : null,
       );
       outgoing = SourceRequestTemplate(
         url: baseRequest.url,
@@ -586,7 +651,11 @@ class SourceRuntimeRequests
         template,
         baseUri: source.baseUri,
         sourceHeaders: headers,
-        cookieJarKey: source.enabledCookieJar ? source.stableId : null,
+        cookieJarKey:
+            (source.enabledCookieJar ||
+                _sessions.current(source).browserSession.active)
+            ? source.stableId
+            : null,
       );
     }
     final stopwatch = _trace.startNetwork();
@@ -596,6 +665,7 @@ class SourceRuntimeRequests
         cancellation: cancellation,
       );
       cancellation?.throwIfCancelled();
+      await _sessions.flush(source);
       _trace.networkSuccess(outgoing, response, stopwatch);
       return SourceScriptNetworkResult(
         body: response.body,
@@ -605,6 +675,7 @@ class SourceRuntimeRequests
         cookies: response.cookies,
       );
     } catch (error) {
+      await _sessions.flush(source);
       _trace.networkFailure(outgoing, error, stopwatch);
       rethrow;
     }

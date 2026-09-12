@@ -369,6 +369,8 @@ class SourceRuleScript {
       cookieRemover: context.cookieRemover,
       loginInfo: context.loginInfo,
       loginHeaders: context.loginHeaders,
+      browserLocalStorage: context.browserLocalStorage,
+      localStorageWriter: context.localStorageWriter,
       loginInfoWriter: context.loginInfoWriter,
       loginHeaderWriter: context.loginHeaderWriter,
       interactionHandler: context.interactionHandler,

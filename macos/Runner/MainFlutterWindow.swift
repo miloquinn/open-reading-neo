@@ -3,6 +3,7 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var appDistributionBridge: AppDistributionBridge?
+  private var sourceBrowserSessionBridge: SourceBrowserSessionBridge?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -12,6 +13,10 @@ class MainFlutterWindow: NSWindow {
 
     appDistributionBridge = AppDistributionBridge(
       messenger: flutterViewController.engine.binaryMessenger
+    )
+    sourceBrowserSessionBridge = SourceBrowserSessionBridge(
+      messenger: flutterViewController.engine.binaryMessenger,
+      parentWindow: self
     )
     RegisterGeneratedPlugins(registry: flutterViewController)
 

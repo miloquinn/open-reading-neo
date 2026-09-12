@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -20,13 +21,7 @@ import java.io.File
 
 class SourceBrowserSessionActivity : Activity() {
     companion object {
-        const val EXTRA_SOURCE_ID = "sourceId"
-        const val EXTRA_URL = "url"
-        const val EXTRA_HEADERS_JSON = "headersJson"
-        const val EXTRA_SESSION_JSON = "sessionJson"
-        const val EXTRA_TITLE = "title"
-        const val EXTRA_DONE_LABEL = "doneLabel"
-        const val EXTRA_CANCEL_LABEL = "cancelLabel"
+        const val EXTRA_REQUEST_FILE = "requestFile"
         const val RESULT_FILE = "resultFile"
     }
 
@@ -34,35 +29,65 @@ class SourceBrowserSessionActivity : Activity() {
     private lateinit var address: TextView
     private lateinit var progress: ProgressBar
     private lateinit var doneButton: Button
-    private val owner: String by lazy { "open:${intent.getStringExtra(EXTRA_SOURCE_ID).orEmpty()}:${hashCode()}" }
-    private val url: String by lazy { intent.getStringExtra(EXTRA_URL).orEmpty() }
-    private val headers: Map<String, String> by lazy { headersFromJson(intent.getStringExtra(EXTRA_HEADERS_JSON)) }
+    private val payload: JSONObject by lazy {
+        val file = intent.getStringExtra(EXTRA_REQUEST_FILE)?.let(::File)
+        try { JSONObject(file?.readText().orEmpty()) } catch (_: Exception) { JSONObject() }
+            .also { file?.delete() }
+    }
+    private val sourceId: String by lazy { payload.optString("sourceId") }
+    private val owner: String by lazy { "open:$sourceId:${hashCode()}" }
+    private val url: String by lazy { payload.optString("url") }
+    private val headers: Map<String, String> by lazy { headersFromJson(payload.optJSONObject("headers")?.toString()) }
+    private val suppliedHtml: String? by lazy { payload.optString("html").takeIf { it.isNotEmpty() } }
     private val tracker: SourceBrowserSessionTracker by lazy {
-        SourceBrowserSessionTracker(SourceBrowserSession.fromJson(intent.getStringExtra(EXTRA_SESSION_JSON)))
+        SourceBrowserSessionTracker(SourceBrowserSession.fromJson(payload.optJSONObject("session")?.toString()))
     }
     private var acquired = false
     private var finishingWithResult = false
     private var hydrating = false
     private var hydrationIndex = 0
+    private var collectingStorage = false
+    private var collectionIndex = 0
+    private var collectionOrigins = emptyList<String>()
+    private var capturedBody = ""
+    private var capturedFinalUrl = ""
+    private val storageBridgeName = "xxreadSourceStorage"
     private val hydration by lazy { tracker.hydrationOrigins() }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (url.isBlank() || intent.getStringExtra(EXTRA_SOURCE_ID).isNullOrBlank()) {
+        if (!isSafeSourceBrowserUrl(url) || sourceId.isBlank()) {
             setResult(RESULT_CANCELED)
             finish()
             return
         }
-        acquired = SourceBrowserSessionRuntime.acquire(owner)
+        if (!SourceBrowserSessionRuntime.supportsIsolatedDataDirectory) {
+            setResult(
+                RESULT_CANCELED,
+                Intent().putExtra("errorCode", "unsupported").putExtra(
+                    "errorMessage",
+                    "Isolated source browser sessions require Android 9 or newer.",
+                ),
+            )
+            finish()
+            return
+        }
+        acquired = SourceBrowserSessionRuntime.acquire(owner, sourceId) {
+            runOnUiThread { cancelAndFinish() }
+        }
         if (!acquired) {
             setResult(RESULT_CANCELED, Intent().putExtra("errorCode", "busy"))
             finish()
             return
         }
-        title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: getString(R.string.source_browser_login_title)
+        title = payload.optString("title").takeIf { it.isNotBlank() } ?: getString(R.string.source_browser_login_title)
         buildUi()
         configureSourceBrowserWebView(webView, headers)
+        webView.addJavascriptInterface(
+            SourceStorageJavascriptBridge { raw -> webView.post { tracker.mergeStoragePayload(raw) } },
+            storageBridgeName,
+        )
         webView.setDownloadListener { _, _, _, _, _ -> }
         webView.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
@@ -72,13 +97,23 @@ class SourceBrowserSessionActivity : Activity() {
         }
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, nextUrl: String, favicon: android.graphics.Bitmap?) {
-                if (!hydrating) {
+                if (!hydrating && !collectingStorage) {
                     address.text = nextUrl
                     tracker.observeCookies(nextUrl)
                 }
             }
 
             override fun onPageFinished(view: WebView, finishedUrl: String) {
+                if (collectingStorage) {
+                    collectionOrigins.getOrNull(collectionIndex)?.let(tracker::observeCookies)
+                    view.evaluateJavascript(tracker.captureStorageScript()) { storage ->
+                        if (completed) return@evaluateJavascript
+                        tracker.mergeStorage(storage)
+                        collectionIndex++
+                        collectNextOriginOrFinish()
+                    }
+                    return
+                }
                 if (hydrating) {
                     hydrationIndex++
                     hydrateNextOrLoad()
@@ -87,11 +122,17 @@ class SourceBrowserSessionActivity : Activity() {
                 address.text = finishedUrl
                 tracker.observeCookies(finishedUrl)
                 view.evaluateJavascript(tracker.captureStorageScript()) { tracker.mergeStorage(it) }
+                view.evaluateJavascript(tracker.installCaptureHooksScript(storageBridgeName), null)
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val scheme = request.url.scheme
                 return scheme != "http" && scheme != "https"
+            }
+
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                tracker.recordVisitedUrl(request.url.toString())
+                return null
             }
         }
         SourceBrowserSessionRuntime.clearStorage {
@@ -110,7 +151,7 @@ class SourceBrowserSessionActivity : Activity() {
             setPadding(12, 8, 12, 8)
         }
         val cancel = Button(this).apply {
-            text = intent.getStringExtra(EXTRA_CANCEL_LABEL)?.takeIf { it.isNotBlank() }
+            text = payload.optString("cancelLabel").takeIf { it.isNotBlank() }
                 ?: getString(R.string.source_browser_cancel)
             isAllCaps = false
             setOnClickListener { cancelAndFinish() }
@@ -122,7 +163,7 @@ class SourceBrowserSessionActivity : Activity() {
             setPadding(12, 0, 12, 0)
         }
         doneButton = Button(this).apply {
-            text = intent.getStringExtra(EXTRA_DONE_LABEL)?.takeIf { it.isNotBlank() }
+            text = payload.optString("doneLabel").takeIf { it.isNotBlank() }
                 ?: getString(R.string.source_browser_done)
             isAllCaps = false
             setOnClickListener { captureAndFinish() }
@@ -157,11 +198,17 @@ class SourceBrowserSessionActivity : Activity() {
         val navigationHeaders = headers.filterKeys {
             !it.equals("cookie", true) && !it.equals("user-agent", true)
         }
-        webView.loadUrl(url, navigationHeaders)
+        if (suppliedHtml != null) {
+            webView.loadDataWithBaseURL(url, suppliedHtml!!, "text/html", "UTF-8", null)
+        } else {
+            webView.loadUrl(url, navigationHeaders)
+        }
     }
 
+    private var completed = false
+
     private fun captureAndFinish() {
-        if (finishingWithResult || hydrating) return
+        if (completed || finishingWithResult || hydrating) return
         finishingWithResult = true
         doneButton.isEnabled = false
         val current = webView.url ?: url
@@ -171,34 +218,71 @@ class SourceBrowserSessionActivity : Activity() {
             webView.evaluateJavascript(
                 "(function(){return document.documentElement ? document.documentElement.outerHTML : (document.body ? document.body.innerHTML : '');})()",
             ) { encoded ->
-                val body = try { JSONTokener(encoded).nextValue() as? String ?: "" } catch (_: Exception) { "" }
-                val resultFile = File(cacheDir, "source_browser_session/open-${System.nanoTime()}.json")
-                try {
-                    resultFile.parentFile?.mkdirs()
-                    resultFile.writeText(
-                        JSONObject(
-                            mapOf(
-                                "body" to body,
-                                "finalUrl" to current,
-                                "session" to tracker.sessionMap(),
-                            ),
-                        ).toString(),
-                    )
-                    setResult(RESULT_OK, Intent().putExtra(RESULT_FILE, resultFile.absolutePath))
-                } catch (error: Exception) {
-                    setResult(
-                        RESULT_CANCELED,
-                        Intent().putExtra("errorCode", "result_failed").putExtra("errorMessage", error.message),
-                    )
+                if (completed) return@evaluateJavascript
+                capturedBody = try { JSONTokener(encoded).nextValue() as? String ?: "" } catch (_: Exception) { "" }
+                capturedFinalUrl = current
+                tracker.collectableOrigins { origins ->
+                    webView.post {
+                        if (completed) return@post
+                        collectionOrigins = origins
+                        collectionIndex = 0
+                        collectingStorage = true
+                        collectNextOriginOrFinish()
+                    }
                 }
-                finish()
             }
         }
     }
 
+    private fun collectNextOriginOrFinish() {
+        if (completed) return
+        if (collectionIndex < collectionOrigins.size) {
+            val origin = collectionOrigins[collectionIndex]
+            webView.loadDataWithBaseURL("$origin/", "<!doctype html><meta charset=utf-8>", "text/html", "UTF-8", null)
+            return
+        }
+        collectingStorage = false
+        val resultFile = File(cacheDir, "source_browser_session/open-${System.nanoTime()}.json")
+        try {
+            resultFile.parentFile?.mkdirs()
+            resultFile.writeText(
+                JSONObject(
+                    mapOf(
+                        "body" to capturedBody,
+                        "finalUrl" to capturedFinalUrl,
+                        "session" to tracker.sessionMap(),
+                    ),
+                ).toString(),
+            )
+            completed = true
+            finishWithClearedStorage(RESULT_OK, Intent().putExtra(RESULT_FILE, resultFile.absolutePath))
+        } catch (error: Exception) {
+            completed = true
+            finishWithClearedStorage(
+                RESULT_CANCELED,
+                Intent().putExtra("errorCode", "result_failed").putExtra("errorMessage", error.message),
+            )
+        }
+    }
+
     private fun cancelAndFinish() {
-        setResult(RESULT_CANCELED, Intent().putExtra("errorCode", "cancelled"))
-        finish()
+        if (completed) return
+        completed = true
+        finishWithClearedStorage(RESULT_CANCELED, Intent().putExtra("errorCode", "cancelled"))
+    }
+
+    private fun finishWithClearedStorage(resultCode: Int, data: Intent) {
+        if (!acquired) {
+            setResult(resultCode, data)
+            finish()
+            return
+        }
+        SourceBrowserSessionRuntime.clearStorage {
+            SourceBrowserSessionRuntime.release(owner)
+            acquired = false
+            setResult(resultCode, data)
+            finish()
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -210,10 +294,11 @@ class SourceBrowserSessionActivity : Activity() {
         if (::webView.isInitialized) {
             webView.stopLoading()
             webView.webViewClient = WebViewClient()
+            webView.removeJavascriptInterface(storageBridgeName)
             webView.destroy()
         }
         if (acquired) {
-            SourceBrowserSessionRuntime.clearStorage { SourceBrowserSessionRuntime.release(owner) }
+            SourceBrowserSessionRuntime.release(owner)
             acquired = false
         }
         super.onDestroy()

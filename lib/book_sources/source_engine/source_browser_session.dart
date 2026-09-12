@@ -84,12 +84,7 @@ Uri? sourceBrowserLoginUri(Map<String, dynamic> config) {
   final base = Uri.tryParse('${config['bookSourceUrl'] ?? ''}');
   final parsed = Uri.tryParse(raw);
   if (parsed == null || !isSourceBrowserUri(base)) return null;
-  if (!parsed.hasScheme &&
-      !raw.startsWith('/') &&
-      !RegExp(r'^[\w.-]+(?:/|\?|\.[\w]+)').hasMatch(raw) &&
-      raw != 'login') {
-    return null;
-  }
+  if (!parsed.hasScheme && RegExp(r'[();=]').hasMatch(parsed.path)) return null;
   final uri = base!.resolveUri(parsed);
   return isSourceBrowserUri(uri) ? uri : null;
 }
@@ -112,14 +107,18 @@ class SourceBrowserResult {
 class SourceBrowserSessionClient {
   const SourceBrowserSessionClient();
 
-  static const channel = MethodChannel('com.niki.xxread/source_browser_session');
+  static const channel = MethodChannel(
+    'com.niki.xxread/source_browser_session',
+  );
   static int _serial = 0;
 
-  bool get isSupported => !kIsWeb && const {
-    TargetPlatform.android,
-    TargetPlatform.iOS,
-    TargetPlatform.macOS,
-  }.contains(defaultTargetPlatform);
+  bool get isSupported =>
+      !kIsWeb &&
+      const {
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+      }.contains(defaultTargetPlatform);
 
   Future<SourceBrowserResult> open({
     required String sourceId,
@@ -149,7 +148,8 @@ class SourceBrowserSessionClient {
     BookDownloadCancellation? cancellation,
   }) async {
     cancellation?.throwIfCancelled();
-    final requestId = 'browser-${DateTime.now().microsecondsSinceEpoch}-${_serial++}';
+    final requestId =
+        'browser-${DateTime.now().microsecondsSinceEpoch}-${_serial++}';
     void cancel() => unawaited(_cancel(requestId));
     final future = _invoke('load', {
       'sourceId': sourceId,
@@ -191,34 +191,51 @@ class SourceBrowserSessionClient {
       await channel.invokeMethod<void>('cancel', {'requestId': requestId});
     } on PlatformException {
       // The request may already have completed and destroyed its WebView.
+    } on MissingPluginException {
+      // No native request was started in this build.
     }
   }
 
-  Future<SourceBrowserResult> _invoke(String method, Map<String, Object?> args) async {
+  Future<SourceBrowserResult> _invoke(
+    String method,
+    Map<String, Object?> args,
+  ) async {
     if (!isSupported) {
       throw const BookSourceProtocolException(
         'Website login is supported on Android, iOS and macOS.',
       );
     }
     if (!isSourceBrowserUri(Uri.tryParse('${args['url']}'))) {
-      throw const BookSourceProtocolException('Website login requires an HTTP(S) URL.');
+      throw const BookSourceProtocolException(
+        'Website login requires an HTTP(S) URL.',
+      );
     }
     try {
       final raw = await channel.invokeMapMethod<String, dynamic>(method, args);
       final uri = Uri.tryParse('${raw?['finalUrl'] ?? ''}');
-      if (!isSourceBrowserUri(uri) || raw?['session'] is! Map || raw?['body'] is! String) {
-        throw const BookSourceProtocolException('The website returned an invalid session.');
+      if (!isSourceBrowserUri(uri) ||
+          raw?['session'] is! Map ||
+          raw?['body'] is! String) {
+        throw const BookSourceProtocolException(
+          'The website returned an invalid session.',
+        );
       }
       return SourceBrowserResult(
         body: raw!['body'] as String,
         finalUri: uri!,
-        session: SourceBrowserSession.fromJson(raw['session']).copyWith(active: true),
+        session: SourceBrowserSession.fromJson(
+          raw['session'],
+        ).copyWith(active: true),
       );
     } on PlatformException catch (error) {
       if (error.code == 'cancelled') throw const SourceBrowserCancelled();
-      throw BookSourceProtocolException(error.message ?? 'Website login failed.');
+      throw BookSourceProtocolException(
+        error.message ?? 'Website login failed.',
+      );
     } on MissingPluginException {
-      throw const BookSourceProtocolException('Website login is unavailable in this build.');
+      throw const BookSourceProtocolException(
+        'Website login is unavailable in this build.',
+      );
     }
   }
 }

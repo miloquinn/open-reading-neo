@@ -180,6 +180,30 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
           state.loginHeaders = normalized;
         }
       }
+      if (envelope['browserLocalStorage'] case final Map origins) {
+        final storage = <String, Map<String, String>>{};
+        for (final origin in origins.entries) {
+          final uri = Uri.tryParse('${origin.key}');
+          if (uri == null ||
+              !const {'https', 'http'}.contains(uri.scheme) ||
+              uri.host.isEmpty ||
+              origin.value is! Map) {
+            continue;
+          }
+          storage[uri.origin] = {
+            for (final entry in (origin.value as Map).entries)
+              '${entry.key}': '${entry.value}',
+          };
+        }
+        final cleared = <String>{
+          if (envelope['clearedStorageOrigins'] case final List origins)
+            for (final origin in origins) '$origin',
+        };
+        if (cleared.isNotEmpty ||
+            jsonEncode(storage) != jsonEncode(context.browserLocalStorage)) {
+          context.localStorageWriter?.call(storage, cleared);
+        }
+      }
       if (envelope['state'] case final Map javaState) {
         state.javaState = javaState.map(
           (key, value) => MapEntry('$key', value),

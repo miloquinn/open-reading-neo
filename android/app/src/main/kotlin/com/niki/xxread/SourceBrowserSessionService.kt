@@ -11,6 +11,7 @@ import android.os.Message
 import android.os.Messenger
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import org.json.JSONObject
@@ -36,6 +37,7 @@ class SourceBrowserSessionService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val messenger = Messenger(IncomingHandler())
     private var active: BackgroundLoad? = null
+    private val queuedLoads = ArrayDeque<QueuedLoad>()
 
     override fun onBind(intent: Intent?): IBinder = messenger.binder
 
@@ -52,16 +54,25 @@ class SourceBrowserSessionService : Service() {
 
     private fun handleLoad(message: Message) {
         val reply = message.replyTo ?: return
+        if (!SourceBrowserSessionRuntime.supportsIsolatedDataDirectory) {
+            replyError(
+                reply,
+                message.data.getString(KEY_REQUEST_ID),
+                "unsupported",
+                "Isolated source browser sessions require Android 9 or newer.",
+            )
+            return
+        }
         val requestFile = message.data.getString(KEY_REQUEST_FILE)?.let(::File)
         if (requestFile == null || !requestFile.isFile) {
-            replyError(reply, null, "invalid_request", "Browser session request payload is missing.")
+            replyError(reply, message.data.getString(KEY_REQUEST_ID), "invalid_request", "Browser session request payload is missing.")
             return
         }
         val payload = try {
             JSONObject(requestFile.readText())
         } catch (error: Exception) {
             requestFile.delete()
-            replyError(reply, null, "invalid_request", error.message ?: "Browser session request is invalid.")
+            replyError(reply, message.data.getString(KEY_REQUEST_ID), "invalid_request", error.message ?: "Browser session request is invalid.")
             return
         } finally {
             requestFile.delete()
@@ -69,35 +80,84 @@ class SourceBrowserSessionService : Service() {
         val requestId = payload.optString("requestId")
         val sourceId = payload.optString("sourceId")
         val url = payload.optString("url")
-        if (requestId.isBlank() || sourceId.isBlank() || url.isBlank()) {
+        if (requestId.isBlank() || sourceId.isBlank() || !isSafeSourceBrowserUrl(url)) {
             replyError(reply, requestId, "invalid_request", "sourceId, requestId, and URL are required.")
             return
         }
-        if (active != null || !SourceBrowserSessionRuntime.acquire("load:$requestId")) {
+        if (active != null) {
+            if (queuedLoads.size >= 32) {
+                replyError(reply, requestId, "busy", "Too many source browser requests are queued.")
+            } else {
+                queuedLoads.addLast(QueuedLoad(payload, reply))
+            }
+            return
+        }
+        if (!SourceBrowserSessionRuntime.acquire("load:$requestId", sourceId) { active?.cancel() }) {
             replyError(reply, requestId, "busy", "Another source browser session is active.")
             return
         }
-        active = BackgroundLoad(payload, reply).also { it.start() }
+        startLoad(payload, reply)
     }
 
     private fun handleCancel(message: Message) {
         val requestId = message.data.getString(KEY_REQUEST_ID)
-        if (active?.requestId == requestId) active?.cancel()
+        if (active?.requestId == requestId) {
+            active?.cancel()
+            return
+        }
+        val queued = queuedLoads.firstOrNull { it.payload.optString("requestId") == requestId } ?: return
+        queuedLoads.remove(queued)
+        replyError(queued.reply, requestId, "cancelled", "Background browser request was cancelled.")
     }
 
     private fun handleClear(message: Message) {
         val reply = message.replyTo ?: return
-        if (active != null || !SourceBrowserSessionRuntime.acquire("clear")) {
-            replyError(reply, null, "busy", "Another source browser session is active.")
+        val sourceId = message.data.getString(KEY_SOURCE_ID)
+        if (sourceId.isNullOrBlank()) {
+            replyError(reply, null, "invalid_request", "sourceId is required.")
             return
         }
-        SourceBrowserSessionRuntime.clearStorage {
-            SourceBrowserSessionRuntime.release("clear")
-            val response = Message.obtain(null, MSG_SUCCESS).apply {
-                data = Bundle().apply { putBoolean("cleared", true) }
-            }
+        if (!SourceBrowserSessionRuntime.supportsIsolatedDataDirectory) {
+            val response = Message.obtain(null, MSG_SUCCESS)
             try { reply.send(response) } catch (_: Exception) {}
+            return
         }
+        val matchingQueued = queuedLoads.filter { it.payload.optString("sourceId") == sourceId }
+        matchingQueued.forEach { queued ->
+            queuedLoads.remove(queued)
+            replyError(queued.reply, queued.payload.optString("requestId"), "cancelled", "Background browser request was cancelled.")
+        }
+        val activeSource = SourceBrowserSessionRuntime.activeSourceId()
+        if (activeSource != null && activeSource != sourceId) {
+            replySuccess(reply)
+            return
+        }
+        SourceBrowserSessionRuntime.cancelSource(sourceId)
+        SourceBrowserSessionRuntime.whenIdle {
+            if (!SourceBrowserSessionRuntime.acquire("clear:$sourceId", sourceId)) {
+                replySuccess(reply)
+                return@whenIdle
+            }
+            SourceBrowserSessionRuntime.clearStorage {
+                SourceBrowserSessionRuntime.release("clear:$sourceId")
+                replySuccess(reply)
+                startNextLoad()
+            }
+        }
+    }
+
+    private fun startLoad(payload: JSONObject, reply: Messenger) {
+        active = BackgroundLoad(payload, reply).also { it.start() }
+    }
+
+    private fun startNextLoad() {
+        val next = queuedLoads.removeFirstOrNull() ?: return
+        val requestId = next.payload.optString("requestId")
+        if (!SourceBrowserSessionRuntime.acquire("load:$requestId", next.payload.optString("sourceId")) { active?.cancel() }) {
+            queuedLoads.addFirst(next)
+            return
+        }
+        startLoad(next.payload, next.reply)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -106,8 +166,8 @@ class SourceBrowserSessionService : Service() {
         private val reply: Messenger,
     ) {
         val requestId: String = payload.optString("requestId")
+        val sourceId: String = payload.optString("sourceId")
         private val owner = "load:$requestId"
-        private val sourceId = payload.optString("sourceId")
         private val url = payload.optString("url")
         private val method = payload.optString("method", "GET").uppercase()
         private val body = payload.optString("body", "")
@@ -120,18 +180,28 @@ class SourceBrowserSessionService : Service() {
         )
         private val completed = AtomicBoolean(false)
         private val webView = WebView(this@SourceBrowserSessionService)
+        private val storageBridgeName = "xxreadSourceStorage"
         private var hydrating = false
         private var hydrationIndex = 0
         private val hydration = tracker.hydrationOrigins()
         private var navigationGeneration = 0
+        private var collectingStorage = false
+        private var collectionIndex = 0
+        private var collectionOrigins = emptyList<String>()
+        private var capturedBody = ""
+        private var capturedFinalUrl = ""
         private var pendingFinish: Runnable? = null
         private val timeout = Runnable { fail("timeout", "Background browser timed out while loading this source.") }
 
         fun start() {
             configureSourceBrowserWebView(webView, headers)
+            webView.addJavascriptInterface(
+                SourceStorageJavascriptBridge { raw -> handler.post { tracker.mergeStoragePayload(raw) } },
+                storageBridgeName,
+            )
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView, startedUrl: String, favicon: android.graphics.Bitmap?) {
-                    if (!hydrating) {
+                    if (!hydrating && !collectingStorage) {
                         navigationGeneration++
                         pendingFinish?.let(handler::removeCallbacks)
                         pendingFinish = null
@@ -141,6 +211,16 @@ class SourceBrowserSessionService : Service() {
 
                 override fun onPageFinished(view: WebView, finishedUrl: String) {
                     if (completed.get()) return
+                    if (collectingStorage) {
+                        collectionOrigins.getOrNull(collectionIndex)?.let(tracker::observeCookies)
+                        view.evaluateJavascript(tracker.captureStorageScript()) { storage ->
+                            if (completed.get()) return@evaluateJavascript
+                            tracker.mergeStorage(storage)
+                            collectionIndex++
+                            collectNextOriginOrSucceed()
+                        }
+                        return
+                    }
                     if (hydrating) {
                         hydrationIndex++
                         hydrateNextOrLoad()
@@ -148,6 +228,7 @@ class SourceBrowserSessionService : Service() {
                     }
                     tracker.observeCookies(finishedUrl)
                     view.evaluateJavascript(tracker.captureStorageScript()) { tracker.mergeStorage(it) }
+                    view.evaluateJavascript(tracker.installCaptureHooksScript(storageBridgeName), null)
                     val generation = navigationGeneration
                     pendingFinish?.let(handler::removeCallbacks)
                     pendingFinish = Runnable {
@@ -166,6 +247,11 @@ class SourceBrowserSessionService : Service() {
                     if (request.isForMainFrame && !hydrating) {
                         fail("load_failed", "Background browser load failed: ${error.description}")
                     }
+                }
+
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                    tracker.recordVisitedUrl(request.url.toString())
+                    return null
                 }
             }
             handler.postDelayed(timeout, timeoutMs)
@@ -210,14 +296,37 @@ class SourceBrowserSessionService : Service() {
                 ) { encoded ->
                     val content = try { JSONTokener(encoded).nextValue() as? String ?: "" } catch (_: Exception) { "" }
                     if (content.isEmpty()) fail("empty_page", "Background browser returned an empty page.")
-                    else succeed(content, webView.url ?: url)
+                    else {
+                        capturedBody = content
+                        capturedFinalUrl = webView.url ?: url
+                        tracker.collectableOrigins { origins ->
+                            handler.post {
+                                if (completed.get()) return@post
+                                collectionOrigins = origins
+                                collectionIndex = 0
+                                collectingStorage = true
+                                collectNextOriginOrSucceed()
+                            }
+                        }
+                    }
                 }
             }
         }
 
+        private fun collectNextOriginOrSucceed() {
+            if (completed.get()) return
+            if (collectionIndex < collectionOrigins.size) {
+                val origin = collectionOrigins[collectionIndex]
+                webView.loadDataWithBaseURL("$origin/", "<!doctype html><meta charset=utf-8>", "text/html", "UTF-8", null)
+                return
+            }
+            collectingStorage = false
+            succeed(capturedBody, capturedFinalUrl)
+        }
+
         private fun succeed(content: String, finalUrl: String) {
             if (!completed.compareAndSet(false, true)) return
-            val resultFile = File(cacheDir, "source_browser_session/result-$requestId.json")
+            val resultFile = File(cacheDir, "source_browser_session/result-${System.nanoTime()}.json")
             resultFile.parentFile?.mkdirs()
             try {
                 resultFile.writeText(
@@ -235,33 +344,36 @@ class SourceBrowserSessionService : Service() {
                         putString(KEY_RESULT_FILE, resultFile.absolutePath)
                     }
                 }
-                reply.send(response)
+                finishAfterStorageClear { reply.send(response) }
             } catch (error: Exception) {
                 resultFile.delete()
-                replyError(reply, requestId, "result_failed", error.message ?: "Browser result could not be returned.")
+                finishAfterStorageClear {
+                    replyError(reply, requestId, "result_failed", error.message ?: "Browser result could not be returned.")
+                }
             }
-            cleanup()
         }
 
         fun cancel() = fail("cancelled", "Background browser request was cancelled.")
 
         private fun fail(code: String, message: String) {
             if (!completed.compareAndSet(false, true)) return
-            replyError(reply, requestId, code, message)
-            cleanup()
+            finishAfterStorageClear { replyError(reply, requestId, code, message) }
         }
 
-        private fun cleanup() {
+        private fun finishAfterStorageClear(replyAction: () -> Unit) {
             handler.removeCallbacks(timeout)
             pendingFinish?.let(handler::removeCallbacks)
             webView.stopLoading()
             webView.webViewClient = WebViewClient()
+            webView.removeJavascriptInterface(storageBridgeName)
             webView.loadUrl("about:blank")
             webView.removeAllViews()
             webView.destroy()
             SourceBrowserSessionRuntime.clearStorage {
                 SourceBrowserSessionRuntime.release(owner)
                 if (active === this) active = null
+                try { replyAction() } catch (_: Exception) {}
+                startNextLoad()
             }
         }
     }
@@ -276,6 +388,12 @@ class SourceBrowserSessionService : Service() {
         }
         try { reply.send(response) } catch (_: Exception) {}
     }
+
+    private fun replySuccess(reply: Messenger) {
+        try { reply.send(Message.obtain(null, MSG_SUCCESS)) } catch (_: Exception) {}
+    }
+
+    private data class QueuedLoad(val payload: JSONObject, val reply: Messenger)
 }
 
 private object CookieManagerCompat {

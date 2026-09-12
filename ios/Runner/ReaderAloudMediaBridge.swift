@@ -101,7 +101,7 @@ final class ReaderAloudMediaBridge {
         result(
           FlutterError(
             code: "audio_session_failed",
-            message: "Unable to activate the iOS spoken-audio session: \(error.localizedDescription)",
+            message: "Unable to activate the iOS audiobook audio session: \(error.localizedDescription)",
             details: nil
           )
         )
@@ -164,8 +164,11 @@ final class ReaderAloudMediaBridge {
     guard !audioSessionActive else { return }
     try audioSession.setCategory(
       .playback,
-      mode: .spokenAudio,
-      options: []
+      // Keep audiobook speech mixable. Navigation apps that use ducking can
+      // then speak over the reader without producing the interruption that
+      // would pause and rebuild Flutter's queued TTS session.
+      mode: .default,
+      options: [.mixWithOthers]
     )
     try audioSession.setActive(true)
     audioSessionActive = true

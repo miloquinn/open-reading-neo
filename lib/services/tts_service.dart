@@ -314,14 +314,19 @@ class TtsService extends ChangeNotifier
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      // Configure the category before activating the shared session. Playback
-      // with spokenAudio is valid with no category options and keeps speech
-      // eligible for background playback. The session remains active between
-      // queued utterances so iOS does not introduce a gap for every sentence.
+      // Configure the category before activating the shared session. Mixing
+      // keeps a navigation prompt from turning into a full interruption of an
+      // audiobook session: Maps can duck this speech while its instruction is
+      // audible instead of forcing the queued reader to stop and rebuild.
+      // Actual system interruptions (calls, Siri, alarms) are still handled by
+      // the media bridge. The shared session remains active between queued
+      // utterances so iOS does not introduce a gap for every sentence.
       await tts.setIosAudioCategory(
         IosTextToSpeechAudioCategory.playback,
-        const <IosTextToSpeechAudioCategoryOptions>[],
-        IosTextToSpeechAudioMode.spokenAudio,
+        const <IosTextToSpeechAudioCategoryOptions>[
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+        ],
+        IosTextToSpeechAudioMode.defaultMode,
       );
       await tts.autoStopSharedSession(false);
       await tts.setSharedInstance(true);

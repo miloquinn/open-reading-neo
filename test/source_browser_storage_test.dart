@@ -30,6 +30,25 @@ void main() {
       'sid=account; sid=root; theme=dark',
     );
   });
+  test('invalid cookie expiry degrades to a usable session cookie', () {
+    final jar = SourceCookieJar();
+    final uri = Uri.parse('https://books.test/login');
+    jar.store(
+      'source',
+      uri,
+      Headers.fromMap({
+        HttpHeaders.setCookieHeader: [
+          'qttoken=secret; Path=/; Expires=Tue, 09 Sep 2036 13:49:33 UTC; HttpOnly',
+        ],
+      }),
+    );
+
+    expect(jar.header('source', uri), 'qttoken=secret');
+    expect(
+      jar.exportCookies('source').single['expiresAt'],
+      DateTime.utc(2036, 9, 9, 13, 49, 33).millisecondsSinceEpoch,
+    );
+  });
   test('website URL detection rejects scripts and unsafe schemes', () {
     final config = {'bookSourceUrl': 'https://books.test'};
     for (final value in [

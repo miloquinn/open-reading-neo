@@ -32,7 +32,7 @@ class ReaderVolumeKeyController {
     _onPreviousPage = onPreviousPage;
 
     final prefs = await SharedPreferences.getInstance();
-    final preferenceEnabled = prefs.getBool(preferenceKey) ?? true;
+    final preferenceEnabled = prefs.getBool(preferenceKey) ?? false;
     final enabled = preferenceEnabled && pageTurningAvailable;
     if (!_supportsVolumePaging ||
         generation != _generation ||

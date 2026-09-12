@@ -64,7 +64,7 @@ void main() {
     expect(settings.enableAutoSave, isTrue);
     expect(settings.autoSaveInterval, 30);
     expect(settings.enableAutoExtractCover, isTrue);
-    expect(settings.enableVolumeKeyTurn, isTrue);
+    expect(settings.enableVolumeKeyTurn, isFalse);
     expect(settings.autoResumeReading, isFalse);
     expect(settings.keepScreenOn, isFalse);
     expect(settings.readerTopBarStyle, ReaderTopBarStyle.reader);

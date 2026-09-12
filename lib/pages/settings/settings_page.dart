@@ -44,7 +44,6 @@ import 'package:xxread/utils/system_ui_helper.dart';
 import 'package:xxread/utils/ui_style.dart';
 import 'package:xxread/widgets/app_brand_icon.dart';
 import 'package:xxread/widgets/accent_color_picker_sheet.dart';
-import 'package:xxread/widgets/contributors_view.dart';
 import 'package:xxread/widgets/developer_support_card.dart';
 import 'package:xxread/widgets/reader_settings_controls.dart';
 import 'package:xxread/widgets/settings_account_card.dart';
@@ -99,7 +98,7 @@ class _SettingsPageState extends State<SettingsPage> {
   int _autoSaveInterval = 30;
 
   // 阅读设置
-  bool _enableVolumeKeyTurn = true;
+  bool _enableVolumeKeyTurn = false;
   bool _autoResumeReading = false;
   ReaderTopBarStyle _readerTopBarStyle = ReaderTopBarStyle.reader;
 

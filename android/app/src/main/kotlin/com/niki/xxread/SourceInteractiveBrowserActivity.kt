@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -57,11 +58,14 @@ class SourceInteractiveBrowserActivity : Activity() {
         }
         val cancel = Button(this).apply {
             text = getString(R.string.source_browser_cancel)
+            isAllCaps = false
             setOnClickListener { cancelAndFinish() }
         }
         address = TextView(this).apply {
             text = url
-            maxLines = 2
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.MIDDLE
+            textSize = 12f
             setTextColor(Color.DKGRAY)
             setPadding(12, 0, 12, 0)
         }
@@ -80,6 +84,7 @@ class SourceInteractiveBrowserActivity : Activity() {
         root.addView(toolbar)
         root.addView(progress, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 5))
         root.addView(webView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        configureSourceBrowserWindow(this, root)
         setContentView(root)
 
         webView.settings.apply {
@@ -107,9 +112,12 @@ class SourceInteractiveBrowserActivity : Activity() {
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val next = request.url
-                if (next.scheme != "http" && next.scheme != "https") return true
-                return false
+                val scheme = request.url.scheme?.lowercase()
+                if (scheme == "http" || scheme == "https") return false
+                if (scheme in setOf("about", "blob", "data", "javascript")) return false
+                if (!request.isForMainFrame) return true
+                openExternalSourceBrowserUrl(this@SourceInteractiveBrowserActivity, view, request.url.toString())
+                return true
             }
         }
         val cookie = headers.entries.firstOrNull { it.key.equals("cookie", true) }?.value

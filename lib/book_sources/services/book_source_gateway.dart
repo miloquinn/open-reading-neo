@@ -18,8 +18,9 @@ abstract interface class BookSourceGateway {
 
   Future<void> loginSource(
     RegisteredBookSource source,
-    Map<String, String> values,
-  );
+    Map<String, String> values, {
+    String? action,
+  });
 
   Future<void> clearSourceLogin(RegisteredBookSource source);
 

@@ -4,4 +4,5 @@
     <string name="source_browser_cancel">取消</string>
     <string name="source_browser_done">完成验证</string>
     <string name="source_browser_login_title">书源登录</string>
+    <string name="source_browser_external_unavailable">无法打开所需的应用，请确认已安装并可处理此登录方式。</string>
 </resources>

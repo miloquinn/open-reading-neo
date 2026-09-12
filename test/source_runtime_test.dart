@@ -218,6 +218,36 @@ void main() {
         expect((await store.read(source.id)).loginInfo['token'], 'reader');
       },
     );
+
+    test('executes the selected login UI button action', () async {
+      final raw = Map<String, dynamic>.from(_htmlSource().raw)
+        ..['loginUi'] = jsonEncode([
+          {'name': 'account', 'type': 'text'},
+          {'name': '注册', 'type': 'button', 'action': 'register()'},
+        ])
+        ..['loginUrl'] = '''
+          function register() {
+            var info = source.getLoginInfoMap();
+            info.put('button', 'register');
+            source.putLoginInfo(info);
+          }
+        ''';
+      final source = ReadingSourceConfig.fromJson(
+        raw,
+      ).toRegisteredSource(enabled: true);
+      final store = _MemoryLoginSessionStore();
+      final runtime = SourceRuntime(loginSessionStore: store);
+      addTearDown(runtime.close);
+
+      await runtime.login(source, const {
+        'account': 'reader',
+      }, action: 'register()');
+
+      expect((await store.read(source.id)).loginInfo, {
+        'account': 'reader',
+        'button': 'register',
+      });
+    });
   });
 
   group('SourceRuntime', () {

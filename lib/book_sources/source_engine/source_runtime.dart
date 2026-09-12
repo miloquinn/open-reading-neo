@@ -240,11 +240,12 @@ class SourceRuntime {
 
   Future<void> login(
     RegisteredBookSource registered,
-    Map<String, String> values,
-  ) async {
+    Map<String, String> values, {
+    String? action,
+  }) async {
     final source = sourceFromRegistered(registered);
     try {
-      await _login.login(registered, values);
+      await _login.login(registered, values, action: action);
     } finally {
       // Login persists the submitted session before running the source script,
       // which can also mutate cookies before throwing. Either outcome changes

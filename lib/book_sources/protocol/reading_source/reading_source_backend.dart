@@ -15,8 +15,9 @@ abstract interface class ReadingSourceBackendPort {
   Future<List<SourceLoginField>> loadLoginFields(RegisteredBookSource source);
   Future<void> loginSource(
     RegisteredBookSource source,
-    Map<String, String> values,
-  );
+    Map<String, String> values, {
+    String? action,
+  });
   Future<void> clearSourceLogin(RegisteredBookSource source);
   Future<BookSourceSearchPage> search(
     RegisteredBookSource source,
@@ -94,11 +95,12 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   @override
   Future<void> loginSource(
     RegisteredBookSource source,
-    Map<String, String> values,
-  ) async {
+    Map<String, String> values, {
+    String? action,
+  }) async {
     await _ensureEnabled();
     try {
-      await _runtime().login(source, values);
+      await _runtime().login(source, values, action: action);
     } finally {
       // The runtime saves login data before executing the source script, so a
       // thrown script can still leave a different session or cookie state.

@@ -126,7 +126,7 @@ class SourceCookieJar {
     final now = _clock().toUtc();
     for (final value in values) {
       try {
-        final cookie = Cookie.fromSetCookieValue(value);
+        final cookie = parseSourceSetCookie(value);
         final configuredDomain = cookie.domain?.trim().toLowerCase();
         final domain = (configuredDomain == null || configuredDomain.isEmpty)
             ? uri.host.toLowerCase()

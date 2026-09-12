@@ -217,8 +217,9 @@ class _CachingRuntime extends SourceRuntime {
   @override
   Future<void> login(
     RegisteredBookSource registered,
-    Map<String, String> values,
-  ) async {
+    Map<String, String> values, {
+    String? action,
+  }) async {
     loginCalls++;
   }
 }

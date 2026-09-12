@@ -65,5 +65,17 @@ void main() {
         throwsA(isA<HttpException>()),
       );
     });
+
+    test('keeps cookies whose non-standard expiry date is rejected', () {
+      final headers = Headers.fromMap({
+        HttpHeaders.setCookieHeader: [
+          'qttoken=secret; Path=/; Expires=Tue, 09 Sep 2036 13:49:33 UTC; HttpOnly',
+        ],
+      });
+
+      expect(SourceResponseCodec.responseCookies(headers), {
+        'qttoken': 'secret',
+      });
+    });
   });
 }

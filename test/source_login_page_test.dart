@@ -109,6 +109,33 @@ void main() {
     expect(browserButton.onPressed, isNotNull);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets('form buttons execute their configured source action', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final client = _LoginClient(
+      fields: const [
+        SourceLoginField(name: 'email', type: 'text', viewName: 'Email'),
+        SourceLoginField(
+          name: 'Register',
+          type: 'button',
+          action: 'register()',
+        ),
+      ],
+    );
+    await _pumpPage(tester, source: _formSource, client: client);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), 'a@b.com');
+    await tester.tap(
+      find.byKey(const ValueKey('source-login-action-Register')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(client.lastValues, {'email': 'a@b.com'});
+    expect(client.lastAction, 'register()');
+    debugDefaultTargetPlatformOverride = null;
+  });
 }
 
 Future<void> _pumpPage(
@@ -137,6 +164,7 @@ class _LoginClient extends BookSourceClient {
   int loginCount = 0;
   int clearCount = 0;
   Map<String, String>? lastValues;
+  String? lastAction;
 
   @override
   Future<List<SourceLoginField>> loadLoginFields(
@@ -146,11 +174,13 @@ class _LoginClient extends BookSourceClient {
   @override
   Future<void> loginSource(
     RegisteredBookSource source,
-    Map<String, String> values,
-  ) async {
+    Map<String, String> values, {
+    String? action,
+  }) async {
     loginCount++;
     if (cancelLogin) throw const SourceBrowserCancelled();
     lastValues = Map.of(values);
+    lastAction = action;
   }
 
   @override

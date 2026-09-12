@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
@@ -126,8 +127,12 @@ class SourceBrowserSessionActivity : Activity() {
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val scheme = request.url.scheme
-                return scheme != "http" && scheme != "https"
+                val scheme = request.url.scheme?.lowercase()
+                if (scheme == "http" || scheme == "https") return false
+                if (scheme in setOf("about", "blob", "data", "javascript")) return false
+                if (!request.isForMainFrame) return true
+                openExternalSourceBrowserUrl(this@SourceBrowserSessionActivity, view, request.url.toString())
+                return true
             }
 
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -158,7 +163,9 @@ class SourceBrowserSessionActivity : Activity() {
         }
         address = TextView(this).apply {
             text = url
-            maxLines = 2
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.MIDDLE
+            textSize = 12f
             setTextColor(Color.DKGRAY)
             setPadding(12, 0, 12, 0)
         }
@@ -176,6 +183,7 @@ class SourceBrowserSessionActivity : Activity() {
         root.addView(toolbar)
         root.addView(progress, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 5))
         root.addView(webView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        configureSourceBrowserWindow(this, root)
         setContentView(root)
     }
 

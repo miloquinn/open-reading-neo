@@ -129,11 +129,6 @@ extension _SettingsLayoutPart on _SettingsPageState {
                   _buildSupportSettingsSection(l10n),
                   const SizedBox(height: 20),
                   _buildAboutCard(),
-                  const SizedBox(height: 20),
-                  const ContributorsView(
-                    repositoryOwner: 'miloquinn',
-                    repositoryName: 'open-reading',
-                  ),
                 ],
               ),
             ),
@@ -176,11 +171,6 @@ extension _SettingsLayoutPart on _SettingsPageState {
       _buildSupportSettingsSection(l10n),
       const SizedBox(height: 20),
       _buildAboutCard(),
-      const SizedBox(height: 20),
-      const ContributorsView(
-        repositoryOwner: 'miloquinn',
-        repositoryName: 'open-reading',
-      ),
       const SizedBox(height: 100),
     ];
   }

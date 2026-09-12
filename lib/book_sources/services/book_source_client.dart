@@ -68,9 +68,10 @@ class BookSourceClient implements BookSourceGateway {
   @override
   Future<void> loginSource(
     RegisteredBookSource source,
-    Map<String, String> values,
-  ) async {
-    await _resources.readingBackend.loginSource(source, values);
+    Map<String, String> values, {
+    String? action,
+  }) async {
+    await _resources.readingBackend.loginSource(source, values, action: action);
     await _discoveryCache.invalidateSource(source);
   }
 

@@ -1,10 +1,17 @@
 package com.niki.xxread
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Build
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebStorage
 import android.webkit.WebView
+import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -358,6 +365,53 @@ internal fun isSafeSourceBrowserUrl(raw: String): Boolean = try {
     (uri.scheme == "http" || uri.scheme == "https") && !uri.host.isNullOrBlank() && uri.userInfo == null
 } catch (_: Exception) {
     false
+}
+
+internal fun configureSourceBrowserWindow(activity: Activity, root: android.view.View) {
+    WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+    WindowCompat.getInsetsController(activity.window, root).apply {
+        isAppearanceLightStatusBars = true
+        isAppearanceLightNavigationBars = true
+    }
+    ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+        val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+        view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+        insets
+    }
+    ViewCompat.requestApplyInsets(root)
+}
+
+internal fun openExternalSourceBrowserUrl(activity: Activity, webView: WebView, raw: String) {
+    try {
+        val intent = if (raw.startsWith("intent:", ignoreCase = true)) {
+            Intent.parseUri(raw, Intent.URI_INTENT_SCHEME).apply {
+                action = Intent.ACTION_VIEW
+                addCategory(Intent.CATEGORY_BROWSABLE)
+                component = null
+                selector = null
+                flags = 0
+            }
+        } else {
+            Intent(Intent.ACTION_VIEW, android.net.Uri.parse(raw)).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+            }
+        }
+        activity.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        val fallback = try {
+            Intent.parseUri(raw, Intent.URI_INTENT_SCHEME)
+                .getStringExtra("browser_fallback_url")
+        } catch (_: Exception) {
+            null
+        }
+        if (fallback != null && isSafeSourceBrowserUrl(fallback)) {
+            webView.loadUrl(fallback)
+        } else {
+            Toast.makeText(activity, R.string.source_browser_external_unavailable, Toast.LENGTH_LONG).show()
+        }
+    } catch (_: Exception) {
+        Toast.makeText(activity, R.string.source_browser_external_unavailable, Toast.LENGTH_LONG).show()
+    }
 }
 
 internal fun platformToJson(value: Any?): String = when (value) {

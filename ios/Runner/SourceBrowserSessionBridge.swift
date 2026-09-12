@@ -412,8 +412,20 @@ private final class AppleSourceBrowserOperation: NSObject, WKNavigationDelegate,
   }
 
   func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-    guard let url = navigationAction.request.url, AppleSourceBrowserSession.isWebURL(url) else {
+    guard let url = navigationAction.request.url else {
       decisionHandler(.cancel)
+      return
+    }
+    if !AppleSourceBrowserSession.isWebURL(url) {
+      let internalSchemes = Set(["about", "blob", "data", "javascript"])
+      if let scheme = url.scheme?.lowercased(), internalSchemes.contains(scheme) {
+        decisionHandler(.allow)
+      } else if interactive && navigationAction.targetFrame?.isMainFrame != false {
+        UIApplication.shared.open(url, options: [:])
+        decisionHandler(.cancel)
+      } else {
+        decisionHandler(.cancel)
+      }
       return
     }
     if navigationAction.targetFrame?.isMainFrame == false {

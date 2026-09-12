@@ -31,6 +31,9 @@ void main() {
   });
 
   test('routes Android volume keys when paging is enabled', () async {
+    SharedPreferences.setMockInitialValues({
+      ReaderVolumeKeyController.preferenceKey: true,
+    });
     var nextCount = 0;
     var previousCount = 0;
 
@@ -56,6 +59,18 @@ void main() {
 
     expect(nextCount, 1);
     expect(previousCount, 1);
+  });
+
+  test('leaves volume keys untouched by default', () async {
+    final enabled = await ReaderVolumeKeyController.activate(
+      owner: owner,
+      pageTurningAvailable: true,
+      onNextPage: () {},
+      onPreviousPage: () {},
+    );
+
+    expect(enabled, isFalse);
+    expect(calls.single.arguments, {'enabled': false});
   });
 
   test('does not intercept volume keys in vertical scroll mode', () async {

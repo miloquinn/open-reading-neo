@@ -21,7 +21,7 @@
                 "en": [
                     "Share menu styling and opening transitions while keeping plain three-dot buttons inside cards; improve source cards for long names, groups and larger text.",
                     "Add source editing and a dedicated book details page, and improve source switching and rematching.",
-                    "Add original-website source login on Android 9+, iOS and macOS, with secure saving, restoration and clearing of cookies and Local Storage for subsequent source requests.",
+                    "Initial support for source login through custom forms or the original website, with secure Cookie and Local Storage persistence, restoration and clearing for later source requests.",
                     "Source maintenance supports pausing, resuming, result filtering and bulk disabling or removing checked sources.",
                     "Add source-book updates with chapter range selection, version comparison and content conflict handling.",
                     "Improve the read-aloud player and settings, including volume, voice, speed, sleep timers and cross-chapter reading; skip blank text.",
@@ -29,7 +29,9 @@
                     "Add application text-size settings and improve narrow-screen, tablet and large-text layouts.",
                     "Improve reading-position restoration and saving across EPUB pagination, continuous scrolling and chapter changes.",
                     "Update book-file and content synchronization, including version checks, conflict handling and status displays.",
-                    "Unify local book storage paths and add legacy-path migration, file repair and book identity matching."
+                    "Unify local book storage paths and add legacy-path migration, file repair and book identity matching.",
+                    "Fix occasional missing covers in the iOS library.",
+                    "Disable volume-key page turning by default to prevent accidental page changes."
                 ]
             }
         },

@@ -13,7 +13,7 @@ class SettingsPagePreferences {
     this.keepScreenOn = false,
     this.autoSaveInterval = 30,
     this.enableAutoExtractCover = true,
-    this.enableVolumeKeyTurn = true,
+    this.enableVolumeKeyTurn = false,
     this.autoResumeReading = false,
     this.readerTopBarStyle = ReaderTopBarStyle.reader,
     this.enableFullscreen = false,
@@ -74,7 +74,7 @@ class SharedPreferencesSettingsPagePreferencesStore
           prefs.getBool(ReaderKeepScreenOnController.preferenceKey) ?? false,
       autoSaveInterval: prefs.getInt('autoSaveInterval') ?? 30,
       enableAutoExtractCover: prefs.getBool('enableAutoExtractCover') ?? true,
-      enableVolumeKeyTurn: prefs.getBool('enableVolumeKeyTurn') ?? true,
+      enableVolumeKeyTurn: prefs.getBool('enableVolumeKeyTurn') ?? false,
       autoResumeReading:
           prefs.getBool(ReadingResumeService.enabledPreferenceKey) ?? false,
       readerTopBarStyle: readerTopBarStyle,

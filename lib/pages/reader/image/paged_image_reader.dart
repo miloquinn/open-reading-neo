@@ -334,7 +334,7 @@ class _PagedImageReaderState extends State<PagedImageReader> {
     var keepScreenOn =
         prefs.getBool(ReaderKeepScreenOnController.preferenceKey) ?? false;
     var volumeKeys =
-        prefs.getBool(ReaderVolumeKeyController.preferenceKey) ?? true;
+        prefs.getBool(ReaderVolumeKeyController.preferenceKey) ?? false;
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,

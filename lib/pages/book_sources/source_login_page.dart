@@ -78,7 +78,7 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
     }
   }
 
-  Future<void> _login() async {
+  Future<void> _login([SourceLoginField? button]) async {
     if (_submitting) return;
     setState(() {
       _submitting = true;
@@ -88,7 +88,7 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
       await _client.loginSource(widget.source, {
         for (final entry in _controllers.entries) entry.key: entry.value.text,
         ..._choices,
-      });
+      }, action: button?.action);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -191,7 +191,21 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
                   const SizedBox(height: 18),
                 ],
                 for (final field in _fields)
-                  if (!field.isButton) ...[
+                  if (field.isButton) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        key: ValueKey('source-login-action-${field.name}'),
+                        onPressed:
+                            _submitting ||
+                                (field.action?.trim().isEmpty ?? true)
+                            ? null
+                            : () => _login(field),
+                        child: Text(field.viewName ?? field.name),
+                      ),
+                    ),
+                    const SizedBox(height: 13),
+                  ] else ...[
                     _buildField(field),
                     const SizedBox(height: 13),
                   ],
@@ -206,7 +220,8 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
                   Text(_error!, style: TextStyle(color: scheme.error)),
                   const SizedBox(height: 13),
                 ],
-                if (_fields.isNotEmpty) ...[
+                if (_fields.isNotEmpty &&
+                    !_fields.any((field) => field.isButton)) ...[
                   FilledButton.icon(
                     onPressed: _submitting ? null : _login,
                     icon: _submitting

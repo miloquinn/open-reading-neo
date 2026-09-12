@@ -344,7 +344,19 @@ private final class MacSourceBrowserOperation: NSObject, WKNavigationDelegate, W
   func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(code: "load_failed", message: error.localizedDescription) }
 
   func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-    guard let url = navigationAction.request.url, MacSourceBrowserSession.isWebURL(url) else { decisionHandler(.cancel); return }
+    guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+    if !MacSourceBrowserSession.isWebURL(url) {
+      let internalSchemes = Set(["about", "blob", "data", "javascript"])
+      if let scheme = url.scheme?.lowercased(), internalSchemes.contains(scheme) {
+        decisionHandler(.allow)
+      } else if interactive && navigationAction.targetFrame?.isMainFrame != false {
+        NSWorkspace.shared.open(url)
+        decisionHandler(.cancel)
+      } else {
+        decisionHandler(.cancel)
+      }
+      return
+    }
     if navigationAction.targetFrame?.isMainFrame == false { decisionHandler(.allow); return }
     configureScripts()
     if navigationAction.targetFrame == nil { webView.load(navigationAction.request); decisionHandler(.cancel) } else { decisionHandler(.allow) }

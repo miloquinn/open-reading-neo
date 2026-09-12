@@ -440,8 +440,9 @@ class SourceRuntimeLogin {
 
   Future<void> login(
     RegisteredBookSource registered,
-    Map<String, String> values,
-  ) async {
+    Map<String, String> values, {
+    String? action,
+  }) async {
     final source = sourceFromRegistered(registered);
     await _sessions.ensure(source);
     final website = sourceBrowserLoginUri(source.raw);
@@ -465,8 +466,17 @@ class SourceRuntimeLogin {
         'This source does not define a login script.',
       );
     }
+    final trimmedAction = action?.trim() ?? '';
+    final actionScript = switch (Uri.tryParse(trimmedAction)) {
+      final uri?
+          when (uri.scheme == 'http' || uri.scheme == 'https') &&
+              uri.host.isNotEmpty =>
+        'java.startBrowserAwait(${jsonEncode(uri.toString())});',
+      _ when trimmedAction.isNotEmpty => trimmedAction,
+      _ => "if (typeof login === 'function') login();",
+    };
     await _scripts().evaluateAsync(
-      '$loginScript\nif (typeof login === \'function\') login();',
+      '$loginScript\n$actionScript',
       _contexts.scriptContext(source, result: loginInfo),
     );
     await _sessions.flush(source);

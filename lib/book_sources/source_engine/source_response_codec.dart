@@ -61,7 +61,7 @@ class SourceResponseCodec {
     final result = <String, String>{};
     for (final value in values) {
       try {
-        final cookie = Cookie.fromSetCookieValue(value);
+        final cookie = parseSourceSetCookie(value);
         result[cookie.name] = cookie.value;
       } on FormatException {
         // Ignore one malformed response cookie without losing other metadata.

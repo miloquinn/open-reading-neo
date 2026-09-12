@@ -15,6 +15,8 @@ import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_source_management_page.dart';
+import 'package:xxread/pages/book_sources/book_source_maintenance_page.dart';
+import 'package:xxread/pages/book_sources/controllers/book_source_management_controller.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_cleanup_review_sheet.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_maintenance_sheet.dart';
 import 'package:xxread/utils/app_themes.dart';
@@ -29,6 +31,103 @@ const _variant = String.fromEnvironment(
 const _outputDirectory = '.omx/maintenance-previews/$_variant';
 
 void main() {
+  for (final (name, size, scale, brightness) in [
+    ('page', const Size(390, 844), 1.0, Brightness.light),
+    ('page-dark-large', const Size(320, 844), 1.4, Brightness.dark),
+    ('page-tablet', const Size(834, 1112), 1.0, Brightness.light),
+    ('page-tablet-wide', const Size(1024, 768), 1.0, Brightness.light),
+    ('page-desktop', const Size(1440, 900), 1.0, Brightness.light),
+    ('page-landscape', const Size(844, 390), 1.0, Brightness.light),
+    ('page-paused', const Size(390, 844), 1.0, Brightness.light),
+    ('page-paused-tablet', const Size(1024, 768), 1.0, Brightness.dark),
+  ]) {
+    testWidgets('capture standalone $name', (tester) async {
+      await tester.runAsync(_loadPreviewFonts);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.reset);
+      final controller = BookSourceManagementController(
+        registry: _PreviewRegistry(),
+      );
+      await controller.load();
+      final previewSources = _reviewSources();
+      final coordinator = _PreviewMaintenanceCoordinator(
+        name.contains('paused')
+            ? BookSourceMaintenanceState(
+                status: BookSourceMaintenanceStatus.cancelled,
+                runId: 1,
+                progress: const BookSourceMaintenanceProgress(
+                  completed: 3,
+                  total: 5,
+                ),
+                result: BookSourceMaintenanceResult(
+                  allSources: previewSources.skip(2).toList(),
+                  assessments: previewSources
+                      .skip(2)
+                      .map(bookSourceMaintenanceAssessment)
+                      .toList(),
+                  remainingSources: previewSources.take(2).toList(),
+                ),
+              )
+            : const BookSourceMaintenanceState(),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(coordinator.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppThemes.defaultAccentColor,
+              brightness: brightness,
+            ),
+            fontFamily: _previewFont,
+            useMaterial3: true,
+          ),
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: RepaintBoundary(
+                key: _captureKey,
+                child: BookSourceMaintenancePage(
+                  controller: controller,
+                  maintenance: coordinator,
+                  readReferencedSourceIds: () async => {'sample-c'},
+                  onDedupe: (_) async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await _writePng(tester, name, _captureKey);
+      if (name.contains('paused')) {
+        await tester.ensureVisible(
+          find.byKey(const Key('maintenanceSelectVisible')),
+        );
+        await tester.tap(find.byKey(const Key('maintenanceSelectVisible')));
+        await tester.pumpAndSettle();
+        await _writePng(tester, '$name-selected', _captureKey);
+      }
+      await tester.drag(
+        find.byKey(const Key('bookSourceMaintenanceScroll')),
+        const Offset(0, -450),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await _writePng(tester, '$name-results', _captureKey);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+  }
+
   final specs = <_PreviewSpec>[
     const _PreviewSpec('entry', _PreviewScene.entry),
     const _PreviewSpec(

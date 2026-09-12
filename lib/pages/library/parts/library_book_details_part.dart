@@ -196,7 +196,7 @@ extension _LibraryPageBookDetails on _LibraryPageState {
                           }
                         },
                       ),
-                      if (book.isOnline)
+                      if (book.hasSourceBinding)
                         _buildOptionItem(
                           context: context,
                           icon: Icons.swap_horiz_rounded,
@@ -206,6 +206,32 @@ extension _LibraryPageBookDetails on _LibraryPageState {
                           onTap: () {
                             Navigator.pop(context);
                             unawaited(_changeOnlineBookSource(book));
+                          },
+                        ),
+                      if (!book.isOnline &&
+                          !book.hasSourceBinding &&
+                          book.format.toLowerCase() == 'txt')
+                        _buildOptionItem(
+                          context: context,
+                          icon: Icons.link_rounded,
+                          iconColor: localScheme.primary,
+                          title: context.l10n.bookSourceBindSource,
+                          onTap: () {
+                            Navigator.pop(context);
+                            unawaited(_changeOnlineBookSource(book));
+                          },
+                        ),
+                      if (!book.isOnline &&
+                          book.hasSourceBinding &&
+                          book.format.toLowerCase() == 'txt')
+                        _buildOptionItem(
+                          context: context,
+                          icon: Icons.update_rounded,
+                          iconColor: localScheme.primary,
+                          title: context.l10n.bookSourceTrackUpdatesTitle,
+                          onTap: () {
+                            Navigator.pop(context);
+                            unawaited(_openSourceUpdates(book));
                           },
                         ),
                       if (book.isOnline)

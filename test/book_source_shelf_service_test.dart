@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -10,9 +11,11 @@ import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
+import 'package:xxread/book_sources/services/source_chapter_state.dart';
 import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_dao.dart';
+import 'package:xxread/services/books/txt_edit_service.dart';
 
 void main() {
   test(
@@ -400,7 +403,310 @@ void main() {
     expect(dao.stored?.id, 7);
     expect(dao.stored?.coverImagePath, isNull);
   });
+
+  test(
+    'downloaded serial appends only new chapters and keeps user edits',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('source-serial-');
+      addTearDown(() => directory.delete(recursive: true));
+      final dao = _MemoryBookDao();
+      final client = _MutableSerialClient(chapterCount: 3);
+      final service = BookSourceShelfService(
+        bookDao: dao,
+        client: client,
+        downloadDirectory: directory,
+        txtEditService: TxtEditService(
+          historyRootProvider: () async =>
+              Directory('${directory.path}/history'),
+        ),
+        sourceRevisionCommitter: _memoryRevisionCommitter(dao),
+      );
+
+      var downloaded = await service.downloadToLocal(
+        source: _source,
+        book: _sourceBook,
+        bookUid: 'stable-book',
+      );
+      final store = const SourceChapterStateStore();
+      final initial = await store.load(downloaded);
+      expect(initial?.bookUid, 'stable-book');
+      expect(initial?.chapters, hasLength(3));
+      expect(initial?.materializedContentHash, isNotEmpty);
+
+      final file = File(downloaded.filePath);
+      await file.writeAsString(
+        (await file.readAsString()).replaceFirst('正文0', '我的正文0'),
+        flush: true,
+      );
+      client
+        ..chapterCount = 5
+        ..requested.clear();
+      final result = await service.updateDownloadedBook(
+        shelfBook: downloaded,
+        mode: SourceUpdateMode.appendNewChapters,
+      );
+      downloaded = result.book;
+
+      expect(result.status, SourceUpdateStatus.updated);
+      expect(result.addedChapterCount, 2);
+      expect(result.refreshedChapterCount, 0);
+      expect(client.requested, ['chapter-3', 'chapter-4']);
+      final text = await file.readAsString();
+      expect(text, contains('我的正文0'));
+      expect(text, contains('正文4'));
+      expect(
+        (await store.load(downloaded))?.chapters.first.userModified,
+        isTrue,
+      );
+    },
+  );
+
+  for (final ambiguousHeader in [false, true]) {
+    test(
+      'source update preserves unmapped edits (duplicate header: $ambiguousHeader)',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'source-unmapped-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final dao = _MemoryBookDao();
+        final client = _MutableSerialClient(chapterCount: 2);
+        final service = BookSourceShelfService(
+          bookDao: dao,
+          client: client,
+          downloadDirectory: directory,
+          sourceRevisionCommitter: _memoryRevisionCommitter(dao),
+        );
+        final downloaded = await service.downloadToLocal(
+          source: _source,
+          book: _sourceBook,
+          bookUid: 'unmapped-book',
+        );
+        final file = File(downloaded.filePath);
+        final original = await file.readAsString();
+        final state = (await const SourceChapterStateStore().load(downloaded))!;
+        final edited = ambiguousHeader
+            ? original.replaceFirst(
+                '正文0',
+                '正文0\n\n\n${state.chapters[1].title}\n\n引用文字',
+              )
+            : '我的前言\n$original';
+        await file.writeAsString(edited);
+        client
+          ..chapterCount = 3
+          ..requested.clear();
+        final result = await service.updateDownloadedBook(
+          shelfBook: downloaded,
+          mode: SourceUpdateMode.appendNewChapters,
+        );
+        expect(result.status, SourceUpdateStatus.baselineUnknown);
+        expect(await file.readAsString(), edited);
+        expect(client.requested, isEmpty);
+      },
+    );
+  }
+
+  test(
+    'explicit refresh preserves local text and creates readable conflict assets',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'source-conflict-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final dao = _MemoryBookDao();
+      final client = _MutableSerialClient(chapterCount: 2);
+      final store = const SourceChapterStateStore();
+      final service = BookSourceShelfService(
+        bookDao: dao,
+        client: client,
+        sourceChapterStateStore: store,
+        downloadDirectory: directory,
+        txtEditService: TxtEditService(
+          historyRootProvider: () async =>
+              Directory('${directory.path}/history'),
+        ),
+        sourceRevisionCommitter: _memoryRevisionCommitter(dao),
+      );
+      final downloaded = await service.downloadToLocal(
+        source: _source,
+        book: _sourceBook,
+        bookUid: 'stable-book',
+      );
+      final file = File(downloaded.filePath);
+      await file.writeAsString(
+        (await file.readAsString()).replaceFirst('正文0', '我的正文0'),
+        flush: true,
+      );
+      client.contents['chapter-0'] = '书源修订0';
+      client.requested.clear();
+
+      final result = await service.updateDownloadedBook(
+        shelfBook: downloaded,
+        mode: SourceUpdateMode.refreshDownloadedChapters,
+      );
+
+      expect(result.status, SourceUpdateStatus.conflicts);
+      expect(result.conflictCount, 1);
+      expect(await file.readAsString(), contains('我的正文0'));
+      expect(client.requested, ['chapter-0', 'chapter-1']);
+      final state = await store.load(downloaded);
+      final conflict = state!.conflicts.single;
+      expect(
+        await store.readAsset(downloaded, conflict.localAsset),
+        contains('我的正文0'),
+      );
+      expect(
+        await store.readAsset(downloaded, conflict.sourceAsset),
+        contains('书源修订0'),
+      );
+
+      final resolved = await service.resolveSourceConflict(
+        shelfBook: result.book,
+        conflictId: conflict.id,
+        resolution: SourceConflictResolution.useSource,
+      );
+      expect(resolved.revisionOrigin, SourceRevisionOrigin.conflictResolution);
+      expect(await file.readAsString(), contains('书源修订0'));
+      expect(await file.readAsString(), isNot(contains('我的正文0')));
+    },
+  );
+
+  test(
+    'legacy local download requires explicit baseline mapping and is never overwritten',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('source-legacy-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/legacy.txt');
+      await file.writeAsString('用户旧正文  \n\n');
+      final book = Book(
+        id: 9,
+        title: _sourceBook.title,
+        author: _sourceBook.author,
+        filePath: file.path,
+        format: 'txt',
+        storageType: 'local',
+        sourceId: _source.id,
+        sourceBookId: _sourceBook.id,
+        sourceJson: jsonEncode(_source.toJson()),
+        sourceBookJson: jsonEncode(_sourceBook.toJson()),
+      );
+      final dao = _MemoryBookDao()..stored = book;
+      final client = _MutableSerialClient(chapterCount: 3);
+      final service = BookSourceShelfService(
+        bookDao: dao,
+        client: client,
+        downloadDirectory: directory,
+        txtEditService: TxtEditService(
+          historyRootProvider: () async =>
+              Directory('${directory.path}/history'),
+        ),
+        sourceRevisionCommitter: _memoryRevisionCommitter(dao),
+      );
+
+      final blocked = await service.updateDownloadedBook(
+        shelfBook: book,
+        mode: SourceUpdateMode.appendNewChapters,
+      );
+      expect(blocked.status, SourceUpdateStatus.baselineUnknown);
+      expect(await file.readAsString(), '用户旧正文  \n\n');
+
+      final candidate = await service.downloadSourceCandidate(shelfBook: book);
+      expect(await candidate.file.readAsString(), contains('正文2'));
+      expect(await file.readAsString(), '用户旧正文  \n\n');
+
+      await service.establishTrackingBaseline(
+        shelfBook: book,
+        sourceChapters: await client.getChaptersForDownload(
+          _source,
+          _sourceBook.id,
+        ),
+        lastDownloadedChapterId: 'chapter-1',
+        mappingConfirmed: true,
+        bookUid: 'legacy-stable',
+      );
+      client.requested.clear();
+      final appended = await service.updateDownloadedBook(
+        shelfBook: book,
+        mode: SourceUpdateMode.appendNewChapters,
+      );
+      expect(appended.addedChapterCount, 1);
+      expect(client.requested, ['chapter-2']);
+      expect(await file.readAsString(), startsWith('用户旧正文  \n\n'));
+      final firstAppend = await file.readAsString();
+      client.chapterCount = 4;
+      await service.updateDownloadedBook(
+        shelfBook: appended.book,
+        mode: SourceUpdateMode.appendNewChapters,
+      );
+      expect(await file.readAsString(), startsWith(firstAppend));
+    },
+  );
+  test(
+    'changing a downloaded source preserves readable content and progress',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('source-rebind-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/book.txt');
+      await file.writeAsString('用户正文');
+      final original = Book(
+        id: 7,
+        title: '本地书',
+        author: '作者',
+        filePath: file.path,
+        format: 'txt',
+        currentPage: 12,
+        totalPages: 99,
+        readingProgress: .42,
+        storageType: 'local',
+        sourceId: _source.id,
+        sourceBookId: _sourceBook.id,
+        sourceJson: jsonEncode(_source.toJson()),
+        sourceBookJson: jsonEncode(_sourceBook.toJson()),
+      );
+      final dao = _MemoryBookDao()..stored = original;
+      final service = BookSourceShelfService(bookDao: dao);
+      final replacement = RegisteredBookSource(
+        id: 'replacement-source',
+        name: '新书源',
+        description: '',
+        manifestUrl: Uri.parse('https://new.example/source.json'),
+        apiBaseUrl: Uri.parse('https://new.example/api/'),
+        protocolVersion: '1.0',
+        languages: const ['zh-CN'],
+        capabilities: const {'catalog', 'content'},
+        enabled: true,
+        addedAt: DateTime.utc(2026, 9, 12),
+      );
+
+      final rebound = await service.replaceOnlineSourceBinding(
+        shelfBook: original,
+        source: replacement,
+        book: _sourceBook,
+        chapterIndex: 5,
+        chapterCount: 200,
+        chapterProgress: .8,
+      );
+
+      expect(rebound.filePath, original.filePath);
+      expect(rebound.currentPage, 12);
+      expect(rebound.totalPages, 99);
+      expect(rebound.readingProgress, .42);
+      expect(rebound.sourceId, replacement.id);
+      expect(await file.readAsString(), '用户正文');
+    },
+  );
 }
+
+SourceTxtRevisionCommitter _memoryRevisionCommitter(_MemoryBookDao dao) =>
+    (book, commit) async {
+      final updated = book.copyWith(
+        contentHash: commit.contentHash,
+        fileModifiedTime: commit.modifiedAt.millisecondsSinceEpoch,
+        textEncoding: commit.textEncoding,
+      );
+      await dao.updateBook(updated);
+      return updated;
+    };
 
 final _source = RegisteredBookSource(
   id: 'source-id',
@@ -569,5 +875,47 @@ class _StreamingDownloadClient extends BookSourceClient {
     } finally {
       active--;
     }
+  }
+}
+
+class _MutableSerialClient extends BookSourceClient {
+  _MutableSerialClient({required this.chapterCount});
+
+  int chapterCount;
+  final requested = <String>[];
+  final contents = <String, String>{};
+
+  @override
+  Future<List<BookSourceChapter>> getChaptersForDownload(
+    RegisteredBookSource source,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+    BookDownloadCancellation? cancellation,
+  }) async => List.generate(
+    chapterCount,
+    (index) => BookSourceChapter(
+      id: 'chapter-$index',
+      title: '第${index + 1}章',
+      order: index,
+      updatedAt: DateTime.utc(2026, 9, index + 1),
+    ),
+  );
+
+  @override
+  Future<BookSourceChapterContent> getChapterContentForDownload(
+    RegisteredBookSource source, {
+    required String bookId,
+    required String chapterId,
+    Map<String, String> sourceVariables = const {},
+    BookDownloadCancellation? cancellation,
+  }) async {
+    requested.add(chapterId);
+    return BookSourceChapterContent(
+      bookId: bookId,
+      chapterId: chapterId,
+      title: sourceVariables['chapterTitle'] ?? '',
+      content: contents[chapterId] ?? '正文${chapterId.split('-').last}',
+      contentType: 'text/plain',
+    );
   }
 }

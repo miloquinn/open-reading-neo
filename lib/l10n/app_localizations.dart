@@ -1281,8 +1281,32 @@ abstract class AppLocalizations {
   /// No description provided for @sourceLoginNoForm.
   ///
   /// In en, this message translates to:
-  /// **'This source does not provide a sign-in form. Browser-based sign-in is not available yet.'**
+  /// **'This source does not provide an available sign-in method.'**
   String get sourceLoginNoForm;
+
+  /// No description provided for @sourceLoginBrowserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in on the original website'**
+  String get sourceLoginBrowserTitle;
+
+  /// No description provided for @sourceLoginBrowserNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete sign-in in the browser, then tap Done. Cookies and website local storage will be saved on this device.'**
+  String get sourceLoginBrowserNotice;
+
+  /// No description provided for @sourceLoginBrowserUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Website sign-in is available on Android, iPhone, iPad, and Mac.'**
+  String get sourceLoginBrowserUnsupported;
+
+  /// No description provided for @sourceLoginBrowserOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open website to sign in'**
+  String get sourceLoginBrowserOpen;
 
   /// No description provided for @sourceLoginSave.
   ///
@@ -9263,20 +9287,8 @@ abstract class AppLocalizations {
   /// Explains that enabling uploads does not upload every book
   ///
   /// In en, this message translates to:
-  /// **'Only selected books are uploaded; WebDAV keeps the original file name and bytes without encryption'**
+  /// **'Automatically back up existing local books. Cloud books/ keeps readable files in their original format and covers, organized by title and author. Identity suffixes distinguish same-name books, and content updates retain history.'**
   String get webDavFilesUploadPermissionHint;
-
-  /// Title for the legacy WebDAV book directory notice
-  ///
-  /// In en, this message translates to:
-  /// **'Existing WebDAV books remain compatible'**
-  String get webDavLegacyBookDirectoryTitle;
-
-  /// Explains legacy WebDAV book files do not require resync
-  ///
-  /// In en, this message translates to:
-  /// **'You do not need to sync them again. New uploads use a readable Book title - Author/original file name directory.'**
-  String get webDavLegacyBookDirectoryMessage;
 
   /// Newly imported book file upload policy title
   ///
@@ -10646,48 +10658,6 @@ abstract class AppLocalizations {
   /// **'Reading took too long. Check your connection or try importing a downloaded JSON file.'**
   String get bookSourcesImportTimedOut;
 
-  /// No description provided for @cloudSyncIncrementalMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Incremental storage'**
-  String get cloudSyncIncrementalMode;
-
-  /// No description provided for @cloudSyncPlainMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Standard TXT file'**
-  String get cloudSyncPlainMode;
-
-  /// No description provided for @cloudSyncIncrementalDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'After the first upload, only changed content blocks are transferred. Your local book stays a complete TXT.'**
-  String get cloudSyncIncrementalDescription;
-
-  /// No description provided for @cloudSyncEnableIncremental.
-  ///
-  /// In en, this message translates to:
-  /// **'Use incremental storage'**
-  String get cloudSyncEnableIncremental;
-
-  /// No description provided for @cloudSyncIncrementalConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Change this book’s cloud storage?'**
-  String get cloudSyncIncrementalConfirmTitle;
-
-  /// No description provided for @cloudSyncIncrementalConfirmBody.
-  ///
-  /// In en, this message translates to:
-  /// **'The cloud copy will use an app-managed block format. Existing TXT copies will be kept but will stop receiving updates. Other devices need a version of this app that supports incremental storage. Your complete TXT remains available locally.'**
-  String get cloudSyncIncrementalConfirmBody;
-
-  /// No description provided for @cloudSyncIncrementalConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch and sync'**
-  String get cloudSyncIncrementalConfirm;
-
   /// No description provided for @bookSourcesImportUsageNotice.
   ///
   /// In en, this message translates to:
@@ -10867,6 +10837,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Used by your shelf · kept by default'**
   String get bookSourcesMaintenanceShelfProtected;
+
+  /// No description provided for @bookSourcesMaintenanceDeleteReferencedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected source(s) are used by books on your bookshelf. Deleting them may prevent those books from updating or loading new chapters.'**
+  String bookSourcesMaintenanceDeleteReferencedWarning(int count);
+
+  /// No description provided for @bookSourcesMaintenanceProblemsFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Problems'**
+  String get bookSourcesMaintenanceProblemsFilter;
+
+  /// No description provided for @bookSourcesMaintenanceSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected {count} source(s)'**
+  String bookSourcesMaintenanceSelectedCount(int count);
+
+  /// No description provided for @bookSourcesMaintenanceShelfUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used by your bookshelf'**
+  String get bookSourcesMaintenanceShelfUsed;
+
+  /// No description provided for @bookSourcesMaintenancePause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get bookSourcesMaintenancePause;
+
+  /// No description provided for @bookSourcesMaintenancePausing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pausing…'**
+  String get bookSourcesMaintenancePausing;
+
+  /// No description provided for @bookSourcesMaintenancePaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Check paused'**
+  String get bookSourcesMaintenancePaused;
+
+  /// No description provided for @bookSourcesMaintenanceCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Check complete'**
+  String get bookSourcesMaintenanceCompleted;
+
+  /// No description provided for @bookSourcesMaintenanceStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start check'**
+  String get bookSourcesMaintenanceStart;
+
+  /// No description provided for @bookSourcesMaintenanceRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start again'**
+  String get bookSourcesMaintenanceRestart;
+
+  /// No description provided for @bookSourcesMaintenanceCheckedThisRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked this run'**
+  String get bookSourcesMaintenanceCheckedThisRun;
+
+  /// No description provided for @bookSourcesMaintenancePausedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select and manage completed results now, or continue checking the remaining sources.'**
+  String get bookSourcesMaintenancePausedHint;
 
   /// No description provided for @bookSourcesMaintenanceApplyFailed.
   ///
@@ -11291,7 +11333,7 @@ abstract class AppLocalizations {
   /// Deletion term about the minimal retained deletion record
   ///
   /// In en, this message translates to:
-  /// **'We keep one deletion record. It contains no plaintext email address and cannot be turned back into personal information. Its only purposes are preventing abuse and making the Apple purchase restore above possible.'**
+  /// **'We retain only minimal deidentified deletion data needed to prevent abuse, together with App Store purchase verification records required to restore or verify purchases. These records are not used to recreate your account.'**
   String get accountDeleteTermsTombstone;
 
   /// Deletion term about registering again with the same address
@@ -11414,11 +11456,233 @@ abstract class AppLocalizations {
   /// **'Your account and its data are permanently gone, and every device has been signed out. Thank you for having used Open Reading.'**
   String get accountDeleteDoneBody;
 
+  /// Manual Apple authorization removal guidance shown after deleting a legacy Apple account
+  ///
+  /// In en, this message translates to:
+  /// **'After closing this dialog, open Apple Account Settings > Sign-In & Security > Sign in with Apple > Open Reading, then choose Stop Using Sign in with Apple.'**
+  String get accountDeleteAppleManualRevocation;
+
   /// Button closing the deletion success dialog
   ///
   /// In en, this message translates to:
   /// **'Close'**
   String get accountDeleteDoneClose;
+
+  /// No description provided for @bookSourceDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Book details'**
+  String get bookSourceDetailsTitle;
+
+  /// No description provided for @bookSourceDetailsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'About this book'**
+  String get bookSourceDetailsDescription;
+
+  /// No description provided for @bookSourceDetailsNoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'No description provided by this source.'**
+  String get bookSourceDetailsNoDescription;
+
+  /// No description provided for @bookSourceDetailsLatestChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest chapter'**
+  String get bookSourceDetailsLatestChapter;
+
+  /// No description provided for @bookSourceDetailsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load full details. You can retry or read with the available information.'**
+  String get bookSourceDetailsLoadFailed;
+
+  /// No description provided for @bookSourceDetailsOnShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'On shelf'**
+  String get bookSourceDetailsOnShelf;
+
+  /// No description provided for @bookSourceDetailsAddFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add this book to your shelf. Try again.'**
+  String get bookSourceDetailsAddFailed;
+
+  /// No description provided for @bookSourceDetailsReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this book. Try again.'**
+  String get bookSourceDetailsReadFailed;
+
+  /// No description provided for @appTextSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface text size'**
+  String get appTextSize;
+
+  /// No description provided for @appTextSizeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Only changes app menus and controls, not reading text.'**
+  String get appTextSizeDescription;
+
+  /// No description provided for @appTextSizePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Menus and settings will use this text size.'**
+  String get appTextSizePreview;
+
+  /// No description provided for @appTextSizeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'100% (Default)'**
+  String get appTextSizeDefault;
+
+  /// No description provided for @bookSourceTrackUpdatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates and downloaded text'**
+  String get bookSourceTrackUpdatesTitle;
+
+  /// No description provided for @bookSourceTrackUpdatesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded books keep their source. Check for new chapters to append new content, or refresh downloaded chapters while preserving your edits and history.'**
+  String get bookSourceTrackUpdatesBody;
+
+  /// No description provided for @bookSourceCheckNewChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for new chapters'**
+  String get bookSourceCheckNewChapters;
+
+  /// No description provided for @bookSourceRefreshDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh downloaded chapters'**
+  String get bookSourceRefreshDownloaded;
+
+  /// No description provided for @bookSourceNoNewChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'No new chapters in the catalog. Refresh downloaded chapters to check earlier text for changes.'**
+  String get bookSourceNoNewChapters;
+
+  /// No description provided for @bookSourceUpdateSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{added} chapters added, {refreshed} refreshed'**
+  String bookSourceUpdateSummary(int added, int refreshed);
+
+  /// No description provided for @bookSourceBaselineUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the last chapter already downloaded before continuing updates. Your existing text will be preserved.'**
+  String get bookSourceBaselineUnknown;
+
+  /// No description provided for @bookSourceSelectBoundary.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm downloaded chapters'**
+  String get bookSourceSelectBoundary;
+
+  /// No description provided for @bookSourceBoundaryHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the last source chapter included in your local text. Only later chapters will be appended; existing text stays intact.'**
+  String get bookSourceBoundaryHelp;
+
+  /// No description provided for @bookSourceTrackingEstablished.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking boundary saved. You can now check for new chapters.'**
+  String get bookSourceTrackingEstablished;
+
+  /// No description provided for @bookSourceMappingChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The source changed its chapter order or identifiers. Confirm your downloaded chapters again. Existing text was preserved.'**
+  String get bookSourceMappingChanged;
+
+  /// No description provided for @bookSourceContentConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'Text changes need review'**
+  String get bookSourceContentConflicts;
+
+  /// No description provided for @bookSourceContentConflictBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You and the source changed these chapters. Your version remains active. Compare and choose what to read; both versions stay in history.'**
+  String get bookSourceContentConflictBody;
+
+  /// No description provided for @bookSourceCompareVersions.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare text'**
+  String get bookSourceCompareVersions;
+
+  /// No description provided for @bookSourceLocalVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'My text'**
+  String get bookSourceLocalVersion;
+
+  /// No description provided for @bookSourceRemoteVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Source text'**
+  String get bookSourceRemoteVersion;
+
+  /// No description provided for @bookSourceBaselineVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded baseline'**
+  String get bookSourceBaselineVersion;
+
+  /// No description provided for @bookSourceKeepLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep my text'**
+  String get bookSourceKeepLocal;
+
+  /// No description provided for @bookSourceUseRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Use source text'**
+  String get bookSourceUseRemote;
+
+  /// No description provided for @bookSourceUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update did not finish. Your text was preserved. Please retry.'**
+  String get bookSourceUpdateFailed;
+
+  /// No description provided for @cloudSyncReadableStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Books keep their original format in books/, with readable history. Unchanged files are not uploaded again; changed text is transferred as a complete file.'**
+  String get cloudSyncReadableStorage;
+
+  /// No description provided for @bookSourceBindSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Link a book source'**
+  String get bookSourceBindSource;
+
+  /// No description provided for @bookSourceNotBound.
+  ///
+  /// In en, this message translates to:
+  /// **'No source linked'**
+  String get bookSourceNotBound;
+
+  /// No description provided for @bookSourceDownloadedUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded chapters are up to date.'**
+  String get bookSourceDownloadedUnchanged;
 }
 
 class _AppLocalizationsDelegate

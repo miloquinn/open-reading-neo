@@ -163,6 +163,7 @@ class _ControlledDownloadService extends BookSourceShelfService {
   Future<Book> downloadToLocal({
     required RegisteredBookSource source,
     required BookSourceBook book,
+    String? bookUid,
     void Function(int completed, int total)? onProgress,
     BookDownloadCancellation? cancellation,
   }) async {

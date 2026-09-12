@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../book_sources/models/registered_book_source.dart';
 import '../../book_sources/services/book_source_client.dart';
+import '../../book_sources/source_engine/source_browser_session.dart';
 import '../../book_sources/source_engine/source_login_ui.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
 import '../../utils/localization_extension.dart';
@@ -28,6 +29,11 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
 
   BookSourceClient get _client =>
       widget.client ?? (_ownedClient ??= BookSourceClient());
+
+  Uri? get _browserLoginUri {
+    final config = widget.source.sourceConfig;
+    return config == null ? null : sourceBrowserLoginUri(config);
+  }
 
   @override
   void initState() {
@@ -87,6 +93,8 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(context.l10n.sourceLoginSaved)));
+    } on SourceBrowserCancelled {
+      // Closing the browser is an expected way to leave sign-in unchanged.
     } on Object catch (error) {
       debugPrint('[SourceLoginPage] login failed: $error');
       if (!mounted) return;
@@ -124,6 +132,7 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final browserLoginUri = _browserLoginUri;
     return FloatingSubpageScaffold(
       title: context.l10n.sourceLoginTitle,
       body: Align(
@@ -176,33 +185,42 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
               const SizedBox(height: 18),
               if (_loading)
                 const Center(child: CircularProgressIndicator())
-              else if (_fields.isEmpty)
-                Text(
-                  _error ?? context.l10n.sourceLoginNoForm,
-                  style: TextStyle(color: scheme.onSurfaceVariant),
-                )
               else ...[
+                if (browserLoginUri != null) ...[
+                  _buildBrowserLogin(browserLoginUri),
+                  const SizedBox(height: 18),
+                ],
                 for (final field in _fields)
                   if (!field.isButton) ...[
                     _buildField(field),
                     const SizedBox(height: 13),
                   ],
+                if (_fields.isEmpty && browserLoginUri == null) ...[
+                  Text(
+                    context.l10n.sourceLoginNoForm,
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 13),
+                ],
                 if (_error != null) ...[
                   Text(_error!, style: TextStyle(color: scheme.error)),
                   const SizedBox(height: 13),
                 ],
-                FilledButton.icon(
-                  onPressed: _submitting ? null : _login,
-                  icon: _submitting
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.login_rounded),
-                  label: Text(context.l10n.sourceLoginSave),
-                ),
-                const SizedBox(height: 8),
+                if (_fields.isNotEmpty) ...[
+                  FilledButton.icon(
+                    onPressed: _submitting ? null : _login,
+                    icon: _submitting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.login_rounded),
+                    label: Text(context.l10n.sourceLoginSave),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 TextButton.icon(
+                  key: const ValueKey('source-login-clear'),
                   onPressed: _submitting ? null : _clear,
                   icon: const Icon(Icons.logout_rounded),
                   label: Text(context.l10n.sourceLoginClear),
@@ -211,6 +229,57 @@ class _SourceLoginPageState extends State<SourceLoginPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBrowserLogin(Uri loginUri) {
+    final scheme = Theme.of(context).colorScheme;
+    final supported = const SourceBrowserSessionClient().isSupported;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.sourceLoginBrowserTitle,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          SelectableText(
+            loginUri.toString(),
+            key: const ValueKey('source-login-browser-url'),
+            style: TextStyle(color: scheme.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            supported
+                ? context.l10n.sourceLoginBrowserNotice
+                : context.l10n.sourceLoginBrowserUnsupported,
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: const ValueKey('source-login-browser-open'),
+              onPressed: supported && !_submitting ? _login : null,
+              icon: _submitting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.open_in_browser_rounded),
+              label: Text(context.l10n.sourceLoginBrowserOpen),
+            ),
+          ),
+        ],
       ),
     );
   }

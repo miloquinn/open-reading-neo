@@ -382,6 +382,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
         bottomMarginLabel: context.l10n.readerBottomMarginLabel,
         chapterTitlePageTitle: context.l10n.readerTxtChapterTitlePageTitle,
         chapterTitlePageHint: context.l10n.readerTxtChapterTitlePageHint,
+        showChapterTitlePageToggle: widget.book.format.toLowerCase() == 'txt',
         themeId: _readerThemeId,
         fontSize: _fontSize,
         textBrightness: _textBrightness,

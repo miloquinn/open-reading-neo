@@ -319,6 +319,23 @@ extension _SettingsAppearancePart on _SettingsPageState {
     );
   }
 
+  Widget _buildAppTextSizeSelector(AppSettingsNotifier appSettings) {
+    final l10n = context.l10n;
+    return _buildActionSetting(
+      title: l10n.appTextSize,
+      subtitle:
+          '${(appSettings.appTextScaleFactor * 100).round()}% · '
+          '${l10n.appTextSizeDescription}',
+      icon: Icons.format_size_rounded,
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => const AppTextSizeSheet(),
+      ),
+    );
+  }
+
   Widget _buildReaderFontSelector(AppSettingsNotifier appSettings) {
     final l10n = context.l10n;
     final selected = appSettings.readerFont;

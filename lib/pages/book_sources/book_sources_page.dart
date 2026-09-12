@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
@@ -246,6 +247,32 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
     if (mounted) setState(() {});
   }
 
+  bool _handleCategoryScroll(ScrollNotification notification) {
+    if (notification.depth != 0 ||
+        notification.metrics.axis != Axis.vertical ||
+        _state.section != BookSourcesSection.categories ||
+        (_state.listLayout && _state.showListDirectory) ||
+        _state.categoryLoadMoreFailed ||
+        !_scrollController.hasClients ||
+        notification.context == null ||
+        Scrollable.maybeOf(notification.context!)?.position !=
+            _scrollController.position ||
+        notification.metrics.extentAfter > 600 ||
+        _scrollController.position.userScrollDirection !=
+            ScrollDirection.reverse) {
+      return false;
+    }
+    // Include overscroll so a short first page can load on an upward swipe.
+    // Layout changes and restored scroll offsets must not fetch extra pages.
+    final delta = switch (notification) {
+      ScrollUpdateNotification() => notification.scrollDelta ?? 0,
+      OverscrollNotification() => notification.overscroll,
+      _ => 0.0,
+    };
+    if (delta > 0) unawaited(_controller.loadMoreCategory());
+    return false;
+  }
+
   void _handleLayoutChanged() {
     if (!mounted) return;
     _pendingScrollOffset = 0;
@@ -355,7 +382,12 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_usesDiscoverySidebar) return _buildTabletDiscovery();
+    if (_usesDiscoverySidebar) {
+      return NotificationListener<ScrollNotification>(
+        onNotification: _handleCategoryScroll,
+        child: _buildTabletDiscovery(),
+      );
+    }
     final useRailNavigation =
         NavigationContext.of(context)?.useRailNavigation ?? false;
     final usesTabletLayout = LayoutHelper.usesTabletLayout(context);
@@ -545,7 +577,10 @@ class _BookSourcesPageState extends State<BookSourcesPage> {
                     : mobileChrome.topBarHeight,
                 bottom: useRailNavigation ? 0 : mobileChrome.navContainerHeight,
               ),
-              child: scrollView,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _handleCategoryScroll,
+                child: scrollView,
+              ),
             ),
           ),
         ),

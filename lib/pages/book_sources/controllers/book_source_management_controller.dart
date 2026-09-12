@@ -301,6 +301,25 @@ class BookSourceManagementController extends ChangeNotifier {
     );
   }
 
+  /// Removes an explicit result-page selection without changing the selection
+  /// owned by the management page.
+  Future<void> removeSources(Iterable<String> ids) async {
+    final selected = ids.toSet();
+    if (selected.isEmpty) return;
+    final applied = await _runMutation(
+      BookSourceManagementMutation.remove,
+      () => _registry.removeAll(selected),
+      refreshGroups: true,
+    );
+    if (!applied) return;
+    final remainingIds = _state.sources.map((source) => source.id).toSet();
+    _emit(
+      _state.copyWith(
+        selectedSourceIds: _state.selectedSourceIds.intersection(remainingIds),
+      ),
+    );
+  }
+
   Future<void> removeSelectedSources() async {
     final selected = _state.selectedSourceIds;
     _loadRevision++;

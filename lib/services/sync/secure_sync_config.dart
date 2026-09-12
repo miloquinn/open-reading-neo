@@ -118,9 +118,17 @@ class SecureSyncConfigStore {
   Future<WebDavSyncScope> readScope() async {
     final raw = await _preferences.read(_scopeKey);
     if (raw == null) {
-      // Existing connections retain their historical default. New connections
-      // keep typography local unless the user explicitly opts in.
-      return WebDavSyncScope(readerSettings: await readConfiguration() != null);
+      // A configured connection with no saved scope is a new connection (or a
+      // pre-scope install): preserve as much user data as possible by default.
+      // Once a scope is saved, its explicit false values remain authoritative.
+      if (await readConfiguration() != null) {
+        return const WebDavSyncScope(
+          notes: true,
+          replaceRules: true,
+          bookFiles: true,
+        );
+      }
+      return const WebDavSyncScope();
     }
     return WebDavSyncScope.fromJson(
       (jsonDecode(raw) as Map).cast<String, dynamic>(),
@@ -136,10 +144,16 @@ class SecureSyncConfigStore {
   Future<void> saveAutoResume(bool enabled) =>
       _preferences.write(_autoResumeKey, enabled.toString());
 
-  Future<WebDavNewBookUploadPolicy> readNewBookUploadPolicy() async =>
-      WebDavNewBookUploadPolicy.fromStorage(
-        await _preferences.read(_newBookUploadPolicyKey),
-      );
+  Future<WebDavNewBookUploadPolicy> readNewBookUploadPolicy() async {
+    final saved = await _preferences.read(_newBookUploadPolicyKey);
+    if (saved != null) return WebDavNewBookUploadPolicy.fromStorage(saved);
+    // A fresh connection defaults to complete backup. Before configuration,
+    // keep the neutral prompt policy so setup screens do not imply that a
+    // connection already exists. Explicitly saved choices always win.
+    return await readConfiguration() == null
+        ? WebDavNewBookUploadPolicy.askEveryTime
+        : WebDavNewBookUploadPolicy.automatic;
+  }
 
   Future<void> saveNewBookUploadPolicy(WebDavNewBookUploadPolicy policy) =>
       _preferences.write(_newBookUploadPolicyKey, policy.storageValue);

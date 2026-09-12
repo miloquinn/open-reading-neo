@@ -28,6 +28,7 @@ void main() {
       request.completeItem(_checked(healthy));
       request.onProgress?.call(1, 2);
       expect(coordinator.state.progress?.completed, 1);
+      expect(coordinator.state.result?.fullyAvailable.single.id, 'healthy');
       final brokenResult = _checked(
         broken,
         failed: const {SourceHealthCapability.content},
@@ -317,6 +318,84 @@ void main() {
     expect(coordinator.state.progress?.total, 2);
     expect(coordinator.state.result?.allSources.single.id, first.id);
   });
+
+  test(
+    'reconcile after pause removes deleted results and preserves pending work',
+    () async {
+      final service = _HealthService();
+      final completed = _source('completed');
+      final remaining = _source('remaining');
+      final registry = BookSourceRegistry(storage: _MemoryRegistryStorage());
+      await registry.upsertAll([completed, remaining]);
+      final coordinator = BookSourceMaintenanceCoordinator(
+        service: service,
+        registry: registry,
+      );
+      addTearDown(coordinator.dispose);
+
+      final run = coordinator.start([completed, remaining]);
+      final request = service.requests.single;
+      request.completeItem(_checked(completed));
+      coordinator.cancel();
+      request.completer.complete([_checked(completed)]);
+      await run;
+
+      final current = await registry.removeAll([completed.id]);
+      coordinator.reconcileSources(current);
+
+      expect(coordinator.state.result?.allSources, isEmpty);
+      expect(coordinator.state.remainingSources.single.id, remaining.id);
+      expect(coordinator.state.progress?.completed, 0);
+      expect(coordinator.state.progress?.total, 1);
+
+      final resume = coordinator.resume();
+      await _waitForRequests(service, 2);
+      final resumed = service.requests.last;
+      expect(resumed.sources.map((source) => source.id), [remaining.id]);
+      resumed.completeItem(_checked(remaining));
+      resumed.completer.complete([_checked(remaining)]);
+      await resume;
+
+      expect(coordinator.state.result?.allSources.single.id, remaining.id);
+      expect(coordinator.state.progress?.completed, 1);
+      expect(coordinator.state.progress?.total, 1);
+    },
+  );
+
+  test(
+    'reconcile preserves diagnostics for disabled completed sources',
+    () async {
+      final service = _HealthService();
+      final source = _source('disabled');
+      final coordinator = BookSourceMaintenanceCoordinator(service: service);
+      addTearDown(coordinator.dispose);
+
+      final run = coordinator.start([source]);
+      final request = service.requests.single;
+      final failed = _checked(
+        source,
+        failed: const {SourceHealthCapability.search},
+      );
+      request.completeItem(failed);
+      request.completer.complete([failed]);
+      await run;
+      final classification = coordinator.state.result?.classificationOf(
+        source.id,
+      );
+
+      coordinator.reconcileSources([failed.copyWith(enabled: false)]);
+
+      expect(
+        coordinator.state.result?.assessments.single.source.enabled,
+        isFalse,
+      );
+      expect(
+        coordinator.state.result?.classificationOf(source.id),
+        classification,
+      );
+      expect(coordinator.state.result?.allSources, hasLength(1));
+    },
+  );
 
   test('a changed configuration result is kept as unchecked', () async {
     final service = _HealthService();

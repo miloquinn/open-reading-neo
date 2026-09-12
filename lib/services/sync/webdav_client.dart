@@ -2,15 +2,21 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 
 import 'secure_sync_config.dart';
 import 'sync_models.dart';
 
+typedef WebDavClientFactory =
+    WebDavClient Function(StoredSyncCredentials credentials);
+
 class WebDavClient {
-  WebDavClient({required this._dio, required StoredSyncCredentials credentials})
-    : _credentials = credentials,
+  WebDavClient({required Dio dio, required StoredSyncCredentials credentials})
+    : _dio = dio,
+      _credentials = credentials,
       _origin = validateWebDavConfiguration(credentials.configuration);
 
   factory WebDavClient.standard(StoredSyncCredentials credentials) {
@@ -32,26 +38,50 @@ class WebDavClient {
   final Uri _origin;
   DateTime? lastServerDate;
 
-  Uri get protocolRoot => _pathUri([..._rootSegments, 'v1']);
+  Uri uriForRootRelativePath(String relativePath) {
+    final segments = relativePath.split('/');
+    if (relativePath.isEmpty ||
+        relativePath.startsWith('/') ||
+        relativePath.endsWith('/') ||
+        segments.any((part) => part.isEmpty || part == '.' || part == '..')) {
+      throw ArgumentError.value(
+        relativePath,
+        'relativePath',
+        'Invalid WebDAV root-relative path.',
+      );
+    }
+    return _pathUri([..._rootSegments, ...segments]);
+  }
 
-  Uri get mutableProtocolRoot => _pathUri([..._rootSegments, 'v2']);
+  Future<void> ensureRootRelativeParent(String relativePath) async {
+    final segments = relativePath.split('/');
+    if (segments.length <= 1) {
+      await ensureCollection(_rootSegments);
+      return;
+    }
+    await ensureCollection([
+      ..._rootSegments,
+      ...segments.take(segments.length - 1),
+    ]);
+  }
+
+  /// User-visible files live directly below the configured storage folder.
+  Uri rootPath(List<String> relativeSegments) =>
+      _pathUri([..._rootSegments, ...relativeSegments]);
+
+  String get readableSpaceKey => jsonEncode([
+    rootPath(const []).toString(),
+    _credentials.configuration.username,
+  ]);
+
+  Future<void> ensureRootPath(List<String> relativeSegments) =>
+      ensureCollection([..._rootSegments, ...relativeSegments]);
 
   List<String> get _rootSegments => _credentials.configuration.rootPath
       .split('/')
       .map((part) => part.trim())
       .where((part) => part.isNotEmpty)
       .toList(growable: false);
-
-  Uri path(List<String> relativeSegments) =>
-      _pathUri([..._rootSegments, 'v1', ...relativeSegments]);
-
-  Uri mutablePath(List<String> relativeSegments) =>
-      _pathUri([..._rootSegments, 'v2', ...relativeSegments]);
-
-  /// Namespace for explicitly enabled content-addressed TXT synchronization.
-  /// Existing v2 bindings continue to use [mutablePath].
-  Uri incrementalMutablePath(List<String> relativeSegments) =>
-      _pathUri([..._rootSegments, 'v3', ...relativeSegments]);
 
   Uri _pathUri(List<String> segments) {
     final baseSegments = _origin.pathSegments.where((part) => part.isNotEmpty);
@@ -123,34 +153,6 @@ class WebDavClient {
     }
   }
 
-  Future<void> ensureProtocolCollections(String deviceId) async {
-    await ensureCollection(_rootSegments);
-    await ensureCollection([..._rootSegments, 'v1']);
-    await ensureCollection([..._rootSegments, 'v1', 'devices']);
-    await ensureCollection([..._rootSegments, 'v1', 'devices', deviceId]);
-    await ensureCollection([
-      ..._rootSegments,
-      'v1',
-      'devices',
-      deviceId,
-      'changes',
-    ]);
-  }
-
-  Future<void> ensureProtocolPath(List<String> relativeSegments) async {
-    await ensureCollection([..._rootSegments, 'v1', ...relativeSegments]);
-  }
-
-  Future<void> ensureMutableProtocolPath(List<String> relativeSegments) async {
-    await ensureCollection([..._rootSegments, 'v2', ...relativeSegments]);
-  }
-
-  Future<void> ensureIncrementalMutableProtocolPath(
-    List<String> relativeSegments,
-  ) async {
-    await ensureCollection([..._rootSegments, 'v3', ...relativeSegments]);
-  }
-
   Future<WebDavResourceState> resourceState(Uri uri) async {
     try {
       final response = await _request('HEAD', uri);
@@ -212,7 +214,20 @@ class WebDavClient {
     final requestHeaders = <String, Object?>{
       'Authorization': _authorization,
       Headers.contentLengthHeader: total,
-      Headers.contentTypeHeader: 'text/plain; charset=utf-8',
+      Headers.contentTypeHeader: switch (uri.pathSegments.last
+          .toLowerCase()
+          .split('.')
+          .last) {
+        'epub' => 'application/epub+zip',
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+        'json' => 'application/json; charset=utf-8',
+        // TXT bytes may retain GBK or UTF-16; do not mislabel them UTF-8.
+        'txt' => 'text/plain',
+        _ => 'application/octet-stream',
+      },
     };
     if (ifMatch case final value?) {
       requestHeaders['If-Match'] = value;
@@ -274,13 +289,13 @@ class WebDavClient {
       await response.data?.stream.listen(null).cancel();
       throw _statusFailure(status).withRequest('GET', uri);
     }
+    _requireResponseEtag(response, expectedEtag: etag);
     final remoteHash = await sha256.bind(response.data!.stream).first;
     final localHash = await sha256.bind(file.openRead()).first;
-    final current = await resourceState(uri);
-    if (remoteHash != localHash || !current.exists || current.etag != etag) {
+    if (remoteHash != localHash) {
       throw WebDavSyncFailure(
         WebDavSyncErrorCode.conflict,
-        'The uploaded file changed before its WebDAV version could be verified.',
+        'The uploaded file differs from its verified WebDAV response.',
         requestMethod: 'GET',
         resourcePath: uri.path,
       );
@@ -303,13 +318,10 @@ class WebDavClient {
     final replacementFile = File('${root.path}/replacement.txt');
     await seedFile.writeAsString(seed, flush: true);
     await replacementFile.writeAsString('must-not-replace-seed', flush: true);
-    final relativeDirectory = ['.capabilities'];
-    final remote = mutablePath([
-      ...relativeDirectory,
-      'conditional-$suffix.txt',
-    ]);
+    final relativeDirectory = ['sync', '.capabilities'];
+    final remote = rootPath([...relativeDirectory, 'conditional-$suffix.txt']);
     try {
-      await ensureMutableProtocolPath(relativeDirectory);
+      await ensureRootPath(relativeDirectory);
       await putFileConditionally(remote, seedFile, ifNoneMatch: true);
       await _expectPreconditionRejection(remote, 'If-None-Match', () async {
         await putFileConditionally(remote, replacementFile, ifNoneMatch: true);
@@ -381,14 +393,165 @@ class WebDavClient {
     }
   }
 
-  Future<bool> exists(Uri uri) async {
+  /// Reads UTF-8 text and binds the returned bytes to the strong validator
+  /// carried by the same GET response.
+  Future<WebDavVersionedText> getTextWithVersion(
+    Uri uri, {
+    String? expectedEtag,
+  }) async {
     try {
-      await _request('HEAD', uri);
-      return true;
+      final response = await _dio.get<List<int>>(
+        uri.toString(),
+        options: Options(
+          followRedirects: false,
+          validateStatus: (_) => true,
+          responseType: ResponseType.bytes,
+          headers: {
+            'Authorization': _authorization,
+            'Cache-Control': 'no-cache',
+            'If-Match': ?expectedEtag,
+          },
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      _rememberServerDate(response);
+      if (status < 200 || status >= 300) throw _statusFailure(status);
+      final etag = _requireResponseEtag(response, expectedEtag: expectedEtag);
+      final bytes = response.data ?? const <int>[];
+      return WebDavVersionedText(
+        text: utf8.decode(bytes),
+        etag: etag,
+        contentLength: bytes.length,
+        contentType: response.headers.value(Headers.contentTypeHeader),
+      );
+    } on FormatException {
+      throw WebDavSyncFailure(
+        WebDavSyncErrorCode.corruptRemoteData,
+        'The WebDAV object is not valid UTF-8 text.',
+      ).withRequest('GET', uri);
     } on WebDavSyncFailure catch (error) {
-      if (error.statusCode == 404) return false;
-      rethrow;
+      throw error.withRequest('GET', uri);
+    } on DioException catch (error) {
+      throw _dioFailure(error).withRequest('GET', uri);
     }
+  }
+
+  /// Streams a response into [destination]. The returned strong validator is
+  /// taken from that same GET response; no later HEAD is used as proof.
+  Future<WebDavConditionalWriteResult> downloadWithVersion(
+    Uri uri,
+    IOSink destination, {
+    String? expectedEtag,
+  }) async {
+    try {
+      final response = await _dio.get<ResponseBody>(
+        uri.toString(),
+        options: Options(
+          followRedirects: false,
+          validateStatus: (_) => true,
+          responseType: ResponseType.stream,
+          headers: {
+            'Authorization': _authorization,
+            'Cache-Control': 'no-cache',
+            'If-Match': ?expectedEtag,
+          },
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      _rememberServerDate(response);
+      final body = response.data;
+      if (status < 200 || status >= 300 || body == null) {
+        await body?.stream.listen(null).cancel();
+        throw _statusFailure(status);
+      }
+      final etag = _requireResponseEtag(response, expectedEtag: expectedEtag);
+      var received = 0;
+      await destination.addStream(
+        body.stream.map((chunk) {
+          received += chunk.length;
+          return chunk;
+        }),
+      );
+      await destination.flush();
+      final declaredLength = int.tryParse(
+        response.headers.value(Headers.contentLengthHeader) ?? '',
+      );
+      if (declaredLength != null && declaredLength != received) {
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.corruptRemoteData,
+          'The WebDAV response length did not match its body.',
+        );
+      }
+      return WebDavConditionalWriteResult(
+        etag: etag,
+        contentLength: received,
+        contentType: response.headers.value(Headers.contentTypeHeader),
+      );
+    } on WebDavSyncFailure catch (error) {
+      throw error.withRequest('GET', uri);
+    } on DioException catch (error) {
+      throw _dioFailure(error).withRequest('GET', uri);
+    }
+  }
+
+  Future<WebDavConditionalWriteResult> putStreamConditionally(
+    Uri uri,
+    Stream<List<int>> bytes, {
+    required int length,
+    required String contentType,
+    String? ifMatch,
+    bool ifNoneMatch = false,
+  }) async {
+    if ((ifMatch == null) == !ifNoneMatch) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.invalidConfiguration,
+        'A mutable WebDAV write requires exactly one version precondition.',
+      );
+    }
+    try {
+      final response = await _dio.request<void>(
+        uri.toString(),
+        data: bytes,
+        options: Options(
+          method: 'PUT',
+          followRedirects: false,
+          validateStatus: (_) => true,
+          headers: {
+            'Authorization': _authorization,
+            Headers.contentLengthHeader: length,
+            Headers.contentTypeHeader: contentType,
+            'If-Match': ?ifMatch,
+            if (ifNoneMatch) 'If-None-Match': '*',
+          },
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      _rememberServerDate(response);
+      if (status < 200 || status >= 300) throw _statusFailure(status);
+      var etag = response.headers.value('etag');
+      if (!_isStrongEtag(etag)) {
+        etag = (await resourceState(uri)).etag;
+      }
+      if (!_isStrongEtag(etag)) {
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.serverIncompatible,
+          'The WebDAV server did not provide a strong object validator.',
+        );
+      }
+      return WebDavConditionalWriteResult(
+        etag: etag!.trim(),
+        contentLength: length,
+        contentType: contentType,
+      );
+    } on WebDavSyncFailure catch (error) {
+      throw error.withRequest('PUT', uri);
+    } on DioException catch (error) {
+      throw _dioFailure(error).withRequest('PUT', uri);
+    }
+  }
+
+  Future<void> deleteConditionally(Uri uri, {required String ifMatch}) async {
+    await _request('DELETE', uri, headers: {'If-Match': ifMatch});
   }
 
   Future<void> putFile(
@@ -496,78 +659,54 @@ class WebDavClient {
     }
   }
 
-  Future<void> move(
-    Uri source,
-    Uri destination, {
-    bool overwrite = false,
-  }) async {
-    if (!_sameOrigin(destination, _origin)) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.serverIncompatible,
-        'WebDAV MOVE is restricted to the configured server origin.',
-      );
-    }
-    await _request(
-      'MOVE',
-      source,
-      headers: {
-        'Destination': destination.toString(),
-        'Overwrite': overwrite ? 'T' : 'F',
-      },
-    );
-  }
-
-  Future<void> putText(
-    Uri uri,
-    String content, {
-    bool immutable = false,
-  }) async {
-    try {
-      await _request(
-        'PUT',
-        uri,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          if (immutable) 'If-None-Match': '*',
-        },
-        data: content,
-      );
-    } on WebDavSyncFailure catch (error) {
-      if (!immutable || (error.statusCode != 409 && error.statusCode != 412)) {
-        rethrow;
-      }
-    }
-    if (immutable) {
-      final stored = await getText(uri);
-      if (stored != content) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.conflict,
-          'The server already contains different data at an immutable batch path.',
-        );
-      }
-    }
-  }
-
-  Future<List<Uri>> list(Uri collection, {int depth = 1}) async {
+  Future<List<WebDavListEntry>> listEntries(Uri collection) async {
     final response = await _request(
       'PROPFIND',
       collection,
-      headers: {'Depth': '$depth'},
-      data: _propfindBody,
+      headers: const {'Depth': '1'},
+      data: _resourcePropfindBody,
     );
-    final body = response.data ?? '';
-    final hrefPattern = RegExp(
-      r'<(?:[A-Za-z0-9_-]+:)?href[^>]*>(.*?)</(?:[A-Za-z0-9_-]+:)?href>',
-      caseSensitive: false,
-      dotAll: true,
-    );
-    final uris = <Uri>[];
-    for (final match in hrefPattern.allMatches(body)) {
-      final decoded = _decodeXml(match.group(1)!.trim());
-      final resolved = collection.resolve(decoded);
-      if (_sameOrigin(resolved, _origin)) uris.add(resolved);
+    final entries = <WebDavListEntry>[];
+    for (final responseXml in _xmlValues(response.data ?? '', 'response')) {
+      final hrefs = _xmlValues(responseXml, 'href').toList();
+      if (hrefs.length != 1) continue;
+      final uri = collection.resolve(_decodeXml(hrefs.single.trim()));
+      if (!_sameOrigin(uri, _origin) || uri == collection) continue;
+      String? etag;
+      int? length;
+      var isCollection = false;
+      for (final propstat in _xmlValues(responseXml, 'propstat')) {
+        final statuses = _xmlValues(propstat, 'status').toList();
+        if (statuses.length != 1 ||
+            !RegExp(
+              r'^HTTP/\S+ 200(?:\s|$)',
+            ).hasMatch(statuses.single.trim())) {
+          continue;
+        }
+        for (final prop in _xmlValues(propstat, 'prop')) {
+          isCollection = _xmlValues(prop, 'resourcetype').any(
+            (value) =>
+                RegExp(r'<(?:[A-Za-z0-9_-]+:)?collection\b').hasMatch(value),
+          );
+          for (final value in _xmlValues(prop, 'getetag')) {
+            final decoded = _decodeXml(value.trim());
+            if (_isStrongEtag(decoded)) etag = decoded;
+          }
+          for (final value in _xmlValues(prop, 'getcontentlength')) {
+            length = int.tryParse(value.trim());
+          }
+        }
+      }
+      entries.add(
+        WebDavListEntry(
+          uri: uri,
+          isCollection: isCollection,
+          etag: etag,
+          contentLength: length,
+        ),
+      );
     }
-    return uris;
+    return entries;
   }
 
   Future<Response<String>> _request(
@@ -635,6 +774,28 @@ class WebDavClient {
     }
   }
 
+  void _rememberServerDate(Response response) {
+    final dateHeader = response.headers.value('date');
+    if (dateHeader != null) lastServerDate = _parseHttpDate(dateHeader);
+  }
+
+  String _requireResponseEtag(Response response, {String? expectedEtag}) {
+    final etag = response.headers.value('etag')?.trim();
+    if (!_isStrongEtag(etag)) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.serverIncompatible,
+        'The WebDAV GET response did not include a strong ETag.',
+      );
+    }
+    if (expectedEtag != null && etag != expectedEtag) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'The WebDAV object version changed during the conditional read.',
+      );
+    }
+    return etag!;
+  }
+
   DateTime? _serverDate(Response response) {
     final value = response.headers.value('date');
     return value == null ? null : _parseHttpDate(value);
@@ -665,10 +826,40 @@ class WebDavConditionalWriteResult {
   const WebDavConditionalWriteResult({
     required this.etag,
     required this.contentLength,
+    this.contentType,
   });
 
   final String etag;
   final int contentLength;
+  final String? contentType;
+}
+
+class WebDavVersionedText {
+  const WebDavVersionedText({
+    required this.text,
+    required this.etag,
+    required this.contentLength,
+    this.contentType,
+  });
+
+  final String text;
+  final String etag;
+  final int contentLength;
+  final String? contentType;
+}
+
+class WebDavListEntry {
+  const WebDavListEntry({
+    required this.uri,
+    required this.isCollection,
+    this.etag,
+    this.contentLength,
+  });
+
+  final Uri uri;
+  final bool isCollection;
+  final String? etag;
+  final int? contentLength;
 }
 
 const _propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>

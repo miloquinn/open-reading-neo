@@ -235,6 +235,41 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
     );
   }
 
+  /// Synchronizes the current maintenance session with the latest registry
+  /// contents after a batch edit.
+  ///
+  /// Sources deleted from the registry are removed from both completed
+  /// results and pending work. Existing sources keep their diagnosis while
+  /// receiving current local fields such as [RegisteredBookSource.enabled].
+  void reconcileSources(Iterable<RegisteredBookSource> currentSources) {
+    if (_state.isRunning || _state.result == null) return;
+    final currentById = {
+      for (final source in currentSources)
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
+          source.id: source,
+    };
+    for (final id in _sourceUniverse.keys.toList(growable: false)) {
+      final source = currentById[id];
+      if (source == null) {
+        _sourceUniverse.remove(id);
+        _assessments.remove(id);
+        _remainingIds.remove(id);
+        _reviewedSourceIds.remove(id);
+        continue;
+      }
+      _sourceUniverse[id] = source;
+      final previous = _assessments[id];
+      if (previous != null) {
+        _assessments[id] = bookSourceMaintenanceAssessment(
+          source,
+          error: previous.error,
+        );
+      }
+    }
+    _total = _sourceUniverse.length;
+    _emitCurrentSnapshot();
+  }
+
   Future<void> _launch(List<RegisteredBookSource> targets) {
     final future = _run(targets);
     _activeRun = future;
@@ -493,7 +528,10 @@ class BookSourceMaintenanceCoordinator extends ChangeNotifier {
         status: _state.status,
         runId: runId,
         progress: progress,
-        result: _state.result,
+        // Item callbacks update the mutable maps immediately. Rebuild their
+        // immutable view only on the already-throttled progress boundary,
+        // keeping partial results visible without an O(n) copy per source.
+        result: _currentResult(),
       ),
     );
   }

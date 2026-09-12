@@ -5,6 +5,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book_note.dart';
 import 'package:xxread/models/bookmark.dart';
 import 'package:xxread/utils/reader_themes.dart';
+import 'package:xxread/widgets/app_menu.dart';
 import 'package:xxread/widgets/reader_navigation_sheet.dart';
 
 void main() {
@@ -81,7 +82,7 @@ void main() {
     expect(find.textContaining('原位置已失效'), findsOneWidget);
     await tester.tap(find.text('仍然保留的书签摘录'));
     expect(bookmarkSelections, 0);
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(AppPopupMenuButton<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('复制'));
     await tester.pumpAndSettle();
@@ -93,7 +94,7 @@ void main() {
     expect(find.textContaining('原位置已失效'), findsOneWidget);
     await tester.tap(find.text('仍然保留的笔记摘录'));
     expect(annotationSelections, 0);
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(AppPopupMenuButton<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('复制'));
     await tester.pumpAndSettle();

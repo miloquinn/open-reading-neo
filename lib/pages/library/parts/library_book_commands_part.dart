@@ -7,10 +7,13 @@ extension _LibraryPageBookCommands on _LibraryPageState {
   Future<void> _downloadOnlineBook(Book book) async {
     final source = _sourceShelfService.sourceFrom(book);
     final sourceBook = _sourceShelfService.sourceBookFrom(book);
+    final uid = await stableBookUid(book);
+    if (!mounted) return;
     final taskId = context.read<DownloadTaskController>().enqueueBookDownload(
       source: source,
       book: sourceBook,
       shelfService: _sourceShelfService,
+      bookUid: uid,
     );
     await showDialog<void>(
       context: context,
@@ -21,9 +24,26 @@ extension _LibraryPageBookCommands on _LibraryPageState {
     showSideToast(context, context.l10n.downloadRunningInBackground);
   }
 
+  Future<void> _openSourceUpdates(Book book) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => SourceBookUpdatesPage(book: book)),
+    );
+    if (mounted) await _loadBooks();
+  }
+
   Future<void> _changeOnlineBookSource(Book book) async {
-    final source = _sourceShelfService.sourceFrom(book);
-    final sourceBook = _sourceShelfService.sourceBookFrom(book);
+    final source = book.hasSourceBinding
+        ? _sourceShelfService.sourceFrom(book)
+        : null;
+    final sourceBook = book.hasSourceBinding
+        ? _sourceShelfService.sourceBookFrom(book)
+        : BookSourceBook(
+            id: 'local:${book.id}',
+            title: book.title,
+            author: book.author,
+            description: '',
+            categories: const [],
+          );
     final result = await Navigator.of(context).push<BookSourceChangeResult>(
       MaterialPageRoute(
         builder: (_) => BookSourceChangePage(

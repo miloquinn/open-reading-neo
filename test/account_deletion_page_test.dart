@@ -10,8 +10,11 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/account/account_page.dart';
 import 'package:xxread/services/account/account.dart';
 
-Future<void> _openDeletionFlow(WidgetTester tester, _DeletionAdapter adapter,
-    _DeletionTokenStore tokenStore) async {
+Future<MemberAccountController> _openDeletionFlow(
+  WidgetTester tester,
+  _DeletionAdapter adapter,
+  _DeletionTokenStore tokenStore,
+) async {
   tester.view.physicalSize = const Size(390, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -52,6 +55,7 @@ Future<void> _openDeletionFlow(WidgetTester tester, _DeletionAdapter adapter,
   );
   await tester.tap(find.byKey(const ValueKey('account-delete-entry')));
   await tester.pumpAndSettle();
+  return controller;
 }
 
 /// Deleting spans a request, a token wipe, a cache wipe and a dialog. Pump a few
@@ -163,12 +167,114 @@ void main() {
       'acknowledged': true,
     });
     expect(find.byKey(const ValueKey('account-delete-done')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('account-delete-apple-manual-revocation')),
+      findsNothing,
+    );
     expect(tokenStore.accessToken, isNull);
 
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     // Every account screen read a member that no longer exists.
     expect(find.byKey(const ValueKey('account-delete-submit')), findsNothing);
+  });
+
+  testWidgets(
+    'remote deletion remains successful when secure token cleanup fails',
+    (tester) async {
+      final adapter = _DeletionAdapter();
+      final tokenStore = _DeletionTokenStore(failClear: true);
+      final controller = await _openDeletionFlow(tester, adapter, tokenStore);
+      await _acceptTermsAndSendCode(tester);
+
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '123456');
+      await tester.enterText(fields.at(1), 'reader@example.com');
+      await tester.tap(find.byKey(const ValueKey('account-delete-submit')));
+      await _settleRequest(tester);
+
+      expect(adapter.deletions, hasLength(1));
+      expect(controller.isAuthenticated, isFalse);
+      expect(find.byKey(const ValueKey('account-delete-done')), findsOneWidget);
+      expect(controller.error, contains('本地登录信息清理失败'));
+      expect(tokenStore.accessToken, 'access-token');
+
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('本地登录信息清理失败'), findsOneWidget);
+    },
+  );
+
+  testWidgets('failed remote deletion preserves the signed-in session', (
+    tester,
+  ) async {
+    final adapter = _DeletionAdapter(deletionStatus: 400);
+    final tokenStore = _DeletionTokenStore();
+    final controller = await _openDeletionFlow(tester, adapter, tokenStore);
+    await _acceptTermsAndSendCode(tester);
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), '000000');
+    await tester.enterText(fields.at(1), 'reader@example.com');
+    await tester.tap(find.byKey(const ValueKey('account-delete-submit')));
+    await _settleRequest(tester);
+
+    expect(adapter.deletions, hasLength(1));
+    expect(controller.isAuthenticated, isTrue);
+    expect(tokenStore.accessToken, 'access-token');
+    expect(find.byKey(const ValueKey('account-delete-done')), findsNothing);
+    expect(find.byKey(const ValueKey('account-delete-submit')), findsOneWidget);
+  });
+
+  testWidgets('legacy Apple deletion asks for Apple sign-in before retry', (
+    tester,
+  ) async {
+    final adapter = _DeletionAdapter(
+      deletionStatus: 409,
+      deletionErrorCode: 'appleReauthenticationRequired',
+    );
+    final controller = await _openDeletionFlow(
+      tester,
+      adapter,
+      _DeletionTokenStore(),
+    );
+    await _acceptTermsAndSendCode(tester);
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), '123456');
+    await tester.enterText(fields.at(1), 'reader@example.com');
+    await tester.tap(find.byKey(const ValueKey('account-delete-submit')));
+    await _settleRequest(tester);
+
+    expect(controller.isAuthenticated, isTrue);
+    expect(find.textContaining('重新使用 Apple 登录'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-delete-done')), findsNothing);
+  });
+
+  testWidgets('legacy Apple deletion shows manual authorization removal', (
+    tester,
+  ) async {
+    final adapter = _DeletionAdapter(appleManualRevocationRequired: true);
+    final controller = await _openDeletionFlow(
+      tester,
+      adapter,
+      _DeletionTokenStore(),
+    );
+    await _acceptTermsAndSendCode(tester);
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), '123456');
+    await tester.enterText(fields.at(1), 'reader@example.com');
+    await tester.tap(find.byKey(const ValueKey('account-delete-submit')));
+    await _settleRequest(tester);
+
+    expect(controller.isAuthenticated, isFalse);
+    expect(find.byKey(const ValueKey('account-delete-done')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('account-delete-apple-manual-revocation')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('停止使用 Apple 登录'), findsOneWidget);
   });
 
   testWidgets('an admin owner is told to hand over ownership instead', (
@@ -209,12 +315,18 @@ class _DeletionAdapter implements HttpClientAdapter {
     this.premium = false,
     this.applePurchase = false,
     this.mfaRequired = false,
+    this.deletionStatus = 200,
+    this.deletionErrorCode,
+    this.appleManualRevocationRequired = false,
   });
 
   final bool deletable;
   final bool premium;
   final bool applePurchase;
   final bool mfaRequired;
+  final int deletionStatus;
+  final String? deletionErrorCode;
+  final bool appleManualRevocationRequired;
   final List<Map<String, dynamic>> deletions = [];
 
   @override
@@ -292,13 +404,24 @@ class _DeletionAdapter implements HttpClientAdapter {
       },
       '/api/v1/auth/security/deletion' => () {
         deletions.add(Map<String, dynamic>.from(options.data as Map));
-        return {'deleted': true, 'premium_removed': premium};
+        return deletionErrorCode == null
+            ? {
+                'deleted': true,
+                'premium_removed': premium,
+                'apple_manual_revocation_required':
+                    appleManualRevocationRequired,
+              }
+            : {
+                'detail': {'code': deletionErrorCode},
+              };
       }(),
       _ => throw StateError('Unexpected route ${options.uri.path}'),
     };
     return ResponseBody.fromString(
       jsonEncode(body),
-      200,
+      options.uri.path == '/api/v1/auth/security/deletion'
+          ? deletionStatus
+          : 200,
       headers: {
         Headers.contentTypeHeader: ['application/json'],
       },
@@ -307,11 +430,15 @@ class _DeletionAdapter implements HttpClientAdapter {
 }
 
 class _DeletionTokenStore implements MemberTokenStore {
+  _DeletionTokenStore({this.failClear = false});
+
+  final bool failClear;
   String? accessToken = 'access-token';
   String? refreshToken = 'refresh-token';
 
   @override
   Future<void> clear() async {
+    if (failClear) throw StateError('secure storage unavailable');
     accessToken = null;
     refreshToken = null;
   }

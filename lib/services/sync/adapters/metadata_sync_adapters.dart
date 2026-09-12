@@ -8,6 +8,7 @@ import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_reading_progress.dart';
 import '../../../book_sources/services/book_source_registry.dart';
 import '../../../core/reader/paged_image_reader_settings.dart';
+import '../../../models/book.dart';
 import '../../../core/reader/reader_auto_page_turn_controller.dart';
 import '../../../core/reader/reader_custom_theme.dart';
 import '../../../core/reader/reader_layout.dart';
@@ -342,6 +343,10 @@ class BooksSyncAdapter extends _BaseAdapter {
   Future<void> scan(HybridLogicalClock clock) async {
     final db = await database();
     final rows = await db.query('books');
+    final contentBindingTable = await db.rawQuery(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+      "AND name = 'book_content_bindings'",
+    );
     final seen = <String>{};
     for (final row in rows) {
       if (_rowHasPrivateSourceIdentity(row)) continue;
@@ -354,6 +359,15 @@ class BooksSyncAdapter extends _BaseAdapter {
         limit: 1,
       );
       final file = fileRows.isEmpty ? null : fileRows.first;
+      final contentRows = contentBindingTable.isEmpty
+          ? const <Map<String, Object?>>[]
+          : await db.query(
+              'book_content_bindings',
+              where: 'book_uid = ?',
+              whereArgs: [uid],
+              limit: 1,
+            );
+      final contentBinding = contentRows.isEmpty ? null : contentRows.first;
       final sourceSnapshot = _publicBookSourceSnapshot(row['source_json']);
       final sourceBookSnapshot = _publicSourceBookSnapshot(
         row['source_book_json'],
@@ -368,7 +382,7 @@ class BooksSyncAdapter extends _BaseAdapter {
         'storage_type': row['storage_type'],
         'source_id': row['source_id'],
         'source_book_id': row['source_book_id'],
-        ...bookFileSyncPayload(file),
+        ...bookFileSyncPayload(file, contentBinding: contentBinding),
       };
       if (sourceSnapshot != null) payload['source_json'] = sourceSnapshot;
       if (sourceBookSnapshot != null) {
@@ -442,15 +456,14 @@ class BooksSyncAdapter extends _BaseAdapter {
     final sourceBookId = _nonEmptyString(payload['source_book_id']);
     final sourceJson = _nonEmptyString(payload['source_json']);
     final sourceBookJson = _nonEmptyString(payload['source_book_json']);
-    final restorableOnline =
-        payload['storage_type'] == 'online' &&
+    final restorableBinding =
         sourceId != null &&
         sourceBookId != null &&
         sourceJson != null &&
         sourceBookJson != null;
     if (id == null) {
-      if (!restorableOnline) return false;
-      await txn.insert('books', {
+      if (!restorableBinding) return false;
+      final insertedId = await txn.insert('books', {
         'title': _nonEmptyString(payload['title']) ?? 'Untitled',
         'author': payload['author'] as String? ?? '',
         'filePath': '',
@@ -466,6 +479,8 @@ class BooksSyncAdapter extends _BaseAdapter {
         'source_json': sourceJson,
         'source_book_json': sourceBookJson,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      if (insertedId <= 0) return false;
+      await freezeBookUid(txn, insertedId, operation.entityKey);
       return true;
     }
     final rows = await txn.query(
@@ -476,17 +491,16 @@ class BooksSyncAdapter extends _BaseAdapter {
       limit: 1,
     );
     if (rows.isEmpty) return false;
+    await freezeBookUid(txn, id, operation.entityKey);
     final values = <String, Object?>{
       'title': payload['title'],
       'author': payload['author'],
+      'source_id': sourceId,
+      'source_book_id': sourceBookId,
+      'source_json': sourceJson,
+      'source_book_json': sourceBookJson,
     };
-    if (restorableOnline) {
-      values.addAll({
-        'source_id': sourceId,
-        'source_book_id': sourceBookId,
-        'source_json': sourceJson,
-        'source_book_json': sourceBookJson,
-      });
+    if (restorableBinding) {
       if (rows.first['storage_type'] == 'online') {
         values.addAll({
           'filePath': '',
@@ -500,8 +514,20 @@ class BooksSyncAdapter extends _BaseAdapter {
   }
 }
 
-Map<String, Object?> bookFileSyncPayload(Map<String, Object?>? file) {
-  if (file == null) return const {};
+Map<String, Object?> bookFileSyncPayload(
+  Map<String, Object?>? file, {
+  Map<String, Object?>? contentBinding,
+}) {
+  if (file == null ||
+      contentBinding == null ||
+      contentBinding['status'] != 'synced' ||
+      contentBinding['remote_version'] == null ||
+      contentBinding['head_version'] == null ||
+      contentBinding['local_hash'] != contentBinding['base_hash'] ||
+      file['blob_sha256'] != contentBinding['base_hash'] ||
+      file['remote_path'] != contentBinding['current_path']) {
+    return const {};
+  }
   return {
     'file_available': true,
     'file_size': file['file_size'],
@@ -2066,7 +2092,7 @@ class ReplaceRulesSyncAdapter implements MetadataSyncAdapter {
 }
 
 Future<String> bookUidForMap(Map<String, Object?> row) async {
-  return initialBookUidForMap(row);
+  return stableBookUid(Book.fromMap(row.cast<String, dynamic>()));
 }
 
 bool _rowHasPrivateSourceIdentity(Map<String, Object?> row) {

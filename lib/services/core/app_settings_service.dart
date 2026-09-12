@@ -25,6 +25,9 @@ export 'advanced_feature_access.dart'
 enum LibraryLayoutMode { card, grid }
 
 class AppSettingsNotifier extends ChangeNotifier {
+  static const appTextScaleFactors = <double>[0.9, 1.0, 1.1, 1.2, 1.3];
+  static const defaultAppTextScaleLevel = 1;
+  static const _keyAppTextScaleLevel = 'app_text_scale_level_v1';
   static const Duration _onlineFontProgressInterval = Duration(
     milliseconds: 100,
   );
@@ -54,6 +57,7 @@ class AppSettingsNotifier extends ChangeNotifier {
 
   Locale? _locale;
   String _localeCode = 'system';
+  int _appTextScaleLevel = defaultAppTextScaleLevel;
   String _appFontId = FontCatalog.defaultAppFont.id;
   String _readerFontId = FontCatalog.defaultReaderFont.id;
   bool _hideNavigationLabels = true;
@@ -99,6 +103,8 @@ class AppSettingsNotifier extends ChangeNotifier {
 
   Locale? get locale => _locale;
   String get localeCode => _localeCode;
+  int get appTextScaleLevel => _appTextScaleLevel;
+  double get appTextScaleFactor => appTextScaleFactors[_appTextScaleLevel];
   String get appFontId => _appFontId;
   String get readerFontId => _readerFontId;
   bool get hideNavigationLabels => _hideNavigationLabels;
@@ -314,6 +320,13 @@ class AppSettingsNotifier extends ChangeNotifier {
     final storedLocale =
         prefs.getString(_keyAppLocale) ?? prefs.getString(_keyLegacyLocale);
     _applyLocaleCode(storedLocale ?? 'system', notify: false);
+    final storedTextScaleLevel = prefs.get(_keyAppTextScaleLevel);
+    _appTextScaleLevel =
+        storedTextScaleLevel is int &&
+            storedTextScaleLevel >= 0 &&
+            storedTextScaleLevel < appTextScaleFactors.length
+        ? storedTextScaleLevel
+        : defaultAppTextScaleLevel;
     final storedAppFontId = prefs.getString(_keyAppFontId);
     if (storedAppFontId != null) {
       _appFontId = FontCatalog.appFontForId(
@@ -461,6 +474,18 @@ class AppSettingsNotifier extends ChangeNotifier {
       return Locale(parts[0], parts[1]);
     }
     return Locale(parts[0]);
+  }
+
+  Future<void> setAppTextScaleLevel(int level) async {
+    if (level < 0 ||
+        level >= appTextScaleFactors.length ||
+        level == _appTextScaleLevel) {
+      return;
+    }
+    _appTextScaleLevel = level;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyAppTextScaleLevel, level);
   }
 
   Future<void> setLocaleCode(String code) async {

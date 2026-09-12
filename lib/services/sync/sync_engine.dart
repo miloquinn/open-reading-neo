@@ -1,118 +1,113 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 
 import 'adapters/metadata_sync_adapters.dart';
-import 'secure_sync_config.dart';
+import 'storage/sync_storage.dart';
 import 'sync_change_store.dart';
 import 'sync_clock.dart';
 import 'sync_dataset_catalog.dart';
 import 'sync_models.dart';
 import 'sync_protocol.dart';
-import 'webdav_client.dart';
-
-typedef WebDavClientFactory =
-    WebDavClient Function(StoredSyncCredentials credentials);
 
 class SyncEngine {
   SyncEngine({
-    required this._configStore,
+    required this.storage,
+    required this.scope,
     required SyncChangeStore changeStore,
     MetadataSyncAdapters? adapters,
-    WebDavClientFactory? clientFactory,
   }) : _changeStore = changeStore,
-       _adapters = adapters ?? MetadataSyncAdapters(store: changeStore),
-       _clientFactory = clientFactory ?? WebDavClient.standard;
+       _adapters = adapters ?? MetadataSyncAdapters(store: changeStore);
 
-  final SecureSyncConfigStore _configStore;
+  static final SyncPath _formatPath = SyncPath('format.json');
+  static final SyncPath _devicesPath = SyncPath('sync/metadata/devices');
+
+  final SyncStorage storage;
+  final WebDavSyncScope scope;
   final SyncChangeStore _changeStore;
   final MetadataSyncAdapters _adapters;
-  final WebDavClientFactory _clientFactory;
+  String _namespace = '';
+
+  String _stateKey(String name) => 'metadata:$_namespace:$name';
 
   Future<WebDavSyncRunResult> run({
     void Function(WebDavSyncPhase phase)? onPhase,
   }) async {
-    final credentials = await _configStore.readCredentials();
-    if (credentials == null) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.authentication,
-        'WebDAV is not configured or its secure password is unavailable.',
+    if (!storage.capabilities.strongVersions) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.unsupported,
+        'This storage provider cannot safely perform bidirectional sync.',
       );
     }
-    final scope = await _configStore.readScope();
+    onPhase?.call(WebDavSyncPhase.connecting);
+    final spaceId = await _ensureSpace();
+    _namespace = sha256
+        .convert(utf8.encode('${storage.spaceKey}\u0000$spaceId'))
+        .toString();
+    await _prepareSpaceState();
+    _checkClockSkew(storage.serverDate);
+
     final deviceId = await _deviceId();
     final clock = HybridLogicalClock(deviceId: deviceId);
     final latestLocalTimestamp = await _changeStore.latestTimestamp();
     if (latestLocalTimestamp != null) clock.observe(latestLocalTimestamp);
-    final client = _clientFactory(credentials);
-
-    onPhase?.call(WebDavSyncPhase.connecting);
-    await client.ensureProtocolCollections(deviceId);
-    _checkClockSkew(client.lastServerDate);
-    await _ensureSpace(client);
 
     onPhase?.call(WebDavSyncPhase.scanningLocal);
     await _adapters.scan(scope, clock);
-
     onPhase?.call(WebDavSyncPhase.readingRemote);
     var downloaded = 0;
     var conflicts = 0;
-    final deviceUris = await client.list(client.path(const ['devices']));
     final remoteDeviceIds = <String>{};
-    for (final uri in deviceUris) {
-      final segments = uri.pathSegments
-          .where((part) => part.isNotEmpty)
-          .toList();
-      final devicesIndex = segments.lastIndexOf('devices');
-      if (devicesIndex < 0 || devicesIndex + 1 >= segments.length) continue;
-      final remoteDeviceId = Uri.decodeComponent(segments[devicesIndex + 1]);
-      if (remoteDeviceId == deviceId) continue;
-      remoteDeviceIds.add(remoteDeviceId);
+    for (final prefix in (await _listOrEmpty(_devicesPath)).prefixes) {
+      final parts = prefix.value.split('/');
+      if (parts.length == 4 &&
+          parts[0] == 'sync' &&
+          parts[1] == 'metadata' &&
+          parts[2] == 'devices' &&
+          parts[3] != deviceId) {
+        remoteDeviceIds.add(parts[3]);
+      }
     }
     for (final remoteDeviceId in remoteDeviceIds) {
-      final rawHead = await client.getText(
-        client.path(['devices', remoteDeviceId, 'head.json']),
-        allowNotFound: true,
-      );
-      if (rawHead == null) continue;
+      final headRead = await _readOptional(_headPath(remoteDeviceId));
+      if (headRead == null) continue;
       late final RemoteDeviceHead head;
       try {
-        head = RemoteDeviceHead.decode(rawHead);
+        head = RemoteDeviceHead.decode(headRead.text);
       } catch (_) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.corruptRemoteData,
+        throw const SyncStorageException(
+          SyncStorageErrorCode.invalidData,
           'A remote device head is invalid.',
         );
       }
       if (head.deviceId != remoteDeviceId) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.corruptRemoteData,
+        throw const SyncStorageException(
+          SyncStorageErrorCode.invalidData,
           'A remote device head does not match its directory.',
         );
       }
-      var cursor = await _changeStore.cursorFor(remoteDeviceId);
+      var cursor = await _changeStore.cursorFor(
+        remoteDeviceId,
+        namespace: _namespace,
+      );
       while (cursor < head.latestSequence) {
         final sequence = cursor + 1;
-        final rawBatch = await client.getText(
-          client.path([
-            'devices',
-            remoteDeviceId,
-            'changes',
-            '${sequence.toString().padLeft(12, '0')}.json',
-          ]),
+        final batchRead = await storage.readText(
+          _batchPath(remoteDeviceId, sequence),
         );
         late final SyncBatch batch;
         try {
-          batch = SyncBatch.decode(rawBatch!);
+          batch = SyncBatch.decode(batchRead.text);
         } catch (_) {
-          throw const WebDavSyncFailure(
-            WebDavSyncErrorCode.corruptRemoteData,
+          throw const SyncStorageException(
+            SyncStorageErrorCode.invalidData,
             'A remote metadata batch is missing or invalid.',
           );
         }
         if (batch.deviceId != remoteDeviceId || batch.sequence != sequence) {
-          throw const WebDavSyncFailure(
-            WebDavSyncErrorCode.corruptRemoteData,
+          throw const SyncStorageException(
+            SyncStorageErrorCode.invalidData,
             'A remote metadata batch has an invalid identity.',
           );
         }
@@ -122,6 +117,7 @@ class SyncEngine {
         onPhase?.call(WebDavSyncPhase.applyingRemote);
         final applied = await _changeStore.applyRemoteBatch(
           batch,
+          cursorNamespace: _namespace,
           validateWinner: _adapters.validate,
           normalizeWinner: _adapters.normalizeRemoteWinner,
           cleanupWinnerAliases: _adapters.cleanupRemoteWinnerAliases,
@@ -134,15 +130,12 @@ class SyncEngine {
       }
     }
 
-    // Reconciliation after applying remote changes avoids turning those writes
-    // back into local changes, while preserving locally newer winners as dirty.
     onPhase?.call(WebDavSyncPhase.scanningLocal);
     await _adapters.scan(scope, clock);
-
     onPhase?.call(WebDavSyncPhase.uploadingLocal);
     var uploaded = 0;
     while (true) {
-      final published = await _publish(client, deviceId, clock, scope);
+      final published = await _publish(deviceId, clock);
       if (published == 0) break;
       uploaded += published;
     }
@@ -156,62 +149,65 @@ class SyncEngine {
     );
   }
 
-  Future<void> _ensureSpace(WebDavClient client) async {
-    final uri = client.path(const ['space.json']);
-    final existing = await client.getText(uri, allowNotFound: true);
-    if (existing == null) {
-      try {
-        await client.putText(
-          uri,
-          jsonEncode({
-            'protocol': 'open-reading-webdav',
-            'schema_version': 1,
-            'space_id': const Uuid().v4(),
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-            'encoding': 'json',
-            'encryption': 'none',
-          }),
-          immutable: true,
-        );
-      } on WebDavSyncFailure catch (error) {
-        if (error.code != WebDavSyncErrorCode.conflict) rethrow;
-        final concurrentlyCreated = await client.getText(uri);
-        _validateSpace(concurrentlyCreated!);
-      }
-      return;
-    }
-    _validateSpace(existing);
+  Future<void> _prepareSpaceState() async {
+    final active = await _changeStore.getState('active_metadata_space');
+    if (active == _namespace) return;
+    await _changeStore.resetRemoteMirrorForNewSpace();
+    await _changeStore.setState('active_metadata_space', _namespace);
   }
 
-  void _validateSpace(String existing) {
+  Future<String> _ensureSpace() async {
+    final existing = await _readOptional(_formatPath);
+    if (existing != null) {
+      return _validateSpace(existing.text);
+    }
+    final content = jsonEncode({
+      'protocol': 'open-reading-sync',
+      'schema_version': 1,
+      'space_id': const Uuid().v4(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'metadata_encoding': 'json',
+      'content_encryption': 'none',
+    });
+    try {
+      await _createText(_formatPath, content);
+      return _validateSpace(content);
+    } on SyncStorageException catch (error) {
+      if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
+      return _validateSpace((await storage.readText(_formatPath)).text);
+    }
+  }
+
+  String _validateSpace(String existing) {
     try {
       final json = (jsonDecode(existing) as Map).cast<String, dynamic>();
-      if (json['protocol'] != 'open-reading-webdav' ||
+      if (json['protocol'] != 'open-reading-sync' ||
           json['schema_version'] != 1 ||
-          json['encoding'] != 'json') {
+          json['metadata_encoding'] != 'json' ||
+          json['content_encryption'] != 'none') {
         throw const FormatException();
       }
+      final spaceId = json['space_id'];
+      if (spaceId is! String || spaceId.isEmpty) throw const FormatException();
+      return spaceId;
     } catch (_) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.serverIncompatible,
-        'This remote folder contains an unsupported Open Reading sync space.',
+      throw const SyncStorageException(
+        SyncStorageErrorCode.unsupported,
+        'This folder contains an unsupported Open Reading sync space.',
       );
     }
   }
 
-  Future<int> _publish(
-    WebDavClient client,
-    String deviceId,
-    HybridLogicalClock clock,
-    WebDavSyncScope scope,
-  ) async {
+  Future<int> _publish(String deviceId, HybridLogicalClock clock) async {
     final enabledDatasets = SyncDatasetCatalog.enabledRemoteNames(scope);
-    final pendingRaw = await _changeStore.getState('pending_batch');
+    final pendingKey = _stateKey('pending_batch');
+    final sequenceKey = _stateKey('local_sequence');
+    final pendingRaw = await _changeStore.getState(pendingKey);
     SyncBatch? batch;
     List<SyncRecord> records = const [];
     if (pendingRaw != null && pendingRaw.isNotEmpty) {
       batch = SyncBatch.decode(pendingRaw);
-      final containsUnauthorizedData = batch.operations.any(
+      final unauthorized = batch.operations.any(
         (operation) => !SyncDatasetCatalog.isRecordPublishable(
           dataset: operation.dataset,
           recordId: operation.recordId,
@@ -220,28 +216,20 @@ class SyncEngine {
           scope: scope,
         ),
       );
-      if (containsUnauthorizedData) {
-        final sequenceName =
-            '${batch.sequence.toString().padLeft(12, '0')}.json';
-        final uploaded = await client.getText(
-          client.path(['devices', deviceId, 'changes', sequenceName]),
-          allowNotFound: true,
+      if (unauthorized) {
+        final uploaded = await _readOptional(
+          _batchPath(deviceId, batch.sequence),
         );
         if (uploaded == null) {
-          // The batch was only staged locally. Rebuild it from the scope that
-          // is authorized now instead of uploading disabled sensitive data.
-          await _changeStore.setState('pending_batch', '');
-          return _publish(client, deviceId, clock, scope);
+          await _changeStore.setState(pendingKey, '');
+          return _publish(deviceId, clock);
         }
-        final uploadedBatch = SyncBatch.decode(uploaded);
-        if (uploadedBatch.sha256 != batch.sha256) {
-          throw const WebDavSyncFailure(
-            WebDavSyncErrorCode.conflict,
-            'The pending metadata batch conflicts with the remote device log.',
+        if (SyncBatch.decode(uploaded.text).sha256 != batch.sha256) {
+          throw const SyncStorageException(
+            SyncStorageErrorCode.versionConflict,
+            'The pending batch conflicts with the remote device log.',
           );
         }
-        // The immutable batch already exists remotely. Completing its head is
-        // recovery of an authorized earlier upload, not a new disclosure.
       }
       final dirty = await _changeStore.dirtyRecords();
       final ids = batch.operations
@@ -271,17 +259,18 @@ class SyncEngine {
           .toList(growable: false);
       if (dirty.isEmpty) return 0;
       final sequence =
-          int.tryParse(await _changeStore.getState('local_sequence') ?? '') ??
-          0;
+          int.tryParse(await _changeStore.getState(sequenceKey) ?? '') ?? 0;
       final selected = <SyncRecord>[];
       for (final record in dirty) {
-        final candidate = [...selected, record];
         try {
           SyncBatch.create(
             deviceId: deviceId,
             sequence: sequence + 1,
             createdHlc: clock.tick().toString(),
-            operations: candidate.map((item) => item.toOperation()).toList(),
+            operations: [
+              ...selected,
+              record,
+            ].map((item) => item.toOperation()).toList(),
           );
           selected.add(record);
         } on ArgumentError {
@@ -289,9 +278,9 @@ class SyncEngine {
         }
       }
       if (selected.isEmpty) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.invalidConfiguration,
-          'A local metadata record exceeds the 1 MiB sync batch limit.',
+        throw const SyncStorageException(
+          SyncStorageErrorCode.invalidData,
+          'A metadata record exceeds the 1 MiB batch limit.',
         );
       }
       records = selected;
@@ -301,45 +290,120 @@ class SyncEngine {
         createdHlc: clock.tick().toString(),
         operations: selected.map((item) => item.toOperation()).toList(),
       );
-      await _changeStore.setState('pending_batch', batch.encode());
+      await _changeStore.setState(pendingKey, batch.encode());
     }
 
-    final sequenceName = '${batch.sequence.toString().padLeft(12, '0')}.json';
-    await client.putText(
-      client.path(['devices', deviceId, 'changes', sequenceName]),
+    await _createImmutableText(
+      _batchPath(deviceId, batch.sequence),
       batch.encode(),
-      immutable: true,
     );
-    await client.putText(
-      client.path(['devices', deviceId, 'head.json']),
-      RemoteDeviceHead(
-        deviceId: deviceId,
-        latestSequence: batch.sequence,
-        latestHlc: batch.createdHlc,
-        updatedAt: DateTime.now().toUtc(),
-      ).encode(),
-    );
+    final head = RemoteDeviceHead(
+      deviceId: deviceId,
+      latestSequence: batch.sequence,
+      latestHlc: batch.createdHlc,
+      updatedAt: DateTime.now().toUtc(),
+    ).encode();
+    await _writeMutableText(_headPath(deviceId), head);
     await _changeStore.markUploaded(records);
-    await _changeStore.setState('local_sequence', '${batch.sequence}');
-    await _changeStore.setState('pending_batch', '');
+    await _changeStore.setState(sequenceKey, '${batch.sequence}');
+    await _changeStore.setState(pendingKey, '');
     return records.length;
   }
 
+  Future<void> _createImmutableText(SyncPath path, String content) async {
+    try {
+      await _createText(path, content);
+    } on SyncStorageException catch (error) {
+      if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
+      if ((await storage.readText(path)).text != content) {
+        throw const SyncStorageException(
+          SyncStorageErrorCode.versionConflict,
+          'An immutable metadata object contains different data.',
+        );
+      }
+    }
+  }
+
+  Future<void> _writeMutableText(SyncPath path, String content) async {
+    final bytes = utf8.encode(content);
+    final current = await storage.stat(path);
+    try {
+      if (current == null) {
+        await storage.create(
+          path,
+          Stream.value(bytes),
+          length: bytes.length,
+          contentType: 'application/json; charset=utf-8',
+        );
+      } else {
+        await storage.compareAndSwap(
+          path,
+          Stream.value(bytes),
+          length: bytes.length,
+          contentType: 'application/json; charset=utf-8',
+          expectedVersion: current.version,
+        );
+      }
+    } on SyncStorageException catch (error) {
+      if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
+      if ((await storage.readText(path)).text != content) rethrow;
+    }
+  }
+
+  Future<void> _createText(SyncPath path, String content) async {
+    final bytes = utf8.encode(content);
+    await storage.create(
+      path,
+      Stream.value(bytes),
+      length: bytes.length,
+      contentType: 'application/json; charset=utf-8',
+    );
+  }
+
+  Future<SyncTextRead?> _readOptional(SyncPath path) async {
+    try {
+      return await storage.readText(path);
+    } on SyncStorageException catch (error) {
+      if (error.code == SyncStorageErrorCode.notFound) return null;
+      rethrow;
+    }
+  }
+
+  Future<SyncListing> _listOrEmpty(SyncPath path) async {
+    try {
+      return await storage.list(path);
+    } on SyncStorageException catch (error) {
+      if (error.code == SyncStorageErrorCode.notFound) {
+        return const SyncListing(objects: [], prefixes: []);
+      }
+      rethrow;
+    }
+  }
+
+  SyncPath _headPath(String deviceId) =>
+      _devicesPath.child(deviceId).child('head.json');
+
+  SyncPath _batchPath(String deviceId, int sequence) => _devicesPath
+      .child(deviceId)
+      .child('changes')
+      .child('${sequence.toString().padLeft(12, '0')}.json');
+
   Future<String> _deviceId() async {
-    final existing = await _changeStore.getState('device_id');
+    final key = _stateKey('device_id');
+    final existing = await _changeStore.getState(key);
     if (existing != null && existing.isNotEmpty) return existing;
     final created = const Uuid().v4();
-    await _changeStore.setState('device_id', created);
+    await _changeStore.setState(key, created);
     return created;
   }
 
   void _checkClockSkew(DateTime? serverDate) {
     if (serverDate == null) return;
-    final skew = DateTime.now().toUtc().difference(serverDate).abs();
-    if (skew > const Duration(hours: 24)) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.clockSkew,
-        'The device clock differs from the WebDAV server by more than 24 hours.',
+    if (DateTime.now().toUtc().difference(serverDate).abs() >
+        const Duration(hours: 24)) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.invalidData,
+        'The device clock differs from storage by more than 24 hours.',
       );
     }
   }

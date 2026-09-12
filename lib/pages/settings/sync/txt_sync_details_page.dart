@@ -6,13 +6,12 @@ import 'package:provider/provider.dart';
 
 import '../../../models/book.dart';
 import '../../../services/books/book_dao.dart';
-import '../../../services/sync/mutable_txt_sync_service.dart';
+import '../../../services/sync/book_content_sync_service.dart';
 import '../../../services/sync/webdav_sync_controller.dart';
 import '../../../utils/localization_extension.dart';
 import '../../../widgets/floating_subpage_scaffold.dart';
 import '../../../widgets/side_toast.dart';
 import 'book_file_sync_page.dart';
-import 'txt_sync_storage_mode_control.dart';
 
 class TxtSyncDetailsPage extends StatefulWidget {
   const TxtSyncDetailsPage({super.key});
@@ -22,7 +21,7 @@ class TxtSyncDetailsPage extends StatefulWidget {
 }
 
 class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
-  List<MutableTxtBookState> _states = const [];
+  List<BookContentState> _states = const [];
   Map<int, Book> _books = const {};
   bool _loading = true;
   bool _busy = false;
@@ -79,9 +78,9 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
     }
   }
 
-  Future<void> _compare(MutableTxtBookState state) async {
+  Future<void> _compare(BookContentState state) async {
     final sync = context.read<WebDavSyncController>();
-    final conflicts = await sync.mutableTxtService.listConflicts(
+    final conflicts = await sync.contentSyncService.listConflicts(
       bookUid: state.bookUid,
     );
     if (!mounted || conflicts.isEmpty) return;
@@ -91,7 +90,7 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
       conflict.remoteSnapshotPath,
     );
     if (!mounted) return;
-    final choice = await showDialog<MutableTxtConflictChoice>(
+    final choice = await showDialog<BookContentConflictChoice>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(context.l10n.cloudSyncCompare),
@@ -130,19 +129,19 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
           ),
           TextButton(
             onPressed: () =>
-                Navigator.pop(context, MutableTxtConflictChoice.useRemote),
+                Navigator.pop(context, BookContentConflictChoice.useRemote),
             child: Text(context.l10n.cloudSyncUseRemote),
           ),
           FilledButton(
             onPressed: () =>
-                Navigator.pop(context, MutableTxtConflictChoice.keepLocal),
+                Navigator.pop(context, BookContentConflictChoice.keepLocal),
             child: Text(context.l10n.cloudSyncKeepLocal),
           ),
         ],
       ),
     );
     if (choice == null) return;
-    await sync.mutableTxtService.resolveConflict(conflict.id, choice);
+    await sync.contentSyncService.resolveConflict(conflict.id, choice);
     if (sync.autoSync) sync.requestAutomaticSync(immediate: true);
   }
 
@@ -208,30 +207,13 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(txtSyncStatusText(context, state.status)),
+                      Text(l10n.cloudSyncReadableStorage),
                       const SizedBox(height: 8),
                       SelectableText(
-                        '${l10n.cloudSyncTextLocation}: ${sync.rootPath ?? ''}/${state.remotePath.replaceFirst('v2:', 'v2/').replaceFirst('v3:', 'v3/')}',
+                        '${l10n.cloudSyncTextLocation}: ${sync.rootPath ?? ''}/${state.remotePath}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),
-                      TxtSyncStorageModeControl(
-                        incremental: state.remotePath.startsWith('v3:'),
-                        onEnable:
-                            _busy ||
-                                sync.syncingText ||
-                                !sync.scope.bookFiles ||
-                                !state.enabled ||
-                                state.status == MutableTxtSyncStatus.conflict ||
-                                state.status ==
-                                    MutableTxtSyncStatus.updateAvailable
-                            ? null
-                            : () => _run(() async {
-                                await sync.mutableTxtService.enableIncremental(
-                                  state.bookUid,
-                                );
-                                await sync.synchronizeTextFiles();
-                              }),
-                      ),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
                         title: Text(l10n.cloudSyncParticipate),
@@ -239,7 +221,7 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
                         onChanged: _busy
                             ? null
                             : (enabled) => _run(() async {
-                                await sync.mutableTxtService.setEnabled(
+                                await sync.contentSyncService.setEnabled(
                                   state.bookUid,
                                   enabled,
                                 );
@@ -248,19 +230,19 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
                                 }
                               }),
                       ),
-                      if (state.status == MutableTxtSyncStatus.conflict)
+                      if (state.status == BookContentSyncStatus.conflict)
                         FilledButton.tonal(
                           onPressed: _busy
                               ? null
                               : () => _run(() => _compare(state)),
                           child: Text(l10n.cloudSyncCompare),
                         ),
-                      if (state.status == MutableTxtSyncStatus.updateAvailable)
+                      if (state.status == BookContentSyncStatus.updateAvailable)
                         TextButton(
                           onPressed: _busy
                               ? null
                               : () => _run(() async {
-                                  final applied = await sync.mutableTxtService
+                                  final applied = await sync.contentSyncService
                                       .applyPendingRemote(state.bookUid);
                                   if (!applied && context.mounted) {
                                     showSideToast(
@@ -271,8 +253,8 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
                                 }),
                           child: Text(l10n.cloudSyncApplyUpdate),
                         ),
-                      if (state.status == MutableTxtSyncStatus.failed ||
-                          state.status == MutableTxtSyncStatus.pending)
+                      if (state.status == BookContentSyncStatus.failed ||
+                          state.status == BookContentSyncStatus.pending)
                         TextButton(
                           onPressed: _busy || !sync.scope.bookFiles
                               ? null
@@ -290,17 +272,17 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
   }
 }
 
-String txtSyncStatusText(BuildContext context, MutableTxtSyncStatus status) {
+String txtSyncStatusText(BuildContext context, BookContentSyncStatus status) {
   final l10n = context.l10n;
   return switch (status) {
-    MutableTxtSyncStatus.localOnly => l10n.cloudSyncLocalOnly,
-    MutableTxtSyncStatus.paused => l10n.cloudSyncPaused,
-    MutableTxtSyncStatus.pending => l10n.cloudSyncPending,
-    MutableTxtSyncStatus.syncing => l10n.webDavSyncing,
-    MutableTxtSyncStatus.synced => l10n.cloudSyncCurrent,
-    MutableTxtSyncStatus.updateAvailable => l10n.cloudSyncApplyUpdate,
-    MutableTxtSyncStatus.conflict => l10n.cloudSyncConflict,
-    MutableTxtSyncStatus.failed => l10n.cloudSyncFailed,
+    BookContentSyncStatus.localOnly => l10n.cloudSyncLocalOnly,
+    BookContentSyncStatus.paused => l10n.cloudSyncPaused,
+    BookContentSyncStatus.pending => l10n.cloudSyncPending,
+    BookContentSyncStatus.syncing => l10n.webDavSyncing,
+    BookContentSyncStatus.synced => l10n.cloudSyncCurrent,
+    BookContentSyncStatus.updateAvailable => l10n.cloudSyncApplyUpdate,
+    BookContentSyncStatus.conflict => l10n.cloudSyncConflict,
+    BookContentSyncStatus.failed => l10n.cloudSyncFailed,
   };
 }
 

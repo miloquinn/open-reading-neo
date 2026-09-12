@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 
 import '../core/reader/reader_aloud_controller.dart';
 import '../services/reader_aloud_service.dart';
+import '../pages/settings/cloud_tts_settings_page.dart';
 import '../services/tts_service.dart';
 import '../services/tts_service_translator.dart';
 import '../utils/localization_extension.dart';
 import '../utils/reader_themes.dart';
 import 'generated_book_cover.dart';
+import 'app_menu.dart';
 
 Future<void> showReaderAloudPlayer({
   required BuildContext context,
@@ -117,11 +119,12 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
     }
   }
 
+  double? _pendingVolume;
+
   @override
   Widget build(BuildContext context) {
-    final palette = widget.palette;
     return Scaffold(
-      backgroundColor: palette.background,
+      backgroundColor: widget.palette.background,
       body: SafeArea(
         child: AnimatedBuilder(
           animation: Listenable.merge([
@@ -129,266 +132,390 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
             widget.ttsService,
             widget.aloudService,
           ]),
-          builder: (context, _) {
-            final controller = widget.controller;
-            final chapter = controller.currentChapter;
-            final segment = controller.currentSegment;
-            final playing =
-                controller.state == ReaderAloudPlaybackState.playing;
-            final loading =
-                controller.state == ReaderAloudPlaybackState.loading;
-            final width = MediaQuery.sizeOf(context).width;
-            final contentWidth = width.clamp(0, 620).toDouble();
-            return Center(
-              child: SizedBox(
-                width: contentWidth,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                      child: Row(
-                        children: [
-                          _roundButton(
-                            key: const ValueKey('reader-aloud-close'),
-                            icon: Icons.keyboard_arrow_down_rounded,
-                            tooltip: MaterialLocalizations.of(
-                              context,
-                            ).closeButtonTooltip,
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Text(
-                                  controller.source.bookTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        color: palette.text,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                ),
-                                if (chapter != null)
+          builder: (context, _) => LayoutBuilder(
+            builder: (context, constraints) {
+              final controller = widget.controller;
+              final chapter = controller.currentChapter;
+              final palette = widget.palette;
+              final wide =
+                  constraints.maxWidth >= 700 ||
+                  (constraints.maxWidth >= 500 &&
+                      constraints.maxWidth > constraints.maxHeight);
+              return Center(
+                child: SizedBox(
+                  width: wide ? 1120 : 560,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: Row(
+                          children: [
+                            _roundButton(
+                              key: const ValueKey('reader-aloud-close'),
+                              icon: Icons.keyboard_arrow_down_rounded,
+                              tooltip: MaterialLocalizations.of(
+                                context,
+                              ).closeButtonTooltip,
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                children: [
                                   Text(
-                                    chapter.title,
+                                    controller.source.bookTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: Theme.of(context)
                                         .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: palette.secondaryText,
-                                        ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _roundButton(
-                            key: const ValueKey('reader-aloud-timer'),
-                            icon: controller.sleepDuration == null
-                                ? Icons.timer_outlined
-                                : Icons.timer_rounded,
-                            tooltip: context.l10n.ttsTimerStop,
-                            onPressed: _showSettings,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: width < 390 ? 156 : 184,
-                              height: width < 390 ? 218 : 258,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(22),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: palette.shadow.withValues(
-                                      alpha: 0.24,
-                                    ),
-                                    blurRadius: 28,
-                                    offset: const Offset(0, 14),
-                                  ),
-                                ],
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: GeneratedBookCover(
-                                title: controller.source.bookTitle,
-                                author: widget.author,
-                              ),
-                            ),
-                            const SizedBox(height: 34),
-                            SizedBox(
-                              height: 94,
-                              child: Center(
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 220),
-                                  child: Text(
-                                    segment?.text ?? context.l10n.ttsReading,
-                                    key: ValueKey(segment?.startOffset),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
+                                        .titleLarge
                                         ?.copyWith(
                                           color: palette.text,
-                                          height: 1.65,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w800,
                                         ),
                                   ),
-                                ),
+                                  if (chapter != null)
+                                    Text(
+                                      chapter.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: palette.secondaryText,
+                                          ),
+                                    ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(99),
-                              child: LinearProgressIndicator(
-                                value: controller.chapterProgress,
-                                minHeight: 4,
-                                color: palette.accent,
-                                backgroundColor: palette.border.withValues(
-                                  alpha: 0.42,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 26),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _featureButton(
-                                  icon: Icons.speed_rounded,
-                                  label:
-                                      '${context.l10n.ttsSpeed} ${(widget.ttsService.speechRate * 2).toStringAsFixed(1)}×',
-                                  onPressed: _showSettings,
-                                ),
-                                _featureButton(
-                                  key: const ValueKey('reader-aloud-chapters'),
-                                  icon: Icons.format_list_bulleted_rounded,
-                                  label: context.l10n.currentChapter,
-                                  onPressed: _showChapters,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 28),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _transportButton(
-                                  icon: Icons.first_page_rounded,
-                                  tooltip: context.l10n.tapZonePreviousChapter,
-                                  onPressed:
-                                      chapter == null || chapter.index == 0
-                                      ? null
-                                      : () => unawaited(
-                                          controller.previousChapter(),
-                                        ),
-                                ),
-                                _transportButton(
-                                  icon: Icons.fast_rewind_rounded,
-                                  tooltip: context.l10n.ttsPreviousSentence,
-                                  onPressed: () =>
-                                      unawaited(controller.previous()),
-                                ),
-                                Semantics(
-                                  button: true,
-                                  label: playing
-                                      ? context.l10n.pause
-                                      : context.l10n.play,
-                                  child: IconButton.filled(
-                                    key: const ValueKey(
-                                      'reader-aloud-play-pause',
-                                    ),
-                                    onPressed: loading
-                                        ? null
-                                        : () => unawaited(
-                                            playing
-                                                ? controller.pause()
-                                                : controller.state ==
-                                                      ReaderAloudPlaybackState
-                                                          .paused
-                                                ? controller.resume()
-                                                : controller.start(),
-                                          ),
-                                    iconSize: 38,
-                                    padding: const EdgeInsets.all(20),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: palette.accent,
-                                      foregroundColor: palette.onAccent,
-                                    ),
-                                    icon: loading
-                                        ? const SizedBox.square(
-                                            dimension: 30,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.5,
-                                            ),
-                                          )
-                                        : Icon(
-                                            playing
-                                                ? Icons.pause_rounded
-                                                : Icons.play_arrow_rounded,
-                                          ),
-                                  ),
-                                ),
-                                _transportButton(
-                                  icon: Icons.fast_forward_rounded,
-                                  tooltip: context.l10n.ttsNextSentence,
-                                  onPressed: () => unawaited(controller.next()),
-                                ),
-                                _transportButton(
-                                  icon: Icons.last_page_rounded,
-                                  tooltip: context.l10n.tapZoneNextChapter,
-                                  onPressed:
-                                      chapter == null ||
-                                          chapter.index + 1 >=
-                                              controller.source.chapterCount
-                                      ? null
-                                      : () =>
-                                            unawaited(controller.nextChapter()),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 30),
-                            OutlinedButton.icon(
+                            const SizedBox(width: 12),
+                            _roundButton(
+                              key: const ValueKey('reader-aloud-timer'),
+                              icon: controller.sleepDuration == null
+                                  ? Icons.timer_outlined
+                                  : Icons.timer_rounded,
+                              tooltip: context.l10n.ttsTimerStop,
                               onPressed: _showSettings,
-                              icon: Icon(
-                                widget.aloudService.usesCloud
-                                    ? Icons.cloud_outlined
-                                    : Icons.record_voice_over_outlined,
-                              ),
-                              label: Text(
-                                widget.aloudService.usesCloud
-                                    ? _copy('云端朗读引擎', 'Cloud voice', 'クラウド音声')
-                                    : _copy('系统朗读引擎', 'System voice', 'システム音声'),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: palette.secondaryText,
-                                side: BorderSide(color: palette.border),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 22,
-                                  vertical: 13,
-                                ),
-                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
+
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, body) {
+                            // Reserve the controls first; the cover absorbs
+                            // differences in screen height and safe areas.
+                            final compact = body.maxHeight < 600;
+                            final narrowWide = wide && body.maxWidth < 760;
+                            return Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: narrowWide ? 16 : (wide ? 32 : 20),
+                                vertical: body.maxHeight < 300 ? 4 : 8,
+                              ),
+                              child: wide
+                                  ? Row(
+                                      key: const ValueKey(
+                                        'reader-aloud-wide-layout',
+                                      ),
+                                      children: [
+                                        Expanded(
+                                          flex: narrowWide ? 4 : 5,
+                                          child: Center(
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxHeight: 580,
+                                              ),
+                                              child: _artworkAndSentence(
+                                                compact: compact,
+                                                wide: true,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(width: narrowWide ? 24 : 40),
+                                        Expanded(
+                                          flex: narrowWide ? 6 : 5,
+                                          child: Center(
+                                            child: _playbackControls(
+                                              compact: compact,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      children: [
+                                        Expanded(
+                                          child: _artworkAndSentence(
+                                            compact: compact,
+                                            wide: false,
+                                          ),
+                                        ),
+                                        SizedBox(height: compact ? 8 : 16),
+                                        _playbackControls(compact: compact),
+                                      ],
+                                    ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
+  }
+
+  Widget _artworkAndSentence({required bool compact, required bool wide}) {
+    final segment = widget.controller.currentSegment;
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: wide ? 300 : 224,
+                  maxHeight: wide ? 420 : 314,
+                ),
+                child: AspectRatio(
+                  aspectRatio: 5 / 7,
+                  child: Container(
+                    key: const ValueKey('reader-aloud-cover'),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.palette.shadow.withValues(alpha: 0.24),
+                          blurRadius: 28,
+                          offset: const Offset(0, 14),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: GeneratedBookCover(
+                      title: widget.controller.source.bookTitle,
+                      author: widget.author,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: compact ? 4 : 16),
+        SizedBox(
+          height:
+              MediaQuery.textScalerOf(context).scale(16) *
+              1.65 *
+              (compact ? 2 : 3),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(
+                segment?.text ?? context.l10n.ttsReading,
+                key: ValueKey(segment?.startOffset),
+                maxLines: compact ? 2 : 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 16,
+                  color: widget.palette.text,
+                  height: 1.65,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _playbackControls({required bool compact}) {
+    final controller = widget.controller;
+    final chapter = controller.currentChapter;
+    final palette = widget.palette;
+    final playing = controller.state == ReaderAloudPlaybackState.playing;
+    final loading = controller.state == ReaderAloudPlaybackState.loading;
+    final volume = _pendingVolume ?? widget.ttsService.speechVolume;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LinearProgressIndicator(
+          value: controller.chapterProgress,
+          minHeight: 4,
+          borderRadius: BorderRadius.circular(99),
+          color: palette.accent,
+          backgroundColor: palette.border.withValues(alpha: 0.42),
+        ),
+        SizedBox(height: compact ? 8 : 16),
+        Row(
+          children: [
+            Expanded(
+              child: _featureButton(
+                icon: Icons.speed_rounded,
+                label:
+                    '${context.l10n.ttsSpeed} ${(widget.ttsService.speechRate * 2).toStringAsFixed(1)}×',
+                onPressed: _showSettings,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _featureButton(
+                key: const ValueKey('reader-aloud-chapters'),
+                icon: Icons.format_list_bulleted_rounded,
+                label: context.l10n.currentChapter,
+                onPressed: _showChapters,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: compact ? 8 : 18),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _transportButton(
+              icon: Icons.first_page_rounded,
+              tooltip: context.l10n.tapZonePreviousChapter,
+              onPressed: chapter == null || chapter.index == 0
+                  ? null
+                  : () => unawaited(controller.previousChapter()),
+            ),
+            _transportButton(
+              icon: Icons.fast_rewind_rounded,
+              tooltip: context.l10n.ttsPreviousSentence,
+              onPressed: () => unawaited(controller.previous()),
+            ),
+            IconButton.filled(
+              key: const ValueKey('reader-aloud-play-pause'),
+              tooltip: playing ? context.l10n.pause : context.l10n.play,
+              onPressed: loading
+                  ? null
+                  : () => unawaited(
+                      playing
+                          ? controller.pause()
+                          : controller.state == ReaderAloudPlaybackState.paused
+                          ? controller.resume()
+                          : controller.start(),
+                    ),
+              iconSize: compact ? 32 : 38,
+              padding: EdgeInsets.all(compact ? 16 : 20),
+              style: IconButton.styleFrom(
+                backgroundColor: palette.accent,
+                foregroundColor: palette.onAccent,
+              ),
+              icon: loading
+                  ? SizedBox.square(
+                      dimension: compact ? 32 : 38,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: palette.onAccent,
+                      ),
+                    )
+                  : Icon(
+                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    ),
+            ),
+            _transportButton(
+              icon: Icons.fast_forward_rounded,
+              tooltip: context.l10n.ttsNextSentence,
+              onPressed: () => unawaited(controller.next()),
+            ),
+            _transportButton(
+              icon: Icons.last_page_rounded,
+              tooltip: context.l10n.tapZoneNextChapter,
+              onPressed:
+                  chapter == null ||
+                      chapter.index + 1 >= controller.source.chapterCount
+                  ? null
+                  : () => unawaited(controller.nextChapter()),
+            ),
+          ],
+        ),
+        SizedBox(height: compact ? 4 : 12),
+        Row(
+          children: [
+            Tooltip(
+              message: context.l10n.ttsVolume,
+              child: Icon(
+                volume == 0
+                    ? Icons.volume_off_rounded
+                    : Icons.volume_down_rounded,
+                color: palette.secondaryText,
+                size: 22,
+              ),
+            ),
+            Expanded(
+              child: Semantics(
+                label: context.l10n.ttsVolume,
+                child: Slider(
+                  key: const ValueKey('reader-aloud-volume'),
+                  value: volume,
+                  activeColor: palette.accent,
+                  inactiveColor: palette.border.withValues(alpha: 0.42),
+                  label: '${(volume * 100).round()}%',
+                  semanticFormatterCallback: (value) =>
+                      '${(value * 100).round()}%',
+                  onChanged: (value) => setState(() => _pendingVolume = value),
+                  onChangeEnd: (value) => unawaited(_commitVolume(value)),
+                ),
+              ),
+            ),
+            Text(
+              '${(volume * 100).round()}%',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: palette.secondaryText,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('reader-aloud-engine'),
+          onPressed: _showSettings,
+          icon: Icon(
+            widget.aloudService.usesCloud
+                ? Icons.cloud_outlined
+                : Icons.record_voice_over_outlined,
+            size: 20,
+          ),
+          label: Text(
+            widget.aloudService.usesCloud
+                ? _copy('云端朗读引擎', 'Cloud voice', 'クラウド音声')
+                : _copy('系统朗读引擎', 'System voice', 'システム音声'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: palette.secondaryText,
+            side: BorderSide(color: palette.border),
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _commitVolume(double value) async {
+    try {
+      await widget.ttsService.setVolume(value);
+      if (widget.aloudService.activeEngineType == ReaderAloudEngineType.cloud) {
+        await widget.aloudService.syncVolume();
+      } else {
+        await widget.controller.refreshPlayback();
+      }
+    } finally {
+      if (mounted) setState(() => _pendingVolume = null);
+    }
   }
 
   Widget _roundButton({
@@ -412,27 +539,18 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
-  }) => Column(
+  }) => OutlinedButton.icon(
     key: key,
-    children: [
-      IconButton.outlined(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        iconSize: 27,
-        padding: const EdgeInsets.all(15),
-        style: IconButton.styleFrom(
-          foregroundColor: widget.palette.text,
-          side: BorderSide(color: widget.palette.border),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelMedium?.copyWith(color: widget.palette.secondaryText),
-      ),
-    ],
+    onPressed: onPressed,
+    icon: Icon(icon, size: 22),
+    label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: widget.palette.text,
+      side: BorderSide(color: widget.palette.border),
+      minimumSize: const Size(0, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      textStyle: Theme.of(context).textTheme.labelMedium,
+    ),
   );
 
   Widget _transportButton({
@@ -535,7 +653,6 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
   Timer? _sleepTimerTicker;
   Timer? _speechRateCommitTimer;
   double? _pendingSpeechRate;
-  double? _pendingVolume;
   double? _pendingPitch;
   int _speechRateCommitGeneration = 0;
   Future<void> _speechRateCommitChain = Future<void>.value();
@@ -576,106 +693,42 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
           final aloud = widget.aloudService;
           final errorCode = tts.lastError;
           final speechRate = _pendingSpeechRate ?? tts.speechRate;
-          final volume = _pendingVolume ?? tts.speechVolume;
           final pitch = _pendingPitch ?? tts.speechPitch;
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.headphones_rounded,
-                      color: widget.palette.accent,
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         context.l10n.ttsPanelTitle,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: widget.palette.text,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    Text(
-                      _stateLabel(context, controller.state),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: widget.palette.secondaryText,
-                      ),
-                    ),
-                  ],
-                ),
-                if (controller.currentChapter != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    controller.currentChapter!.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: widget.palette.text,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: controller.chapterProgress,
-                    minHeight: 5,
-                    borderRadius: BorderRadius.circular(99),
-                    color: widget.palette.accent,
-                    backgroundColor: widget.palette.secondaryText.withValues(
-                      alpha: 0.14,
-                    ),
-                  ),
-                ],
-                if (controller.currentSegment != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    controller.currentSegment!.text,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      height: 1.55,
+                    IconButton(
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).closeButtonTooltip,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
                       color: widget.palette.secondaryText,
                     ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                _engineSelector(context, controller, aloud),
-                if (aloud.usesCloud) ...[
-                  const SizedBox(height: 12),
-                  _cloudConfigurationCard(context, aloud),
-                ],
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _controlButton(
-                      context,
-                      icon: Icons.skip_previous_rounded,
-                      tooltip: context.l10n.ttsPreviousSentence,
-                      onPressed: () => unawaited(controller.previous()),
-                    ),
-                    _primaryControl(context, controller),
-                    _controlButton(
-                      context,
-                      icon: Icons.skip_next_rounded,
-                      tooltip: context.l10n.ttsNextSentence,
-                      onPressed: () => unawaited(controller.next()),
-                    ),
-                    _controlButton(
-                      context,
-                      icon: Icons.stop_rounded,
-                      tooltip: context.l10n.stop,
-                      onPressed: controller.isActive
-                          ? () => unawaited(controller.stop())
-                          : null,
-                    ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                _engineSelector(context, controller, aloud),
                 const SizedBox(height: 20),
+                if (aloud.usesCloud)
+                  _cloudConfigurationCard(context, aloud)
+                else
+                  _voicePicker(context, tts, controller),
+                const SizedBox(height: 24),
                 _slider(
                   context,
                   label: context.l10n.ttsSpeed,
@@ -696,35 +749,20 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
                     delay: Duration.zero,
                   ),
                 ),
-                _slider(
-                  context,
-                  label: context.l10n.ttsVolume,
-                  value: volume,
-                  min: 0,
-                  max: 1,
-                  valueLabel: '${(volume * 100).round()}%',
-                  onChanged: (value) => setState(() => _pendingVolume = value),
-                  onChangeEnd: (value) =>
-                      unawaited(_commitVolume(value, controller, tts, aloud)),
-                ),
-                _slider(
-                  context,
-                  label: context.l10n.ttsPitch,
-                  value: pitch,
-                  min: 0.5,
-                  max: 2,
-                  valueLabel: pitch.toStringAsFixed(2),
-                  onChanged: aloud.usesCloud
-                      ? null
-                      : (value) => setState(() => _pendingPitch = value),
-                  onChangeEnd: aloud.usesCloud
-                      ? null
-                      : (value) =>
-                            unawaited(_commitPitch(value, controller, tts)),
-                ),
+                if (!aloud.usesCloud)
+                  _slider(
+                    context,
+                    label: context.l10n.ttsPitch,
+                    value: pitch,
+                    min: 0.5,
+                    max: 2,
+                    valueLabel: pitch.toStringAsFixed(2),
+                    onChanged: (value) => setState(() => _pendingPitch = value),
+                    onChangeEnd: (value) =>
+                        unawaited(_commitPitch(value, controller, tts)),
+                  ),
                 const SizedBox(height: 8),
-                if (!aloud.usesCloud) _voicePicker(context, tts, controller),
-                const SizedBox(height: 16),
+                Divider(color: widget.palette.border.withValues(alpha: 0.5)),
                 _sleepTimerCard(context, controller),
                 if (errorCode != null ||
                     controller.lastError != null ||
@@ -748,47 +786,6 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _primaryControl(
-    BuildContext context,
-    ReaderAloudController controller,
-  ) {
-    final loading = controller.state == ReaderAloudPlaybackState.loading;
-    final playing = controller.state == ReaderAloudPlaybackState.playing;
-    return Semantics(
-      button: true,
-      label: playing ? context.l10n.pause : context.l10n.play,
-      child: IconButton.filled(
-        onPressed: loading
-            ? null
-            : () {
-                if (playing) {
-                  unawaited(controller.pause());
-                } else if (controller.state ==
-                    ReaderAloudPlaybackState.paused) {
-                  unawaited(controller.resume());
-                } else {
-                  unawaited(controller.start());
-                }
-              },
-        tooltip: playing ? context.l10n.pause : context.l10n.play,
-        iconSize: 32,
-        padding: const EdgeInsets.all(16),
-        style: IconButton.styleFrom(
-          backgroundColor: widget.palette.accent,
-          foregroundColor: widget.palette.brightness == Brightness.dark
-              ? Colors.black
-              : Colors.white,
-        ),
-        icon: loading
-            ? const SizedBox.square(
-                dimension: 26,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              )
-            : Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
       ),
     );
   }
@@ -823,24 +820,6 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     });
   }
 
-  Future<void> _commitVolume(
-    double value,
-    ReaderAloudController controller,
-    TtsService tts,
-    ReaderAloudService aloud,
-  ) async {
-    try {
-      await tts.setVolume(value);
-      if (aloud.activeEngineType == ReaderAloudEngineType.cloud) {
-        await aloud.syncVolume();
-      } else {
-        await controller.refreshPlayback();
-      }
-    } finally {
-      if (mounted) setState(() => _pendingVolume = null);
-    }
-  }
-
   Future<void> _commitPitch(
     double value,
     ReaderAloudController controller,
@@ -871,6 +850,15 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
         label: Text(_copy(context, '云端 TTS', 'Cloud TTS', 'クラウド TTS')),
       ),
     ],
+    style: SegmentedButton.styleFrom(
+      backgroundColor: widget.palette.controlFill.withValues(alpha: 0.5),
+      selectedBackgroundColor: widget.palette.accent.withValues(alpha: 0.12),
+      selectedForegroundColor: widget.palette.accent,
+      foregroundColor: widget.palette.secondaryText,
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+    ),
     selected: {aloud.engineType},
     showSelectedIcon: false,
     onSelectionChanged: (selection) {
@@ -889,12 +877,10 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
   Widget _cloudConfigurationCard(
     BuildContext context,
     ReaderAloudService aloud,
-  ) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: widget.palette.surface.withValues(alpha: 0.72),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: widget.palette.border.withValues(alpha: 0.72)),
-    ),
+  ) => Material(
+    color: widget.palette.surface.withValues(alpha: 0.72),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    clipBehavior: Clip.antiAlias,
     child: ListTile(
       leading: Icon(
         aloud.hasCloudApiKey ? Icons.cloud_done_outlined : Icons.key_outlined,
@@ -911,18 +897,13 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
         aloud.hasCloudApiKey
             ? _copy(
                 context,
-                'API Key 已安全保存',
-                'API key saved securely',
-                'API Key を安全に保存済み',
+                '管理音色与连接',
+                'Voice and connection settings',
+                '音声と接続の設定',
               )
-            : _copy(
-                context,
-                '需要配置 API Key',
-                'API key required',
-                'API Key の設定が必要です',
-              ),
+            : _copy(context, '配置云端朗读', 'Set up cloud voice', 'クラウド音声を設定'),
       ),
-      trailing: const Icon(Icons.tune_rounded),
+      trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => unawaited(_showCloudSettings(context, aloud)),
     ),
   );
@@ -931,166 +912,10 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     BuildContext context,
     ReaderAloudService aloud,
   ) async {
-    final settings = aloud.cloudSettings;
-    final baseUrlController = TextEditingController(text: settings.baseUrl);
-    final modelController = TextEditingController(text: settings.model);
-    final voiceController = TextEditingController(text: settings.voice);
-    final apiKeyController = TextEditingController();
-    var responseFormat = settings.responseFormat;
-    var fallbackToSystem = settings.fallbackToSystem;
-    String? validationError;
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            _copy(context, '云端 TTS 设置', 'Cloud TTS settings', 'クラウド TTS 設定'),
-          ),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: baseUrlController,
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Base URL',
-                      hintText: 'https://api.openai.com/v1',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: modelController,
-                    autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Model'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: voiceController,
-                    autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Voice'),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: responseFormat,
-                    decoration: const InputDecoration(labelText: 'Format'),
-                    items: const [
-                      DropdownMenuItem(value: 'mp3', child: Text('mp3')),
-                      DropdownMenuItem(value: 'opus', child: Text('opus')),
-                      DropdownMenuItem(value: 'aac', child: Text('aac')),
-                      DropdownMenuItem(value: 'flac', child: Text('flac')),
-                      DropdownMenuItem(value: 'wav', child: Text('wav')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) responseFormat = value;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: apiKeyController,
-                    obscureText: true,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: 'API Key',
-                      hintText: aloud.hasCloudApiKey
-                          ? _copy(
-                              context,
-                              '留空保留已保存的密钥',
-                              'Leave blank to keep saved key',
-                              '空欄で保存済みキーを維持',
-                            )
-                          : null,
-                    ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      _copy(
-                        context,
-                        '失败时回退到系统语音',
-                        'Fall back to system voice',
-                        '失敗時はシステム音声に切り替え',
-                      ),
-                    ),
-                    value: fallbackToSystem,
-                    onChanged: (value) =>
-                        setDialogState(() => fallbackToSystem = value),
-                  ),
-                  if (validationError != null)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        validationError!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            if (aloud.hasCloudApiKey)
-              TextButton(
-                onPressed: () async {
-                  await aloud.clearCloudApiKey();
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(false);
-                  }
-                },
-                child: Text(_copy(context, '清除密钥', 'Clear key', 'キーを削除')),
-              ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await aloud.updateCloudSettings(
-                    ReaderAloudCloudSettings(
-                      baseUrl: baseUrlController.text,
-                      model: modelController.text,
-                      voice: voiceController.text,
-                      responseFormat: responseFormat,
-                      fallbackToSystem: fallbackToSystem,
-                    ),
-                  );
-                  if (apiKeyController.text.trim().isNotEmpty) {
-                    await aloud.saveCloudApiKey(apiKeyController.text);
-                  }
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(true);
-                  }
-                } on ReaderAloudCloudException catch (error) {
-                  setDialogState(() => validationError = error.message);
-                } catch (_) {
-                  setDialogState(
-                    () => validationError = _copy(
-                      context,
-                      '保存失败，请检查系统安全存储',
-                      'Could not save settings or secure key',
-                      '設定または安全なキーを保存できません',
-                    ),
-                  );
-                }
-              },
-              child: Text(_copy(context, '保存', 'Save', '保存')),
-            ),
-          ],
-        ),
-      ),
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CloudTtsSettingsPage(service: aloud)),
     );
-    baseUrlController.dispose();
-    modelController.dispose();
-    voiceController.dispose();
-    apiKeyController.dispose();
-    if (saved == true) {
+    if (saved == true && mounted) {
       await widget.controller.refreshPlayback();
     }
   }
@@ -1103,20 +928,6 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     };
   }
 
-  Widget _controlButton(
-    BuildContext context, {
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback? onPressed,
-  }) => IconButton(
-    onPressed: onPressed,
-    tooltip: tooltip,
-    iconSize: 30,
-    color: widget.palette.text,
-    disabledColor: widget.palette.secondaryText.withValues(alpha: 0.35),
-    icon: Icon(icon),
-  );
-
   Widget _slider(
     BuildContext context, {
     required String label,
@@ -1126,37 +937,44 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     required String valueLabel,
     required ValueChanged<double>? onChanged,
     required ValueChanged<double>? onChangeEnd,
-  }) => Row(
-    children: [
-      SizedBox(
-        width: 48,
-        child: Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: widget.palette.text),
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: widget.palette.text),
+              ),
+            ),
+            Text(
+              valueLabel,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: widget.palette.accent,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
         ),
-      ),
-      Expanded(
-        child: Slider(
+        Slider(
           value: value.clamp(min, max),
           min: min,
           max: max,
+          label: valueLabel,
+          semanticFormatterCallback: (value) => label == context.l10n.ttsSpeed
+              ? '${(value * 2).toStringAsFixed(2)}×'
+              : value.toStringAsFixed(2),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 16),
           onChanged: onChanged,
           onChangeEnd: onChangeEnd,
         ),
-      ),
-      SizedBox(
-        width: 48,
-        child: Text(
-          valueLabel,
-          textAlign: TextAlign.end,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: widget.palette.secondaryText,
-          ),
-        ),
-      ),
-    ],
+      ],
+    ),
   );
 
   Widget _voicePicker(
@@ -1168,44 +986,68 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     final selectedId = voices.any((voice) => voice.id == tts.currentVoice?.id)
         ? tts.currentVoice!.id
         : '';
-    return DropdownButtonFormField<String>(
+    final currentVoice = voices
+        .where((voice) => voice.id == selectedId)
+        .firstOrNull;
+    return AppPopupMenuButton<String>(
       key: ValueKey('reader-aloud-voice:$selectedId:${voices.length}'),
       initialValue: selectedId,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: context.l10n.ttsReading,
-        border: const OutlineInputBorder(),
-      ),
-      items: [
-        DropdownMenuItem(value: '', child: Text(context.l10n.ttsSystemDefault)),
+      anchorRadius: 12,
+      enabled: !tts.isLoadingVoices,
+      tooltip: _copy(context, '音色', 'Voice', '音声'),
+      color: widget.palette.controlBar,
+      itemBuilder: (context) => [
+        PopupMenuItem(value: '', child: Text(context.l10n.ttsSystemDefault)),
         for (final voice in voices)
-          DropdownMenuItem(
+          PopupMenuItem(
             value: voice.id,
             child: Text(
               voice.subtitle.isEmpty
                   ? voice.title
                   : '${voice.title} · ${voice.subtitle}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],
-      onChanged: tts.isLoadingVoices
-          ? null
-          : (id) {
-              unawaited(() async {
-                if (id == null || id.isEmpty) {
-                  await tts.clearSelectedVoice();
-                } else {
-                  final voice = voices
-                      .where((voice) => voice.id == id)
-                      .firstOrNull;
-                  if (voice == null) return;
-                  await tts.setVoice(voice);
-                }
-                await controller.refreshPlayback();
-              }());
-            },
+      onSelected: (id) {
+        unawaited(() async {
+          if (id.isEmpty) {
+            await tts.clearSelectedVoice();
+          } else {
+            final voice = voices.where((voice) => voice.id == id).firstOrNull;
+            if (voice == null) return;
+            await tts.setVoice(voice);
+          }
+          await controller.refreshPlayback();
+        }());
+      },
+      child: InputDecorator(
+        isEmpty: false,
+        decoration: InputDecoration(
+          labelText: _copy(context, '音色', 'Voice', '音声'),
+          enabled: !tts.isLoadingVoices,
+          filled: true,
+          fillColor: widget.palette.controlFill.withValues(alpha: 0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                currentVoice == null
+                    ? context.l10n.ttsSystemDefault
+                    : currentVoice.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.unfold_more_rounded, size: 20),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1213,146 +1055,36 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     BuildContext context,
     ReaderAloudController controller,
   ) {
-    final total = controller.sleepDuration;
     final remaining = controller.sleepRemaining;
-    final active = total != null && remaining != null;
-    final progress = active && total.inMilliseconds > 0
-        ? (remaining.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
-    return Material(
+    return ListTile(
       key: const ValueKey('reader-aloud-sleep-timer-card'),
-      color: widget.palette.accent.withValues(
-        alpha: active
-            ? (widget.palette.brightness == Brightness.dark ? 0.16 : 0.10)
-            : 0.05,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        Icons.bedtime_outlined,
+        color: remaining == null
+            ? widget.palette.secondaryText
+            : widget.palette.accent,
       ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: active
-              ? widget.palette.accent.withValues(alpha: 0.42)
-              : widget.palette.border.withValues(alpha: 0.62),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => unawaited(_showSleepTimerPicker(context, controller)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 13, 10, 11),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: widget.palette.accent.withValues(
-                        alpha: active ? 0.18 : 0.10,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      active ? Icons.bedtime_rounded : Icons.timer_outlined,
-                      color: widget.palette.accent,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                context.l10n.ttsTimerStop,
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(
-                                      color: widget.palette.text,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                            if (active) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: widget.palette.accent.withValues(
-                                    alpha: 0.16,
-                                  ),
-                                  borderRadius: BorderRadius.circular(99),
-                                ),
-                                child: Text(
-                                  _copy(context, '已开启', 'Active', '有効'),
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: widget.palette.accent,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          active
-                              ? _copy(
-                                  context,
-                                  '剩余 ${_formatTimerDuration(context, remaining)}',
-                                  '${_formatTimerDuration(context, remaining)} remaining',
-                                  '残り ${_formatTimerDuration(context, remaining)}',
-                                )
-                              : _copy(
-                                  context,
-                                  '自由选择小时和分钟',
-                                  'Choose any hours and minutes',
-                                  '時間と分を自由に選択',
-                                ),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: widget.palette.secondaryText),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (active)
-                    IconButton(
-                      key: const ValueKey('reader-aloud-sleep-timer-clear'),
-                      tooltip: context.l10n.ttsTimerOff,
-                      onPressed: () => controller.setSleepTimer(null),
-                      icon: const Icon(Icons.close_rounded),
-                      color: widget.palette.secondaryText,
-                    )
-                  else
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: widget.palette.secondaryText,
-                    ),
-                ],
+      title: Text(context.l10n.ttsTimerStop),
+      subtitle: Text(
+        remaining == null
+            ? context.l10n.ttsTimerOff
+            : _copy(
+                context,
+                '剩余 ${_formatTimerDuration(context, remaining)}',
+                '${_formatTimerDuration(context, remaining)} remaining',
+                '残り ${_formatTimerDuration(context, remaining)}',
               ),
-              if (active) ...[
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 4,
-                    color: widget.palette.accent,
-                    backgroundColor: widget.palette.accent.withValues(
-                      alpha: 0.10,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
       ),
+      trailing: remaining == null
+          ? const Icon(Icons.chevron_right_rounded)
+          : IconButton(
+              key: const ValueKey('reader-aloud-sleep-timer-clear'),
+              tooltip: context.l10n.ttsTimerOff,
+              onPressed: () => controller.setSleepTimer(null),
+              icon: const Icon(Icons.close_rounded),
+            ),
+      onTap: () => unawaited(_showSleepTimerPicker(context, controller)),
     );
   }
 
@@ -1495,13 +1227,4 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
       '$hours 時間 $minutes 分',
     );
   }
-
-  String _stateLabel(BuildContext context, ReaderAloudPlaybackState state) =>
-      switch (state) {
-        ReaderAloudPlaybackState.playing => context.l10n.ttsPlaying,
-        ReaderAloudPlaybackState.paused => context.l10n.ttsPaused,
-        ReaderAloudPlaybackState.loading => context.l10n.ttsReading,
-        ReaderAloudPlaybackState.error => context.l10n.ttsPlaybackFailed,
-        ReaderAloudPlaybackState.stopped => context.l10n.ttsStopped,
-      };
 }

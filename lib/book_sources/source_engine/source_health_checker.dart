@@ -17,6 +17,7 @@ class SourceHealthCheckResult {
     required this.checked,
     required this.failed,
     required this.checkedAt,
+    this.requiredForFullAvailability = fullAvailabilityCapabilities,
     this.respondTimeMs,
     this.timedOut = false,
   });
@@ -24,6 +25,7 @@ class SourceHealthCheckResult {
   final Set<SourceHealthCapability> checked;
   final Set<SourceHealthCapability> failed;
   final DateTime checkedAt;
+  final Set<SourceHealthCapability> requiredForFullAvailability;
   final int? respondTimeMs;
   final bool timedOut;
 
@@ -38,26 +40,43 @@ class SourceHealthCheckResult {
     SourceHealthCapability.search,
     SourceHealthCapability.discover,
     SourceHealthCapability.info,
+    SourceHealthCapability.catalog,
+    SourceHealthCapability.content,
+  };
+
+  static const _readingChain = {
+    SourceHealthCapability.info,
+    SourceHealthCapability.catalog,
     SourceHealthCapability.content,
   };
 
   bool get fullyAvailable =>
       !timedOut &&
       failed.isEmpty &&
-      checked.containsAll(fullAvailabilityCapabilities);
+      requiredForFullAvailability.containsAll(_readingChain) &&
+      (requiredForFullAvailability.contains(SourceHealthCapability.search) ||
+          requiredForFullAvailability.contains(
+            SourceHealthCapability.discover,
+          )) &&
+      checked.containsAll(requiredForFullAvailability);
 
   /// The capabilities keeping this result short of [fullyAvailable]: ones
   /// that failed outright, plus ones a source never even attempted (for
   /// example because it doesn't declare a `search` rule at all).
   Set<SourceHealthCapability> get missingForFullAvailability => timedOut
-      ? fullAvailabilityCapabilities
-      : fullAvailabilityCapabilities
+      ? requiredForFullAvailability
+      : requiredForFullAvailability
             .difference(checked)
-            .union(failed.intersection(fullAvailabilityCapabilities));
+            .union(failed.intersection(requiredForFullAvailability));
 
   Map<String, dynamic> toJson() => {
     'checked': (checked.map((capability) => capability.name).toList()..sort()),
     'failed': (failed.map((capability) => capability.name).toList()..sort()),
+    'requiredForFullAvailability':
+        (requiredForFullAvailability
+            .map((capability) => capability.name)
+            .toList()
+          ..sort()),
     'checkedAt': checkedAt.toIso8601String(),
     if (respondTimeMs != null) 'respondTimeMs': respondTimeMs,
     if (timedOut) 'timedOut': true,
@@ -67,6 +86,10 @@ class SourceHealthCheckResult {
     return SourceHealthCheckResult(
       checked: _capabilitiesFromJson(json['checked']),
       failed: _capabilitiesFromJson(json['failed']),
+      requiredForFullAvailability:
+          json.containsKey('requiredForFullAvailability')
+          ? _requirementsFromJson(json['requiredForFullAvailability'])
+          : fullAvailabilityCapabilities,
       checkedAt:
           DateTime.tryParse('${json['checkedAt']}')?.toUtc() ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
@@ -171,6 +194,15 @@ class SourceHealthChecker {
       checked: Set.unmodifiable(checked),
       failed: Set.unmodifiable(failed),
       checkedAt: DateTime.now().toUtc(),
+      requiredForFullAvailability: Set.unmodifiable({
+        if (source.capabilities.contains('search'))
+          SourceHealthCapability.search,
+        if (source.capabilities.contains('browse'))
+          SourceHealthCapability.discover,
+        SourceHealthCapability.info,
+        SourceHealthCapability.catalog,
+        SourceHealthCapability.content,
+      }),
       respondTimeMs: timedOut ? null : stopwatch.elapsedMilliseconds,
       timedOut: timedOut,
     );
@@ -305,4 +337,18 @@ Set<SourceHealthCapability> _capabilitiesFromJson(Object? value) {
     }
   }
   return Set.unmodifiable(result);
+}
+
+Set<SourceHealthCapability> _requirementsFromJson(Object? value) {
+  final known = SourceHealthCapability.values.map((item) => item.name).toSet();
+  if (value is! List || value.any((item) => !known.contains(item))) {
+    return SourceHealthCheckResult.fullAvailabilityCapabilities;
+  }
+  final required = _capabilitiesFromJson(value);
+  if (!required.containsAll(SourceHealthCheckResult._readingChain) ||
+      (!required.contains(SourceHealthCapability.search) &&
+          !required.contains(SourceHealthCapability.discover))) {
+    return SourceHealthCheckResult.fullAvailabilityCapabilities;
+  }
+  return required;
 }

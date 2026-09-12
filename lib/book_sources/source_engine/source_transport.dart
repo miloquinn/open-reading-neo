@@ -3,6 +3,13 @@ import 'dart:typed_data';
 import '../services/book_download_cancellation.dart';
 import 'source_request_template.dart';
 import 'source_response.dart';
+import 'source_browser_session.dart';
+
+abstract interface class SourceBrowserSessionTransport {
+  SourceBrowserSession browserSession(String sourceId);
+  void restoreBrowserSession(String sourceId, SourceBrowserSession session);
+  void clearBrowserSession(String sourceId);
+}
 
 abstract interface class SourceTransport {
   Future<SourceResponse> send(

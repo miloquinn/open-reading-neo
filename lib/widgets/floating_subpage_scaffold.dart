@@ -1,12 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../utils/glass_config.dart';
 import '../utils/page_style_helper.dart';
 import '../utils/system_ui_helper.dart';
 import 'glass_top_bar.dart';
+import 'app_menu.dart';
 import 'glass_control_surface.dart';
 
 /// Shared navigation shell for pushed secondary pages.
@@ -270,25 +268,17 @@ class FloatingSubpageMenuAction<T> extends StatelessWidget {
   final PopupMenuItemSelected<T> onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    final items = itemBuilder(context)
-        .whereType<PopupMenuItem<T>>()
-        .map(
-          (item) => FloatingSubpageMenuItem<T>(
-            value: item.value as T,
-            child: item.child ?? const SizedBox.shrink(),
-            enabled: item.enabled,
-            itemKey: item.key,
-          ),
-        )
-        .toList(growable: false);
-    return FloatingSubpageMenuButton<T>(
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 48,
+    child: AppPopupMenuButton<T>(
+      buttonStyle: AppMenuButtonStyle.circular,
       tooltip: tooltip,
-      icon: icon,
-      items: items,
+      icon: Icon(icon),
+      iconSize: 30,
+      itemBuilder: itemBuilder,
       onSelected: onSelected,
-    );
-  }
+    ),
+  );
 }
 
 class FloatingSubpageMenuItem<T> {
@@ -323,221 +313,26 @@ class FloatingSubpageMenuButton<T> extends StatelessWidget {
   final List<FloatingSubpageMenuItem<T>> items;
   final ValueChanged<T> onSelected;
 
-  Future<void> _show(BuildContext context) async {
-    final box = context.findRenderObject()! as RenderBox;
-    final overlay =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
-    final mediaQuery = MediaQuery.of(context);
-    final menuWidth = (overlay.size.width - 40).clamp(232.0, 272.0);
-    final menuLeft = (topLeft.dx + box.size.width - menuWidth).clamp(
-      20.0,
-      overlay.size.width - menuWidth - 20,
-    );
-    final menuTop = topLeft.dy + box.size.height + 10;
-    final selected = await showGeneralDialog<T>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.transparent,
-      transitionDuration: mediaQuery.disableAnimations
-          ? Duration.zero
-          : const Duration(milliseconds: 320),
-      pageBuilder: (dialogContext, _, _) => Stack(
-        children: [
-          Positioned(
-            left: menuLeft,
-            top: menuTop,
-            width: menuWidth,
-            child: Material(
-              color: Colors.transparent,
-              child: _FloatingSubpageMenuSurface<T>(
-                items: items,
-                onSelected: (value) => Navigator.of(dialogContext).pop(value),
-              ),
-            ),
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 48,
+    child: AppPopupMenuButton<T>(
+      buttonStyle: AppMenuButtonStyle.circular,
+      icon: Icon(icon),
+      iconSize: 30,
+      tooltip: tooltip,
+      onSelected: onSelected,
+      itemBuilder: (context) => [
+        for (final item in items) ...[
+          if (item.startsSection) const PopupMenuDivider(),
+          PopupMenuItem<T>(
+            key: item.itemKey,
+            value: item.value,
+            enabled: item.enabled,
+            child: item.child,
           ),
         ],
-      ),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutBack,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: animation.drive(
-            Tween<double>(
-              begin: 0.82,
-              end: 1,
-            ).chain(CurveTween(curve: const Interval(0, 0.42))),
-          ),
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.08, -0.08),
-              end: Offset.zero,
-            ).animate(curved),
-            child: ScaleTransition(
-              alignment: Alignment.topRight,
-              scale: Tween<double>(begin: 0.76, end: 1).animate(curved),
-              child: child,
-            ),
-          ),
-        );
-      },
-    );
-    if (selected != null && context.mounted) onSelected(selected);
-  }
-
-  @override
-  Widget build(BuildContext context) => FloatingSubpageAction(
-    icon: icon,
-    tooltip: tooltip,
-    onPressed: () => _show(context),
+      ],
+    ),
   );
-}
-
-class _FloatingSubpageMenuSurface<T> extends StatelessWidget {
-  const _FloatingSubpageMenuSurface({
-    required this.items,
-    required this.onSelected,
-  });
-
-  final List<FloatingSubpageMenuItem<T>> items;
-  final ValueChanged<T> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(22);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.16),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: GlassEffectConfig.modalBlur,
-            sigmaY: GlassEffectConfig.modalBlur,
-          ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: GlassEffectConfig.chromeSurfaceColor(
-                context,
-                opacity: scheme.brightness == Brightness.light ? 0.78 : 0.64,
-              ),
-              borderRadius: radius,
-              border: Border.all(
-                color: scheme.onSurface.withValues(alpha: 0.1),
-                width: 0.8,
-              ),
-            ),
-            child: IconTheme.merge(
-              data: IconThemeData(color: scheme.onSurfaceVariant),
-              child: DefaultTextStyle.merge(
-                style: TextStyle(color: scheme.onSurface),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var index = 0; index < items.length; index++) ...[
-                        if (items[index].startsSection) ...[
-                          const SizedBox(height: 5),
-                          Divider(
-                            height: 1,
-                            indent: 12,
-                            endIndent: 12,
-                            color: scheme.outlineVariant.withValues(
-                              alpha: 0.55,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                        ],
-                        _FloatingSubpageMenuTile(
-                          key: items[index].itemKey,
-                          item: items[index],
-                          onTap: items[index].enabled
-                              ? () => onSelected(items[index].value)
-                              : null,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FloatingSubpageMenuTile<T> extends StatelessWidget {
-  const _FloatingSubpageMenuTile({
-    super.key,
-    required this.item,
-    required this.onTap,
-  });
-
-  final FloatingSubpageMenuItem<T> item;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final iconColor = item.iconColor ?? scheme.primary;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Opacity(
-        opacity: onTap == null ? 0.42 : 1,
-        child: SizedBox(
-          height: 54,
-          child: Row(
-            children: [
-              const SizedBox(width: 4),
-              SizedBox.square(
-                dimension: 42,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconTheme.merge(
-                    data: IconThemeData(color: iconColor, size: 21),
-                    child: Center(
-                      child: item.child is ListTile
-                          ? (item.child as ListTile).leading
-                          : null,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DefaultTextStyle.merge(
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  child: item.child is ListTile
-                      ? (item.child as ListTile).title ??
-                            const SizedBox.shrink()
-                      : item.child,
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

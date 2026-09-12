@@ -55,6 +55,7 @@ class TxtEditCommit {
     required this.textEncoding,
     this.mapping,
     this.invalidateAllReferences = false,
+    this.preserveReferenceOffsets = false,
   });
 
   final String contentHash;
@@ -62,6 +63,7 @@ class TxtEditCommit {
   final String textEncoding;
   final TxtEditRevisionMapping? mapping;
   final bool invalidateAllReferences;
+  final bool preserveReferenceOffsets;
 }
 
 @immutable
@@ -302,6 +304,34 @@ class TxtEditService {
     );
   }
 
+  /// Atomically replaces a complete TXT revision while preserving the same
+  /// rollback journal and readable history used by chapter edits.
+  ///
+  /// Source updates use this entry point because an append or refresh can
+  /// affect several chapters at once. Callers must commit their metadata in
+  /// [onCommitted]; if that callback fails the readable file is restored.
+  Future<TxtEditCommit> replaceContent({
+    required Book book,
+    required String content,
+    required String expectedBaseContentHash,
+    bool invalidateAllReferences = false,
+    bool preserveReferenceOffsets = false,
+    Future<void> Function(TxtEditCommit commit)? onCommitted,
+  }) {
+    final bytes = utf8.encode(content);
+    final expectedNewHash = sha256.convert(bytes).toString();
+    return _replaceFile(
+      book: book,
+      expectedBaseContentHash: expectedBaseContentHash,
+      expectedNewHash: expectedNewHash,
+      writeTemporary: (temporary) => temporary.writeAsBytes(bytes, flush: true),
+      textEncoding: 'utf8',
+      invalidateAllReferences: invalidateAllReferences,
+      preserveReferenceOffsets: preserveReferenceOffsets,
+      onCommitted: onCommitted,
+    );
+  }
+
   Future<_PreparedTxtSource> _prepareSource(
     Book book, {
     required String prefaceTitle,
@@ -362,6 +392,7 @@ class TxtEditService {
     required String textEncoding,
     TxtEditRevisionMapping? mapping,
     bool invalidateAllReferences = false,
+    bool preserveReferenceOffsets = false,
     Future<void> Function(TxtEditCommit commit)? onCommitted,
   }) async {
     final source = File(book.filePath);
@@ -400,6 +431,7 @@ class TxtEditService {
           textEncoding: textEncoding,
           mapping: mapping,
           invalidateAllReferences: false,
+          preserveReferenceOffsets: preserveReferenceOffsets,
         );
         await onCommitted?.call(commit);
         return commit;
@@ -441,6 +473,7 @@ class TxtEditService {
           textEncoding: textEncoding,
           mapping: mapping,
           invalidateAllReferences: invalidateAllReferences,
+          preserveReferenceOffsets: preserveReferenceOffsets,
         );
         await onCommitted?.call(commit);
         try {

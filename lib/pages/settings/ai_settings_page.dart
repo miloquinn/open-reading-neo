@@ -14,6 +14,8 @@ import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
+import 'ai_model_editor_page.dart';
+
 class AiSettingsPage extends StatefulWidget {
   const AiSettingsPage({super.key, this.aiService});
 
@@ -36,7 +38,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   String? _activeAiQuickModelId;
   bool _aiSettingsLoaded = false;
   bool _aiPreprocessEnabled = false;
-  bool _obscureAiApiKey = true;
+
+  String _copy(String zh, String ja, String en) =>
+      switch (Localizations.localeOf(context).languageCode) {
+        'zh' => zh,
+        'ja' => ja,
+        _ => en,
+      };
 
   @override
   void initState() {
@@ -191,23 +199,44 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           : ListView(
               padding: floatingSubpagePadding(context),
               children: [
-                Text(
-                  l10n.settingsAiQuickCardSubtitle,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.4,
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _copy(
+                            '选择一个模型用于阅读问答，也可以添加自己的服务。',
+                            '読書中の質問に使うモデルを選ぶか、独自のサービスを追加できます。',
+                            'Choose a model for reading questions, or add your own service.',
+                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                height: 1.4,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildCard(
+                          palette,
+                          children: [
+                            for (final item in _aiQuickModels)
+                              _buildAiModelRow(item),
+                            _buildAddAiModelRow(),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildCard(
+                          palette,
+                          children: [_buildPreprocessSwitch()],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                _buildCard(
-                  palette,
-                  children: [
-                    for (final item in _aiQuickModels) _buildAiModelRow(item),
-                    _buildAddAiModelRow(),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _buildCard(palette, children: [_buildPreprocessSwitch()]),
               ],
             ),
     );
@@ -389,9 +418,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: configured
-                            ? scheme.onSurfaceVariant
-                            : scheme.error,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -400,7 +427,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
               const SizedBox(width: 6),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 160),
-                child: selected
+                child: selected && configured
                     ? Icon(
                         Icons.check_circle_rounded,
                         key: const ValueKey('selected'),
@@ -413,10 +440,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                       ),
               ),
               IconButton(
-                onPressed: () => unawaited(_showAiQuickModelMenu(item)),
-                icon: const Icon(Icons.more_vert_rounded, size: 20),
+                tooltip: l10n.edit,
+                onPressed: () => unawaited(_openAiModelEditor(editing: item)),
+                icon: const Icon(Icons.edit_outlined, size: 20),
                 visualDensity: VisualDensity.compact,
               ),
+              if (item.isCustom && _aiQuickModels.length > 1)
+                IconButton(
+                  onPressed: () => unawaited(_showAiQuickModelMenu(item)),
+                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  visualDensity: VisualDensity.compact,
+                ),
             ],
           ),
         ),
@@ -430,7 +464,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => unawaited(_showAiModelSheet()),
+        onTap: () => unawaited(_openAiModelEditor()),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(
@@ -460,7 +494,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   Future<void> _activateAiQuickModel(_AiQuickModel item) async {
     if (!item.settings.isConfigured) {
-      await _showAiModelSheet(editing: item);
+      await _openAiModelEditor(editing: item);
       return;
     }
     try {
@@ -520,7 +554,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     if (!mounted) return;
     switch (action) {
       case 'edit':
-        await _showAiModelSheet(editing: item);
+        await _openAiModelEditor(editing: item);
       case 'delete':
         await _removeAiQuickModel(item);
     }
@@ -539,560 +573,45 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     await _persistAiQuickModels();
   }
 
-  Future<void> _showAiModelSheet({_AiQuickModel? editing}) async {
+  Future<void> _openAiModelEditor({_AiQuickModel? editing}) async {
     final initial =
         editing?.settings ??
         AIProviderSettings.defaults(_selectedAiProvider).copyWith(
           apiKey: _aiDraftByProvider[_selectedAiProvider]?.apiKey ?? '',
         );
-    var provider = initial.provider;
-    var protocol = initial.effectiveProtocol;
-    var customMode = editing?.isCustom ?? provider == AIProviderType.custom;
-    var selectedPreset =
-        AIModelPresets.match(initial) ??
-        AIModelPresets.defaultForProvider(
-          provider == AIProviderType.custom ? AIProviderType.openai : provider,
-        );
-    final apiKeyController = TextEditingController(text: initial.apiKey);
-    final baseUrlController = TextEditingController(text: initial.baseUrl);
-    final modelController = TextEditingController(text: initial.model);
-    final temperatureController = TextEditingController(
-      text: initial.temperature.toStringAsFixed(2),
-    );
-    var fetchedModels = <String>[];
-    var loadingModels = false;
-    String? errorText;
-
-    final result = await showModalBottomSheet<_AiQuickModel>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) {
-          final l10n = sheetContext.l10n;
-          final scheme = Theme.of(sheetContext).colorScheme;
-          final presets = AIModelPresets.byProvider(provider);
-
-          String protocolLabel(AIProtocolType value) => switch (value) {
-            AIProtocolType.openai => l10n.settingsAiProtocolOpenAi,
-            AIProtocolType.anthropic => l10n.settingsAiProtocolAnthropic,
-            AIProtocolType.gemini => 'Gemini',
-          };
-
-          String? baseUrlHint() {
-            if (!customMode) return null;
-            return switch (protocol) {
-              AIProtocolType.openai => l10n.settingsAiBaseUrlHintOpenAi,
-              AIProtocolType.anthropic => l10n.settingsAiBaseUrlHintAnthropic,
-              AIProtocolType.gemini => null,
-            };
-          }
-
-          void applySettings(AIProviderSettings settings) {
-            protocol = settings.effectiveProtocol;
-            baseUrlController.text = settings.baseUrl;
-            modelController.text = settings.model;
-            temperatureController.text = settings.temperature.toStringAsFixed(
-              2,
-            );
-            apiKeyController.text = settings.apiKey;
-          }
-
-          void applyPreset(AIModelPreset preset) {
-            selectedPreset = preset;
-            baseUrlController.text = preset.baseUrl;
-            modelController.text = preset.model;
-            temperatureController.text = preset.temperature.toStringAsFixed(2);
-            apiKeyController.text = _knownAiApiKey(
-              preset.provider,
-              preset.baseUrl,
-              protocol: preset.provider.defaultProtocol,
-            );
-          }
-
-          Future<void> fetchModels() async {
-            final apiKey = apiKeyController.text.trim();
-            final baseUrl = baseUrlController.text.trim();
-            if (apiKey.isEmpty || baseUrl.isEmpty) {
-              setSheetState(() {
-                errorText = l10n.settingsAiFillBaseUrlAndApiKey;
-              });
-              return;
-            }
-            setSheetState(() {
-              loadingModels = true;
-              errorText = null;
-            });
-            try {
-              final models = await _aiService.fetchAvailableModels(
-                AIProviderSettings(
-                  provider: provider,
-                  protocol: protocol,
-                  apiKey: apiKey,
-                  baseUrl: baseUrl,
-                  model: modelController.text.trim(),
-                  temperature:
-                      double.tryParse(temperatureController.text) ?? 0.7,
-                ),
-              );
-              if (!sheetContext.mounted) return;
-              setSheetState(() {
-                fetchedModels = models;
-                loadingModels = false;
-              });
-            } catch (error) {
-              if (!sheetContext.mounted) return;
-              setSheetState(() {
-                loadingModels = false;
-                errorText = '$error';
-              });
-            }
-          }
-
-          Future<void> saveModel() async {
-            final temperature = double.tryParse(
-              temperatureController.text.trim(),
-            );
-            final settings = AIProviderSettings(
-              provider: provider,
-              protocol: protocol,
-              apiKey: apiKeyController.text.trim(),
-              baseUrl: baseUrlController.text.trim(),
-              model: modelController.text.trim(),
-              temperature: temperature ?? 0.7,
-            ).normalized();
-            final validation = validateAIProviderSettings(settings);
-            if (validation != null) {
-              setSheetState(() => errorText = validation);
-              return;
-            }
-            try {
-              await _aiService.saveSettings(settings);
-              if (!sheetContext.mounted) return;
-              Navigator.of(sheetContext).pop(
-                _AiQuickModel(
-                  id: editing?.id ?? _AiQuickModel.idFor(settings),
-                  settings: settings,
-                  isCustom: customMode,
-                ),
-              );
-            } catch (error) {
-              if (sheetContext.mounted) {
-                setSheetState(() => errorText = '$error');
-              }
-            }
-          }
-
-          return AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-            ),
-            child: FractionallySizedBox(
-              heightFactor: 0.92,
-              child: Material(
-                color: scheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 10, bottom: 8),
-                      decoration: BoxDecoration(
-                        color: scheme.outlineVariant,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  editing == null
-                                      ? l10n.settingsAiAddModel
-                                      : l10n.settingsAiEditModelTitle,
-                                  style: Theme.of(sheetContext)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w800),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  l10n.settingsAiQuickCardSubtitle,
-                                  style: Theme.of(sheetContext)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.of(sheetContext).pop(),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                        children: [
-                          SegmentedButton<bool>(
-                            segments: [
-                              ButtonSegment(
-                                value: false,
-                                label: Text(l10n.settingsAiPresetModel),
-                                icon: const Icon(Icons.auto_awesome_outlined),
-                              ),
-                              ButtonSegment(
-                                value: true,
-                                label: Text(l10n.settingsAiCustomButton),
-                                icon: const Icon(Icons.tune_rounded),
-                              ),
-                            ],
-                            selected: {customMode},
-                            onSelectionChanged: (selection) {
-                              setSheetState(() {
-                                customMode = selection.first;
-                                errorText = null;
-                                fetchedModels = [];
-                                if (!customMode) {
-                                  if (provider == AIProviderType.custom) {
-                                    provider = AIProviderType.openai;
-                                    protocol = provider.defaultProtocol;
-                                    selectedPreset =
-                                        AIModelPresets.defaultForProvider(
-                                          provider,
-                                        );
-                                  }
-                                  applyPreset(selectedPreset);
-                                }
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 18),
-                          DropdownButtonFormField<AIProviderType>(
-                            initialValue: provider,
-                            decoration: InputDecoration(
-                              labelText: l10n.settingsAiProviderLabel,
-                              prefixIcon: const Icon(Icons.hub_outlined),
-                              border: const OutlineInputBorder(),
-                            ),
-                            items: AIProviderType.values
-                                .map(
-                                  (item) => DropdownMenuItem(
-                                    value: item,
-                                    child: Text(
-                                      item == AIProviderType.custom
-                                          ? l10n.settingsAiCustomProvider
-                                          : item.displayName,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setSheetState(() {
-                                provider = value;
-                                protocol = value.defaultProtocol;
-                                fetchedModels = [];
-                                errorText = null;
-                                if (value == AIProviderType.custom) {
-                                  customMode = true;
-                                  applySettings(
-                                    _aiDraftByProvider[value] ??
-                                        AIProviderSettings.defaults(value),
-                                  );
-                                } else if (!customMode) {
-                                  selectedPreset =
-                                      AIModelPresets.defaultForProvider(value);
-                                  applyPreset(selectedPreset);
-                                } else {
-                                  apiKeyController.text = _knownAiApiKey(
-                                    value,
-                                    baseUrlController.text,
-                                    protocol: protocol,
-                                  );
-                                }
-                              });
-                            },
-                          ),
-                          if (provider == AIProviderType.custom) ...[
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<AIProtocolType>(
-                              initialValue: protocol,
-                              decoration: InputDecoration(
-                                labelText: l10n.settingsAiProtocolLabel,
-                                prefixIcon: const Icon(
-                                  Icons.swap_calls_rounded,
-                                ),
-                                border: const OutlineInputBorder(),
-                              ),
-                              items:
-                                  const [
-                                        AIProtocolType.openai,
-                                        AIProtocolType.anthropic,
-                                      ]
-                                      .map(
-                                        (item) => DropdownMenuItem(
-                                          value: item,
-                                          child: Text(protocolLabel(item)),
-                                        ),
-                                      )
-                                      .toList(),
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setSheetState(() {
-                                  protocol = value;
-                                  fetchedModels = [];
-                                  errorText = null;
-                                  apiKeyController.text = _knownAiApiKey(
-                                    provider,
-                                    baseUrlController.text,
-                                    protocol: protocol,
-                                  );
-                                });
-                              },
-                            ),
-                          ],
-                          if (!customMode) ...[
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<AIModelPreset>(
-                              key: ValueKey(
-                                'sheet-${provider.value}-${selectedPreset.id}',
-                              ),
-                              initialValue: selectedPreset,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                labelText: l10n.settingsAiPresetModel,
-                                prefixIcon: const Icon(Icons.memory_rounded),
-                                border: const OutlineInputBorder(),
-                              ),
-                              items: presets
-                                  .map(
-                                    (preset) => DropdownMenuItem(
-                                      value: preset,
-                                      child: Text(
-                                        '${preset.vendor} · ${preset.label}',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (preset) {
-                                if (preset == null) return;
-                                setSheetState(() => applyPreset(preset));
-                              },
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: baseUrlController,
-                            enabled: customMode,
-                            decoration: InputDecoration(
-                              labelText: l10n.settingsAiBaseUrlLabel,
-                              helperText: baseUrlHint(),
-                              helperMaxLines: 3,
-                              prefixIcon: const Icon(Icons.link_rounded),
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: apiKeyController,
-                            obscureText: _obscureAiApiKey,
-                            decoration: InputDecoration(
-                              labelText: l10n.settingsAiApiKeyLabel,
-                              prefixIcon: const Icon(Icons.key_rounded),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureAiApiKey = !_obscureAiApiKey;
-                                  });
-                                  setSheetState(() {});
-                                },
-                                icon: Icon(
-                                  _obscureAiApiKey
-                                      ? Icons.visibility_off_rounded
-                                      : Icons.visibility_rounded,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: modelController,
-                            enabled: customMode,
-                            decoration: InputDecoration(
-                              labelText: l10n.settingsAiModelNameLabel,
-                              prefixIcon: const Icon(Icons.smart_toy_outlined),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: customMode
-                                  ? IconButton(
-                                      tooltip:
-                                          l10n.settingsAiFetchModelsTooltip,
-                                      onPressed: loadingModels
-                                          ? null
-                                          : fetchModels,
-                                      icon: loadingModels
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.refresh_rounded),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          if (customMode) ...[
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: loadingModels ? null : fetchModels,
-                                icon: const Icon(Icons.travel_explore_rounded),
-                                label: Text(l10n.settingsAiFetchModelsList),
-                              ),
-                            ),
-                          ],
-                          if (fetchedModels.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              l10n.settingsAiSelectModel,
-                              style: Theme.of(sheetContext).textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              constraints: const BoxConstraints(maxHeight: 220),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: scheme.outlineVariant,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: fetchedModels.length,
-                                itemBuilder: (_, index) {
-                                  final model = fetchedModels[index];
-                                  final selected =
-                                      modelController.text.trim() == model;
-                                  return ListTile(
-                                    dense: true,
-                                    title: Text(model),
-                                    trailing: Icon(
-                                      selected
-                                          ? Icons.check_circle_rounded
-                                          : Icons.circle_outlined,
-                                      color: selected ? scheme.primary : null,
-                                    ),
-                                    onTap: () {
-                                      modelController.text = model;
-                                      setSheetState(() {});
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                          if (customMode) ...[
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: temperatureController,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              decoration: InputDecoration(
-                                labelText: l10n.settingsAiTemperatureLabel,
-                                prefixIcon: const Icon(
-                                  Icons.thermostat_rounded,
-                                ),
-                                border: const OutlineInputBorder(),
-                              ),
-                            ),
-                          ],
-                          if (errorText != null) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              errorText!,
-                              style: TextStyle(
-                                color: scheme.error,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: saveModel,
-                          icon: const Icon(Icons.add_task_rounded),
-                          label: Text(
-                            editing == null
-                                ? l10n.settingsAiAddAndEnable
-                                : l10n.settingsAiSaveAndEnable,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+    final result = await Navigator.of(context).push<AiModelEditorResult>(
+      MaterialPageRoute(
+        builder: (_) => AiModelEditorPage(
+          initialSettings: initial,
+          initialIsCustom:
+              editing?.isCustom ?? initial.provider == AIProviderType.custom,
+          isEditing: editing != null,
+          aiService: _aiService,
+          knownApiKey: (provider, baseUrl, protocol) =>
+              _knownAiApiKey(provider, baseUrl, protocol: protocol),
+        ),
       ),
     );
-
-    // 弹窗 pop 后仍有退场动画，期间表单还会随键盘收起重建并读取这些控制器；
-    // 立即释放会让 EditableText 在拆除中途崩溃，延迟到动画结束后再释放。
-    unawaited(
-      Future<void>.delayed(const Duration(seconds: 1), () {
-        apiKeyController.dispose();
-        baseUrlController.dispose();
-        modelController.dispose();
-        temperatureController.dispose();
-      }),
-    );
-
     if (result == null || !mounted) return;
+    final item = _AiQuickModel(
+      id: editing?.id ?? _AiQuickModel.idFor(result.settings),
+      settings: result.settings,
+      isCustom: result.isCustom,
+    );
     setState(() {
       final existingIndex = _aiQuickModels.indexWhere(
-        (item) => item.id == result.id,
+        (candidate) => candidate.id == item.id,
       );
       if (existingIndex >= 0) {
         final next = [..._aiQuickModels];
-        next[existingIndex] = result;
+        next[existingIndex] = item;
         _aiQuickModels = next;
       } else {
-        _aiQuickModels = [..._aiQuickModels, result];
+        _aiQuickModels = [..._aiQuickModels, item];
       }
-      _activeAiQuickModelId = result.id;
-      _selectedAiProvider = result.settings.provider;
-      _aiDraftByProvider[result.settings.provider] = result.settings;
+      _activeAiQuickModelId = item.id;
+      _selectedAiProvider = item.settings.provider;
+      _aiDraftByProvider[item.settings.provider] = item.settings;
     });
     await _persistAiQuickModels();
   }

@@ -4,11 +4,14 @@ import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/source_engine/source_health_checker.dart';
 import '../../../utils/localization_extension.dart';
 import '../../../utils/page_style_helper.dart';
+import '../../../widgets/app_menu.dart';
 import '../../../widgets/source_cover_image.dart';
 import '../controllers/book_source_management_controller.dart';
+import '../models/source_edit_fields.dart';
 import 'book_source_organization_copy.dart';
 
 enum BookSourceManagementSourceAction {
+  edit,
   groups,
   favorite,
   refresh,
@@ -133,52 +136,70 @@ class BookSourceManagementSourceCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Container(
         key: ValueKey('bookSourceCard-${source.id}'),
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 10),
         decoration: _cardDecoration(palette.card, palette.border, 16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox.square(
-              dimension: 40,
-              child: selectionMode
-                  ? Center(
-                      child: Checkbox(
-                        value: selected,
-                        onChanged: (_) => onToggleSelection(),
-                      ),
-                    )
-                  : _SourceIcon(source: source, size: 40),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox.square(
+                  dimension: 40,
+                  child: selectionMode
+                      ? Center(
+                          child: Checkbox(
+                            value: selected,
+                            onChanged: (_) => onToggleSelection(),
+                          ),
+                        )
+                      : _SourceIcon(source: source, size: 40),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: _SourceSummary(source: source)),
+                if (!selectionMode) ...[
+                  const SizedBox(width: 4),
+                  _SourceMenu(source: source, onAction: onAction),
+                ],
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(child: _SourceSummary(source: source)),
-            const SizedBox(width: 4),
-            if (!selectionMode)
-              IconButton(
-                key: ValueKey('bookSourceFavorite-${source.id}'),
-                tooltip: source.isFavorite
-                    ? BookSourceOrganizationCopy.of(context).unfavorite
-                    : BookSourceOrganizationCopy.of(context).favorite,
-                onPressed: () =>
-                    onAction(BookSourceManagementSourceAction.favorite),
-                icon: Icon(
-                  source.isFavorite
-                      ? Icons.star_rounded
-                      : Icons.star_border_rounded,
-                  color: source.isFavorite
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: _SourceMetadata(source: source),
+            ),
+            if (!selectionMode) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    key: ValueKey('bookSourceFavorite-${source.id}'),
+                    tooltip: source.isFavorite
+                        ? BookSourceOrganizationCopy.of(context).unfavorite
+                        : BookSourceOrganizationCopy.of(context).favorite,
+                    onPressed: () =>
+                        onAction(BookSourceManagementSourceAction.favorite),
+                    icon: Icon(
+                      source.isFavorite
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      color: source.isFavorite
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                  ),
+                  Tooltip(
+                    message: source.enabled
+                        ? context.l10n.bookSourcesEnabled
+                        : context.l10n.bookSourcesDisabled,
+                    child: Switch.adaptive(
+                      value: source.enabled,
+                      onChanged: !canEnable ? null : onEnabledChanged,
+                    ),
+                  ),
+                ],
               ),
-            if (!selectionMode)
-              Tooltip(
-                message: source.enabled
-                    ? context.l10n.bookSourcesEnabled
-                    : context.l10n.bookSourcesDisabled,
-                child: Switch.adaptive(
-                  value: source.enabled,
-                  onChanged: !canEnable ? null : onEnabledChanged,
-                ),
-              ),
-            if (!selectionMode) _SourceMenu(source: source, onAction: onAction),
+            ],
           ],
         ),
       ),
@@ -194,7 +215,40 @@ class _SourceSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final groups = bookSourceGroups(source);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          source.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          source.description.isEmpty
+              ? source.apiBaseUrl.host
+              : source.description,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+        ),
+      ],
+    );
+  }
+}
+
+class _SourceMetadata extends StatelessWidget {
+  const _SourceMetadata({required this.source});
+
+  final RegisteredBookSource source;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final runnable = source.capabilities.isNotEmpty;
     final health = sourceHealthCheckResultOf(source);
     final badges = <Widget>[
@@ -225,39 +279,26 @@ class _SourceSummary extends StatelessWidget {
           icon: Icons.verified_rounded,
           color: scheme.tertiary,
         ),
-      for (final group in groups.take(2))
+      for (final group in bookSourceGroups(source).take(2))
         _MetaPill(
           label: group,
           icon: Icons.folder_outlined,
           color: scheme.onSurfaceVariant,
         ),
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          source.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          source.description.isEmpty
-              ? source.apiBaseUrl.host
-              : source.description,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
-        ),
-        if (badges.isNotEmpty) ...[
-          const SizedBox(height: 5),
-          Wrap(spacing: 6, runSpacing: 4, children: badges),
+    if (badges.isEmpty) return const SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, constraints) => Wrap(
+        spacing: 8,
+        runSpacing: 5,
+        children: [
+          for (final badge in badges)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+              child: badge,
+            ),
         ],
-      ],
+      ),
     );
   }
 }
@@ -280,12 +321,16 @@ class _MetaPill extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: color),
         const SizedBox(width: 3),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -301,30 +346,35 @@ class _SourceMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
+    return AppPopupMenuButton<String>(
       tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
       onSelected: (value) =>
           onAction(BookSourceManagementSourceAction.values.byName(value)),
       itemBuilder: (context) => [
+        if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
+          PopupMenuItem(
+            value: BookSourceManagementSourceAction.edit.name,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(SourceEditCopy.of(context).edit),
+            ),
+          ),
         PopupMenuItem(
           value: BookSourceManagementSourceAction.groups.name,
-          child: Row(
-            children: [
-              const Icon(Icons.folder_outlined),
-              const SizedBox(width: 10),
-              Text(BookSourceOrganizationCopy.of(context).editGroups),
-            ],
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.folder_outlined),
+            title: Text(BookSourceOrganizationCopy.of(context).editGroups),
           ),
         ),
         if (source.sourceProtocol == BookSourceProtocolKind.orsp)
           PopupMenuItem(
             value: BookSourceManagementSourceAction.refresh.name,
-            child: Row(
-              children: [
-                const Icon(Icons.refresh_rounded),
-                const SizedBox(width: 10),
-                Text(context.l10n.bookSourcesRefresh),
-              ],
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.refresh_rounded),
+              title: Text(context.l10n.bookSourcesRefresh),
             ),
           ),
         if (source.sourceProtocol == BookSourceProtocolKind.orsp)
@@ -335,44 +385,36 @@ class _SourceMenu extends StatelessWidget {
         if (sourceRequiresLogin(source))
           PopupMenuItem(
             value: BookSourceManagementSourceAction.login.name,
-            child: Row(
-              children: [
-                const Icon(Icons.key_rounded),
-                const SizedBox(width: 10),
-                Text(context.l10n.sourceLoginTitle),
-              ],
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.key_rounded),
+              title: Text(context.l10n.sourceLoginTitle),
             ),
           ),
         if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
           PopupMenuItem(
             value: BookSourceManagementSourceAction.debug.name,
-            child: Row(
-              children: [
-                const Icon(Icons.bug_report_outlined),
-                const SizedBox(width: 10),
-                Text(context.l10n.sourceDebugMenuLabel),
-              ],
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.bug_report_outlined),
+              title: Text(context.l10n.sourceDebugMenuLabel),
             ),
           ),
         if (source.sourceProtocol == BookSourceProtocolKind.readingSource)
           PopupMenuItem(
             value: BookSourceManagementSourceAction.health.name,
-            child: Row(
-              children: [
-                const Icon(Icons.health_and_safety_outlined),
-                const SizedBox(width: 10),
-                Text(context.l10n.sourceHealthMenuLabel),
-              ],
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.health_and_safety_outlined),
+              title: Text(context.l10n.sourceHealthMenuLabel),
             ),
           ),
         PopupMenuItem(
           value: BookSourceManagementSourceAction.remove.name,
-          child: Row(
-            children: [
-              const Icon(Icons.delete_outline_rounded),
-              const SizedBox(width: 10),
-              Text(context.l10n.bookSourcesRemove),
-            ],
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.delete_outline_rounded),
+            title: Text(context.l10n.bookSourcesRemove),
           ),
         ),
       ],

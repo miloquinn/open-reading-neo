@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_registry.dart';
+import '../../../widgets/app_menu.dart';
 import 'book_source_organization_copy.dart';
 import 'book_source_organization_sheets.dart';
 
@@ -142,7 +143,7 @@ class _BookSourceOrganizationActionsState
         ),
         SizedBox.square(
           dimension: 44,
-          child: PopupMenuButton<_BookSourceOrganizationAction>(
+          child: AppPopupMenuButton<_BookSourceOrganizationAction>(
             key: ValueKey('bookSourceOrganizationMore-${widget.source.id}'),
             constraints: const BoxConstraints(minWidth: 180, maxWidth: 320),
             tooltip: copy.moreActions,

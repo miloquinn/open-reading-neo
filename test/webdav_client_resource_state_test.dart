@@ -47,10 +47,10 @@ void main() {
       if (method == 'HEAD') return _response(200);
       if (method == 'PROPFIND') {
         return _xmlResponse('''<d:multistatus xmlns:d="DAV:">
-          <d:response><d:href>/OpenReading/v2/books/other.txt</d:href>
+          <d:response><d:href>/OpenReading/books/other/current.txt</d:href>
             <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop><d:getetag>"other"</d:getetag></d:prop></d:propstat>
           </d:response>
-          <d:response><d:href>/OpenReading/v2/books/current.txt</d:href>
+          <d:response><d:href>/OpenReading/books/book/current.txt</d:href>
             <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop><d:getetag>"dav"</d:getetag><d:getcontentlength>12</d:getcontentlength></d:prop></d:propstat>
           </d:response></d:multistatus>''');
       }
@@ -66,7 +66,7 @@ void main() {
     'decodes numeric quotes once and preserves encoded ampersands',
     () async {
       final adapter = _propertyAdapter('''<d:multistatus xmlns:d="DAV:">
-      <d:response><d:href>/OpenReading/v2/books/current.txt</d:href>
+      <d:response><d:href>/OpenReading/books/book/current.txt</d:href>
         <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop>
           <d:getetag>&#34;revision&#x22;</d:getetag>
         </d:prop></d:propstat>
@@ -75,7 +75,7 @@ void main() {
 
       final literalEntityAdapter = _propertyAdapter(
         '''<d:multistatus xmlns:d="DAV:">
-      <d:response><d:href>/OpenReading/v2/books/current.txt</d:href>
+      <d:response><d:href>/OpenReading/books/book/current.txt</d:href>
         <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop>
           <d:getetag>&quot;a&amp;quot;b&quot;</d:getetag>
         </d:prop></d:propstat>
@@ -90,7 +90,7 @@ void main() {
 
   test('rejects a property response with only an unrelated href', () async {
     final adapter = _propertyAdapter('''<d:multistatus xmlns:d="DAV:">
-      <d:response><d:href>/OpenReading/v2/books/other.txt</d:href>
+      <d:response><d:href>/OpenReading/books/other/current.txt</d:href>
         <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop><d:getetag>"other"</d:getetag></d:prop></d:propstat>
       </d:response></d:multistatus>''');
     await expectLater(
@@ -107,7 +107,7 @@ void main() {
 
   test('does not accept ETag from a failed propstat', () async {
     final adapter = _propertyAdapter('''<d:multistatus xmlns:d="DAV:">
-      <d:response><d:href>/OpenReading/v2/books/current.txt</d:href>
+      <d:response><d:href>/OpenReading/books/book/current.txt</d:href>
         <d:propstat><d:status>HTTP/1.1 404 Not Found</d:status><d:prop><d:getetag>"bad"</d:getetag></d:prop></d:propstat>
       </d:response></d:multistatus>''');
     final state = await _client(adapter).resourceState(_uri());
@@ -118,7 +118,7 @@ void main() {
   test('weak or missing property ETags remain unusable', () async {
     for (final etag in ['W/"weak"', null]) {
       final adapter = _propertyAdapter('''<d:multistatus xmlns:d="DAV:">
-        <d:response><d:href>/OpenReading/v2/books/current.txt</d:href>
+        <d:response><d:href>/OpenReading/books/book/current.txt</d:href>
           <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop><d:getetag>${etag ?? ''}</d:getetag></d:prop></d:propstat>
         </d:response></d:multistatus>''');
       final state = await _client(adapter).resourceState(_uri());
@@ -203,7 +203,7 @@ void main() {
 }
 
 Uri _uri() =>
-    Uri.parse('https://dav.example.com/OpenReading/v2/books/current.txt');
+    Uri.parse('https://dav.example.com/OpenReading/books/book/current.txt');
 
 WebDavClient _client(HttpClientAdapter adapter) => WebDavClient(
   dio: Dio()..httpClientAdapter = adapter,
@@ -283,6 +283,9 @@ class _RaceAdapter implements HttpClientAdapter {
         return ResponseBody(
           Stream.value(Uint8List.fromList(utf8.encode(remoteBytes))),
           200,
+          headers: {
+            'etag': [remoteEtags[headCount++]],
+          },
         );
       default:
         fail('unexpected ${options.method}');

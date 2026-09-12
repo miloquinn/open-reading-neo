@@ -19,6 +19,8 @@ import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/settings/about/changelog_page.dart';
 import 'package:xxread/pages/settings/about/open_source_licenses_page.dart';
 import 'package:xxread/pages/settings/ai_settings_page.dart';
+import 'package:xxread/pages/settings/cloud_tts_settings_page.dart';
+import 'package:xxread/services/reader_aloud_service.dart';
 import 'package:xxread/pages/settings/cache_management_page.dart';
 import 'package:xxread/pages/settings/font_selection_sheet.dart';
 import 'package:xxread/pages/settings/floating_navigation_settings_page.dart';
@@ -49,6 +51,7 @@ import 'package:xxread/widgets/settings_account_card.dart';
 import 'package:xxread/widgets/side_toast.dart';
 import 'package:xxread/widgets/update_check_gate.dart';
 
+import 'app_text_size_sheet.dart';
 import 'custom_fonts_page.dart';
 
 part 'parts/settings_appearance_part.dart';

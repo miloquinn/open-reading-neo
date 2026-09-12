@@ -128,6 +128,21 @@ void main() {
         expect(controller.page, controller.initialPage.toDouble());
         expect(precachedImages.toSet(), hasLength(greaterThanOrEqualTo(2)));
         expect(precachedImages, everyElement(isA<FileImage>()));
+        tester
+            .widget<IconButton>(
+              find.ancestor(
+                of: find.byIcon(Icons.tune_rounded),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed!();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Layout'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('reader-chapter-title-page-switch')),
+          findsNothing,
+        );
         expect(tester.takeException(), isNull);
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());

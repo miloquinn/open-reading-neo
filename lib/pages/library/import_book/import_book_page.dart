@@ -131,7 +131,7 @@ class _ImportBookPageState extends State<ImportBookPage> {
       if (!await file.exists()) continue;
       if (book.format.toLowerCase() == 'txt' ||
           await file.length() <=
-              WebDavBookFileService.maxRecoverableFileBytes) {
+              BookFileSyncService.maxRecoverableFileBytes) {
         eligible.add(book);
       }
     }

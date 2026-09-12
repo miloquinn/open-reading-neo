@@ -14,11 +14,25 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       NotificationListener<ScrollNotification>(
         onNotification: (notification) {
           if (notification is ScrollStartNotification &&
-              notification.dragDetails != null) {
-            _markReadingPositionChanged();
+              _initialPositionRestored) {
+            _verticalPositionCapturePending = true;
+            _verticalScrollRevision++;
+            if (notification.dragDetails != null) {
+              _markReadingPositionChanged();
+            }
           } else if (notification is ScrollEndNotification &&
-              _progressSyncEventPending) {
-            unawaited(_persistCurrentReaderPosition(reason: 'scroll-end'));
+              _verticalPositionCapturePending) {
+            // ItemPositionsListener publishes after layout. Capture that last
+            // frame before ending the scroll, without closing a newer gesture.
+            final revision = _verticalScrollRevision;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || revision != _verticalScrollRevision) return;
+              _captureVerticalPosition();
+              _verticalPositionCapturePending = false;
+              if (_progressSyncEventPending) {
+                unawaited(_persistCurrentReaderPosition(reason: 'scroll-end'));
+              }
+            });
           }
           return false;
         },
@@ -32,8 +46,18 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
   GlobalKey _continuousPartKey(String chapterId, int partIndex) =>
       _continuousPartKeys.putIfAbsent('$chapterId:$partIndex', GlobalKey.new);
 
+  void _captureVerticalPosition() {
+    if (_usesChapterScopedVerticalList) {
+      _onVerticalPagePositionsChanged();
+    } else {
+      _onVerticalChapterPositionsChanged();
+    }
+  }
+
   void _onVerticalPagePositionsChanged() {
     if (!mounted ||
+        !_initialPositionRestored ||
+        !_verticalPositionCapturePending ||
         _pageMode != NativePageMode.verticalScroll ||
         !_usesChapterScopedVerticalList ||
         _visibleContinuousParts.isEmpty) {
@@ -56,7 +80,6 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     final chapter = _visibleChapters[_chapterIndex];
     final part = _visibleContinuousParts[nextPage];
     final offset = _continuousOffsetAtViewportCenter(chapter, part, nextPage);
-    _verticalCanonicalOffset = offset;
     _saveCanonicalProgress(
       chapter,
       _ReaderPageData(text: '', startOffset: offset, endOffset: offset),
@@ -67,6 +90,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
   void _onVerticalChapterPositionsChanged() {
     if (!mounted ||
         !_initialPositionRestored ||
+        !_verticalPositionCapturePending ||
         _pageMode != NativePageMode.verticalScroll ||
         _usesChapterScopedVerticalList ||
         _visibleChapters.isEmpty ||
@@ -128,7 +152,6 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       parts[nextPage],
       nextPage,
     );
-    _verticalCanonicalOffset = offset;
     _saveCanonicalProgress(
       _visibleChapters[nextChapter],
       _ReaderPageData(text: '', startOffset: offset, endOffset: offset),
@@ -152,26 +175,26 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     );
   }
 
-  Future<void> _scrollContinuousAnchorIntoView(
+  Future<bool> _scrollContinuousAnchorIntoView(
     _NativeChapter chapter,
     List<_ContinuousReaderPart> parts,
     int partIndex,
     int sourceOffset, {
     bool centerInViewport = false,
   }) async {
+    final revision = _verticalScrollRevision;
     final targetContext = _continuousPartKey(
       chapter.id,
       partIndex,
     ).currentContext;
-    if (targetContext != null) {
-      await Scrollable.ensureVisible(
-        targetContext,
-        alignment: 0,
-        duration: Duration.zero,
-      );
-    }
+    if (targetContext == null) return false;
+    await Scrollable.ensureVisible(
+      targetContext,
+      alignment: 0,
+      duration: Duration.zero,
+    );
     await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
+    if (!mounted || revision != _verticalScrollRevision) return false;
     final paragraph = readerParagraphForKey(
       _continuousPartKey(chapter.id, partIndex),
     );
@@ -182,7 +205,9 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
       sourceOffset: sourceOffset,
       textOffsetForSourceOffset: part.content.textOffsetForSourceOffset,
     );
-    if (caretOffset == null) return;
+    // Images and empty parts have a valid coarse anchor but no text caret.
+    if (part.content.text.isEmpty) return true;
+    if (caretOffset == null) return false;
     final restoredContext = _continuousPartKey(
       chapter.id,
       partIndex,
@@ -190,25 +215,25 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
     final scrollable = restoredContext == null || !restoredContext.mounted
         ? null
         : Scrollable.maybeOf(restoredContext);
+    if (scrollable == null) return false;
     final offsetDelta = centerInViewport && paragraph != null
         ? paragraph.localToGlobal(Offset(0, caretOffset)).dy -
               MediaQuery.sizeOf(context).height / 2
         : caretOffset;
     if (_usesChapterScopedVerticalList) {
-      if (scrollable != null) {
-        scrollable.position.jumpTo(
-          (scrollable.position.pixels + offsetDelta).clamp(
-            scrollable.position.minScrollExtent,
-            scrollable.position.maxScrollExtent,
-          ),
-        );
-      }
-      return;
+      scrollable.position.jumpTo(
+        (scrollable.position.pixels + offsetDelta).clamp(
+          scrollable.position.minScrollExtent,
+          scrollable.position.maxScrollExtent,
+        ),
+      );
+      return true;
     }
     await _verticalChapterOffsetController.animateScroll(
       offset: offsetDelta,
       duration: const Duration(milliseconds: 1),
     );
+    return true;
   }
 
   List<_ContinuousReaderPart> _continuousPartsFor(

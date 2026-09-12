@@ -1,0 +1,5 @@
+This is a one-time, non-consumable lifetime Premium purchase (com.niki.xxread.premium.lifetime), with no subscription or automatic renewal.
+
+On macOS, open Settings, enter the account center, sign in, and open Premium. The purchase screen explains the benefits and displays the localized App Store price. Premium unlocks additional compatible book-source protocols and trusted local/private-network sources. After purchase, these options are available under Settings > Advanced Features and must be enabled by the user. The app does not supply commercial books or a bundled third-party source catalog.
+
+Restore Purchases is available in the membership screen. Purchases are verified on the server and linked to the signed-in Open Reading account.

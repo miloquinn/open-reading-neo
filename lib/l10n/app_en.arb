@@ -36,11 +36,23 @@
   "discoverCategoryEmpty": "There are no books to show in this category yet.",
   "bookSourceChannelLoadFailed": "Could not load channel",
   "bookSourceChannelLoadFailedMessage": "The source returned no usable books: {details}",
-  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChannelLoadFailedMessage": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceConnectionFailed": "Could not connect to the source server after trying its available network addresses. Try again later.",
   "bookSourceRedirectFailed": "The source site kept redirecting. Site cookies were retained, but the address still returned no content.",
   "bookSourceHttpFailed": "The source site returned HTTP {status}. The channel address may be stale or blocked by the site.",
-  "@bookSourceHttpFailed": {"placeholders":{"status":{"type":"int"}}},
+  "@bookSourceHttpFailed": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceStandardLayout": "Standard layout",
   "bookSourceListLayout": "List layout",
   "bookSourceChangeChannel": "Change",
@@ -49,13 +61,28 @@
   "bookSourceChangeTargetSource": "Change to",
   "bookSourceChangeNotSelected": "Not selected",
   "bookSourceChangeCurrentChapter": "Currently at chapter {chapter}",
-  "@bookSourceChangeCurrentChapter": {"placeholders":{"chapter":{"type":"int"}}},
+  "@bookSourceChangeCurrentChapter": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeSearchLabel": "Find this book in other sources",
   "bookSourceChangeSearchAgain": "Search again",
   "bookSourceChangeSearchRemaining": "Search all remaining sources",
   "bookSourceChangeCheckAuthor": "Match author",
   "bookSourceChangeSearchProgress": "Checked {completed} of {total}",
-  "@bookSourceChangeSearchProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourceChangeSearchProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeNoOtherSources": "No other sources available",
   "bookSourceChangeNoOtherSourcesHint": "Add and enable another source that supports search first.",
   "bookSourceChangeSearching": "Finding other sources",
@@ -63,24 +90,60 @@
   "bookSourceChangeNoMatches": "No matching sources found",
   "bookSourceChangeNoMatchesHint": "Edit the title or turn off author matching, then search again.",
   "bookSourceChangeFailedSources": "{count} source request(s) failed. You can search again.",
-  "@bookSourceChangeFailedSources": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeFailedSources": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeAuthorDifferent": "Different author",
   "bookSourceChangeValidating": "Checking the catalog and current chapter…",
   "bookSourceChangeValidationFailed": "Validation failed: {details}",
-  "@bookSourceChangeValidationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChangeValidationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChangeReadable": "Current chapter readable",
   "bookSourceChangeChapterCount": "{count} chapters",
-  "@bookSourceChangeChapterCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeChapterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeResponseTime": "{milliseconds} ms",
-  "@bookSourceChangeResponseTime": {"placeholders":{"milliseconds":{"type":"int"}}},
+  "@bookSourceChangeResponseTime": {
+    "placeholders": {
+      "milliseconds": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeTapToValidate": "Select to check the catalog and current chapter.",
   "bookSourceChangeAlreadyOnShelf": "This source version is already on the bookshelf.",
   "bookSourceChangeSwitching": "Changing source…",
   "bookSourceChangeSwitchAction": "Change to this source",
   "bookSourceChangeSuccess": "Changed source to {source}",
-  "@bookSourceChangeSuccess": {"placeholders":{"source":{"type":"String"}}},
+  "@bookSourceChangeSuccess": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChannelCount": "{count} channels",
-  "@bookSourceChannelCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceManagementTitle": "Manage sources",
   "bookSourceManagementSubtitle": "Add, enable, remove, and inspect content providers. Discovery stays focused on finding books.",
   "settingsContentSourcesTitle": "Content sources",
@@ -134,7 +197,16 @@
   "bookSourcesNoMatchingSources": "No sources match the current search and filters",
   "bookSourcesResetFilters": "Reset",
   "bookSourcesVisibleCount": "Showing {visible} of {total}",
-  "@bookSourcesVisibleCount": {"placeholders":{"visible":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesVisibleCount": {
+    "placeholders": {
+      "visible": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesRemove": "Remove",
   "bookSourcesRemoveTitle": "Remove source",
   "bookSourcesRemoveMessage": "This only removes the source configuration. Local books are not affected.",
@@ -150,7 +222,19 @@
   "bookSourcesAdvancedFeatureRequired": "This source is unavailable for the current account or settings.",
   "bookSourcesNoWorkingSources": "No source passed the live search check. Nothing was imported.",
   "bookSourcesVerificationProgress": "Checked {completed}/{total}; {available} working",
-  "@bookSourcesVerificationProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"},"available":{"type":"int"}}},
+  "@bookSourcesVerificationProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "available": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesSelect": "Select sources",
   "bookSourcesSelectAll": "Select all",
   "bookSourcesClearSelection": "Clear selection",
@@ -158,24 +242,72 @@
   "bookSourcesDisableSelected": "Disable selected",
   "bookSourcesDeleteSelected": "Delete selected",
   "bookSourcesDeleteSelectedMessage": "Delete {count} selected sources? Local books are not affected.",
-  "@bookSourcesDeleteSelectedMessage": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDeleteSelectedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCheckSelected": "Check selected",
   "bookSourcesHealthCheckSummary": "{healthy} of {total} source(s) are healthy",
-  "@bookSourcesHealthCheckSummary": {"placeholders":{"healthy":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesHealthCheckSummary": {
+    "placeholders": {
+      "healthy": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupMenuLabel": "Check & clean up sources",
   "bookSourcesCleanupNoCheckableSources": "No sources to check",
   "bookSourcesCleanupAllFullyAvailable": "All {count} checked source(s) are fully available",
-  "@bookSourcesCleanupAllFullyAvailable": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupAllFullyAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewTitle": "Health results",
   "bookSourcesCleanupReviewSummary": "{fullyAvailable} fully available · {needsAttention} to review",
-  "@bookSourcesCleanupReviewSummary": {"placeholders":{"fullyAvailable":{"type":"int"},"needsAttention":{"type":"int"}}},
+  "@bookSourcesCleanupReviewSummary": {
+    "placeholders": {
+      "fullyAvailable": {
+        "type": "int"
+      },
+      "needsAttention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewHint": "Missing features or a timeout do not mean a source is unusable. Select only the sources you want to disable.",
   "bookSourcesCleanupDisableSelected": "Disable {count} selected",
-  "@bookSourcesCleanupDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupDisabledSummary": "Disabled {count} source(s)",
-  "@bookSourcesCleanupDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupCancelledSummary": "Stopped — checked {count} source(s). Run it again later to pick up where you left off.",
-  "@bookSourcesCleanupCancelledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupCancelledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceTitle": "Source maintenance",
   "bookSourcesMaintenanceSubtitle": "Find duplicates and check source availability",
   "bookSourcesMaintenanceHealthTitle": "Source health check",
@@ -185,32 +317,86 @@
   "bookSourcesMaintenanceDedupeSubtitle": "Compare sources locally, no network needed",
   "bookSourcesMaintenanceReviewTitle": "Last health-check result",
   "bookSourcesMaintenanceReviewSubtitle": "{count} source(s) need attention",
-  "@bookSourcesMaintenanceReviewSubtitle": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesMaintenanceReviewSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceSafetyHint": "Only sources you confirm are disabled. Their configurations are kept.",
   "bookSourcesMaintenanceProgressTitle": "Checking sources",
   "bookSourcesMaintenanceProgressHint": "Checking search, details, catalogs, and content",
   "bookSourcesMaintenanceFinishedTitle": "Source health check complete",
   "bookSourcesMaintenanceFinishedSummary": "Checked {checked} source(s); {attention} need attention",
-  "@bookSourcesMaintenanceFinishedSummary": {"placeholders":{"checked":{"type":"int"},"attention":{"type":"int"}}},
+  "@bookSourcesMaintenanceFinishedSummary": {
+    "placeholders": {
+      "checked": {
+        "type": "int"
+      },
+      "attention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceProgress": "{completed} / {total}",
-  "@bookSourcesMaintenanceProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceStop": "Stop checking",
   "bookSourcesMaintenanceBackground": "Continue in background",
   "bookSourcesMaintenanceBackgroundHint": "Close this progress view and the check will continue quietly while the app is running.",
   "bookSourcesMaintenanceBackgroundToast": "Source health check is continuing quietly in the background",
   "bookSourcesMaintenanceReviewResults": "Review results",
   "bookSourcesMaintenanceRunningMenuLabel": "Source maintenance {completed}/{total}",
-  "@bookSourcesMaintenanceRunningMenuLabel": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceRunningMenuLabel": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeMenuLabel": "Find duplicate sources",
   "bookSourcesDedupeNone": "No duplicate sources found",
   "bookSourcesDedupeReviewTitle": "Review duplicate sources",
   "bookSourcesDedupeReviewSummary": "{groups} group(s), {duplicates} duplicate source(s)",
-  "@bookSourcesDedupeReviewSummary": {"placeholders":{"groups":{"type":"int"},"duplicates":{"type":"int"}}},
+  "@bookSourcesDedupeReviewSummary": {
+    "placeholders": {
+      "groups": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeReviewHint": "The recommended source is kept. Selected duplicates will be disabled, not deleted.",
   "bookSourcesDedupeDisableSelected": "Disable {count} selected",
-  "@bookSourcesDedupeDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeDisabledSummary": "Disabled {count} duplicate source(s)",
-  "@bookSourcesDedupeDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeModeExact": "Exact",
   "bookSourcesDedupeModeStandard": "Standard",
   "bookSourcesDedupeModeSite": "Same site",
@@ -220,9 +406,33 @@
   "bookSourcesDedupeRecommended": "Recommended",
   "bookSourcesDedupeReviewAction": "Review deduplication",
   "bookSourcesDedupeImportSummary": "{ready} ready, {duplicates} duplicate, {errors} invalid",
-  "@bookSourcesDedupeImportSummary": {"placeholders":{"ready":{"type":"int"},"duplicates":{"type":"int"},"errors":{"type":"int"}}},
+  "@bookSourcesDedupeImportSummary": {
+    "placeholders": {
+      "ready": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "errors": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesImportTypeSummary": "{books} book · {comics} comic · {unsupported} currently unrunnable",
-  "@bookSourcesImportTypeSummary": {"placeholders":{"books":{"type":"int"},"comics":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@bookSourcesImportTypeSummary": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "comics": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeRestoreDefaults": "Restore recommendations",
   "bookSourcesUrlLabel": "Source address",
   "bookSourcesUrlHint": "https://example.com or a source JSON URL",
@@ -259,15 +469,31 @@
   "bookSourcesClose": "Close",
   "sourceLoginTitle": "Source sign-in",
   "sourceLoginSecureStorageNotice": "Sign-in details stay in this device's secure system storage.",
-  "sourceLoginNoForm": "This source does not provide a sign-in form. Browser-based sign-in is not available yet.",
+  "sourceLoginNoForm": "This source does not provide an available sign-in method.",
+  "sourceLoginBrowserTitle": "Sign in on the original website",
+  "sourceLoginBrowserNotice": "Complete sign-in in the browser, then tap Done. Cookies and website local storage will be saved on this device.",
+  "sourceLoginBrowserUnsupported": "Website sign-in is available on Android, iPhone, iPad, and Mac.",
+  "sourceLoginBrowserOpen": "Open website to sign in",
   "sourceLoginSave": "Sign in and save session",
   "sourceLoginClear": "Clear sign-in session",
   "sourceLoginSaved": "Source sign-in session updated",
   "sourceLoginCleared": "Source sign-in session cleared",
   "sourceLoginFailed": "Could not update the source sign-in session: {details}",
-  "@sourceLoginFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceLoginFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "sourceLoginDiscoveryNotice": "“{sourceName}” provides sign-in for account-only content.",
-  "@sourceLoginDiscoveryNotice": {"placeholders":{"sourceName":{"type":"String"}}},
+  "@sourceLoginDiscoveryNotice": {
+    "placeholders": {
+      "sourceName": {
+        "type": "String"
+      }
+    }
+  },
   "sourceDebugMenuLabel": "Debug",
   "sourceDebugTitle": "Source debugger",
   "sourceDebugInputHint": "Enter a search keyword, or paste a book/catalog/chapter URL",
@@ -283,7 +509,13 @@
   "bookSourcesFullyAvailable": "Fully available",
   "sourceHealthTimedOut": "Check timed out",
   "sourceHealthFailedCapabilities": "Broken: {capabilities}",
-  "@sourceHealthFailedCapabilities": {"placeholders":{"capabilities":{"type":"String"}}},
+  "@sourceHealthFailedCapabilities": {
+    "placeholders": {
+      "capabilities": {
+        "type": "String"
+      }
+    }
+  },
   "sourceHealthCapabilitySearch": "search",
   "sourceHealthCapabilityDiscover": "discover",
   "sourceHealthCapabilityInfo": "book info",
@@ -297,7 +529,13 @@
   "sourceVerificationRetry": "Open browser again",
   "sourceVerificationCancel": "Cancel verification",
   "sourceVerificationFailed": "Could not open source verification: {details}",
-  "@sourceVerificationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceVerificationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "settings": "Settings",
   "@settings": {
     "description": "Settings tab label"
@@ -616,7 +854,9 @@
   "customFontsCount": "{count} imported fonts",
   "@customFontsCount": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "customFontsLocalOnly": "Imported fonts are stored only on this device and are not synced automatically.",
@@ -630,8 +870,12 @@
   "fontVariableWeightRange": "Adjustable weight {min}–{max}",
   "@fontVariableWeightRange": {
     "placeholders": {
-      "min": {"type": "int"},
-      "max": {"type": "int"}
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
     }
   },
   "fontStaticWeight": "Fixed weight (bold is synthesized)",
@@ -639,13 +883,17 @@
   "fontDeleteDownloadTitle": "Delete downloaded \"{name}\"?",
   "@fontDeleteDownloadTitle": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fontDeleteDownloadMessage": "Will free {size} of storage. Will re-download next time you use it.",
   "@fontDeleteDownloadMessage": {
     "placeholders": {
-      "size": {"type": "String"}
+      "size": {
+        "type": "String"
+      }
     }
   },
   "fontDownloadCancelled": "Download cancelled",
@@ -674,7 +922,9 @@
   "deleteCustomFontTitle": "Delete “{name}”?",
   "@deleteCustomFontTitle": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "deleteCustomFontMessage": "The font file will be removed from this device.",
@@ -727,8 +977,12 @@
   "readerFontWeightVariableHint": "Reading controls use five legible steps from 300–700. This font's true full range is {min}–{max}.",
   "@readerFontWeightVariableHint": {
     "placeholders": {
-      "min": {"type": "int"},
-      "max": {"type": "int"}
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
     }
   },
   "readerFontWeightSyntheticHint": "Reading controls use five steps from 300–700. This font has no declared variable weight axis, so the system approximates the result and it may differ by platform.",
@@ -1153,8 +1407,12 @@
   "readerNavigationPosition": "Chapter {current} of {total}",
   "@readerNavigationPosition": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "readerSearchChapters": "Search chapters",
@@ -1891,7 +2149,13 @@
   "libraryExportOriginalHint": "Copy the original file to another location",
   "libraryExportDownloadedTxtHint": "Export the downloaded book as a generated TXT file",
   "bookExportSuccess": "Exported to {location}",
-  "@bookExportSuccess": {"placeholders": {"location": {"type": "String"}}},
+  "@bookExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "bookExportSourceMissing": "The book file is missing and cannot be exported",
   "bookExportUnsupported": "Book export is not supported on this platform yet",
   "bookExportFailed": "Could not export the book",
@@ -2007,18 +2271,60 @@
   "librarySelectMultiple": "Select multiple",
   "librarySelectAll": "Select all",
   "librarySelectedBooks": "{count} selected",
-  "@librarySelectedBooks": {"placeholders": {"count": {"type": "int"}}},
+  "@librarySelectedBooks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeleteSelected": "Delete {count}",
-  "@libraryDeleteSelected": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryDeleteSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteTitle": "Delete selected books?",
   "libraryBatchDeleteMessage": "This permanently deletes the selected {count} books, related notes and bookmarks, and local files. This cannot be undone.",
-  "@libraryBatchDeleteMessage": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeletingSelected": "Deleting {done}/{total}",
-  "@libraryDeletingSelected": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@libraryDeletingSelected": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteSuccess": "Deleted {count} books",
-  "@libraryBatchDeleteSuccess": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeletePartial": "Deleted {success}; {failed} failed",
-  "@libraryBatchDeletePartial": {"placeholders": {"success": {"type": "int"}, "failed": {"type": "int"}}},
+  "@libraryBatchDeletePartial": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "@libraryDeleteComplete": {
     "description": "Deletion progress step: finished"
   },
@@ -2330,19 +2636,70 @@
   "additionalSourcesUrlLabel": "Source JSON URL",
   "additionalSourcesLoadUrl": "Load URL",
   "additionalSourcesPreview": "{supported} available, {partial} partially supported, {unsupported} not supported",
-  "@additionalSourcesPreview": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@additionalSourcesPreview": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesPreviewDetails": "{supported} standard-rule, {partial} extended-rule, {unsupported} advanced-rule, {skipped} skipped",
-  "@additionalSourcesPreviewDetails": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesPreviewDetails": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesQuickPreview": "{count} sources ready to import, {skipped} skipped",
-  "@additionalSourcesQuickPreview": {"placeholders":{"count":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesQuickPreview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesAvailable": "Available",
   "additionalSourcesPartial": "Partially supported",
   "additionalSourcesUnsupported": "Not supported",
   "additionalSourcesImportConfirm": "Import all",
   "additionalSourcesImported": "Imported {count} sources",
-  "@additionalSourcesImported": {"placeholders":{"count":{"type":"int"}}},
+  "@additionalSourcesImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesImportedWithConflicts": "Imported {count} sources; skipped {conflicted} whose id is already registered from a different origin",
-  "@additionalSourcesImportedWithConflicts": {"placeholders":{"count":{"type":"int"},"conflicted":{"type":"int"}}},
+  "@additionalSourcesImportedWithConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "conflicted": {
+        "type": "int"
+      }
+    }
+  },
   "@settingsSectionGeneral": {
     "description": "Section title grouping language and system toggles"
   },
@@ -2505,115 +2862,223 @@
     "description": "Explanation shown on the voluntary developer support card"
   },
   "settingsAccountGuestTitle": "Sign in to Open Reading",
-  "@settingsAccountGuestTitle": {"description": "Guest account card title in settings"},
+  "@settingsAccountGuestTitle": {
+    "description": "Guest account card title in settings"
+  },
   "settingsAccountGuestSubtitle": "Sync your profile and security settings.",
-  "@settingsAccountGuestSubtitle": {"description": "Guest account card subtitle in settings"},
+  "@settingsAccountGuestSubtitle": {
+    "description": "Guest account card subtitle in settings"
+  },
   "settingsAccountOpen": "Account center",
-  "@settingsAccountOpen": {"description": "Action that opens the account center"},
+  "@settingsAccountOpen": {
+    "description": "Action that opens the account center"
+  },
   "settingsAccountVerified": "Verified account",
-  "@settingsAccountVerified": {"description": "Verified member account label"},
+  "@settingsAccountVerified": {
+    "description": "Verified member account label"
+  },
   "accountPageTitle": "Account",
-  "@accountPageTitle": {"description": "Member account page title"},
+  "@accountPageTitle": {
+    "description": "Member account page title"
+  },
   "accountIntroTitle": "Account",
-  "@accountIntroTitle": {"description": "Signed-out account introduction card title"},
+  "@accountIntroTitle": {
+    "description": "Signed-out account introduction card title"
+  },
   "accountPageSubtitle": "Sign in to sync your profile and account settings.",
-  "@accountPageSubtitle": {"description": "Member account page subtitle"},
+  "@accountPageSubtitle": {
+    "description": "Member account page subtitle"
+  },
   "accountLoginTab": "Email sign in",
-  "@accountLoginTab": {"description": "Password sign-in tab"},
+  "@accountLoginTab": {
+    "description": "Password sign-in tab"
+  },
   "accountRegisterTab": "Register",
-  "@accountRegisterTab": {"description": "Account registration tab"},
+  "@accountRegisterTab": {
+    "description": "Account registration tab"
+  },
   "accountCodeTab": "Email code",
-  "@accountCodeTab": {"description": "Email code sign-in tab"},
+  "@accountCodeTab": {
+    "description": "Email code sign-in tab"
+  },
   "accountResetTab": "Reset",
-  "@accountResetTab": {"description": "Password reset tab"},
+  "@accountResetTab": {
+    "description": "Password reset tab"
+  },
   "accountEmail": "Email",
-  "@accountEmail": {"description": "Account email field"},
+  "@accountEmail": {
+    "description": "Account email field"
+  },
   "accountEmailRequired": "Enter your email address",
-  "@accountEmailRequired": {"description": "Validation shown when the email-first step is empty"},
+  "@accountEmailRequired": {
+    "description": "Validation shown when the email-first step is empty"
+  },
   "accountEmailFirstHint": "Enter your email to continue. Password sign-in is the default.",
-  "@accountEmailFirstHint": {"description": "Email-first sign-in introduction"},
+  "@accountEmailFirstHint": {
+    "description": "Email-first sign-in introduction"
+  },
   "accountContinue": "Continue",
-  "@accountContinue": {"description": "Continue from the email-first step"},
+  "@accountContinue": {
+    "description": "Continue from the email-first step"
+  },
   "accountPasswordLoginTitle": "Sign in with password",
-  "@accountPasswordLoginTitle": {"description": "Password sign-in step title"},
+  "@accountPasswordLoginTitle": {
+    "description": "Password sign-in step title"
+  },
   "accountPasswordLoginHint": "Enter your password or use an email code instead.",
-  "@accountPasswordLoginHint": {"description": "Password sign-in step explanation"},
+  "@accountPasswordLoginHint": {
+    "description": "Password sign-in step explanation"
+  },
   "accountUseEmailCode": "Sign in with an email code",
-  "@accountUseEmailCode": {"description": "Switch from password to email code sign-in"},
+  "@accountUseEmailCode": {
+    "description": "Switch from password to email code sign-in"
+  },
   "accountNoAccount": "No account? Register",
-  "@accountNoAccount": {"description": "Open account registration"},
+  "@accountNoAccount": {
+    "description": "Open account registration"
+  },
   "accountForgotPassword": "Forgot password",
-  "@accountForgotPassword": {"description": "Open password recovery"},
+  "@accountForgotPassword": {
+    "description": "Open password recovery"
+  },
   "accountHaveAccount": "Already registered? Return to sign in",
-  "@accountHaveAccount": {"description": "Return from registration to sign in"},
+  "@accountHaveAccount": {
+    "description": "Return from registration to sign in"
+  },
   "accountBackToPassword": "Back to password sign-in",
-  "@accountBackToPassword": {"description": "Return to password sign-in"},
+  "@accountBackToPassword": {
+    "description": "Return to password sign-in"
+  },
   "accountChangeEmail": "Change",
-  "@accountChangeEmail": {"description": "Change the email selected for sign-in"},
+  "@accountChangeEmail": {
+    "description": "Change the email selected for sign-in"
+  },
   "accountRegisterHint": "Verify your email, then create an account and password.",
-  "@accountRegisterHint": {"description": "Registration step explanation"},
+  "@accountRegisterHint": {
+    "description": "Registration step explanation"
+  },
   "accountCodeLoginHint": "We will send a code to the selected email.",
-  "@accountCodeLoginHint": {"description": "Email code sign-in explanation"},
+  "@accountCodeLoginHint": {
+    "description": "Email code sign-in explanation"
+  },
   "accountResetHint": "Verify your email, then choose a new password.",
-  "@accountResetHint": {"description": "Password recovery explanation"},
+  "@accountResetHint": {
+    "description": "Password recovery explanation"
+  },
   "accountPassword": "Password",
-  "@accountPassword": {"description": "Account password field"},
+  "@accountPassword": {
+    "description": "Account password field"
+  },
   "accountConfirmPassword": "Confirm password",
   "accountAvatarCropTitle": "Crop avatar",
   "accountAvatarCropHint": "Drag to reposition and pinch to zoom until the subject fits inside the circle.",
-  "@accountConfirmPassword": {"description": "Password confirmation field"},
+  "@accountConfirmPassword": {
+    "description": "Password confirmation field"
+  },
   "accountUsername": "Username",
-  "@accountUsername": {"description": "Public username field"},
+  "@accountUsername": {
+    "description": "Public username field"
+  },
   "accountDisplayName": "Display name",
-  "@accountDisplayName": {"description": "Display name field"},
+  "@accountDisplayName": {
+    "description": "Display name field"
+  },
   "accountVerificationCode": "Verification code",
-  "@accountVerificationCode": {"description": "Email verification code field"},
+  "@accountVerificationCode": {
+    "description": "Email verification code field"
+  },
   "accountSendCode": "Send code",
-  "@accountSendCode": {"description": "Send an email verification code"},
+  "@accountSendCode": {
+    "description": "Send an email verification code"
+  },
   "accountSignIn": "Sign in",
-  "@accountSignIn": {"description": "Submit sign in"},
+  "@accountSignIn": {
+    "description": "Submit sign in"
+  },
   "accountCreate": "Create account",
-  "@accountCreate": {"description": "Submit account registration"},
+  "@accountCreate": {
+    "description": "Submit account registration"
+  },
   "accountResetPassword": "Reset password",
-  "@accountResetPassword": {"description": "Submit password reset"},
+  "@accountResetPassword": {
+    "description": "Submit password reset"
+  },
   "accountUseApple": "Sign in with Apple",
-  "@accountUseApple": {"description": "Apple account login"},
+  "@accountUseApple": {
+    "description": "Apple account login"
+  },
   "accountUseGithub": "GitHub sign in",
-  "@accountUseGithub": {"description": "GitHub account login"},
+  "@accountUseGithub": {
+    "description": "GitHub account login"
+  },
   "accountUseGoogle": "Continue with Google",
-  "@accountUseGoogle": {"description": "Google account login"},
+  "@accountUseGoogle": {
+    "description": "Google account login"
+  },
   "accountUsePasskey": "Continue with Passkey",
-  "@accountUsePasskey": {"description": "Passkey account login"},
+  "@accountUsePasskey": {
+    "description": "Passkey account login"
+  },
   "accountMoreSignInMethods": "More sign-in methods",
-  "@accountMoreSignInMethods": {"description": "Expand less prominent account login providers"},
+  "@accountMoreSignInMethods": {
+    "description": "Expand less prominent account login providers"
+  },
   "accountExternalHint": "A secure browser will open. Return here after approval.",
-  "@accountExternalHint": {"description": "External device authorization explanation"},
+  "@accountExternalHint": {
+    "description": "External device authorization explanation"
+  },
   "accountProfileTitle": "Profile",
-  "@accountProfileTitle": {"description": "Profile settings section title"},
+  "@accountProfileTitle": {
+    "description": "Profile settings section title"
+  },
   "accountEditProfile": "Edit profile",
-  "@accountEditProfile": {"description": "Open or title the profile editor"},
+  "@accountEditProfile": {
+    "description": "Open or title the profile editor"
+  },
   "accountSignInMethodsTitle": "Sign-in methods",
-  "@accountSignInMethodsTitle": {"description": "Linked sign-in methods section title"},
+  "@accountSignInMethodsTitle": {
+    "description": "Linked sign-in methods section title"
+  },
   "accountSaveProfile": "Save profile",
-  "@accountSaveProfile": {"description": "Save member profile action"},
+  "@accountSaveProfile": {
+    "description": "Save member profile action"
+  },
   "accountChangeAvatar": "Change avatar",
-  "@accountChangeAvatar": {"description": "Upload a new avatar"},
+  "@accountChangeAvatar": {
+    "description": "Upload a new avatar"
+  },
   "accountRemoveAvatar": "Remove avatar",
-  "@accountRemoveAvatar": {"description": "Delete the current avatar"},
+  "@accountRemoveAvatar": {
+    "description": "Delete the current avatar"
+  },
   "accountSignOut": "Sign out",
-  "@accountSignOut": {"description": "Sign out of the member account"},
+  "@accountSignOut": {
+    "description": "Sign out of the member account"
+  },
   "accountSupportTitle": "Premium membership",
-  "@accountSupportTitle": {"description": "Premium membership card title"},
+  "@accountSupportTitle": {
+    "description": "Premium membership card title"
+  },
   "accountSupportFreeSubtitle": "Basic reading features are free to use.",
-  "@accountSupportFreeSubtitle": {"description": "Explains that basic reading remains free"},
+  "@accountSupportFreeSubtitle": {
+    "description": "Explains that basic reading remains free"
+  },
   "accountSupportAction": "Get Premium",
-  "@accountSupportAction": {"description": "Open the Premium purchase page"},
+  "@accountSupportAction": {
+    "description": "Open the Premium purchase page"
+  },
   "accountSupporterBadge": "Premium",
-  "@accountSupporterBadge": {"description": "Premium membership badge"},
+  "@accountSupporterBadge": {
+    "description": "Premium membership badge"
+  },
   "accountPasswordLengthHint": "At least 12 characters",
-  "@accountPasswordLengthHint": {"description": "Password minimum length hint"},
+  "@accountPasswordLengthHint": {
+    "description": "Password minimum length hint"
+  },
   "accountUsernameHint": "3–30 lowercase letters, numbers, or underscores",
-  "@accountUsernameHint": {"description": "Username format hint"},
+  "@accountUsernameHint": {
+    "description": "Username format hint"
+  },
   "settingsDonationAction": "Donate with WeChat",
   "@settingsDonationAction": {
     "description": "Action label that opens the WeChat donation QR code"
@@ -2969,7 +3434,9 @@
   "updateDownloadProgress": "Downloaded {percent}%",
   "@updateDownloadProgress": {
     "placeholders": {
-      "percent": {"type": "int"}
+      "percent": {
+        "type": "int"
+      }
     }
   },
   "updatePreparingInstaller": "Verifying the package and preparing the system installer…",
@@ -3496,20 +3963,62 @@
   "readerAutoPageTurnSweepDurationLabel": "Sweep duration",
   "readerAutoPageTurnScrollSpeedLabel": "Scroll speed",
   "readerAutoPageTurnSecondsPerScreen": "{seconds} seconds per screen",
-  "@readerAutoPageTurnSecondsPerScreen": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnSecondsPerScreen": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModeValue": "{mode} · {seconds}s/screen",
-  "@readerAutoPageTurnModeValue": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModeValue": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModePaused": "Paused · {mode} · {seconds}s/screen",
-  "@readerAutoPageTurnModePaused": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModePaused": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnIntervalLabel": "Page interval",
   "readerAutoPageTurnInterval": "{seconds} seconds per screen",
-  "@readerAutoPageTurnInterval": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnInterval": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnStart": "Start auto page turn",
   "readerAutoPageTurnResume": "Resume auto page turn",
   "readerAutoPageTurnRunning": "Auto · {seconds}s/screen",
-  "@readerAutoPageTurnRunning": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnRunning": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnPaused": "Paused · {seconds}s/screen",
-  "@readerAutoPageTurnPaused": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnPaused": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerThemeDay": "Day",
   "@readerThemeDay": {
     "description": "Day reading theme name"
@@ -3569,7 +4078,9 @@
   "readerCustomThemeDeleteMessage": "“{name}” will be removed from your themes, along with its saved background image.",
   "@readerCustomThemeDeleteMessage": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "readerCustomThemeEmptyTitle": "No custom themes yet",
@@ -3600,14 +4111,32 @@
   "importFolderPermissionLost": "Permission lost · authorize again to restore access",
   "importRemoveFolder": "Remove folder",
   "importQueueTitle": "Import queue ({count})",
-  "@importQueueTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@importQueueTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "importQueueHint": "Remove files selected by mistake, then import them one at a time.",
   "importQueueEmptyTitle": "No books selected",
   "importQueueEmptyBody": "Choose EPUB, PDF, TXT, MOBI or another supported book file.",
   "importAction": "Import {count} books",
-  "@importAction": {"placeholders": {"count": {"type": "int"}}},
+  "@importAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "importRetryFailed": "Retry {count} failed",
-  "@importRetryFailed": {"placeholders": {"count": {"type": "int"}}},
+  "@importRetryFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "importStatusQueued": "Waiting",
   "importStatusPreparing": "Preparing file",
   "importStatusChecking": "Checking",
@@ -3622,7 +4151,19 @@
   "importClearCompleted": "Clear completed",
   "importDone": "Done",
   "importSummary": "{succeeded} imported · {skipped} skipped · {failed} failed",
-  "@importSummary": {"placeholders": {"succeeded": {"type": "int"}, "skipped": {"type": "int"}, "failed": {"type": "int"}}},
+  "@importSummary": {
+    "placeholders": {
+      "succeeded": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "importNoSupportedFiles": "No supported book files were found",
   "importScanning": "Scanning files…",
   "settingsAiApiKeyConfigured": "API Key configured",
@@ -3641,7 +4182,9 @@
   "@settingsAiSwitchedToModel": {
     "description": "Toast shown after switching to a different AI model",
     "placeholders": {
-        "model": {"type": "String"}
+      "model": {
+        "type": "String"
+      }
     }
   },
   "settingsAiFillBaseUrlAndApiKey": "Please fill in Base URL and API Key first",
@@ -3732,7 +4275,9 @@
   "@settingsAiFetchModelsFailed": {
     "description": "AIServiceException wrapping an unexpected error during model fetching",
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "settingsAiPreprocessTitle": "AI book preprocessing",
@@ -3917,7 +4462,9 @@
   "@readerAiRequestFailed": {
     "description": "AIServiceException for a generic request failure",
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "readerAiUnknownError": "Unknown error",
@@ -3928,85 +4475,135 @@
   "@readerAiEmptyResponseError": {
     "description": "AIServiceException when the response body is empty",
     "placeholders": {
-        "endpoint": {"type": "String"}
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiInvalidJsonError": "Server response is not valid JSON. The current endpoint may be incompatible with the {provider} configuration.\nRequest URL: {endpoint}\nResponse snippet: {snippet}",
   "@readerAiInvalidJsonError": {
     "description": "AIServiceException when the response body cannot be parsed as JSON",
     "placeholders": {
-        "provider": {"type": "String"},
-        "endpoint": {"type": "String"},
-        "snippet": {"type": "String"}
+      "provider": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      },
+      "snippet": {
+        "type": "String"
+      }
     }
   },
   "readerAiFailedReadBody": "Request failed{status}: could not read the server response. This is usually caused by an incorrect Base URL, the endpoint returning empty content, or the network truncating the response.\nRequest URL: {endpoint}",
   "@readerAiFailedReadBody": {
     "description": "AIServiceException when the response body cannot be read; {status} is either empty or '(code)'",
     "placeholders": {
-        "status": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiNetworkRequestFailed": "Network request failed{status}: {error}\nRequest URL: {endpoint}",
   "@readerAiNetworkRequestFailed": {
     "description": "AIServiceException for a Dio network error; {status} is either empty or '(code)'",
     "placeholders": {
-        "status": {"type": "String"},
-        "error": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedMinimaxHint": "Request failed({status}): {text}\nSuggestions: 1) MiniMax temperature must be in (0,1]; 2) check that the model name matches the endpoint; 3) use only a single system instruction.\nRequest URL: {endpoint}",
   "@readerAiRequestFailedMinimaxHint": {
     "description": "AIServiceException with MiniMax-specific debugging hints",
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedClaudeHint": "Request failed({status}): {text}\nTip: Claude requires the anthropic-version request header.\nRequest URL: {endpoint}",
   "@readerAiRequestFailedClaudeHint": {
     "description": "AIServiceException with Claude-specific debugging hints",
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedProviderMismatchHint": "Request failed({status}): {text}\nTip: Please confirm that the provider and API Key match; they cannot be mixed.\nRequest URL: {endpoint}",
   "@readerAiRequestFailedProviderMismatchHint": {
     "description": "AIServiceException hinting that the provider and API key may be mismatched",
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedGeneric": "Request failed({status}): {text}\nRequest URL: {endpoint}",
   "@readerAiRequestFailedGeneric": {
     "description": "Generic AIServiceException for a non-200 response with body text",
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockSelectionResponse": "AI (mock): The text you selected is \"{selectedText}\".\n\nBefore: {before}\nAfter: {after}",
   "@readerAiMockSelectionResponse": {
     "description": "Mock AI response shown when AI is not configured, for a text selection query",
     "placeholders": {
-        "selectedText": {"type": "String"},
-        "before": {"type": "String"},
-        "after": {"type": "String"}
+      "selectedText": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockPageAnalysis": "AI (mock): This page has {chars} characters. Focus on the arguments at the beginning and end of paragraphs.",
   "@readerAiMockPageAnalysis": {
     "description": "Mock AI response shown when AI is not configured, for a page analysis query",
     "placeholders": {
-        "chars": {"type": "int"}
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "readerAiMockGreeting": "Hello",
@@ -4017,8 +4614,12 @@
   "@readerAiMockChatResponse": {
     "description": "Mock AI response shown when AI is not configured, for a chat question",
     "placeholders": {
-        "question": {"type": "String"},
-        "chars": {"type": "int"}
+      "question": {
+        "type": "String"
+      },
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "ttsSystemDefault": "System default",
@@ -4033,7 +4634,9 @@
   "@ttsUnsupportedLanguage": {
     "description": "Error message when the requested TTS language is not supported",
     "placeholders": {
-        "language": {"type": "String"}
+      "language": {
+        "type": "String"
+      }
     }
   },
   "ttsCallFailed": "System TTS call failed",
@@ -4160,53 +4763,99 @@
   "@agreementV2VersionLabel": {
     "description": "User agreement V2 version label with version placeholder",
     "placeholders": {
-        "version": {"type": "String"}
+      "version": {
+        "type": "String"
+      }
     }
   },
   "agreementFlowStepIntroduction": "Introduction",
-  "@agreementFlowStepIntroduction": {"description": "First onboarding flow step label"},
+  "@agreementFlowStepIntroduction": {
+    "description": "First onboarding flow step label"
+  },
   "agreementFlowStepTerms": "Terms",
-  "@agreementFlowStepTerms": {"description": "Terms onboarding flow step label"},
+  "@agreementFlowStepTerms": {
+    "description": "Terms onboarding flow step label"
+  },
   "agreementFlowStepSource": "Book sources",
-  "@agreementFlowStepSource": {"description": "Third-party book source agreement flow step label"},
+  "@agreementFlowStepSource": {
+    "description": "Third-party book source agreement flow step label"
+  },
   "agreementFlowStepPrivacy": "Privacy",
-  "@agreementFlowStepPrivacy": {"description": "Privacy onboarding flow step label"},
+  "@agreementFlowStepPrivacy": {
+    "description": "Privacy onboarding flow step label"
+  },
   "agreementFlowNext": "Next",
-  "@agreementFlowNext": {"description": "Button that advances the agreement onboarding flow"},
+  "@agreementFlowNext": {
+    "description": "Button that advances the agreement onboarding flow"
+  },
   "agreementFlowBack": "Back",
-  "@agreementFlowBack": {"description": "Button that goes back in the agreement onboarding flow"},
+  "@agreementFlowBack": {
+    "description": "Button that goes back in the agreement onboarding flow"
+  },
   "agreementFlowTermsTitle": "Use OpenReading with clear boundaries",
-  "@agreementFlowTermsTitle": {"description": "Terms step heading"},
+  "@agreementFlowTermsTitle": {
+    "description": "Terms step heading"
+  },
   "agreementFlowTermsSubtitle": "Review the terms governing use of the software and content you choose to open.",
-  "@agreementFlowTermsSubtitle": {"description": "Terms step supporting text"},
+  "@agreementFlowTermsSubtitle": {
+    "description": "Terms step supporting text"
+  },
   "agreementFlowTermsConsent": "I have read and agree to the Terms of Use.",
-  "@agreementFlowTermsConsent": {"description": "Terms-only consent checkbox label"},
+  "@agreementFlowTermsConsent": {
+    "description": "Terms-only consent checkbox label"
+  },
   "agreementFlowSourceTitle": "Third-party book source agreement",
-  "@agreementFlowSourceTitle": {"description": "Third-party book source agreement step heading"},
+  "@agreementFlowSourceTitle": {
+    "description": "Third-party book source agreement step heading"
+  },
   "agreementFlowSourceSubtitle": "Confirm how source addresses, content, authorization, and responsibility are separated from the official project.",
-  "@agreementFlowSourceSubtitle": {"description": "Third-party book source agreement step supporting text"},
+  "@agreementFlowSourceSubtitle": {
+    "description": "Third-party book source agreement step supporting text"
+  },
   "agreementFlowSourceConsent": "I have read and agree to the Third-party Book Source Agreement.",
-  "@agreementFlowSourceConsent": {"description": "Third-party book source agreement consent checkbox label"},
+  "@agreementFlowSourceConsent": {
+    "description": "Third-party book source agreement consent checkbox label"
+  },
   "agreementFlowPrivacyTitle": "Your data stays under your control",
-  "@agreementFlowPrivacyTitle": {"description": "Privacy step heading"},
+  "@agreementFlowPrivacyTitle": {
+    "description": "Privacy step heading"
+  },
   "agreementFlowPrivacySubtitle": "Review what remains local, when network requests happen, and how download records are retained.",
-  "@agreementFlowPrivacySubtitle": {"description": "Privacy step supporting text"},
+  "@agreementFlowPrivacySubtitle": {
+    "description": "Privacy step supporting text"
+  },
   "agreementFlowPrivacyConsent": "I have read and agree to the Privacy Notice.",
-  "@agreementFlowPrivacyConsent": {"description": "Privacy-only consent checkbox label"},
+  "@agreementFlowPrivacyConsent": {
+    "description": "Privacy-only consent checkbox label"
+  },
   "agreementFlowEnterApp": "Enter OpenReading",
-  "@agreementFlowEnterApp": {"description": "Final onboarding button that enters the app"},
+  "@agreementFlowEnterApp": {
+    "description": "Final onboarding button that enters the app"
+  },
   "agreementFlowPrivacyLocalTitle": "Local by default",
-  "@agreementFlowPrivacyLocalTitle": {"description": "Privacy summary card title for local storage"},
+  "@agreementFlowPrivacyLocalTitle": {
+    "description": "Privacy summary card title for local storage"
+  },
   "agreementFlowPrivacyLocalBody": "Books, progress, notes, and settings normally remain on this device.",
-  "@agreementFlowPrivacyLocalBody": {"description": "Privacy summary card body for local storage"},
+  "@agreementFlowPrivacyLocalBody": {
+    "description": "Privacy summary card body for local storage"
+  },
   "agreementFlowPrivacyNetworkTitle": "Network use is explicit",
-  "@agreementFlowPrivacyNetworkTitle": {"description": "Privacy summary card title for network access"},
+  "@agreementFlowPrivacyNetworkTitle": {
+    "description": "Privacy summary card title for network access"
+  },
   "agreementFlowPrivacyNetworkBody": "Local reading does not upload book text. Update checks contact GitHub and the official site; sources, AI, and sync connect only when their features are used.",
-  "@agreementFlowPrivacyNetworkBody": {"description": "Privacy summary card body for network access"},
+  "@agreementFlowPrivacyNetworkBody": {
+    "description": "Privacy summary card body for network access"
+  },
   "agreementFlowPrivacyRetentionTitle": "Limited download records",
-  "@agreementFlowPrivacyRetentionTitle": {"description": "Privacy summary card title for retention"},
+  "@agreementFlowPrivacyRetentionTitle": {
+    "description": "Privacy summary card title for retention"
+  },
   "agreementFlowPrivacyRetentionBody": "Official-site download records containing a raw IP are kept for no more than 180 days, then deleted.",
-  "@agreementFlowPrivacyRetentionBody": {"description": "Privacy summary card body for retention"},
+  "@agreementFlowPrivacyRetentionBody": {
+    "description": "Privacy summary card body for retention"
+  },
   "agreementV2Title": "Terms of Use & Privacy Notice",
   "@agreementV2Title": {
     "description": "User agreement V2 panel title"
@@ -4364,7 +5013,11 @@
   "settingsCacheManagementSubtitle": "Using {size} · View details and clear caches",
   "@settingsCacheManagementSubtitle": {
     "description": "Cache management entry subtitle with current total usage",
-    "placeholders": {"size": {"type": "String"}}
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   },
   "settingsCacheUsageTitle": "Cache usage",
   "@settingsCacheUsageTitle": {
@@ -4381,258 +5034,566 @@
   "settingsCacheSourceCovers": "Source cover cache",
   "settingsCacheSourceCoversSubtitle": "Downloaded source covers · {size}",
   "@settingsCacheSourceCoversSubtitle": {
-    "placeholders": {"size": {"type": "String"}}
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   },
   "settingsCacheSourceData": "Source chapter cache",
   "settingsCacheSourceDataSubtitle": "Safely removable online chapter cache · {size}",
   "@settingsCacheSourceDataSubtitle": {
-    "placeholders": {"size": {"type": "String"}}
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   },
   "settingsCacheReadingCache": "Local reading cache",
   "settingsCacheReadingCacheSubtitle": "Rebuildable EPUB/TXT parsing cache · {size}",
   "@settingsCacheReadingCacheSubtitle": {
-    "placeholders": {"size": {"type": "String"}}
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   },
   "settingsCacheTemporaryFiles": "Temporary files",
   "settingsCacheTemporaryFilesSubtitle": "Disposable update and temporary files · {size}",
   "@settingsCacheTemporaryFilesSubtitle": {
-    "placeholders": {"size": {"type": "String"}}
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   },
   "settingsCacheClearAll": "Clear all safe caches",
   "settingsCacheClearAllSubtitle": "Clears only the categories above · {size}",
   "@settingsCacheClearAllSubtitle": {
-    "placeholders": {"size": {"type": "String"}}
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   },
   "settingsCacheCalculating": "Calculating…",
   "settingsCacheClearConfirm": "This removes only temporary cache data. Books, saved covers, reading progress, databases, settings, and credentials are preserved.",
   "settingsCacheClearAction": "Clear",
   "settingsCacheCleared": "Cache cleared",
   "settingsCacheClearFailed": "Could not clear the cache",
-  "@settingsDataSyncTitle": {"description": "Settings section title for data and sync"},
+  "@settingsDataSyncTitle": {
+    "description": "Settings section title for data and sync"
+  },
   "settingsWebDavSyncTitle": "WebDAV sync",
-  "@settingsWebDavSyncTitle": {"description": "WebDAV sync settings entry title"},
+  "@settingsWebDavSyncTitle": {
+    "description": "WebDAV sync settings entry title"
+  },
   "webDavNotConfigured": "Not configured",
-  "@webDavNotConfigured": {"description": "WebDAV unconfigured status"},
+  "@webDavNotConfigured": {
+    "description": "WebDAV unconfigured status"
+  },
   "webDavConfigureSubtitle": "Sync reading data to your own WebDAV storage",
-  "@webDavConfigureSubtitle": {"description": "WebDAV entry subtitle before setup"},
+  "@webDavConfigureSubtitle": {
+    "description": "WebDAV entry subtitle before setup"
+  },
   "webDavBetaBadge": "Beta · May be unstable",
-  "@webDavBetaBadge": {"description": "WebDAV beta stability badge"},
+  "@webDavBetaBadge": {
+    "description": "WebDAV beta stability badge"
+  },
   "webDavPageTitle": "WebDAV sync",
-  "@webDavPageTitle": {"description": "WebDAV overview page title"},
+  "@webDavPageTitle": {
+    "description": "WebDAV overview page title"
+  },
   "webDavConnected": "Connected",
-  "@webDavConnected": {"description": "WebDAV connected status"},
+  "@webDavConnected": {
+    "description": "WebDAV connected status"
+  },
   "webDavSyncing": "Syncing",
-  "@webDavSyncing": {"description": "WebDAV syncing status"},
+  "@webDavSyncing": {
+    "description": "WebDAV syncing status"
+  },
   "webDavPartialFailure": "Some items need attention",
-  "@webDavPartialFailure": {"description": "WebDAV partial failure status"},
+  "@webDavPartialFailure": {
+    "description": "WebDAV partial failure status"
+  },
   "webDavSyncFailed": "Sync failed",
-  "@webDavSyncFailed": {"description": "WebDAV failed status"},
+  "@webDavSyncFailed": {
+    "description": "WebDAV failed status"
+  },
   "webDavPendingChanges": "{count} changes waiting to sync",
-  "@webDavPendingChanges": {"description": "Count of pending WebDAV changes", "placeholders": {"count": {"type": "int"}}},
+  "@webDavPendingChanges": {
+    "description": "Count of pending WebDAV changes",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "webDavLastSync": "Last sync: {time}",
-  "@webDavLastSync": {"description": "Last successful WebDAV sync time", "placeholders": {"time": {"type": "String"}}},
+  "@webDavLastSync": {
+    "description": "Last successful WebDAV sync time",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "webDavNeverSynced": "Not synced yet",
-  "@webDavNeverSynced": {"description": "WebDAV has never synced"},
+  "@webDavNeverSynced": {
+    "description": "WebDAV has never synced"
+  },
   "webDavSyncNow": "Sync now",
-  "@webDavSyncNow": {"description": "Manual WebDAV sync button"},
+  "@webDavSyncNow": {
+    "description": "Manual WebDAV sync button"
+  },
   "webDavSetUp": "Set up WebDAV",
-  "@webDavSetUp": {"description": "Open WebDAV setup button"},
+  "@webDavSetUp": {
+    "description": "Open WebDAV setup button"
+  },
   "webDavConnectionTitle": "Connection",
-  "@webDavConnectionTitle": {"description": "WebDAV connection section title"},
+  "@webDavConnectionTitle": {
+    "description": "WebDAV connection section title"
+  },
   "webDavServerUrl": "WebDAV address",
-  "@webDavServerUrl": {"description": "WebDAV server URL field label"},
+  "@webDavServerUrl": {
+    "description": "WebDAV server URL field label"
+  },
   "webDavUsername": "Username",
-  "@webDavUsername": {"description": "WebDAV username field label"},
+  "@webDavUsername": {
+    "description": "WebDAV username field label"
+  },
   "webDavPassword": "App password",
-  "@webDavPassword": {"description": "WebDAV password field label"},
+  "@webDavPassword": {
+    "description": "WebDAV password field label"
+  },
   "webDavPasswordHint": "Stored securely on this device only",
-  "@webDavPasswordHint": {"description": "WebDAV password storage hint"},
+  "@webDavPasswordHint": {
+    "description": "WebDAV password storage hint"
+  },
   "webDavRootPath": "Remote folder",
-  "@webDavRootPath": {"description": "WebDAV root folder field label"},
+  "@webDavRootPath": {
+    "description": "WebDAV root folder field label"
+  },
   "webDavTestConnection": "Test connection",
-  "@webDavTestConnection": {"description": "WebDAV connection test button"},
+  "@webDavTestConnection": {
+    "description": "WebDAV connection test button"
+  },
   "webDavTestingConnection": "Testing connection…",
-  "@webDavTestingConnection": {"description": "WebDAV connection test progress"},
+  "@webDavTestingConnection": {
+    "description": "WebDAV connection test progress"
+  },
   "webDavConnectionSuccess": "Connection and write access verified",
-  "@webDavConnectionSuccess": {"description": "WebDAV connection test success"},
+  "@webDavConnectionSuccess": {
+    "description": "WebDAV connection test success"
+  },
   "webDavConnectionFailed": "Connection test failed: {reason}",
-  "@webDavConnectionFailed": {"description": "WebDAV connection test failure", "placeholders": {"reason": {"type": "String"}}},
+  "@webDavConnectionFailed": {
+    "description": "WebDAV connection test failure",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "webDavSaveConfiguration": "Save configuration",
-  "@webDavSaveConfiguration": {"description": "Save WebDAV configuration button"},
+  "@webDavSaveConfiguration": {
+    "description": "Save WebDAV configuration button"
+  },
   "webDavAutomaticSync": "Automatic sync",
-  "@webDavAutomaticSync": {"description": "Automatic WebDAV sync switch"},
+  "@webDavAutomaticSync": {
+    "description": "Automatic WebDAV sync switch"
+  },
   "webDavAutomaticSyncHint": "Sync after launch or when the app returns to the foreground",
-  "@webDavAutomaticSyncHint": {"description": "Automatic WebDAV sync explanation"},
+  "@webDavAutomaticSyncHint": {
+    "description": "Automatic WebDAV sync explanation"
+  },
   "webDavSyncContent": "Sync content",
-  "@webDavSyncContent": {"description": "WebDAV scope section title"},
+  "@webDavSyncContent": {
+    "description": "WebDAV scope section title"
+  },
   "webDavScopeBookSources": "Book sources",
   "webDavScopeBookSourcesHint": "Sync public ORSP sources and favorites, plus all group names, empty groups, and their order. Source credentials and private configurations stay on this device.",
-  "@webDavScopeBookSources": {"description": "Sync scope for registered book sources"},
+  "@webDavScopeBookSources": {
+    "description": "Sync scope for registered book sources"
+  },
   "webDavScopeBooks": "Library and online books",
-  "@webDavScopeBooks": {"description": "Sync scope for book metadata"},
+  "@webDavScopeBooks": {
+    "description": "Sync scope for book metadata"
+  },
   "webDavScopeProgress": "Reading progress",
-  "@webDavScopeProgress": {"description": "Sync scope for reading progress"},
+  "@webDavScopeProgress": {
+    "description": "Sync scope for reading progress"
+  },
   "webDavScopeBookmarks": "Bookmarks",
-  "@webDavScopeBookmarks": {"description": "Sync scope for bookmarks"},
+  "@webDavScopeBookmarks": {
+    "description": "Sync scope for bookmarks"
+  },
   "webDavScopeNotes": "Notes and highlights",
-  "@webDavScopeNotes": {"description": "Sync scope for reader notes and highlights"},
+  "@webDavScopeNotes": {
+    "description": "Sync scope for reader notes and highlights"
+  },
   "webDavScopeNotesHint": "Includes quoted text, notes, and ink. WebDAV data is not end-to-end encrypted.",
-  "@webDavScopeNotesHint": {"description": "Privacy disclosure for syncing notes and highlights"},
+  "@webDavScopeNotesHint": {
+    "description": "Privacy disclosure for syncing notes and highlights"
+  },
   "webDavScopeReadingSessions": "Reading statistics",
-  "@webDavScopeReadingSessions": {"description": "Sync scope for reading sessions"},
+  "@webDavScopeReadingSessions": {
+    "description": "Sync scope for reading sessions"
+  },
   "webDavScopeReaderSettings": "Reader settings",
-  "@webDavScopeReaderSettings": {"description": "Sync scope for portable reader settings"},
+  "@webDavScopeReaderSettings": {
+    "description": "Sync scope for portable reader settings"
+  },
   "webDavScopeReaderSettingsHint": "Sync typography, themes, page turns, automatic paging preferences, tap zones, and image-reader preferences.",
-  "@webDavScopeReaderSettingsHint": {"description": "Description for the reader settings sync scope"},
+  "@webDavScopeReaderSettingsHint": {
+    "description": "Description for the reader settings sync scope"
+  },
   "webDavScopeReplaceRules": "Replacement rules",
-  "@webDavScopeReplaceRules": {"description": "Sync scope for user-authored replacement rules"},
+  "@webDavScopeReplaceRules": {
+    "description": "Sync scope for user-authored replacement rules"
+  },
   "webDavScopeReplaceRulesHint": "Sync rule patterns and replacement text. WebDAV data is not end-to-end encrypted.",
-  "@webDavScopeReplaceRulesHint": {"description": "Privacy disclosure for replacement-rule sync"},
+  "@webDavScopeReplaceRulesHint": {
+    "description": "Privacy disclosure for replacement-rule sync"
+  },
   "webDavScopeBookFiles": "Book files",
-  "@webDavScopeBookFiles": {"description": "Sync scope for book files"},
+  "@webDavScopeBookFiles": {
+    "description": "Sync scope for book files"
+  },
   "webDavBookFilesHint": "Choose which books to upload or download",
-  "@webDavBookFilesHint": {"description": "Book file sync scope explanation"},
+  "@webDavBookFilesHint": {
+    "description": "Book file sync scope explanation"
+  },
   "webDavBookFilesUnavailable": "Book file transfer will be enabled after metadata sync is stable",
-  "@webDavBookFilesUnavailable": {"description": "Book file transfer feature-gate explanation"},
+  "@webDavBookFilesUnavailable": {
+    "description": "Book file transfer feature-gate explanation"
+  },
   "webDavSecurityNotice": "Data is sent over HTTPS, but your WebDAV provider can read unencrypted remote content.",
-  "@webDavSecurityNotice": {"description": "WebDAV non-E2EE disclosure"},
+  "@webDavSecurityNotice": {
+    "description": "WebDAV non-E2EE disclosure"
+  },
   "webDavConnectionDetails": "Connection settings",
-  "@webDavConnectionDetails": {"description": "Open WebDAV connection settings"},
+  "@webDavConnectionDetails": {
+    "description": "Open WebDAV connection settings"
+  },
   "webDavClearConfiguration": "Clear configuration",
-  "@webDavClearConfiguration": {"description": "Clear local WebDAV configuration action"},
+  "@webDavClearConfiguration": {
+    "description": "Clear local WebDAV configuration action"
+  },
   "webDavClearConfigurationTitle": "Clear WebDAV configuration?",
-  "@webDavClearConfigurationTitle": {"description": "Clear WebDAV configuration dialog title"},
+  "@webDavClearConfigurationTitle": {
+    "description": "Clear WebDAV configuration dialog title"
+  },
   "webDavClearConfigurationMessage": "This removes the WebDAV address and login from this device. Local reading data and remote files will not be deleted.",
-  "@webDavClearConfigurationMessage": {"description": "Clear WebDAV configuration dialog body"},
+  "@webDavClearConfigurationMessage": {
+    "description": "Clear WebDAV configuration dialog body"
+  },
   "webDavClearConfigurationConfirm": "Clear from this device",
-  "@webDavClearConfigurationConfirm": {"description": "Clear WebDAV configuration confirmation"},
+  "@webDavClearConfigurationConfirm": {
+    "description": "Clear WebDAV configuration confirmation"
+  },
   "webDavActivityTitle": "Sync activity",
-  "@webDavActivityTitle": {"description": "WebDAV sync activity page title"},
+  "@webDavActivityTitle": {
+    "description": "WebDAV sync activity page title"
+  },
   "webDavActivityEmpty": "No sync activity yet",
-  "@webDavActivityEmpty": {"description": "Empty WebDAV activity state"},
+  "@webDavActivityEmpty": {
+    "description": "Empty WebDAV activity state"
+  },
   "webDavSyncCompleteSummary": "Uploaded {uploaded}, downloaded {downloaded}",
-  "@webDavSyncCompleteSummary": {"description": "WebDAV sync result summary", "placeholders": {"uploaded": {"type": "int"}, "downloaded": {"type": "int"}}},
+  "@webDavSyncCompleteSummary": {
+    "description": "WebDAV sync result summary",
+    "placeholders": {
+      "uploaded": {
+        "type": "int"
+      },
+      "downloaded": {
+        "type": "int"
+      }
+    }
+  },
   "webDavErrorAuthentication": "The username, password, or folder permission is incorrect.",
-  "@webDavErrorAuthentication": {"description": "WebDAV authentication error"},
+  "@webDavErrorAuthentication": {
+    "description": "WebDAV authentication error"
+  },
   "webDavErrorInvalidConfiguration": "The WebDAV configuration is incomplete or invalid.",
-  "@webDavErrorInvalidConfiguration": {"description": "Invalid WebDAV configuration error"},
+  "@webDavErrorInvalidConfiguration": {
+    "description": "Invalid WebDAV configuration error"
+  },
   "webDavErrorInsecureConnection": "The connection does not meet the security requirements.",
-  "@webDavErrorInsecureConnection": {"description": "Insecure WebDAV connection error"},
+  "@webDavErrorInsecureConnection": {
+    "description": "Insecure WebDAV connection error"
+  },
   "webDavErrorCertificate": "The server certificate could not be verified.",
-  "@webDavErrorCertificate": {"description": "WebDAV certificate error"},
+  "@webDavErrorCertificate": {
+    "description": "WebDAV certificate error"
+  },
   "webDavErrorPermission": "The remote folder is not writable.",
-  "@webDavErrorPermission": {"description": "WebDAV permission error"},
+  "@webDavErrorPermission": {
+    "description": "WebDAV permission error"
+  },
   "webDavErrorNotFound": "The remote sync folder or a required file was not found.",
-  "@webDavErrorNotFound": {"description": "WebDAV remote path not found error"},
+  "@webDavErrorNotFound": {
+    "description": "WebDAV remote path not found error"
+  },
   "webDavErrorConflict": "Remote data is in conflict. Try syncing again.",
-  "@webDavErrorConflict": {"description": "WebDAV conflict error"},
+  "@webDavErrorConflict": {
+    "description": "WebDAV conflict error"
+  },
   "webDavErrorStorageFull": "The WebDAV storage is full.",
-  "@webDavErrorStorageFull": {"description": "WebDAV storage full error"},
+  "@webDavErrorStorageFull": {
+    "description": "WebDAV storage full error"
+  },
   "webDavErrorRateLimited": "Too many WebDAV requests were made. Try again later.",
-  "@webDavErrorRateLimited": {"description": "WebDAV rate limit error"},
+  "@webDavErrorRateLimited": {
+    "description": "WebDAV rate limit error"
+  },
   "webDavErrorTimeout": "The server did not respond in time.",
-  "@webDavErrorTimeout": {"description": "WebDAV timeout error"},
+  "@webDavErrorTimeout": {
+    "description": "WebDAV timeout error"
+  },
   "webDavErrorUnsupported": "The server response is incompatible with the synchronization protocol.",
-  "@webDavErrorUnsupported": {"description": "Unsupported WebDAV error"},
+  "@webDavErrorUnsupported": {
+    "description": "Unsupported WebDAV error"
+  },
   "webDavErrorServer": "The WebDAV server could not complete the request.",
-  "@webDavErrorServer": {"description": "WebDAV server error"},
+  "@webDavErrorServer": {
+    "description": "WebDAV server error"
+  },
   "webDavErrorNetwork": "The network is unavailable. Changes remain saved on this device.",
-  "@webDavErrorNetwork": {"description": "WebDAV network error"},
+  "@webDavErrorNetwork": {
+    "description": "WebDAV network error"
+  },
   "webDavErrorCorruptData": "Some remote sync data is damaged and was not applied.",
-  "@webDavErrorCorruptData": {"description": "WebDAV corrupt remote data error"},
+  "@webDavErrorCorruptData": {
+    "description": "WebDAV corrupt remote data error"
+  },
   "webDavErrorLocalDataCorrupt": "Local reading settings are damaged. Sync stopped without deleting the remote backup.",
-  "@webDavErrorLocalDataCorrupt": {"description": "WebDAV corrupt local reading data error"},
+  "@webDavErrorLocalDataCorrupt": {
+    "description": "WebDAV corrupt local reading data error"
+  },
   "webDavErrorClockSkew": "This device's clock differs too much from the WebDAV server.",
-  "@webDavErrorClockSkew": {"description": "WebDAV clock skew error"},
+  "@webDavErrorClockSkew": {
+    "description": "WebDAV clock skew error"
+  },
   "webDavErrorSecureStorage": "The WebDAV password could not be read from secure storage.",
-  "@webDavErrorSecureStorage": {"description": "WebDAV secure storage error"},
+  "@webDavErrorSecureStorage": {
+    "description": "WebDAV secure storage error"
+  },
   "webDavErrorUnknown": "WebDAV could not complete the operation.",
-  "@webDavErrorUnknown": {"description": "Unknown WebDAV error"},
+  "@webDavErrorUnknown": {
+    "description": "Unknown WebDAV error"
+  },
   "webDavErrorDetails": "Server response details",
-  "@webDavErrorDetails": {"description": "WebDAV error details heading"},
+  "@webDavErrorDetails": {
+    "description": "WebDAV error details heading"
+  },
   "webDavErrorMissingEtagDetail": "The server did not return a strong file version identifier (ETag). The ETag may be missing or too weak, so the app cannot tell whether another device changed the remote file.",
   "webDavErrorIfMatchIgnoredDetail": "The server ignored the condition that permits writing only when the file version matches (If-Match). Continuing could overwrite a newer change from another device.",
   "webDavErrorIfNoneMatchIgnoredDetail": "The server ignored the condition that permits creation only when the file does not exist (If-None-Match). Continuing could overwrite an existing file.",
   "webDavErrorReason": "Reason: {reason}",
-  "@webDavErrorReason": {"description": "WebDAV detailed failure reason", "placeholders": {"reason": {"type": "String"}}},
+  "@webDavErrorReason": {
+    "description": "WebDAV detailed failure reason",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorHttpStatus": "HTTP status: {status}",
-  "@webDavErrorHttpStatus": {"description": "WebDAV HTTP status detail", "placeholders": {"status": {"type": "int"}}},
+  "@webDavErrorHttpStatus": {
+    "description": "WebDAV HTTP status detail",
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "webDavErrorRequestMethod": "Request method: {method}",
-  "@webDavErrorRequestMethod": {"description": "WebDAV request method detail", "placeholders": {"method": {"type": "String"}}},
+  "@webDavErrorRequestMethod": {
+    "description": "WebDAV request method detail",
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorResourcePath": "Resource path: {path}",
-  "@webDavErrorResourcePath": {"description": "WebDAV resource path detail", "placeholders": {"path": {"type": "String"}}},
+  "@webDavErrorResourcePath": {
+    "description": "WebDAV resource path detail",
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorPhase": "Failed while: {phase}",
-  "@webDavErrorPhase": {"description": "WebDAV failure phase", "placeholders": {"phase": {"type": "String"}}},
+  "@webDavErrorPhase": {
+    "description": "WebDAV failure phase",
+    "placeholders": {
+      "phase": {
+        "type": "String"
+      }
+    }
+  },
   "webDavPhaseConnecting": "connecting to the remote server",
-  "@webDavPhaseConnecting": {"description": "WebDAV connecting phase"},
+  "@webDavPhaseConnecting": {
+    "description": "WebDAV connecting phase"
+  },
   "webDavPhaseScanningLocal": "scanning this device",
-  "@webDavPhaseScanningLocal": {"description": "WebDAV local scan phase"},
+  "@webDavPhaseScanningLocal": {
+    "description": "WebDAV local scan phase"
+  },
   "webDavPhaseReadingRemote": "reading remote data",
-  "@webDavPhaseReadingRemote": {"description": "WebDAV remote read phase"},
+  "@webDavPhaseReadingRemote": {
+    "description": "WebDAV remote read phase"
+  },
   "webDavPhaseApplyingRemote": "merging remote data",
-  "@webDavPhaseApplyingRemote": {"description": "WebDAV remote apply phase"},
+  "@webDavPhaseApplyingRemote": {
+    "description": "WebDAV remote apply phase"
+  },
   "webDavPhaseUploadingLocal": "uploading local changes",
-  "@webDavPhaseUploadingLocal": {"description": "WebDAV local upload phase"},
+  "@webDavPhaseUploadingLocal": {
+    "description": "WebDAV local upload phase"
+  },
   "webDavPhaseFinishing": "finishing synchronization",
-  "@webDavPhaseFinishing": {"description": "WebDAV finishing phase"},
+  "@webDavPhaseFinishing": {
+    "description": "WebDAV finishing phase"
+  },
   "webDavPhaseUnknown": "an unknown step",
-  "@webDavPhaseUnknown": {"description": "Unknown WebDAV phase"},
+  "@webDavPhaseUnknown": {
+    "description": "Unknown WebDAV phase"
+  },
   "webDavBookFilesTitle": "Book files",
-  "@webDavBookFilesTitle": {"description": "WebDAV book-file manager title"},
+  "@webDavBookFilesTitle": {
+    "description": "WebDAV book-file manager title"
+  },
   "webDavFilesPendingUpload": "To upload",
-  "@webDavFilesPendingUpload": {"description": "Book-file pending upload tab"},
+  "@webDavFilesPendingUpload": {
+    "description": "Book-file pending upload tab"
+  },
   "webDavFilesAvailableDownload": "Available",
-  "@webDavFilesAvailableDownload": {"description": "Book-file available download tab"},
+  "@webDavFilesAvailableDownload": {
+    "description": "Book-file available download tab"
+  },
   "webDavFilesSynced": "Synced",
-  "@webDavFilesSynced": {"description": "Book-file synced tab"},
+  "@webDavFilesSynced": {
+    "description": "Book-file synced tab"
+  },
   "webDavFilesUploadSelected": "Upload selected",
-  "@webDavFilesUploadSelected": {"description": "Upload selected books action"},
+  "@webDavFilesUploadSelected": {
+    "description": "Upload selected books action"
+  },
   "webDavFilesDownloadSelected": "Download selected",
-  "@webDavFilesDownloadSelected": {"description": "Download selected books action"},
+  "@webDavFilesDownloadSelected": {
+    "description": "Download selected books action"
+  },
   "webDavFilesSelectedSummary": "{count} selected · {size}",
-  "@webDavFilesSelectedSummary": {"description": "Selected book-file count and size", "placeholders": {"count": {"type": "int"}, "size": {"type": "String"}}},
+  "@webDavFilesSelectedSummary": {
+    "description": "Selected book-file count and size",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "webDavFilesOnlyLocal": "Only on this device",
-  "@webDavFilesOnlyLocal": {"description": "Book file exists only locally"},
+  "@webDavFilesOnlyLocal": {
+    "description": "Book file exists only locally"
+  },
   "webDavFilesOnlyRemote": "File not downloaded to this device",
-  "@webDavFilesOnlyRemote": {"description": "Book file exists only remotely"},
+  "@webDavFilesOnlyRemote": {
+    "description": "Book file exists only remotely"
+  },
   "webDavFilesUploadPermission": "Allow book file uploads",
-  "@webDavFilesUploadPermission": {"description": "Global permission for explicit book-file uploads"},
-  "webDavFilesUploadPermissionHint": "Only selected books are uploaded; WebDAV keeps the original file name and bytes without encryption",
-  "@webDavFilesUploadPermissionHint": {"description": "Explains that enabling uploads does not upload every book"},
-  "webDavLegacyBookDirectoryTitle": "Existing WebDAV books remain compatible",
-  "@webDavLegacyBookDirectoryTitle": {"description": "Title for the legacy WebDAV book directory notice"},
-  "webDavLegacyBookDirectoryMessage": "You do not need to sync them again. New uploads use a readable Book title - Author/original file name directory.",
-  "@webDavLegacyBookDirectoryMessage": {"description": "Explains legacy WebDAV book files do not require resync"},
+  "@webDavFilesUploadPermission": {
+    "description": "Global permission for explicit book-file uploads"
+  },
+  "webDavFilesUploadPermissionHint": "Automatically back up existing local books. Cloud books/ keeps readable files in their original format and covers, organized by title and author. Identity suffixes distinguish same-name books, and content updates retain history.",
+  "@webDavFilesUploadPermissionHint": {
+    "description": "Explains that enabling uploads does not upload every book"
+  },
   "webDavNewBookPolicyTitle": "New book files",
-  "@webDavNewBookPolicyTitle": {"description": "Newly imported book file upload policy title"},
+  "@webDavNewBookPolicyTitle": {
+    "description": "Newly imported book file upload policy title"
+  },
   "webDavNewBookPolicyAsk": "Ask every time (recommended)",
-  "@webDavNewBookPolicyAsk": {"description": "Ask after each import policy"},
+  "@webDavNewBookPolicyAsk": {
+    "description": "Ask after each import policy"
+  },
   "webDavNewBookPolicyAskHint": "Choose which books to upload after an import finishes",
-  "@webDavNewBookPolicyAskHint": {"description": "Ask policy explanation"},
+  "@webDavNewBookPolicyAskHint": {
+    "description": "Ask policy explanation"
+  },
   "webDavNewBookPolicyAutomatic": "Automatically upload new books",
-  "@webDavNewBookPolicyAutomatic": {"description": "Automatic new-book upload policy"},
+  "@webDavNewBookPolicyAutomatic": {
+    "description": "Automatic new-book upload policy"
+  },
   "webDavNewBookPolicyAutomaticHint": "Upload immediately after import and potentially use mobile data",
-  "@webDavNewBookPolicyAutomaticHint": {"description": "Automatic policy explanation"},
+  "@webDavNewBookPolicyAutomaticHint": {
+    "description": "Automatic policy explanation"
+  },
   "webDavNewBookPolicyManual": "Always choose manually",
-  "@webDavNewBookPolicyManual": {"description": "Manual new-book upload policy"},
+  "@webDavNewBookPolicyManual": {
+    "description": "Manual new-book upload policy"
+  },
   "webDavNewBookPolicyManualHint": "Start uploads only from the Book files page",
-  "@webDavNewBookPolicyManualHint": {"description": "Manual policy explanation"},
+  "@webDavNewBookPolicyManualHint": {
+    "description": "Manual policy explanation"
+  },
   "webDavNewBooksPromptTitle": "Sync the {count} books just imported?",
-  "@webDavNewBooksPromptTitle": {"description": "Prompt title after importing books", "placeholders": {"count": {"type": "int"}}},
+  "@webDavNewBooksPromptTitle": {
+    "description": "Prompt title after importing books",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "webDavNewBooksPromptBody": "Reading data syncs automatically. Choose the original book files to upload to WebDAV.",
-  "@webDavNewBooksPromptBody": {"description": "Prompt explanation after importing books"},
+  "@webDavNewBooksPromptBody": {
+    "description": "Prompt explanation after importing books"
+  },
   "webDavNewBooksSkip": "Not now",
-  "@webDavNewBooksSkip": {"description": "Skip new-book upload action"},
+  "@webDavNewBooksSkip": {
+    "description": "Skip new-book upload action"
+  },
   "webDavNewBooksUploading": "Uploading {count} new books…",
-  "@webDavNewBooksUploading": {"description": "New-book upload progress", "placeholders": {"count": {"type": "int"}}},
+  "@webDavNewBooksUploading": {
+    "description": "New-book upload progress",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "webDavNewBooksUploadResult": "New-book upload complete: {success} succeeded, {failed} failed",
-  "@webDavNewBooksUploadResult": {"description": "New-book upload result", "placeholders": {"success": {"type": "int"}, "failed": {"type": "int"}}},
+  "@webDavNewBooksUploadResult": {
+    "description": "New-book upload result",
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "webDavFilesTooLarge": "This file exceeds the sync size limit for its format",
-  "@webDavFilesTooLarge": {"description": "Book file transfer size limit"},
+  "@webDavFilesTooLarge": {
+    "description": "Book file transfer size limit"
+  },
   "webDavFilesEmpty": "No books in this category",
-  "@webDavFilesEmpty": {"description": "Empty book-file category"},
+  "@webDavFilesEmpty": {
+    "description": "Empty book-file category"
+  },
   "webDavFilesTransferComplete": "Book-file transfer complete",
-  "@webDavFilesTransferComplete": {"description": "Book-file transfer success"},
+  "@webDavFilesTransferComplete": {
+    "description": "Book-file transfer success"
+  },
   "readerAddAnnotation": "Add annotation",
   "readerAnnotationHint": "Write your thoughts about this passage…",
   "readerAnnotationSaved": "Annotation saved",
@@ -4667,19 +5628,61 @@
   "replaceRulesDeleteConfirmTitle": "Delete this rule?",
   "replaceRulesDeleteConfirmBody": "The rule will be removed from this device.",
   "replaceRulesImported": "Imported {count} rules",
-  "@replaceRulesImported": {"description": "Replacement-rule import success", "placeholders": {"count": {"type": "int"}}},
+  "@replaceRulesImported": {
+    "description": "Replacement-rule import success",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "replaceRulesImportFailed": "Could not import rules: {error}",
-  "@replaceRulesImportFailed": {"description": "Replacement-rule import error", "placeholders": {"error": {"type": "String"}}},
+  "@replaceRulesImportFailed": {
+    "description": "Replacement-rule import error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "replaceRulesImportTooLarge": "The rule file exceeds {max}",
-  "@replaceRulesImportTooLarge": {"description": "Replacement-rule import file size error", "placeholders": {"max": {"type": "String"}}},
+  "@replaceRulesImportTooLarge": {
+    "description": "Replacement-rule import file size error",
+    "placeholders": {
+      "max": {
+        "type": "String"
+      }
+    }
+  },
   "replaceRulesExported": "Rules exported",
   "replaceRulesPatternRequired": "Enter text or a regular expression to match",
   "replaceRulesPatternTooLong": "The pattern exceeds {max} characters",
-  "@replaceRulesPatternTooLong": {"description": "Replacement-rule pattern size error", "placeholders": {"max": {"type": "int"}}},
+  "@replaceRulesPatternTooLong": {
+    "description": "Replacement-rule pattern size error",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
   "replaceRulesInvalidRegex": "Invalid regular expression: {error}",
-  "@replaceRulesInvalidRegex": {"description": "Replacement-rule regular expression error", "placeholders": {"error": {"type": "String"}}},
+  "@replaceRulesInvalidRegex": {
+    "description": "Replacement-rule regular expression error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "replaceRulesTooMany": "A maximum of {max} rules is supported",
-  "@replaceRulesTooMany": {"description": "Replacement-rule count error", "placeholders": {"max": {"type": "int"}}},
+  "@replaceRulesTooMany": {
+    "description": "Replacement-rule count error",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
   "accountSecurityTitle": "Security",
   "accountSecurityLoading": "Loading security status…",
   "accountChangeEmailTitle": "Change email",
@@ -4709,7 +5712,13 @@
   "accountMfaOnTitle": "Two-factor authentication is on",
   "accountMfaEmailTitle": "Verify your email first",
   "accountMfaEmailHint": "We will send a setup code to {email}.",
-  "@accountMfaEmailHint": {"placeholders":{"email":{"type":"String"}}},
+  "@accountMfaEmailHint": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "accountMfaEmailCodeTitle": "Enter the email code",
   "accountMfaEmailCodeHint": "After verification, the authenticator QR code and secret will open on the next page.",
   "accountMfaAuthenticatorTitle": "Add Open Reading to your authenticator",
@@ -4741,9 +5750,13 @@
   "accountApplePurchase": "Unlock forever with App Store",
   "accountApplePurchaseHint": "A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.",
   "accountAppleProductLoading": "Loading product info…",
-  "@accountAppleProductLoading": {"description": "Apple product details are still loading"},
+  "@accountAppleProductLoading": {
+    "description": "Apple product details are still loading"
+  },
   "accountAppleProductRetry": "Couldn't load product info. Tap to retry.",
-  "@accountAppleProductRetry": {"description": "Apple product details failed to load; tappable retry"},
+  "@accountAppleProductRetry": {
+    "description": "Apple product details failed to load; tappable retry"
+  },
   "accountAppleRestore": "Restore purchases",
   "accountApplePurchasePending": "The purchase is waiting for App Store approval",
   "accountApplePurchaseSubmitted": "Purchase submitted; verifying Premium access",
@@ -4758,11 +5771,26 @@
   "accountInviteShareAction": "Copy invite link to share",
   "accountInviteCopied": "Invite details copied",
   "accountInviteStats": "{invited} invited · {rewarded} successful",
-  "@accountInviteStats": {"placeholders":{"invited":{"type":"int"},"rewarded":{"type":"int"}}},
+  "@accountInviteStats": {
+    "placeholders": {
+      "invited": {
+        "type": "int"
+      },
+      "rewarded": {
+        "type": "int"
+      }
+    }
+  },
   "accountInviteStatsInvited": "Codes bound",
   "accountInviteStatsRewarded": "Rewards unlocked",
   "accountInviterBound": "Invited by {name}",
-  "@accountInviterBound": {"placeholders":{"name":{"type":"String"}}},
+  "@accountInviterBound": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "accountInviteRewarded": "Invite completed",
   "accountInviteWaiting": "Waiting for code redemption",
   "accountInviteBindLabel": "Friend's invite code",
@@ -4785,25 +5813,61 @@
   "readingDataExportWholeBookHint": "Exports all of your annotations in this book. The book text and source file are not included.",
   "readingDataExportPrivacySummary": "Includes highlighted or underlined excerpts and your private notes. The book file, full text, account details, and device information are not included.",
   "readingDataExportCounts": "{highlights} highlights · {underlines} underlines · {notes} notes",
-  "@readingDataExportCounts": {"placeholders":{"highlights":{"type":"int"},"underlines":{"type":"int"},"notes":{"type":"int"}}},
+  "@readingDataExportCounts": {
+    "placeholders": {
+      "highlights": {
+        "type": "int"
+      },
+      "underlines": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportButton": "Export {count} annotations",
-  "@readingDataExportButton": {"placeholders":{"count":{"type":"int"}}},
+  "@readingDataExportButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportPreparing": "Preparing Markdown…",
   "readingDataExportEmpty": "This book has no highlights, underlines, or notes to export.",
   "readingDataExportSuccess": "Reading data exported to {location}",
-  "@readingDataExportSuccess": {"placeholders":{"location":{"type":"String"}}},
+  "@readingDataExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportFailed": "Could not export reading data",
   "readingDataExportUnsupported": "Reading data export is not supported on this platform yet",
   "readingDataExportReplaceTitle": "Replace existing file?",
   "readingDataExportReplaceMessage": "A file already exists at {path}. Replacing it cannot be undone.",
-  "@readingDataExportReplaceMessage": {"placeholders":{"path":{"type":"String"}}},
+  "@readingDataExportReplaceMessage": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportReplaceAction": "Replace",
   "readingDataExportExportedAt": "Exported",
   "readingDataExportAuthor": "Author",
   "readingDataExportContents": "Contents",
   "readingDataExportMyNote": "My note",
   "readingDataExportPositionPage": "Page {page}",
-  "@readingDataExportPositionPage": {"placeholders":{"page":{"type":"int"}}},
+  "@readingDataExportPositionPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportUnknownChapter": "Unlocated annotations",
   "cloudSyncTitle": "Cloud sync",
   "cloudSyncTagline": "Pick up where you left off on another device",
@@ -4869,20 +5933,19 @@
   },
   "bookSourcesImportFileTab": "JSON file",
   "bookSourcesImportTimedOut": "Reading took too long. Check your connection or try importing a downloaded JSON file.",
-  "cloudSyncIncrementalMode": "Incremental storage",
-  "cloudSyncPlainMode": "Standard TXT file",
-  "cloudSyncIncrementalDescription": "After the first upload, only changed content blocks are transferred. Your local book stays a complete TXT.",
-  "cloudSyncEnableIncremental": "Use incremental storage",
-  "cloudSyncIncrementalConfirmTitle": "Change this book’s cloud storage?",
-  "cloudSyncIncrementalConfirmBody": "The cloud copy will use an app-managed block format. Existing TXT copies will be kept but will stop receiving updates. Other devices need a version of this app that supports incremental storage. Your complete TXT remains available locally.",
-  "cloudSyncIncrementalConfirm": "Switch and sync",
   "bookSourcesImportUsageNotice": "Source usage information",
   "bookSourcesMaintenanceScope": "Scope",
   "bookSourcesMaintenanceScopeEnabled": "Enabled",
   "bookSourcesMaintenanceScopeAll": "All sources",
   "bookSourcesMaintenanceScopeSelected": "Selected",
   "bookSourcesMaintenanceCount": "{count} sources in this scope",
-  "@bookSourcesMaintenanceCount": {"placeholders": {"count": {"type": "int"}}},
+  "@bookSourcesMaintenanceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceEmptyScope": "No sources in this scope",
   "bookSourcesMaintenanceCancelledTitle": "Check stopped",
   "bookSourcesMaintenanceCancellingTitle": "Stopping checks",
@@ -4891,7 +5954,13 @@
   "bookSourcesMaintenanceResume": "Resume remaining checks",
   "bookSourcesMaintenanceRetry": "Retry unresolved checks",
   "bookSourcesMaintenanceRemaining": "{count} sources not checked yet",
-  "@bookSourcesMaintenanceRemaining": {"placeholders": {"count": {"type": "int"}}},
+  "@bookSourcesMaintenanceRemaining": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceResultTitle": "Health results",
   "bookSourcesMaintenanceReviewAll": "All results",
   "bookSourcesMaintenanceAvailable": "Available",
@@ -4902,187 +5971,480 @@
   "bookSourcesMaintenanceReviewSearch": "Search name or address",
   "bookSourcesMaintenanceReviewEmpty": "No matching results",
   "bookSourcesMaintenanceReviewSelection": "{count} selected to disable",
-  "@bookSourcesMaintenanceReviewSelection": {"placeholders": {"count": {"type": "int"}}},
+  "@bookSourcesMaintenanceReviewSelection": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceSelectFailures": "Select failed checks",
   "bookSourcesMaintenanceTimeoutReason": "Connection timed out; retry later",
   "bookSourcesMaintenanceUncheckedReason": "No conclusive result from this check",
   "bookSourcesMaintenanceAvailableReason": "Core checks passed",
   "bookSourcesMaintenanceDedupeBusy": "Finding duplicates…",
   "bookSourcesMaintenanceShelfProtected": "Used by your shelf · kept by default",
+  "bookSourcesMaintenanceDeleteReferencedWarning": "{count} selected source(s) are used by books on your bookshelf. Deleting them may prevent those books from updating or loading new chapters.",
+  "@bookSourcesMaintenanceDeleteReferencedWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceProblemsFilter": "Problems",
+  "bookSourcesMaintenanceSelectedCount": "Selected {count} source(s)",
+  "@bookSourcesMaintenanceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceShelfUsed": "Used by your bookshelf",
+  "bookSourcesMaintenancePause": "Pause",
+  "bookSourcesMaintenancePausing": "Pausing…",
+  "bookSourcesMaintenancePaused": "Check paused",
+  "bookSourcesMaintenanceCompleted": "Check complete",
+  "bookSourcesMaintenanceStart": "Start check",
+  "bookSourcesMaintenanceRestart": "Start again",
+  "bookSourcesMaintenanceCheckedThisRun": "Checked this run",
+  "bookSourcesMaintenancePausedHint": "Select and manage completed results now, or continue checking the remaining sources.",
   "bookSourcesMaintenanceApplyFailed": "Could not save changes. Try again.",
   "settingsQqGroup": "QQ Group",
   "settingsOpenSourceTitle": "Open-source details",
   "settingsOpenSourceDetails": "All features except advanced features are open source. The open-source code is licensed under AGPL-3.0; see the GitHub repository for its scope.",
   "premiumLifetimeTitle": "Lifetime Premium",
-  "@premiumLifetimeTitle": {"description": "Lifetime Premium"},
+  "@premiumLifetimeTitle": {
+    "description": "Lifetime Premium"
+  },
   "premiumLifetimeCaption": "One-time purchase · No auto-renewal",
-  "@premiumLifetimeCaption": {"description": "One-time purchase · No auto-renewal"},
+  "@premiumLifetimeCaption": {
+    "description": "One-time purchase · No auto-renewal"
+  },
   "premiumBenefitsTitle": "Included with Premium",
-  "@premiumBenefitsTitle": {"description": "Included with Premium"},
+  "@premiumBenefitsTitle": {
+    "description": "Included with Premium"
+  },
   "premiumProtocolsBenefit": "Import and use additional compatible source protocols.",
-  "@premiumProtocolsBenefit": {"description": "Import and use additional compatible source protocols."},
+  "@premiumProtocolsBenefit": {
+    "description": "Import and use additional compatible source protocols."
+  },
   "premiumPrivateNetworkBenefit": "Access trusted sources on your device, local network or private network.",
-  "@premiumPrivateNetworkBenefit": {"description": "Access trusted sources on your device, local network or private network."},
+  "@premiumPrivateNetworkBenefit": {
+    "description": "Access trusted sources on your device, local network or private network."
+  },
   "premiumSourceNotice": "Premium does not include books or source addresses. Third-party services may charge separately.",
-  "@premiumSourceNotice": {"description": "Premium does not include books or source addresses. Third-party services may charge separately."},
+  "@premiumSourceNotice": {
+    "description": "Premium does not include books or source addresses. Third-party services may charge separately."
+  },
   "premiumSetupHint": "After unlocking, enable these options in Settings → Advanced features.",
-  "@premiumSetupHint": {"description": "After unlocking, enable these options in Settings → Advanced features."},
+  "@premiumSetupHint": {
+    "description": "After unlocking, enable these options in Settings → Advanced features."
+  },
   "premiumBillingTitle": "Purchase details",
-  "@premiumBillingTitle": {"description": "Purchase details"},
+  "@premiumBillingTitle": {
+    "description": "Purchase details"
+  },
   "premiumBillingBody": "This is a non-consumable, one-time purchase, not a subscription. It does not renew automatically. The App Store displays the actual price and Apple handles payment.",
-  "@premiumBillingBody": {"description": "This is a non-consumable, one-time purchase, not a subscription. It does not renew automatically. The App Store displays the actual price and Apple handles payment."},
+  "@premiumBillingBody": {
+    "description": "This is a non-consumable, one-time purchase, not a subscription. It does not renew automatically. The App Store displays the actual price and Apple handles payment."
+  },
   "premiumRestoreHelp": "After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Open Reading account. Restoring does not charge you again.",
-  "@premiumRestoreHelp": {"description": "After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Open Reading account. Restoring does not charge you again."},
+  "@premiumRestoreHelp": {
+    "description": "After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Open Reading account. Restoring does not charge you again."
+  },
   "premiumMembershipTerms": "Membership terms",
-  "@premiumMembershipTerms": {"description": "Membership terms"},
+  "@premiumMembershipTerms": {
+    "description": "Membership terms"
+  },
   "premiumPrivacyPolicy": "Privacy policy",
-  "@premiumPrivacyPolicy": {"description": "Privacy policy"},
+  "@premiumPrivacyPolicy": {
+    "description": "Privacy policy"
+  },
   "premiumAppleEula": "Apple standard EULA",
-  "@premiumAppleEula": {"description": "Apple standard EULA"},
+  "@premiumAppleEula": {
+    "description": "Apple standard EULA"
+  },
   "premiumPurchaseConsent": "Before purchasing, read the membership terms, privacy policy and Apple standard EULA.",
-  "@premiumPurchaseConsent": {"description": "Before purchasing, read the membership terms, privacy policy and Apple standard EULA."},
+  "@premiumPurchaseConsent": {
+    "description": "Before purchasing, read the membership terms, privacy policy and Apple standard EULA."
+  },
   "premiumAccountBindingTitle": "Account and access",
-  "@premiumAccountBindingTitle": {"description": "Account and access"},
+  "@premiumAccountBindingTitle": {
+    "description": "Account and access"
+  },
   "premiumAccountBindingBody": "After verification, Premium is linked to the current Open Reading account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing.",
-  "@premiumAccountBindingBody": {"description": "After verification, Premium is linked to the current Open Reading account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing."},
+  "@premiumAccountBindingBody": {
+    "description": "After verification, Premium is linked to the current Open Reading account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing."
+  },
   "premiumRefundTitle": "Request a refund",
-  "@premiumRefundTitle": {"description": "Request a refund"},
+  "@premiumRefundTitle": {
+    "description": "Request a refund"
+  },
   "premiumRefundTerms": "Apple reviews and processes App Store refund requests under its applicable rules. Submitting a request does not mean it is approved. Refunded or revoked purchases no longer provide the corresponding Premium access.",
-  "@premiumRefundTerms": {"description": "Apple reviews and processes App Store refund requests under its applicable rules. Submitting a request does not mean it is approved. Refunded or revoked purchases no longer provide the corresponding Premium access."},
+  "@premiumRefundTerms": {
+    "description": "Apple reviews and processes App Store refund requests under its applicable rules. Submitting a request does not mean it is approved. Refunded or revoked purchases no longer provide the corresponding Premium access."
+  },
   "premiumPrivacyPurchaseTitle": "Purchase verification data",
-  "@premiumPrivacyPurchaseTitle": {"description": "Purchase verification data"},
+  "@premiumPrivacyPurchaseTitle": {
+    "description": "Purchase verification data"
+  },
   "premiumPrivacyPurchaseBody": "Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Open Reading account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password.",
-  "@premiumPrivacyPurchaseBody": {"description": "Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Open Reading account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password."},
+  "@premiumPrivacyPurchaseBody": {
+    "description": "Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Open Reading account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password."
+  },
   "premiumPrivacyAccountTitle": "Account service",
-  "@premiumPrivacyAccountTitle": {"description": "Account service"},
+  "@premiumPrivacyAccountTitle": {
+    "description": "Account service"
+  },
   "premiumPrivacyAccountBody": "The Open Reading account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website.",
-  "@premiumPrivacyAccountBody": {"description": "The Open Reading account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website."},
+  "@premiumPrivacyAccountBody": {
+    "description": "The Open Reading account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website."
+  },
   "premiumPurchaseSuccess": "Premium unlocked",
-  "@premiumPurchaseSuccess": {"description": "Premium unlocked"},
+  "@premiumPurchaseSuccess": {
+    "description": "Premium unlocked"
+  },
   "premiumTestPurchaseVerified": "Test purchase verified. Formal Premium was not activated.",
-  "@premiumTestPurchaseVerified": {"description": "Sandbox purchase verification result"},
+  "@premiumTestPurchaseVerified": {
+    "description": "Sandbox purchase verification result"
+  },
   "premiumPurchaseRevoked": "Premium access from this purchase has been revoked.",
-  "@premiumPurchaseRevoked": {"description": "Revoked Apple purchase result"},
+  "@premiumPurchaseRevoked": {
+    "description": "Revoked Apple purchase result"
+  },
   "premiumRestoreSuccess": "Purchase restored. Premium is synced.",
-  "@premiumRestoreSuccess": {"description": "Purchase restored. Premium is synced."},
+  "@premiumRestoreSuccess": {
+    "description": "Purchase restored. Premium is synced."
+  },
   "premiumRestoreEmpty": "No restorable purchase was found. Check your Apple Account and the Open Reading account linked to the purchase.",
-  "@premiumRestoreEmpty": {"description": "No restorable purchase was found. Check your Apple Account and the Open Reading account linked to the purchase."},
+  "@premiumRestoreEmpty": {
+    "description": "No restorable purchase was found. Check your Apple Account and the Open Reading account linked to the purchase."
+  },
   "premiumPurchaseCanceled": "Purchase canceled",
-  "@premiumPurchaseCanceled": {"description": "Purchase canceled"},
+  "@premiumPurchaseCanceled": {
+    "description": "Purchase canceled"
+  },
   "premiumPendingApproval": "Waiting for Apple approval. Access unlocks after approval and verification.",
-  "@premiumPendingApproval": {"description": "Waiting for Apple approval. Access unlocks after approval and verification."},
+  "@premiumPendingApproval": {
+    "description": "Waiting for Apple approval. Access unlocks after approval and verification."
+  },
   "premiumVerifying": "Verifying your purchase…",
-  "@premiumVerifying": {"description": "Verifying your purchase…"},
+  "@premiumVerifying": {
+    "description": "Verifying your purchase…"
+  },
   "premiumRestoring": "Restoring purchases…",
-  "@premiumRestoring": {"description": "Restoring purchases…"},
+  "@premiumRestoring": {
+    "description": "Restoring purchases…"
+  },
   "premiumRefundSubmitted": "Refund request sent to Apple for review.",
-  "@premiumRefundSubmitted": {"description": "Refund request sent to Apple for review."},
+  "@premiumRefundSubmitted": {
+    "description": "Refund request sent to Apple for review."
+  },
   "premiumRefundNotFound": "No refundable Premium purchase was found for this Apple Account. You can also check your history with Apple purchase support.",
-  "@premiumRefundNotFound": {"description": "No refundable Premium purchase was found for this Apple Account. You can also check your history with Apple purchase support."},
+  "@premiumRefundNotFound": {
+    "description": "No refundable Premium purchase was found for this Apple Account. You can also check your history with Apple purchase support."
+  },
   "premiumApplePurchaseSupport": "Apple purchase support",
-  "@premiumApplePurchaseSupport": {"description": "Apple purchase support"},
+  "@premiumApplePurchaseSupport": {
+    "description": "Apple purchase support"
+  },
   "premiumLinkFailed": "Unable to open this link. Please try again later.",
-  "@premiumLinkFailed": {"description": "Unable to open this link. Please try again later."},
+  "@premiumLinkFailed": {
+    "description": "Unable to open this link. Please try again later."
+  },
   "premiumSignInRequired": "Sign in to Open Reading before purchasing or restoring Premium.",
-  "@premiumSignInRequired": {"description": "Sign in to Open Reading before purchasing or restoring Premium."},
+  "@premiumSignInRequired": {
+    "description": "Sign in to Open Reading before purchasing or restoring Premium."
+  },
   "premiumRefundUnavailable": "The Apple refund sheet is unavailable. Continue through Apple purchase support.",
   "premiumOperationFailed": "The operation could not be completed. Please try again.",
   "premiumPurchaseConsentOther": "Please read the membership terms and privacy policy before unlocking Premium.",
   "premiumBillingBodyOther": "Unlock Premium through the available purchase or redemption options. The purchase channel displays the price and payment method. Verified membership is linked to your current Open Reading account.",
   "accountDeleteTitle": "Delete account",
-  "@accountDeleteTitle": {"description": "Title of the account deletion screen and its entry tile"},
+  "@accountDeleteTitle": {
+    "description": "Title of the account deletion screen and its entry tile"
+  },
   "accountDeleteEntrySubtitle": "Permanently erase this account and all of its data",
-  "@accountDeleteEntrySubtitle": {"description": "Subtitle of the account deletion entry tile"},
+  "@accountDeleteEntrySubtitle": {
+    "description": "Subtitle of the account deletion entry tile"
+  },
   "accountDeleteStepOf": "Step {current} of {total}",
-  "@accountDeleteStepOf": {"description": "Progress indicator in the account deletion flow", "placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "@accountDeleteStepOf": {
+    "description": "Progress indicator in the account deletion flow",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "accountDeleteReviewTitle": "What deletion does",
-  "@accountDeleteReviewTitle": {"description": "Heading of the first deletion step"},
+  "@accountDeleteReviewTitle": {
+    "description": "Heading of the first deletion step"
+  },
   "accountDeleteReviewBody": "Please read every point. Once you confirm, everything below is deleted immediately and we cannot get it back for you.",
-  "@accountDeleteReviewBody": {"description": "Intro paragraph of the first deletion step"},
+  "@accountDeleteReviewBody": {
+    "description": "Intro paragraph of the first deletion step"
+  },
   "accountDeleteCurrentAccount": "Current account",
-  "@accountDeleteCurrentAccount": {"description": "Label for the account being deleted"},
+  "@accountDeleteCurrentAccount": {
+    "description": "Label for the account being deleted"
+  },
   "accountDeleteJoined": "Joined",
-  "@accountDeleteJoined": {"description": "Label for the account registration date"},
+  "@accountDeleteJoined": {
+    "description": "Label for the account registration date"
+  },
   "accountDeletePremiumActive": "Premium unlocked (will be removed)",
-  "@accountDeletePremiumActive": {"description": "Premium status line when premium will be removed"},
+  "@accountDeletePremiumActive": {
+    "description": "Premium status line when premium will be removed"
+  },
   "accountDeletePremiumNone": "Premium not unlocked",
-  "@accountDeletePremiumNone": {"description": "Premium status line when no premium is held"},
+  "@accountDeletePremiumNone": {
+    "description": "Premium status line when no premium is held"
+  },
   "accountDeleteHasTitle": "This account currently has",
-  "@accountDeleteHasTitle": {"description": "Heading above the counts of data the deletion removes"},
+  "@accountDeleteHasTitle": {
+    "description": "Heading above the counts of data the deletion removes"
+  },
   "accountDeleteHasSessions": "{count} signed-in devices",
-  "@accountDeleteHasSessions": {"description": "Count of active sessions the deletion will revoke", "placeholders": {"count": {"type": "int"}}},
+  "@accountDeleteHasSessions": {
+    "description": "Count of active sessions the deletion will revoke",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "accountDeleteHasPasskeys": "{count} passkeys",
-  "@accountDeleteHasPasskeys": {"description": "Count of passkeys the deletion will remove", "placeholders": {"count": {"type": "int"}}},
+  "@accountDeleteHasPasskeys": {
+    "description": "Count of passkeys the deletion will remove",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "accountDeleteHasOauth": "{count} linked sign-in providers",
-  "@accountDeleteHasOauth": {"description": "Count of linked OAuth providers the deletion will remove", "placeholders": {"count": {"type": "int"}}},
+  "@accountDeleteHasOauth": {
+    "description": "Count of linked OAuth providers the deletion will remove",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "accountDeleteHasInvited": "{count} members who joined with your invite code",
-  "@accountDeleteHasInvited": {"description": "Count of members invited by this account", "placeholders": {"count": {"type": "int"}}},
+  "@accountDeleteHasInvited": {
+    "description": "Count of members invited by this account",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "accountDeleteHasRedemptions": "{count} redeemed codes",
-  "@accountDeleteHasRedemptions": {"description": "Count of redemption codes this account has used", "placeholders": {"count": {"type": "int"}}},
+  "@accountDeleteHasRedemptions": {
+    "description": "Count of redemption codes this account has used",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "accountDeleteTermsTitle": "Deletion terms",
-  "@accountDeleteTermsTitle": {"description": "Heading of the deletion terms"},
+  "@accountDeleteTermsTitle": {
+    "description": "Heading of the deletion terms"
+  },
   "accountDeleteTermsIrreversible": "Account deletion is final and cannot be reversed. Once you confirm, nobody — support included — has any way to restore the deleted data.",
-  "@accountDeleteTermsIrreversible": {"description": "Lead warning that deletion cannot be undone"},
+  "@accountDeleteTermsIrreversible": {
+    "description": "Lead warning that deletion cannot be undone"
+  },
   "accountDeleteTermsIdentity": "The account itself is deleted: your email address, username, display name and avatar.",
-  "@accountDeleteTermsIdentity": {"description": "Deletion term about identity data"},
+  "@accountDeleteTermsIdentity": {
+    "description": "Deletion term about identity data"
+  },
   "accountDeleteTermsLogins": "Every sign-in method is deleted: your password, your passkeys, and your Google, GitHub and Apple links.",
-  "@accountDeleteTermsLogins": {"description": "Deletion term about sign-in methods"},
+  "@accountDeleteTermsLogins": {
+    "description": "Deletion term about sign-in methods"
+  },
   "accountDeleteTermsSessions": "You are signed out everywhere immediately, on phones, tablets and computers alike.",
-  "@accountDeleteTermsSessions": {"description": "Deletion term about active sessions"},
+  "@accountDeleteTermsSessions": {
+    "description": "Deletion term about active sessions"
+  },
   "accountDeleteTermsMfa": "Your two-factor setup and all recovery codes are deleted.",
-  "@accountDeleteTermsMfa": {"description": "Deletion term about two-factor authentication"},
+  "@accountDeleteTermsMfa": {
+    "description": "Deletion term about two-factor authentication"
+  },
   "accountDeleteTermsPremium": "Premium access is removed, however you unlocked it — a redemption code, an invite reward, or an Apple purchase.",
-  "@accountDeleteTermsPremium": {"description": "Deletion term about premium entitlements"},
+  "@accountDeleteTermsPremium": {
+    "description": "Deletion term about premium entitlements"
+  },
   "accountDeleteTermsReferrals": "Your invite code stops working and the referral records between you and the people you invited are deleted. Rewards already given to others are not taken back.",
-  "@accountDeleteTermsReferrals": {"description": "Deletion term about referrals and invite codes"},
+  "@accountDeleteTermsReferrals": {
+    "description": "Deletion term about referrals and invite codes"
+  },
   "accountDeleteTermsRedemptions": "Redemption codes you have already used are not refunded and do not become available again.",
-  "@accountDeleteTermsRedemptions": {"description": "Deletion term about spent redemption codes"},
+  "@accountDeleteTermsRedemptions": {
+    "description": "Deletion term about spent redemption codes"
+  },
   "accountDeleteTermsApple": "You bought lifetime Premium on the App Store. Deleting your account does not refund it and does not cancel any App Store transaction — refunds can only be requested from Apple. Your purchase receipt is unlinked from this account and kept, so you can later tap Restore purchases on a new account with the same Apple ID and get Premium back.",
-  "@accountDeleteTermsApple": {"description": "Deletion term about App Store purchases and restoring them"},
+  "@accountDeleteTermsApple": {
+    "description": "Deletion term about App Store purchases and restoring them"
+  },
   "accountDeleteTermsLocalData": "Books, shelves and reading progress on this device are not deleted — they only ever lived on your device. Remove them in the app if you want them gone too.",
-  "@accountDeleteTermsLocalData": {"description": "Deletion term clarifying that on-device library data stays"},
-  "accountDeleteTermsTombstone": "We keep one deletion record. It contains no plaintext email address and cannot be turned back into personal information. Its only purposes are preventing abuse and making the Apple purchase restore above possible.",
-  "@accountDeleteTermsTombstone": {"description": "Deletion term about the minimal retained deletion record"},
+  "@accountDeleteTermsLocalData": {
+    "description": "Deletion term clarifying that on-device library data stays"
+  },
+  "accountDeleteTermsTombstone": "We retain only minimal deidentified deletion data needed to prevent abuse, together with App Store purchase verification records required to restore or verify purchases. These records are not used to recreate your account.",
+  "@accountDeleteTermsTombstone": {
+    "description": "Deletion term about the minimal retained deletion record"
+  },
   "accountDeleteTermsRejoin": "After deletion the same email address can register again, but it will be a brand-new empty account with none of your old data or access.",
-  "@accountDeleteTermsRejoin": {"description": "Deletion term about registering again with the same address"},
+  "@accountDeleteTermsRejoin": {
+    "description": "Deletion term about registering again with the same address"
+  },
   "accountDeleteBlockedTitle": "This account cannot be deleted yet",
-  "@accountDeleteBlockedTitle": {"description": "Heading shown when the account may not be deleted"},
+  "@accountDeleteBlockedTitle": {
+    "description": "Heading shown when the account may not be deleted"
+  },
   "accountDeleteBlockedOwner": "You are the owner of the admin console. Hand the ownership to someone else first, then come back — otherwise nobody would be left to administer it.",
-  "@accountDeleteBlockedOwner": {"description": "Explains that an admin owner must hand over ownership first"},
+  "@accountDeleteBlockedOwner": {
+    "description": "Explains that an admin owner must hand over ownership first"
+  },
   "accountDeleteConsent": "I have read the terms in full, I understand that deletion cannot be undone, and I agree to permanently delete my account and all of its data.",
-  "@accountDeleteConsent": {"description": "Checkbox label accepting the deletion terms"},
+  "@accountDeleteConsent": {
+    "description": "Checkbox label accepting the deletion terms"
+  },
   "accountDeleteConsentRequired": "Please accept the deletion terms first.",
-  "@accountDeleteConsentRequired": {"description": "Error shown when continuing without accepting the terms"},
+  "@accountDeleteConsentRequired": {
+    "description": "Error shown when continuing without accepting the terms"
+  },
   "accountDeleteContinue": "I understand, continue",
-  "@accountDeleteContinue": {"description": "Button advancing from the terms step"},
+  "@accountDeleteContinue": {
+    "description": "Button advancing from the terms step"
+  },
   "accountDeleteVerifyTitle": "Verify your email",
-  "@accountDeleteVerifyTitle": {"description": "Heading of the deletion email verification step"},
+  "@accountDeleteVerifyTitle": {
+    "description": "Heading of the deletion email verification step"
+  },
   "accountDeleteVerifyBody": "We will send a 6-digit code to {email} to confirm that this request is really from you.",
-  "@accountDeleteVerifyBody": {"description": "Explains the deletion verification code email", "placeholders": {"email": {"type": "String"}}},
+  "@accountDeleteVerifyBody": {
+    "description": "Explains the deletion verification code email",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "accountDeleteSendCode": "Send deletion code",
-  "@accountDeleteSendCode": {"description": "Button sending the deletion verification code"},
+  "@accountDeleteSendCode": {
+    "description": "Button sending the deletion verification code"
+  },
   "accountDeleteResendCode": "Send again",
-  "@accountDeleteResendCode": {"description": "Button resending the deletion verification code"},
+  "@accountDeleteResendCode": {
+    "description": "Button resending the deletion verification code"
+  },
   "accountDeleteCodeSent": "Code sent. Finish the deletion within 10 minutes.",
-  "@accountDeleteCodeSent": {"description": "Toast confirming the deletion code was sent"},
+  "@accountDeleteCodeSent": {
+    "description": "Toast confirming the deletion code was sent"
+  },
   "accountDeleteConfirmTitle": "Final step",
-  "@accountDeleteConfirmTitle": {"description": "Heading of the final deletion step"},
+  "@accountDeleteConfirmTitle": {
+    "description": "Heading of the final deletion step"
+  },
   "accountDeleteConfirmBody": "Type your account email {email} so there is no doubt which account is being deleted.",
-  "@accountDeleteConfirmBody": {"description": "Asks the member to retype their account email to confirm deletion", "placeholders": {"email": {"type": "String"}}},
+  "@accountDeleteConfirmBody": {
+    "description": "Asks the member to retype their account email to confirm deletion",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "accountDeleteConfirmWarning": "The moment you press the button below, the account is permanently deleted.",
-  "@accountDeleteConfirmWarning": {"description": "Warning directly above the irreversible delete button"},
+  "@accountDeleteConfirmWarning": {
+    "description": "Warning directly above the irreversible delete button"
+  },
   "accountDeleteConfirmField": "Type your account email to confirm",
-  "@accountDeleteConfirmField": {"description": "Label of the field where the member retypes their email"},
+  "@accountDeleteConfirmField": {
+    "description": "Label of the field where the member retypes their email"
+  },
   "accountDeleteMfaHint": "This account has two-factor authentication on, so one more code is required.",
-  "@accountDeleteMfaHint": {"description": "Hint that a two-factor code is also required"},
+  "@accountDeleteMfaHint": {
+    "description": "Hint that a two-factor code is also required"
+  },
   "accountDeleteConfirmMismatch": "That email does not match the current account.",
-  "@accountDeleteConfirmMismatch": {"description": "Error when the retyped email does not match"},
+  "@accountDeleteConfirmMismatch": {
+    "description": "Error when the retyped email does not match"
+  },
   "accountDeleteAction": "Permanently delete my account",
-  "@accountDeleteAction": {"description": "Button that permanently deletes the account"},
+  "@accountDeleteAction": {
+    "description": "Button that permanently deletes the account"
+  },
   "accountDeleteDoneTitle": "Your account is deleted",
-  "@accountDeleteDoneTitle": {"description": "Heading of the deletion success dialog"},
+  "@accountDeleteDoneTitle": {
+    "description": "Heading of the deletion success dialog"
+  },
   "accountDeleteDoneBody": "Your account and its data are permanently gone, and every device has been signed out. Thank you for having used Open Reading.",
-  "@accountDeleteDoneBody": {"description": "Body of the deletion success dialog"},
+  "@accountDeleteDoneBody": {
+    "description": "Body of the deletion success dialog"
+  },
+  "accountDeleteAppleManualRevocation": "After closing this dialog, open Apple Account Settings > Sign-In & Security > Sign in with Apple > Open Reading, then choose Stop Using Sign in with Apple.",
+  "@accountDeleteAppleManualRevocation": {
+    "description": "Manual Apple authorization removal guidance shown after deleting a legacy Apple account"
+  },
   "accountDeleteDoneClose": "Close",
-  "@accountDeleteDoneClose": {"description": "Button closing the deletion success dialog"}
+  "@accountDeleteDoneClose": {
+    "description": "Button closing the deletion success dialog"
+  },
+  "bookSourceDetailsTitle": "Book details",
+  "bookSourceDetailsDescription": "About this book",
+  "bookSourceDetailsNoDescription": "No description provided by this source.",
+  "bookSourceDetailsLatestChapter": "Latest chapter",
+  "bookSourceDetailsLoadFailed": "Could not load full details. You can retry or read with the available information.",
+  "bookSourceDetailsOnShelf": "On shelf",
+  "bookSourceDetailsAddFailed": "Could not add this book to your shelf. Try again.",
+  "bookSourceDetailsReadFailed": "Could not open this book. Try again.",
+  "appTextSize": "Interface text size",
+  "appTextSizeDescription": "Only changes app menus and controls, not reading text.",
+  "appTextSizePreview": "Menus and settings will use this text size.",
+  "appTextSizeDefault": "100% (Default)",
+  "bookSourceTrackUpdatesTitle": "Updates and downloaded text",
+  "bookSourceTrackUpdatesBody": "Downloaded books keep their source. Check for new chapters to append new content, or refresh downloaded chapters while preserving your edits and history.",
+  "bookSourceCheckNewChapters": "Check for new chapters",
+  "bookSourceRefreshDownloaded": "Refresh downloaded chapters",
+  "bookSourceNoNewChapters": "No new chapters in the catalog. Refresh downloaded chapters to check earlier text for changes.",
+  "bookSourceUpdateSummary": "{added} chapters added, {refreshed} refreshed",
+  "bookSourceBaselineUnknown": "Confirm the last chapter already downloaded before continuing updates. Your existing text will be preserved.",
+  "bookSourceSelectBoundary": "Confirm downloaded chapters",
+  "bookSourceBoundaryHelp": "Select the last source chapter included in your local text. Only later chapters will be appended; existing text stays intact.",
+  "bookSourceTrackingEstablished": "Tracking boundary saved. You can now check for new chapters.",
+  "bookSourceMappingChanged": "The source changed its chapter order or identifiers. Confirm your downloaded chapters again. Existing text was preserved.",
+  "bookSourceContentConflicts": "Text changes need review",
+  "bookSourceContentConflictBody": "You and the source changed these chapters. Your version remains active. Compare and choose what to read; both versions stay in history.",
+  "bookSourceCompareVersions": "Compare text",
+  "bookSourceLocalVersion": "My text",
+  "bookSourceRemoteVersion": "Source text",
+  "bookSourceBaselineVersion": "Downloaded baseline",
+  "bookSourceKeepLocal": "Keep my text",
+  "bookSourceUseRemote": "Use source text",
+  "bookSourceUpdateFailed": "Update did not finish. Your text was preserved. Please retry.",
+  "cloudSyncReadableStorage": "Books keep their original format in books/, with readable history. Unchanged files are not uploaded again; changed text is transferred as a complete file.",
+  "@bookSourceUpdateSummary": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "refreshed": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourceBindSource": "Link a book source",
+  "bookSourceNotBound": "No source linked",
+  "bookSourceDownloadedUnchanged": "Downloaded chapters are up to date."
 }

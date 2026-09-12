@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'package:xxread/services/sync/storage/memory_sync_storage.dart';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xxread/services/sync/mutable_txt_sync_service.dart';
+import 'package:xxread/services/sync/book_content_sync_service.dart';
 import 'package:xxread/services/sync/secure_sync_config.dart';
 import 'package:xxread/services/sync/sync_change_store.dart';
 import 'package:xxread/services/sync/sync_engine.dart';
@@ -13,16 +14,17 @@ void main() {
     tester,
   ) async {
     final files = _Files();
-    final transfer = Completer<MutableTxtReconcileResult>();
+    final transfer = Completer<BookContentReconcileResult>();
     files.transfer = transfer.future;
     final config = _Config();
     final store = _Store();
     final engine = _Engine(config, store);
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: engine,
-      mutableTxtService: files,
+      contentSyncService: files,
     );
     await controller.initialize();
     var notifiedWhileSyncingText = false;
@@ -44,7 +46,7 @@ void main() {
   });
 
   testWidgets(
-    'follows a bound v3 TXT descriptor before reconcile without blocking progress',
+    'reconciles readable files without blocking independent progress checks',
     (tester) async {
       const bookUid = 'book-uid';
       final store = _Store(
@@ -61,7 +63,7 @@ void main() {
               'file_size': 1024,
               'blob_sha256':
                   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-              'remote_path': 'v3:books/$bookUid/manifest.json',
+              'remote_path': 'books/$bookUid/large.txt',
               'file_name': 'large.txt',
             },
             hlc: '1-0-device',
@@ -70,32 +72,33 @@ void main() {
           ),
         ],
       );
-      final transfer = Completer<MutableTxtReconcileResult>();
+      final transfer = Completer<BookContentReconcileResult>();
       final files = _Files(
-        states: const <MutableTxtBookState>[
-          MutableTxtBookState(
+        states: const <BookContentState>[
+          BookContentState(
             bookUid: bookUid,
             localBookId: 7,
             localPath: '/books/large.txt',
-            remotePath: 'v2:books/book-uid.txt',
-            status: MutableTxtSyncStatus.synced,
+            remotePath: 'books/book-uid.txt',
+            status: BookContentSyncStatus.synced,
           ),
         ],
       )..transfer = transfer.future;
       final config = _Config();
       final engine = _Engine(config, store);
       final controller = WebDavSyncController(
+        localBooksLoader: () async => [],
         configStore: config,
         changeStore: store,
         engine: engine,
-        mutableTxtService: files,
+        contentSyncService: files,
       );
       await controller.initialize();
 
       final fullSync = controller.syncNow();
       await tester.pump();
 
-      expect(files.events, <String>['follow:$bookUid', 'reconcile']);
+      expect(files.events, <String>['reconcile']);
       expect(controller.syncingText, isTrue);
       await controller.checkProgressBeforeOpen();
       expect(engine.calls, 2);
@@ -114,7 +117,7 @@ void main() {
     final store = _Store();
     final files = _Files();
     files.transfer = Future.value(
-      const MutableTxtReconcileResult(
+      const BookContentReconcileResult(
         uploaded: 0,
         downloaded: 0,
         conflicts: 0,
@@ -122,10 +125,11 @@ void main() {
       ),
     );
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: _Engine(config, store),
-      mutableTxtService: files,
+      contentSyncService: files,
     );
     await controller.initialize();
     await controller.syncNow();
@@ -156,10 +160,11 @@ void main() {
       };
       final engine = _Engine(config, store);
       final controller = WebDavSyncController(
+        localBooksLoader: () async => [],
         configStore: config,
         changeStore: store,
         engine: engine,
-        mutableTxtService: files,
+        contentSyncService: files,
       );
       await controller.initialize();
 
@@ -191,10 +196,11 @@ void main() {
     final files = _Files()
       ..onTransfer = () async => throw StateError('transport exploded');
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: _Engine(config, store),
-      mutableTxtService: files,
+      contentSyncService: files,
     );
     await controller.initialize();
 
@@ -229,10 +235,11 @@ void main() {
     final store = _Store();
     final engine = _Engine(config, store)..error = failure;
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: engine,
-      mutableTxtService: _Files(),
+      contentSyncService: _Files(),
     );
     await controller.initialize();
 
@@ -254,22 +261,23 @@ void main() {
     final store = _Store();
     final engine = _Engine(config, store);
     final files = _Files(
-      states: const <MutableTxtBookState>[
-        MutableTxtBookState(
+      states: const <BookContentState>[
+        BookContentState(
           bookUid: 'failed-book',
           localBookId: 9,
           localPath: '/books/failed.txt',
-          remotePath: 'v2:books/failed/current.txt',
-          status: MutableTxtSyncStatus.failed,
+          remotePath: 'books/failed/current.txt',
+          status: BookContentSyncStatus.failed,
           error: 'PUT /OpenReading/v2/books/failed/current.txt: HTTP 503',
         ),
       ],
     );
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: engine,
-      mutableTxtService: files,
+      contentSyncService: files,
     );
     await controller.initialize();
 
@@ -299,7 +307,7 @@ void main() {
       ..failOnCall = 2;
     final files = _Files()
       ..transfer = Future.value(
-        const MutableTxtReconcileResult(
+        const BookContentReconcileResult(
           uploaded: 1,
           downloaded: 0,
           conflicts: 0,
@@ -307,10 +315,11 @@ void main() {
         ),
       );
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: engine,
-      mutableTxtService: files,
+      contentSyncService: files,
     );
     await controller.initialize();
 
@@ -343,10 +352,11 @@ void main() {
       final engine = _Engine(config, store);
       final files = _Files()..onTransfer = () async => throw fileFailure;
       final controller = WebDavSyncController(
+        localBooksLoader: () async => [],
         configStore: config,
         changeStore: store,
         engine: engine,
-        mutableTxtService: files,
+        contentSyncService: files,
       );
       await controller.initialize();
 
@@ -377,10 +387,11 @@ void main() {
       final files = _Files();
       final engine = _Engine(config, store);
       final controller = WebDavSyncController(
+        localBooksLoader: () async => [],
         configStore: config,
         changeStore: store,
         engine: engine,
-        mutableTxtService: files,
+        contentSyncService: files,
       );
       await controller.initialize();
       await controller.setScope(controller.scope.copyWith(bookFiles: false));
@@ -402,10 +413,11 @@ void main() {
     final store = _Store();
     final files = _Files()..onTransfer = () async => throw failure;
     final controller = WebDavSyncController(
+      localBooksLoader: () async => [],
       configStore: config,
       changeStore: store,
       engine: _Engine(config, store),
-      mutableTxtService: files,
+      contentSyncService: files,
     );
     await controller.initialize();
     await expectLater(controller.syncNow(), throwsA(same(failure)));
@@ -418,7 +430,7 @@ void main() {
   });
 }
 
-const _success = MutableTxtReconcileResult(
+const _success = BookContentReconcileResult(
   uploaded: 0,
   downloaded: 0,
   conflicts: 0,
@@ -469,7 +481,11 @@ class _Store extends SyncChangeStore {
 
 class _Engine extends SyncEngine {
   _Engine(SecureSyncConfigStore config, SyncChangeStore store)
-    : super(configStore: config, changeStore: store);
+    : super(
+        storage: MemorySyncStorage(),
+        scope: const WebDavSyncScope(),
+        changeStore: store,
+      );
   int calls = 0;
   Object? error;
   int? failOnCall;
@@ -492,31 +508,20 @@ class _Engine extends SyncEngine {
   }
 }
 
-class _Files extends MutableTxtSyncService {
-  _Files({this.states = const <MutableTxtBookState>[]});
+class _Files extends BookContentSyncService {
+  _Files({this.states = const <BookContentState>[]});
 
-  final List<MutableTxtBookState> states;
+  final List<BookContentState> states;
   final List<String> events = <String>[];
   int calls = 0;
-  Future<MutableTxtReconcileResult> transfer = Future.value(_success);
-  Future<MutableTxtReconcileResult> Function()? onTransfer;
+  Future<BookContentReconcileResult> transfer = Future.value(_success);
+  Future<BookContentReconcileResult> Function()? onTransfer;
   @override
   Future<void> recoverLocalState() async {}
   @override
-  Future<List<MutableTxtBookState>> listStates() async => states;
+  Future<List<BookContentState>> listStates() async => states;
   @override
-  Future<bool> followRemoteStorage({
-    required String bookUid,
-    required String remotePath,
-    required String contentHash,
-    required int fileSize,
-  }) async {
-    events.add('follow:$bookUid');
-    return true;
-  }
-
-  @override
-  Future<MutableTxtReconcileResult> reconcile({
+  Future<BookContentReconcileResult> reconcile({
     bool allowNetwork = true,
     String? bookUid,
     bool Function()? shouldContinue,

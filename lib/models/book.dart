@@ -7,7 +7,9 @@ class Book {
   final int? id;
   final String title;
   final String author;
-  final String filePath; // 存储书籍文件的路径，而不是内容
+  // 运行时可直接访问的文件路径（或平台 URI）。受管路径由存储边界
+  // 在数据库相对路径和当前 Documents 绝对路径之间转换。
+  final String filePath;
   final String format;
   final int currentPage;
   final int totalPages; // 添加总页数字段
@@ -19,7 +21,7 @@ class Book {
   final int? fileModifiedTime;
   final String? contentHash;
   final String? tableOfContents;
-  final String? coverImagePath; // 书籍封面图片路径
+  final String? coverImagePath; // 运行时封面路径；数据库中受管封面使用相对路径
   final String? textEncoding; // TXT编码（导入时自动检测的结果）
 
   // ---- CanonicalLocator 双轨定位字段 ----
@@ -53,6 +55,13 @@ class Book {
   final int? sourceModifiedTime;
 
   bool get isOnline => storageType == 'online';
+
+  /// Source association survives downloading the book into a local file.
+  bool get hasSourceBinding =>
+      sourceId?.isNotEmpty == true &&
+      sourceBookId?.isNotEmpty == true &&
+      sourceJson?.isNotEmpty == true &&
+      sourceBookJson?.isNotEmpty == true;
 
   /// 全书阅读进度。新数据使用统一的 0..1 值，旧数据继续兼容页码比值。
   double get progress {

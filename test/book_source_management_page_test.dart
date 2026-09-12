@@ -13,8 +13,9 @@ import 'package:xxread/book_sources/source_engine/source_health_checker.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_source_management_page.dart';
 import 'package:xxread/pages/book_sources/widgets/book_source_management_source_card.dart';
-import 'package:xxread/pages/book_sources/widgets/book_source_cleanup_review_sheet.dart';
+import 'package:xxread/pages/book_sources/book_source_maintenance_page.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
+import 'package:xxread/widgets/app_menu.dart';
 
 import 'support/premium_account.dart';
 
@@ -72,7 +73,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesMaintenanceButton')));
     await tester.pumpAndSettle();
-    expect(find.text('Source health check'), findsOneWidget);
+    expect(find.byType(BookSourceMaintenancePage), findsOneWidget);
+    expect(find.text('Source health check'), findsWidgets);
     expect(find.text('Duplicate cleanup'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -349,7 +351,7 @@ void main() {
     await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesSelectionModeButton')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Select all'), findsOneWidget);
     expect(find.text('Enable selected'), findsOneWidget);
@@ -393,7 +395,7 @@ void main() {
     await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesSelectionModeButton')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect((tester.getRect(title).left - normalLeft).abs(), lessThan(1));
     expect(tester.takeException(), isNull);
@@ -441,13 +443,12 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(AppPopupMenuButton<String>));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Operator and rights'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
 
     expect(find.text('Example Library'), findsOneWidget);
     expect(find.text('CC BY 4.0'), findsOneWidget);
@@ -542,7 +543,7 @@ void main() {
     await tester.tap(find.byKey(const Key('bookSourcesToolButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesSelectionModeButton')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(OutlinedButton, 'Select all'));
     await tester.pump();
     expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
@@ -673,20 +674,21 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesMaintenanceButton')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('bookSourcesMaintenanceReviewAction')),
+    expect(find.byType(BookSourceMaintenancePage), findsOneWidget);
+    final row = find.byKey(Key('maintenanceSource-${source.id}'));
+    await tester.scrollUntilVisible(
+      row,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('bookSourceMaintenanceScroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await tester.pumpAndSettle();
-    final review = tester.widget<BookSourceCleanupReviewSheet>(
-      find.byType(BookSourceCleanupReviewSheet),
-    );
-    expect(review.needsAttention.single.id, source.id);
-    expect(review.needsAttention.single.enabled, isFalse);
     expect(find.text('Disabled diagnosis').hitTestable(), findsOneWidget);
-    expect(tester.widget<Checkbox>(find.byType(Checkbox)).onChanged, isNull);
-    Navigator.of(
-      tester.element(find.byType(BookSourceCleanupReviewSheet)),
-    ).pop();
+    expect(tester.widget<CheckboxListTile>(row).onChanged, isNotNull);
+    Navigator.of(tester.element(find.byType(BookSourceMaintenancePage))).pop();
     await tester.pumpAndSettle();
     maintenance.emit(
       BookSourceMaintenanceState(
@@ -699,18 +701,18 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourcesMaintenanceButton')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('bookSourcesMaintenanceReviewAction')),
-    );
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<BookSourceCleanupReviewSheet>(
-            find.byType(BookSourceCleanupReviewSheet),
+    await tester.scrollUntilVisible(
+      row,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('bookSourceMaintenanceScroll')),
+            matching: find.byType(Scrollable),
           )
-          .needsAttention,
-      isEmpty,
+          .first,
     );
+    expect(find.text('Disabled diagnosis').hitTestable(), findsOneWidget);
+    expect(tester.widget<CheckboxListTile>(row).onChanged, isNotNull);
   });
 }
 

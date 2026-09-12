@@ -15,6 +15,7 @@ import 'package:xxread/models/home_navigation_destination.dart';
 import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/home/widgets/home_bounce_navigation_item.dart';
+import 'package:xxread/pages/home/widgets/home_navigation_item.dart';
 import 'package:xxread/pages/home/widgets/home_tablet_toolbar.dart';
 import 'package:xxread/pages/home/widgets/home_tablet_top_backdrop.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
@@ -270,6 +271,82 @@ void main() {
       expect(metrics.floatingActionBottomMargin, 35);
     },
   );
+
+  testWidgets('narrow navigation keeps all labels visible at 1.3 text scale', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 120);
+    addTearDown(tester.view.reset);
+    const labels = ['首页', '书架', '发现', 'AI', '设置'];
+    const destinations = HomeNavigationDestination.values;
+    final dimensions = homeMobileFloatingNavDimensionsFor(
+      screenWidth: 320,
+      itemCount: labels.length,
+      platform: TargetPlatform.iOS,
+      systemBottomInset: 20,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 120),
+            textScaler: TextScaler.linear(1.3),
+          ),
+          child: Center(
+            child: SizedBox(
+              width: dimensions.width,
+              height: dimensions.height,
+              child: Row(
+                children: [
+                  for (var index = 0; index < labels.length; index++)
+                    Expanded(
+                      child: HomeBounceNavigationItem(
+                        item: HomeNavigationItem(
+                          destination: destinations[index],
+                          icon: Icons.circle_outlined,
+                          selectedIcon: Icons.circle,
+                          label: labels[index],
+                          page: const SizedBox(),
+                        ),
+                        isSelected: index == 0,
+                        showLabel: true,
+                        onTap: () {},
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final label in labels) {
+      final item = find.byKey(ValueKey('home-nav-press-$label'));
+      final text = find.descendant(of: item, matching: find.text(label));
+      expect(text, findsOneWidget);
+      expect(
+        tester.getRect(text).left,
+        greaterThanOrEqualTo(tester.getRect(item).left),
+      );
+      expect(
+        tester.getRect(text).right,
+        lessThanOrEqualTo(tester.getRect(item).right),
+      );
+      expect(
+        tester.getRect(text).top,
+        greaterThanOrEqualTo(tester.getRect(item).top),
+      );
+      expect(
+        tester.getRect(text).bottom,
+        lessThanOrEqualTo(tester.getRect(item).bottom),
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('tablet navigation survives rotation and compact window resize', (
     tester,

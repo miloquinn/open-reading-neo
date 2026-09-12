@@ -1,28 +1,6 @@
 part of 'native_reader_page.dart';
 
 extension _NativeReaderNavigation on _NativeReaderPageState {
-  _ReaderPageData _bookmarkPageFor(List<_ReaderPageData> pages) {
-    if (_pageMode == NativePageMode.verticalScroll) {
-      if (_visibleContinuousParts.isNotEmpty &&
-          _visibleChapters.isNotEmpty &&
-          _chapterIndex < _visibleChapters.length) {
-        final partIndex = _pageIndex.clamp(
-          0,
-          _visibleContinuousParts.length - 1,
-        );
-        final offset =
-            _verticalCanonicalOffset ??
-            _visibleContinuousParts[partIndex].content.startOffset;
-        return _ReaderPageData(
-          text: '',
-          startOffset: offset,
-          endOffset: offset,
-        );
-      }
-    }
-    return pages[_pageIndex.clamp(0, pages.length - 1)];
-  }
-
   String _bookmarkAnchorKey(_NativeChapter chapter, _ReaderPageData page) =>
       '${chapter.id}:${page.startOffset}';
 
@@ -154,54 +132,19 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     }
     _anchorOffset = locator?.textAnchor?.startOffsetUtf16;
     _pendingRestoreChapterIndex = chapterIndex;
-    _restoreAnchorAfterLayout = true;
+    _requestPositionRestore();
+    final completion = _continuousRestoreCompletion?.future;
+    final revision = _verticalScrollRevision;
     final alreadyInChapter = chapterIndex == _chapterIndex;
     await _setChapter(
       chapterIndex,
       chapters.length,
       recenterContinuousScroll: false,
     );
-    if (_pageMode != NativePageMode.verticalScroll) {
-      if (alreadyInChapter && mounted) _setReaderState(() {});
-      return;
-    }
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || _verticalViewportSize.isEmpty) return;
-    final parts = _continuousPartsFor(
-      chapters[chapterIndex],
-      _verticalViewportSize,
-    );
-    final anchor = _anchorOffset ?? 0;
-    final targetPage = parts.indexWhere(
-      (part) =>
-          anchor >= part.content.startOffset && anchor < part.content.endOffset,
-    );
-    final safePage = (targetPage < 0 ? parts.length - 1 : targetPage).clamp(
-      0,
-      parts.length - 1,
-    );
-    _setReaderState(() {
-      _pageIndex = safePage;
-      _visibleContinuousParts = parts;
-      _visiblePages = parts.map((part) => part.content).toList(growable: false);
-      _restoreAnchorAfterLayout = false;
-      _pendingRestoreChapterIndex = null;
-    });
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    if (_scrollByChapter && _verticalPageScrollController.isAttached) {
-      _verticalPageScrollController.jumpTo(index: safePage);
-    } else if (_verticalChapterScrollController.isAttached) {
-      _verticalChapterScrollController.jumpTo(index: chapterIndex);
-    }
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    await _scrollContinuousAnchorIntoView(
-      chapters[chapterIndex],
-      parts,
-      safePage,
-      anchor,
-    );
+    if (!mounted || revision != _verticalScrollRevision) return;
+    if (alreadyInChapter) _setReaderState(() {});
+    if (completion == null) return;
+    await completion;
   }
 
   Future<void> _jumpToNavigationChapter(

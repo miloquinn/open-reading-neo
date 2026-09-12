@@ -88,7 +88,7 @@ jobs:
           )
           flutter test --coverage --exclude-tags isolated-process "${test_files[@]}"
 
-      - name: Run stateful reader tests in isolated processes
+      - name: Stateful widget tests (isolated processes)
         shell: bash
         run: |
           set -euo pipefail
@@ -98,6 +98,7 @@ jobs:
           # keeps a framework leak from looking like an application failure.
           management_tests=(
             'keeps native ORSP source management available'
+            'all-scope review retains diagnoses for disabled sources'
             'uses one add flow regardless of the advanced toggle'
             'keeps dense source metadata readable on narrow phones'
             'groups connected sources by protocol'
@@ -111,6 +112,8 @@ jobs:
             flutter test test/book_source_management_page_test.dart \
               --plain-name "$test_name"
           done
+
+          flutter test test/book_source_maintenance_page_test.dart
 
           organization_tests=(
             'source switches and favorites respond before storage finishes'
@@ -276,7 +279,7 @@ jobs:
             'adding online stays in the details sheet for feedback then closes'
             'an existing shelf book uses an information state without drop'
             'a failed online add keeps the sheet open for retry'
-            'local download progress stays in the sheet and can continue'
+            'local download stays inline and backgrounding returns'
             'reading from the details sheet hands off to paper transition'
           )
           for test_name in "${discovery_tests[@]}"; do
@@ -284,11 +287,20 @@ jobs:
               --plain-name "$test_name"
           done
 
-          # This discovery/search case inherits animated controllers from
-          # earlier cases in the same Dart VM. Its assertions are kept active
-          # in a fresh process, where it is deterministic.
-          flutter test test/book_source_search_page_test.dart \
-            --plain-name 'discover page selects a reading source, channel, and next page'
+          # These discovery/search cases inherit animated controllers from
+          # earlier cases in the same Dart VM. Keep their assertions active
+          # in fresh processes, where they are deterministic.
+          pagination_tests=(
+            'discover page selects a reading source, channel, and next page'
+            'list discovery loads a short channel after opening it and overscrolling'
+            'tablet discovery loads a short channel on content overscroll'
+            'channel pagination ignores duplicate swipes and stops at the last page'
+            'failed automatic channel page keeps a clickable retry'
+          )
+          for test_name in "${pagination_tests[@]}"; do
+            flutter test test/book_source_search_page_test.dart \
+              --plain-name "$test_name"
+          done
 
       - name: Explain validation failures
         if: ${{ failure() }}

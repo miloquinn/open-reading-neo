@@ -193,6 +193,27 @@ void main() {
     expect(title.style?.fontSize, 34);
     expect(find.text('1 / 2'), findsOneWidget);
     expect(_richTextContaining('天边压着墨色的云。'), findsNothing);
+    tester
+        .widget<IconButton>(
+          find.ancestor(
+            of: find.byIcon(Icons.tune_rounded),
+            matching: find.byType(IconButton),
+          ),
+        )
+        .onPressed!();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Layout'));
+    await tester.pumpAndSettle();
+    final titleSwitch = tester.widget<SwitchListTile>(
+      find.byKey(const ValueKey('reader-chapter-title-page-switch')),
+    );
+    expect(titleSwitch.value, isTrue);
+    titleSwitch.onChanged!(false);
+    await tester.pumpAndSettle();
+    expect(
+      (await const ReaderSettingsStore().load()).chapterTitlePageEnabled,
+      isFalse,
+    );
   });
 
   testWidgets('native open failure keeps the seeded reader theme background', (

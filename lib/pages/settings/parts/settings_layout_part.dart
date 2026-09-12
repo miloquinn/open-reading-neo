@@ -53,11 +53,13 @@ extension _SettingsLayoutPart on _SettingsPageState {
             children: [
               Icon(icon, color: scheme.primary, size: 18),
               const SizedBox(width: 9),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -196,6 +198,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
         _buildThemeToggle(themeNotifier),
         _buildAccentColorSelector(themeNotifier),
         _buildAppFontSelector(appSettings),
+        _buildAppTextSizeSelector(appSettings),
         _buildReaderFontSelector(appSettings),
         _buildCustomFontsManager(appSettings),
         _buildActionSetting(
@@ -302,6 +305,23 @@ extension _SettingsLayoutPart on _SettingsPageState {
               : l10n.settingsAiApiKeyTapToConfigure,
           onTap: () => unawaited(_openAiSettings()),
           icon: Icons.auto_awesome_outlined,
+        ),
+        _buildActionSetting(
+          title: cloudTtsCopy(context, '云端 TTS', 'Cloud TTS', 'クラウド TTS'),
+          subtitle: cloudTtsCopy(
+            context,
+            '配置听书的语音服务与音色',
+            'Speech service and voice for read aloud',
+            '読み上げサービスと音声を設定',
+          ),
+          onTap: () => Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => CloudTtsSettingsPage(
+                service: context.read<ReaderAloudService>(),
+              ),
+            ),
+          ),
+          icon: Icons.record_voice_over_outlined,
         ),
       ],
     );

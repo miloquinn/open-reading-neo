@@ -80,6 +80,34 @@ void main() {
     expect(await store.cursorFor('remote'), 1);
   });
 
+  test('remote cursors are isolated by storage space', () async {
+    final batch = SyncBatch.create(
+      deviceId: 'remote',
+      sequence: 1,
+      createdHlc: '2000-0000-remote',
+      operations: const [
+        SyncOperation(
+          dataset: 'future_annotations',
+          recordId: 'one',
+          entityKey: 'one',
+          hlc: '2000-0000-remote',
+          deleted: false,
+          payload: {'value': 1},
+        ),
+      ],
+    );
+    await store.applyRemoteBatch(
+      batch,
+      cursorNamespace: 'space-a',
+      validateWinner: (_) async {},
+      applyWinner: (_, _) async => true,
+    );
+
+    expect(await store.cursorFor('remote', namespace: 'space-a'), 1);
+    expect(await store.cursorFor('remote', namespace: 'space-b'), 0);
+    expect(await store.cursorFor('remote'), 0);
+  });
+
   test(
     'canonical payload comparison does not create false local changes',
     () async {
@@ -328,58 +356,78 @@ void main() {
     },
   );
 
-  test('book file payload exposes the content-addressed cover reference', () {
-    expect(
-      bookFileSyncPayload(const {
-        'file_size': 10,
-        'file_name': 'book.txt',
-        'blob_sha256': 'book-hash',
-        'remote_path': 'blobs/books/book-hash',
-        'cover_blob_sha256': 'cover-hash',
-        'cover_file_name': 'cover.img',
-        'cover_file_size': 5,
-        'cover_remote_path': 'blobs/covers/cover-hash',
-      }),
-      {
-        'file_available': true,
-        'file_size': 10,
-        'file_name': 'book.txt',
-        'blob_sha256': 'book-hash',
-        'remote_path': 'blobs/books/book-hash',
-        'cover_available': true,
-        'cover_blob_sha256': 'cover-hash',
-        'cover_file_name': 'cover.img',
-        'cover_file_size': 5,
-        'cover_remote_path': 'blobs/covers/cover-hash',
-      },
-    );
-  });
+  test(
+    'book file payload is published only from a verified synced binding',
+    () {
+      expect(
+        bookFileSyncPayload(
+          const {
+            'file_size': 10,
+            'file_name': 'book.txt',
+            'blob_sha256': 'book-hash',
+            'remote_path': 'books/a/current.txt',
+            'cover_blob_sha256': 'cover-hash',
+            'cover_file_name': 'cover.img',
+            'cover_file_size': 5,
+            'cover_remote_path': 'blobs/covers/cover-hash',
+          },
+          contentBinding: const {
+            'status': 'synced',
+            'local_hash': 'book-hash',
+            'base_hash': 'book-hash',
+            'remote_version': '"current"',
+            'head_version': '"head"',
+            'current_path': 'books/a/current.txt',
+          },
+        ),
+        {
+          'file_available': true,
+          'file_size': 10,
+          'file_name': 'book.txt',
+          'blob_sha256': 'book-hash',
+          'remote_path': 'books/a/current.txt',
+          'cover_available': true,
+          'cover_blob_sha256': 'cover-hash',
+          'cover_file_name': 'cover.img',
+          'cover_file_size': 5,
+          'cover_remote_path': 'blobs/covers/cover-hash',
+        },
+      );
+    },
+  );
 
-  test('book file payload exposes the content-addressed cover reference', () {
-    expect(
-      bookFileSyncPayload(const {
-        'file_size': 10,
-        'file_name': 'book.txt',
-        'blob_sha256': 'book-hash',
-        'remote_path': 'blobs/books/book-hash',
-        'cover_blob_sha256': 'cover-hash',
-        'cover_file_name': 'cover.img',
-        'cover_file_size': 5,
-        'cover_remote_path': 'blobs/covers/cover-hash',
-      }),
-      {
-        'file_available': true,
-        'file_size': 10,
-        'file_name': 'book.txt',
-        'blob_sha256': 'book-hash',
-        'remote_path': 'blobs/books/book-hash',
-        'cover_available': true,
-        'cover_blob_sha256': 'cover-hash',
-        'cover_file_name': 'cover.img',
-        'cover_file_size': 5,
-        'cover_remote_path': 'blobs/covers/cover-hash',
-      },
-    );
+  test('partial content states never claim that a file is available', () {
+    const file = {
+      'file_size': 10,
+      'file_name': 'book.txt',
+      'blob_sha256': 'book-hash',
+      'remote_path': 'books/a/current.txt',
+    };
+    for (final status in const [
+      'pending',
+      'updateAvailable',
+      'syncing',
+      'failed',
+      'conflict',
+      'localOnly',
+      'paused',
+    ]) {
+      expect(
+        bookFileSyncPayload(
+          file,
+          contentBinding: {
+            'status': status,
+            'local_hash': 'book-hash',
+            'base_hash': 'book-hash',
+            'remote_version': '"current"',
+            'head_version': '"head"',
+            'current_path': 'books/a/current.txt',
+          },
+        ),
+        isEmpty,
+        reason: status,
+      );
+    }
   });
 }
 

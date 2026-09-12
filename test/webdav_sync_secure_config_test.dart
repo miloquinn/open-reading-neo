@@ -4,13 +4,28 @@ import 'package:xxread/services/sync/sync_models.dart';
 
 void main() {
   test(
-    'new connections keep typography local and preserve explicit choices',
+    'unconfigured scope stays legacy, configured scope defaults complete',
     () async {
       final store = SecureSyncConfigStore(
         secretStorage: _MemorySecrets(),
         preferences: _MemoryPreferences(),
       );
-      expect((await store.readScope()).readerSettings, isFalse);
+      expect((await store.readScope()).bookFiles, isFalse);
+      await store.save(
+        const WebDavSyncConfiguration(
+          serverUrl: 'https://dav.example.com/',
+          username: 'reader',
+        ),
+        'password',
+      );
+      expect(
+        await store.readNewBookUploadPolicy(),
+        WebDavNewBookUploadPolicy.automatic,
+      );
+      final complete = await store.readScope();
+      expect(complete.bookFiles, isTrue);
+      expect(complete.notes, isTrue);
+      expect(complete.replaceRules, isTrue);
       await store.saveScope(const WebDavSyncScope(readerSettings: true));
       expect((await store.readScope()).readerSettings, isTrue);
       expect(await store.readAutoResume(), isTrue);
@@ -20,6 +35,22 @@ void main() {
       expect(await store.readAutoResume(), isTrue);
     },
   );
+
+  test('saved false scope remains disabled after configuration', () async {
+    final store = SecureSyncConfigStore(
+      secretStorage: _MemorySecrets(),
+      preferences: _MemoryPreferences(),
+    );
+    await store.save(
+      const WebDavSyncConfiguration(
+        serverUrl: 'https://dav.example.com/',
+        username: 'reader',
+      ),
+      'password',
+    );
+    await store.saveScope(const WebDavSyncScope(bookFiles: false));
+    expect((await store.readScope()).bookFiles, isFalse);
+  });
 
   test(
     'legacy connection without scope keeps its typography preference',
@@ -112,32 +143,40 @@ void main() {
     );
   });
 
-  test(
-    'new-book upload policy is explicit and cleared with configuration',
-    () async {
-      final preferences = _MemoryPreferences();
-      final store = SecureSyncConfigStore(
-        secretStorage: _MemorySecrets(),
-        preferences: preferences,
-      );
+  test('explicit book upload policy survives the configured default', () async {
+    final preferences = _MemoryPreferences();
+    final store = SecureSyncConfigStore(
+      secretStorage: _MemorySecrets(),
+      preferences: preferences,
+    );
 
-      expect(
-        await store.readNewBookUploadPolicy(),
-        WebDavNewBookUploadPolicy.askEveryTime,
-      );
-      await store.saveNewBookUploadPolicy(WebDavNewBookUploadPolicy.automatic);
-      expect(
-        await store.readNewBookUploadPolicy(),
-        WebDavNewBookUploadPolicy.automatic,
-      );
+    expect(
+      await store.readNewBookUploadPolicy(),
+      WebDavNewBookUploadPolicy.askEveryTime,
+    );
+    await store.save(
+      const WebDavSyncConfiguration(
+        serverUrl: 'https://dav.example.com/',
+        username: 'reader',
+      ),
+      'password',
+    );
+    expect(
+      await store.readNewBookUploadPolicy(),
+      WebDavNewBookUploadPolicy.automatic,
+    );
+    await store.saveNewBookUploadPolicy(WebDavNewBookUploadPolicy.manual);
+    expect(
+      await store.readNewBookUploadPolicy(),
+      WebDavNewBookUploadPolicy.manual,
+    );
 
-      await store.clear();
-      expect(
-        await store.readNewBookUploadPolicy(),
-        WebDavNewBookUploadPolicy.askEveryTime,
-      );
-    },
-  );
+    await store.clear();
+    expect(
+      await store.readNewBookUploadPolicy(),
+      WebDavNewBookUploadPolicy.askEveryTime,
+    );
+  });
 
   test(
     'legacy scope enables portable settings without exposing private data',

@@ -1,6 +1,45 @@
 part of 'native_reader_page.dart';
 
 extension _NativeReaderSession on _NativeReaderPageState {
+  // All consumers use the same location: a page anchor in paged modes and
+  // the precise viewport text anchor in continuous mode.
+  _ReaderPageData _currentPositionPage(List<_ReaderPageData> pages) {
+    if (_pageMode == NativePageMode.verticalScroll) {
+      if (_visibleContinuousParts.isNotEmpty &&
+          _visibleChapters.isNotEmpty &&
+          _chapterIndex < _visibleChapters.length) {
+        final partIndex = _pageIndex.clamp(
+          0,
+          _visibleContinuousParts.length - 1,
+        );
+        final offset =
+            _verticalCanonicalOffset ??
+            _visibleContinuousParts[partIndex].content.startOffset;
+        return _ReaderPageData(
+          text: '',
+          startOffset: offset,
+          endOffset: offset,
+        );
+      }
+    }
+    return pages[_pageIndex.clamp(0, pages.length - 1)];
+  }
+
+  void _requestPositionRestore() {
+    _restoreAnchorAfterLayout = true;
+    _verticalPositionCapturePending = false;
+    _verticalScrollRevision++;
+    _continuousRestoreCompletion?.complete();
+    _continuousRestoreCompletion = null;
+    if (_pageMode != NativePageMode.verticalScroll) return;
+    _anchorOffset ??= 0;
+    _verticalCanonicalOffset = _anchorOffset;
+    _initialPositionRestored = false;
+    _initialPositionRestoreScheduled = false;
+    _restoreContinuousAnchorCentered = true;
+    _continuousRestoreCompletion = Completer<void>();
+  }
+
   void _startReadingSession() {
     _readingSessionStartedAt ??= DateTime.now();
   }
@@ -154,10 +193,14 @@ extension _NativeReaderSession on _NativeReaderPageState {
       return Future<void>.value();
     }
 
+    if (_pageMode == NativePageMode.verticalScroll &&
+        _verticalPositionCapturePending) {
+      _captureVerticalPosition();
+    }
     if (_visiblePages.isEmpty) return Future<void>.value();
     final chapterIndex = _chapterIndex.clamp(0, chapters.length - 1);
     final pageIndex = _pageIndex.clamp(0, _visiblePages.length - 1);
-    final page = _visiblePages[pageIndex];
+    final page = _currentPositionPage(_visiblePages);
     debugPrint(
       '[reader-progress] save visible page on $reason '
       'chapter=$chapterIndex page=$pageIndex offset=${page.startOffset}',

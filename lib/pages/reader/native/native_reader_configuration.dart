@@ -322,7 +322,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
         ReaderMarginSettings.max,
       );
       _pageIndex = 0;
-      _restoreAnchorAfterLayout = true;
+      _requestPositionRestore();
     });
     await _readerSettingsStore.save(_readerSettings);
   }
@@ -332,7 +332,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
     _setReaderState(() {
       _chapterTitlePageEnabled = value;
       _pageIndex = 0;
-      _restoreAnchorAfterLayout = true;
+      _requestPositionRestore();
     });
     await _readerSettingsStore.save(_readerSettings);
   }
@@ -360,7 +360,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       _topBarStyle = style;
       if (repaginate) {
         _pageIndex = 0;
-        _restoreAnchorAfterLayout = true;
+        _requestPositionRestore();
       }
     });
     await ReaderSystemUiController.savePreference(style);

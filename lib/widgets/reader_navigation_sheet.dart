@@ -8,6 +8,7 @@ import '../models/book_note.dart';
 import '../models/bookmark.dart';
 import '../utils/localization_extension.dart';
 import '../utils/reader_themes.dart';
+import 'app_menu.dart';
 import 'open_reading_icons.dart';
 
 class ReaderNavigationChapter {
@@ -994,7 +995,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
+              AppPopupMenuButton<String>(
                 tooltip: MaterialLocalizations.of(context).showMenuTooltip,
                 onSelected: (value) {
                   if (value == 'copy') {
@@ -1125,7 +1126,7 @@ class _ReaderNavigationSheetState extends State<ReaderNavigationSheet>
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
+                AppPopupMenuButton<String>(
                   tooltip: MaterialLocalizations.of(context).showMenuTooltip,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(

@@ -660,11 +660,245 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ranking'), findsWidgets);
-      await tester.tap(find.byKey(const Key('bookSourceCategoryLoadMore')));
+      expect(find.byKey(const Key('bookSourceCategoryLoadMore')), findsNothing);
+      expect(client.requestedPages, [1, 1]);
+
+      await tester.drag(
+        find.byKey(const Key('bookSourceDiscoverScrollView')),
+        const Offset(0, -300),
+      );
       await tester.pumpAndSettle();
 
       expect(client.requestedPages, [1, 1, 2]);
       expect(find.text('Channel Book 2'), findsOneWidget);
+      expect(find.byKey(const Key('bookSourceCategoryLoadMore')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+    tags: 'isolated-process',
+  );
+
+  testWidgets(
+    'list discovery loads a short channel after opening it and overscrolling',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+      final source = _readingDiscoverySource();
+      AdvancedFeatureAccess.premiumUnlocked = true;
+      addTearDown(() => AdvancedFeatureAccess.premiumUnlocked = false);
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+        additionalSourceProtocolsPreferenceKey: true,
+        BookSourcesPageController.preferenceKey: 'list',
+      });
+      final client = _DiscoveryBookSourceClient();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('bookSourceListSourceToggle-reading-source')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('bookSourceListChannel-reading-source-/rank')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bookSourceListSelectionHeader')), findsOne);
+      expect(find.text('Channel Book 1'), findsOneWidget);
+      expect(find.byKey(const Key('bookSourceCategoryLoadMore')), findsNothing);
+      final pageTwoRequestsBefore = client.requestedPages
+          .where((page) => page == 2)
+          .length;
+
+      await tester.drag(
+        find.byKey(const Key('bookSourceDiscoverScrollView')),
+        const Offset(0, 80),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        client.requestedPages.where((page) => page == 2).length,
+        pageTwoRequestsBefore,
+      );
+
+      await tester.drag(
+        find.byKey(const Key('bookSourceDiscoverScrollView')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        client.requestedPages.where((page) => page == 2).length,
+        pageTwoRequestsBefore + 1,
+      );
+      expect(find.text('Channel Book 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    tags: 'isolated-process',
+  );
+
+  testWidgets(
+    'tablet discovery loads a short channel on content overscroll',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1200, 1000);
+      addTearDown(tester.view.reset);
+      final source = _readingDiscoverySource();
+      AdvancedFeatureAccess.premiumUnlocked = true;
+      addTearDown(() => AdvancedFeatureAccess.premiumUnlocked = false);
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+        additionalSourceProtocolsPreferenceKey: true,
+      });
+      final client = _DiscoveryBookSourceClient();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bookSourceTabletSidebar')), findsOneWidget);
+      expect(find.text('Channel Book 1'), findsOneWidget);
+      expect(client.requestedPages.where((page) => page == 2), isEmpty);
+
+      await tester.drag(
+        find.byKey(const Key('bookSourceDiscoverScrollView')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(client.requestedPages.where((page) => page == 2).length, 1);
+      expect(find.text('Channel Book 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    tags: 'isolated-process',
+  );
+
+  testWidgets(
+    'channel pagination ignores duplicate swipes and stops at the last page',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 700);
+      addTearDown(tester.view.reset);
+      final source = _readingDiscoverySource();
+      AdvancedFeatureAccess.premiumUnlocked = true;
+      addTearDown(() => AdvancedFeatureAccess.premiumUnlocked = false);
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+        additionalSourceProtocolsPreferenceKey: true,
+      });
+      final client = _PaginationDiscoveryClient(
+        initialItemCount: 30,
+        holdPageTwo: true,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(client.requestedPages.where((page) => page == 2), isEmpty);
+      expect(find.byKey(const Key('bookSourceCategoryLoadMore')), findsNothing);
+
+      final scrollView = find.byKey(const Key('bookSourceDiscoverScrollView'));
+      await tester.drag(scrollView, const Offset(0, -200));
+      await tester.pump();
+      expect(client.requestedPages.where((page) => page == 2), isEmpty);
+
+      for (var i = 0; i < 8 && !client.requestedPages.contains(2); i++) {
+        await tester.drag(scrollView, const Offset(0, -600));
+        await tester.pump();
+      }
+      expect(client.requestedPages.where((page) => page == 2).length, 1);
+
+      await tester.drag(scrollView, const Offset(0, -300));
+      await tester.drag(scrollView, const Offset(0, -300));
+      await tester.pump();
+      expect(client.requestedPages.where((page) => page == 2).length, 1);
+
+      client.completePageTwo();
+      await tester.pumpAndSettle();
+      expect(find.text('Page 2 Book'), findsOneWidget);
+
+      await tester.drag(scrollView, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      expect(client.requestedPages.where((page) => page == 2).length, 1);
+      expect(client.requestedPages, isNot(contains(3)));
+      expect(tester.takeException(), isNull);
+    },
+    tags: 'isolated-process',
+  );
+
+  testWidgets(
+    'failed automatic channel page keeps a clickable retry',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 1000);
+      addTearDown(tester.view.reset);
+      final source = _readingDiscoverySource();
+      AdvancedFeatureAccess.premiumUnlocked = true;
+      addTearDown(() => AdvancedFeatureAccess.premiumUnlocked = false);
+      SharedPreferences.setMockInitialValues({
+        'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+        additionalSourceProtocolsPreferenceKey: true,
+      });
+      final client = _PaginationDiscoveryClient(
+        initialItemCount: 1,
+        failFirstPageTwo: true,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BookSourcesPage(client: client)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final retry = find.byKey(const Key('bookSourceCategoryLoadMore'));
+      expect(retry, findsNothing);
+      await tester.drag(
+        find.byKey(const Key('bookSourceDiscoverScrollView')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(retry, findsOneWidget);
+      expect(
+        find.descendant(of: retry, matching: find.text('Retry')),
+        findsOne,
+      );
+      expect(client.requestedPages.where((page) => page == 2).length, 1);
+
+      await tester.drag(
+        find.byKey(const Key('bookSourceDiscoverScrollView')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+      expect(client.requestedPages.where((page) => page == 2).length, 1);
+
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+
+      expect(client.requestedPages.where((page) => page == 2).length, 2);
+      expect(find.text('Page 2 Book'), findsOneWidget);
+      expect(retry, findsNothing);
       expect(tester.takeException(), isNull);
     },
     tags: 'isolated-process',
@@ -900,6 +1134,79 @@ class _DiscoveryBookSourceClient extends BookSourceClient {
       page: page,
       pageSize: 1,
       hasMore: page == 1,
+    );
+  }
+}
+
+class _PaginationDiscoveryClient extends BookSourceClient {
+  _PaginationDiscoveryClient({
+    required this.initialItemCount,
+    this.holdPageTwo = false,
+    this.failFirstPageTwo = false,
+  });
+
+  final int initialItemCount;
+  final bool holdPageTwo;
+  final bool failFirstPageTwo;
+  final List<int> requestedPages = [];
+  final Completer<void> _pageTwo = Completer<void>();
+  int _pageTwoAttempts = 0;
+
+  void completePageTwo() {
+    if (!_pageTwo.isCompleted) _pageTwo.complete();
+  }
+
+  @override
+  Future<List<BookSourceCategory>> getCategories(
+    RegisteredBookSource source, {
+    void Function(List<BookSourceCategory>)? onCached,
+  }) async => const [BookSourceCategory(id: '/rank', name: 'Ranking')];
+
+  @override
+  Future<BookSourceSearchPage> browse(
+    RegisteredBookSource source, {
+    String? category,
+    String sort = 'latest',
+    int page = 1,
+    int pageSize = 20,
+    void Function(BookSourceSearchPage)? onCached,
+  }) async {
+    requestedPages.add(page);
+    if (page == 1) {
+      return BookSourceSearchPage(
+        items: List.generate(
+          initialItemCount,
+          (index) => BookSourceBook(
+            id: 'page-1-book-$index',
+            title: 'Page 1 Book ${index + 1}',
+            author: 'Author',
+            description: '',
+            categories: const [],
+          ),
+        ),
+        page: 1,
+        pageSize: pageSize,
+        hasMore: true,
+      );
+    }
+    _pageTwoAttempts++;
+    if (failFirstPageTwo && _pageTwoAttempts == 1) {
+      throw const BookSourceProtocolException('page two failed');
+    }
+    if (holdPageTwo) await _pageTwo.future;
+    return BookSourceSearchPage(
+      items: const [
+        BookSourceBook(
+          id: 'page-2-book',
+          title: 'Page 2 Book',
+          author: 'Author',
+          description: '',
+          categories: [],
+        ),
+      ],
+      page: page,
+      pageSize: pageSize,
+      hasMore: false,
     );
   }
 }

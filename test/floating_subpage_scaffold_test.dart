@@ -143,7 +143,7 @@ void main() {
     expect(titleRect.left, greaterThanOrEqualTo(backRect.right + 8));
   });
 
-  testWidgets('shared menu springs from its anchor and returns selection', (
+  testWidgets('shared menu morphs from its anchor and returns selection', (
     tester,
   ) async {
     String? selected;
@@ -170,7 +170,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('Import'), findsOneWidget);
-    expect(find.byType(ScaleTransition), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('app-menu-morph-surface')),
+      findsOneWidget,
+    );
 
     await tester.pumpAndSettle();
     await tester.tap(find.text('Import'));

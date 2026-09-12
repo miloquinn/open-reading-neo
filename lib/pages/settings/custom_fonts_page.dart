@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:xxread/services/core/core_services.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
 import 'package:xxread/utils/localization_extension.dart';
+import 'package:xxread/widgets/app_menu.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
@@ -357,7 +358,7 @@ class _CustomFontCard extends StatelessWidget {
                 ],
               ),
             ),
-            PopupMenuButton<_CustomFontAction>(
+            AppPopupMenuButton<_CustomFontAction>(
               onSelected: onAction,
               itemBuilder: (context) => [
                 if (font.isAvailable) ...[

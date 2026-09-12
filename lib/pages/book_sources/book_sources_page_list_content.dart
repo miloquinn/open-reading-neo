@@ -135,16 +135,12 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
         _bookListSliver(
           _state.categoryBooks,
           bottomPadding:
-              _state.categoryHasMore ||
-                  _state.loadingMoreCategoryBooks ||
-                  _state.categoryLoadMoreFailed
+              _state.loadingMoreCategoryBooks || _state.categoryLoadMoreFailed
               ? 12
               : bottomPadding,
         ),
       );
-      if (_state.categoryHasMore ||
-          _state.loadingMoreCategoryBooks ||
-          _state.categoryLoadMoreFailed) {
+      if (_state.loadingMoreCategoryBooks || _state.categoryLoadMoreFailed) {
         slivers.add(
           _paddedSectionSliver(
             Center(
@@ -153,16 +149,8 @@ extension _BookSourcesPageListContent on _BookSourcesPageState {
                   : OutlinedButton.icon(
                       key: const Key('bookSourceCategoryLoadMore'),
                       onPressed: _controller.loadMoreCategory,
-                      icon: Icon(
-                        _state.categoryLoadMoreFailed
-                            ? Icons.refresh_rounded
-                            : Icons.expand_more_rounded,
-                      ),
-                      label: Text(
-                        _state.categoryLoadMoreFailed
-                            ? context.l10n.retry
-                            : context.l10n.bookSourcesLoadMore,
-                      ),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(context.l10n.retry),
                     ),
             ),
             topPadding: 0,

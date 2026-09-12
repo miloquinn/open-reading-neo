@@ -57,57 +57,61 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('actions present provider-backed details with reduced motion', (
-    tester,
-  ) async {
-    tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
-        const FakeAccessibilityFeatures(disableAnimations: true);
-    addTearDown(
-      tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
-    );
-    final source = _source();
-    final summary = SourcedBook(
-      source: source,
-      book: _book(title: 'Summary title'),
-    );
+  testWidgets(
+    'actions push provider-backed details and return with reduced motion',
+    (tester) async {
+      tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final source = _source();
+      final summary = SourcedBook(
+        source: source,
+        book: _book(title: 'Summary title'),
+      );
 
-    await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => DownloadTaskController(),
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: FilledButton(
-                key: const Key('openDetails'),
-                onPressed: () => SourcedBookActions(
-                  context: context,
-                  client: _DetailsClient(),
-                  shelfService: _ShelfService(),
-                ).showBookDetails(summary),
-                child: const Text('Open'),
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => DownloadTaskController(),
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: FilledButton(
+                  key: const Key('openDetails'),
+                  onPressed: () => SourcedBookActions(
+                    context: context,
+                    client: _DetailsClient(),
+                    shelfService: _ShelfService(),
+                  ).showBookDetails(summary),
+                  child: const Text('Open'),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.tap(find.byKey(const Key('openDetails')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('openDetails')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Detailed title'), findsOneWidget);
-    expect(find.byKey(const Key('bookSourceDetailsContent')), findsOneWidget);
-    final animatedSize = tester.widget<AnimatedSize>(
-      find.byKey(const Key('bookSourceSheetAnimatedSize')),
-    );
-    expect(animatedSize.duration, Duration.zero);
-    final switcher = tester.widget<AnimatedSwitcher>(
-      find.byType(AnimatedSwitcher),
-    );
-    expect(switcher.duration, Duration.zero);
-  });
+      expect(find.text('Detailed title'), findsOneWidget);
+      expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
+      expect(find.byKey(const Key('bookSourceDetailsContent')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('floating-subpage-back')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('floating-subpage-back')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bookSourceDetailsPage')), findsNothing);
+      expect(find.byKey(const Key('openDetails')), findsOneWidget);
+    },
+  );
 }
 
 class _DetailsClient extends BookSourceClient {

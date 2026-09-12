@@ -114,7 +114,7 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                           (_lastPaginationSize != paginationSize ||
                               _lastUsesTwoPageLayout != usesTwoPageLayout);
                       if (paginationGeometryChanged) {
-                        _restoreAnchorAfterLayout = true;
+                        _requestPositionRestore();
                         _lastSavedLocation = null;
                       }
                       _lastPaginationSize = paginationSize;
@@ -191,13 +191,19 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                           _anchorOffset != null &&
                           (_pendingRestoreChapterIndex == null ||
                               _pendingRestoreChapterIndex == _chapterIndex)) {
-                        final anchor = _anchorOffset!;
+                        final anchor = _anchorOffset!.clamp(
+                          0,
+                          chapter.plainText.length,
+                        );
+                        _anchorOffset = anchor;
+                        if (_pageMode == NativePageMode.verticalScroll) {
+                          _verticalCanonicalOffset = anchor;
+                        }
                         final restoredIndex =
                             _pageMode == NativePageMode.verticalScroll
-                            ? _continuousPartsFor(chapter, size).indexWhere(
-                                (part) =>
-                                    anchor >= part.content.startOffset &&
-                                    anchor < part.content.endOffset,
+                            ? readerTextPageIndexForOffset(
+                                _visiblePages,
+                                anchor,
                               )
                             : anchor == 0 && pages.first.isChapterTitle
                             ? 0
@@ -208,8 +214,7 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                         }
                         _restoreAnchorAfterLayout = false;
                         _pendingRestoreChapterIndex = null;
-                        if (_pageMode == NativePageMode.verticalScroll &&
-                            anchor > 0) {
+                        if (_pageMode == NativePageMode.verticalScroll) {
                           _scheduleInitialContinuousScrollRestore(size);
                         } else {
                           _initialPositionRestored = true;
@@ -311,7 +316,7 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                         });
                       }
 
-                      final bookmarkPage = _bookmarkPageFor(pages);
+                      final bookmarkPage = _currentPositionPage(pages);
                       final currentBookmarkAnchorKey = _bookmarkAnchorKey(
                         chapter,
                         bookmarkPage,

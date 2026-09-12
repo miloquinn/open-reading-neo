@@ -3,96 +3,63 @@ part of 'native_reader_page.dart';
 extension _NativeReaderContinuousLayout on _NativeReaderPageState {
   void _scheduleInitialContinuousScrollRestore(Size viewport) {
     if (_initialPositionRestored || _initialPositionRestoreScheduled) return;
-    if ((_anchorOffset ?? 0) <= 0) {
-      _restoreContinuousAnchorCentered = false;
-      _initialPositionRestored = true;
-      return;
-    }
+    final chapterIndex = _chapterIndex;
+    final chapter = _loadedChapters[chapterIndex];
+    final parts = _continuousPartsFor(chapter, viewport);
+    final partIndex = _pageIndex;
+    final anchor = _anchorOffset ?? 0;
+    final centerAnchor = _restoreContinuousAnchorCentered;
+    final revision = _verticalScrollRevision;
     _initialPositionRestoreScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final controllerReady = _usesChapterScopedVerticalList
-          ? _verticalPageScrollController.isAttached
-          : _verticalChapterScrollController.isAttached;
-      if (!controllerReady) {
+      if (!mounted || revision != _verticalScrollRevision) return;
+      final controller = _usesChapterScopedVerticalList
+          ? _verticalPageScrollController
+          : _verticalChapterScrollController;
+      if (!controller.isAttached) {
         _initialPositionRestoreScheduled = false;
         _scheduleInitialContinuousScrollRestore(viewport);
         return;
       }
-      final chapter = _loadedChapters[_chapterIndex];
-      final parts = _continuousPartsFor(chapter, viewport);
-      var precedingExtent = 0.0;
-      for (final part in parts.take(_pageIndex)) {
-        precedingExtent += _measureContinuousPartExtent(
-          chapter,
-          part,
-          viewport,
-        );
-      }
-      if (!_usesChapterScopedVerticalList && precedingExtent > 0) {
-        unawaited(
-          _verticalChapterOffsetController
-              .animateScroll(
-                offset: precedingExtent,
-                duration: const Duration(milliseconds: 1),
-              )
-              .catchError((error) {
-                debugPrint('restore continuous reader offset failed: $error');
-              }),
-        );
-      }
+      controller.jumpTo(
+        index: _usesChapterScopedVerticalList ? partIndex : chapterIndex,
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final centerAnchor = _restoreContinuousAnchorCentered;
+        if (!mounted || revision != _verticalScrollRevision) return;
         unawaited(
           _scrollContinuousAnchorIntoView(
             chapter,
             parts,
-            _pageIndex,
-            _anchorOffset ?? parts[_pageIndex].content.startOffset,
+            partIndex,
+            anchor,
             centerInViewport: centerAnchor,
-          ).whenComplete(() {
-            if (!mounted) return;
+          ).then((restored) {
+            if (!mounted || revision != _verticalScrollRevision) return;
+            _initialPositionRestoreScheduled = false;
+            if (!restored) {
+              _scheduleInitialContinuousScrollRestore(viewport);
+              return;
+            }
             _setReaderState(() {
               _initialPositionRestored = true;
-              _initialPositionRestoreScheduled = false;
-              if (centerAnchor) _restoreContinuousAnchorCentered = false;
+              _restoreContinuousAnchorCentered = false;
             });
+            unawaited(
+              _saveCanonicalProgress(
+                chapter,
+                _ReaderPageData(
+                  text: '',
+                  startOffset: anchor,
+                  endOffset: anchor,
+                ),
+                chapterIndex,
+              ),
+            );
+            _continuousRestoreCompletion?.complete();
+            _continuousRestoreCompletion = null;
           }),
         );
       });
     });
-  }
-
-  double _measureContinuousPartExtent(
-    _NativeChapter chapter,
-    _ContinuousReaderPart part,
-    Size viewport,
-  ) {
-    if (part.content.isChapterTitle) return _verticalPageExtentFor(viewport);
-    final imageExtent = part.imageBlockIndex == null ? 0.0 : 444.0;
-    if (part.content.text.isEmpty) return imageExtent;
-    final painter =
-        _readerTextFlowStyle(
-            direction: _verticalTextDirection,
-            textScaler: _verticalTextScaler,
-          ).createPainter(
-            part.content.buildSpan(
-              style: _readerTextStyle,
-              sourceSpanBuilder: (start, end) => _styledSpanForRange(
-                chapter,
-                start,
-                end,
-                _readerTextStyle,
-                preserveEpubFont: _readerFontProfile.isPlatformDefault,
-              ),
-            ),
-          )
-          ..layout(
-            maxWidth: readerTextContentWidth(viewport.width, _horizontalMargin),
-          );
-    final extent = painter.height + imageExtent;
-    painter.dispose();
-    return extent;
   }
 }

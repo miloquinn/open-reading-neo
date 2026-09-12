@@ -13,7 +13,7 @@ import 'widgets/sourced_book_cards.dart';
 class BookSourceChangePage extends StatefulWidget {
   const BookSourceChangePage({
     super.key,
-    required this.currentSource,
+    this.currentSource,
     required this.currentBook,
     this.sources,
     this.sourcesFuture,
@@ -25,7 +25,7 @@ class BookSourceChangePage extends StatefulWidget {
 
   final List<RegisteredBookSource>? sources;
   final Future<List<RegisteredBookSource>>? sourcesFuture;
-  final RegisteredBookSource currentSource;
+  final RegisteredBookSource? currentSource;
   final BookSourceBook currentBook;
   final Book? shelfBook;
   final BookSourceChangeService? service;
@@ -101,11 +101,19 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
   }
 
   Future<BookSourceChangePosition> _loadPosition() async {
-    final position = await _service.loadPosition(
-      source: widget.currentSource,
-      book: widget.currentBook,
-      shelfBook: widget.shelfBook,
-    );
+    final source = widget.currentSource;
+    final position = source == null
+        ? const BookSourceChangePosition(
+            chapterIndex: 0,
+            chapterProgress: 0,
+            chapterTitle: '',
+            chapterCount: 0,
+          )
+        : await _service.loadPosition(
+            source: source,
+            book: widget.currentBook,
+            shelfBook: widget.shelfBook,
+          );
     if (mounted) setState(() => _position = position);
     return position;
   }
@@ -167,7 +175,7 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
           title: query,
           author: widget.currentBook.author,
           checkAuthor: _checkAuthor,
-          currentSourceId: widget.currentSource.id,
+          currentSourceId: widget.currentSource?.id,
           excludedSourceIds: _searchedSourceIds,
           sourceLimit: continueSearch ? null : _quickSourceLimit,
           candidateLimit: continueSearch ? null : _quickCandidateLimit,
@@ -268,6 +276,7 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
       final result = await _service.commit(
         validated: validated,
         shelfBook: widget.shelfBook,
+        mappingConfirmed: true,
       );
       if (mounted) Navigator.of(context).pop(result);
     } catch (error) {
@@ -339,7 +348,9 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
               Expanded(
                 child: _SourceRailStop(
                   label: context.l10n.bookSourceChangeCurrentSource,
-                  value: widget.currentSource.name,
+                  value:
+                      widget.currentSource?.name ??
+                      context.l10n.bookSourceNotBound,
                   active: true,
                 ),
               ),
@@ -474,7 +485,7 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
       .where(
         (source) =>
             source.enabled &&
-            source.id != widget.currentSource.id &&
+            source.id != widget.currentSource?.id &&
             source.capabilities.contains('search'),
       )
       .length;

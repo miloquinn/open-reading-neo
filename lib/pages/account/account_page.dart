@@ -277,8 +277,9 @@ class _AccountPageState extends State<AccountPage> {
           callbackUrlScheme: 'xxread',
         );
         return true;
-      } catch (_) {
-        return false;
+      } on PlatformException catch (error) {
+        if (error.code == 'CANCELED') return false;
+        rethrow;
       }
     }
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {

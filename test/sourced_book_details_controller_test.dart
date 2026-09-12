@@ -6,7 +6,8 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_client.dart';
 import 'package:xxread/models/book.dart';
-import 'package:xxread/pages/book_sources/widgets/sourced_book_widgets.dart';
+import 'package:xxread/pages/book_sources/models/sourced_book.dart';
+import 'package:xxread/pages/book_sources/widgets/sourced_book_details_controller.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 
 void main() {
@@ -69,18 +70,106 @@ void main() {
     expect(controller.state.result.book.toJson(), details.toJson());
   });
 
-  test('failed details leave the summary usable', () async {
+  test(
+    'details preserve summary fields omitted by the detail response',
+    () async {
+      final gateway = _DetailGateway();
+      final summary = _book(
+        'book',
+        title: 'Summary title',
+        coverUrl: Uri.parse('https://example.org/summary.jpg'),
+        coverHeaders: const {'Referer': 'summary', 'Shared': 'summary'},
+        categories: const ['Summary category'],
+        status: 'Ongoing',
+        latestChapter: 'Chapter 12',
+        updatedAt: DateTime.utc(2026, 9, 1),
+        sourceVariables: const {'catalog': '/summary', 'shared': 'summary'},
+      );
+      final controller = _controller(gateway: gateway, initialBook: summary);
+      addTearDown(controller.dispose);
+
+      final loading = controller.loadDetails();
+      expect(controller.state.isLoadingDetails, isTrue);
+      expect(controller.state.detailError, isNull);
+      gateway.requests.single.complete(
+        BookSourceBook(
+          id: 'book',
+          title: ' ',
+          author: 'Detailed author',
+          description: 'Detailed description',
+          categories: const [],
+          coverHeaders: const {'Shared': 'detail'},
+          sourceVariables: const {'shared': 'detail', 'toc': '/detail'},
+        ),
+      );
+      await loading;
+
+      final book = controller.state.result.book;
+      expect(controller.state.isLoadingDetails, isFalse);
+      expect(book.title, 'Summary title');
+      expect(book.coverUrl, summary.coverUrl);
+      expect(book.coverHeaders, {'Referer': 'summary', 'Shared': 'detail'});
+      expect(book.categories, ['Summary category']);
+      expect(book.status, 'Ongoing');
+      expect(book.latestChapter, 'Chapter 12');
+      expect(book.updatedAt, DateTime.utc(2026, 9, 1));
+      expect(book.sourceVariables, {
+        'catalog': '/summary',
+        'shared': 'detail',
+        'toc': '/detail',
+      });
+    },
+  );
+
+  test('failed details expose an error and retry clears it', () async {
     final gateway = _DetailGateway();
     final controller = _controller(gateway: gateway);
     addTearDown(controller.dispose);
     final summary = controller.state.result;
 
     final loading = controller.loadDetails();
+    expect(controller.state.isLoadingDetails, isTrue);
     gateway.requests.single.completeError(StateError('offline'));
     await loading;
 
     expect(controller.state.result, same(summary));
+    expect(controller.state.isLoadingDetails, isFalse);
+    expect('${controller.state.detailError}', contains('offline'));
+
+    final retry = controller.retryLoadDetails();
+    expect(controller.state.isLoadingDetails, isTrue);
+    expect(controller.state.detailError, isNull);
+    gateway.requests[1].complete(_book('book', title: 'Retried details'));
+    await retry;
+    expect(controller.state.result.book.title, 'Retried details');
+    expect(controller.state.isLoadingDetails, isFalse);
+    expect(controller.state.detailError, isNull);
   });
+
+  test(
+    'shelf status loads independently and failure stays nonblocking',
+    () async {
+      final shelf = _ShelfPort(existing: _localBook());
+      final controller = _controller(shelf: shelf);
+      addTearDown(controller.dispose);
+
+      shelf.findCompleter = Completer<Book?>();
+      final loading = controller.loadShelfStatus();
+      expect(controller.state.checkingShelf, isTrue);
+      expect(controller.state.hasShelfBook, isFalse);
+      shelf.findCompleter!.complete(_localBook());
+      await loading;
+      expect(controller.state.checkingShelf, isFalse);
+      expect(controller.state.hasShelfBook, isTrue);
+
+      shelf.findCompleter = null;
+      shelf.findError = StateError('database unavailable');
+      await controller.loadShelfStatus();
+      expect(controller.state.checkingShelf, isFalse);
+      expect(controller.state.hasShelfBook, isTrue);
+      expect(controller.state.step, SourcedBookDetailsStep.details);
+    },
+  );
 
   test(
     'detail loading ignores stale completions and disposed controllers',
@@ -117,6 +206,7 @@ void main() {
     expect(await first, isTrue);
     expect(shelf.addCalls, 1);
     expect(controller.state.step, SourcedBookDetailsStep.added);
+    expect(controller.state.hasShelfBook, isTrue);
 
     shelf.error = StateError('save failed');
     controller.showShelfOptions();
@@ -163,9 +253,12 @@ void main() {
       expect(controller.state.downloadTask?.state, DownloadTaskState.failed);
       expect('${controller.state.downloadTask?.error}', contains('offline'));
 
+      downloads.update(DownloadTaskState.completed);
+      expect(controller.state.hasShelfBook, isTrue);
+
       controller.dispose();
       expect(downloads.removeListenerCalls, 1);
-      downloads.update(DownloadTaskState.completed);
+      downloads.update(DownloadTaskState.failed);
     },
   );
 }
@@ -174,8 +267,12 @@ SourcedBookDetailsController _controller({
   _DetailGateway? gateway,
   _ShelfPort? shelf,
   _DownloadPort? downloads,
+  BookSourceBook? initialBook,
 }) => SourcedBookDetailsController(
-  initialResult: SourcedBook(source: _source(), book: _book('book')),
+  initialResult: SourcedBook(
+    source: _source(),
+    book: initialBook ?? _book('book'),
+  ),
   gateway: gateway ?? _DetailGateway(),
   shelf: shelf ?? _ShelfPort(),
   downloads: downloads ?? _DownloadPort(),
@@ -201,6 +298,7 @@ class _ShelfPort implements SourcedBookShelfPort {
 
   Book? existing;
   Object? error;
+  Object? findError;
   Completer<Book?>? findCompleter;
   int addCalls = 0;
 
@@ -208,7 +306,10 @@ class _ShelfPort implements SourcedBookShelfPort {
   Future<Book?> findShelfBook({
     required String sourceId,
     required String sourceBookId,
-  }) async => findCompleter?.future ?? existing;
+  }) async {
+    if (findError case final value?) throw value;
+    return findCompleter?.future ?? existing;
+  }
 
   @override
   Future<Book> addOnline({
@@ -296,12 +397,28 @@ RegisteredBookSource _source() => RegisteredBookSource(
   addedAt: DateTime.utc(2026),
 );
 
-BookSourceBook _book(String id, {String title = 'Book'}) => BookSourceBook(
+BookSourceBook _book(
+  String id, {
+  String title = 'Book',
+  Uri? coverUrl,
+  Map<String, String> coverHeaders = const {},
+  List<String> categories = const [],
+  String? status,
+  String? latestChapter,
+  DateTime? updatedAt,
+  Map<String, String> sourceVariables = const {},
+}) => BookSourceBook(
   id: id,
   title: title,
   author: 'Author',
   description: 'Description',
-  categories: const [],
+  coverUrl: coverUrl,
+  coverHeaders: coverHeaders,
+  categories: categories,
+  status: status,
+  latestChapter: latestChapter,
+  updatedAt: updatedAt,
+  sourceVariables: sourceVariables,
 );
 
 Book _localBook() => Book(

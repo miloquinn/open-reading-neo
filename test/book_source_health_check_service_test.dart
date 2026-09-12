@@ -53,6 +53,11 @@ void main() {
 
       expect(updated, hasLength(1));
       expect(sourceHealthCheckResultOf(updated.single)?.healthy, isTrue);
+      expect(
+        sourceHealthCheckResultOf(updated.single)?.fullyAvailable,
+        isTrue,
+        reason: 'discovery is not required when the source does not declare it',
+      );
       expect(lastCompleted, 1);
 
       final reloaded = (await registry.load()).single;
@@ -60,6 +65,38 @@ void main() {
       // The health check must not touch fields it isn't responsible for.
       expect(reloaded.enabled, isTrue);
       expect(reloaded.id, added.id);
+    },
+  );
+
+  test(
+    'second cleanup sweep makes no requests for a fresh readable source without discovery',
+    () async {
+      final registry = BookSourceRegistry(storage: _MemoryRegistryStorage());
+      final source = _fixtureSource().toRegisteredSource(enabled: true);
+      await registry.applySynced(source);
+      final transport = _FakeTransport({
+        'https://books.test/search?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1':
+            '<div class="book"><a href="/book/1"><span class="name">剑来</span></a></div>',
+        'https://books.test/book/1':
+            '<h1>剑来</h1><a class="toc" href="/book/1/toc">目录</a>',
+        'https://books.test/book/1/toc':
+            '<ul id="chapters"><li><a href="/chapter/1">第一章</a></li></ul>',
+        'https://books.test/chapter/1':
+            '<article id="content"><p>正文</p></article>',
+      });
+      final service = BookSourceHealthCheckService(
+        checker: SourceHealthChecker(transport: transport),
+        registry: registry,
+      );
+
+      final first = await service.checkAllForCleanup([source]);
+      final firstSweepRequests = transport.requestCount;
+      final second = await service.checkAllForCleanup(first);
+
+      expect(firstSweepRequests, 4);
+      expect(transport.requestCount, firstSweepRequests);
+      expect(second, hasLength(1));
+      expect(sourceHealthCheckResultOf(second.single)?.fullyAvailable, isTrue);
     },
   );
 
@@ -324,12 +361,14 @@ class _FakeTransport implements SourceTransport {
   _FakeTransport(this.responses);
 
   final Map<String, String> responses;
+  var requestCount = 0;
 
   @override
   Future<SourceResponse> send(
     SourceRequestTemplate request, {
     BookDownloadCancellation? cancellation,
   }) async {
+    requestCount++;
     final body = responses[request.url.toString()];
     if (body == null) {
       throw StateError('Missing fake response for ${request.url}');

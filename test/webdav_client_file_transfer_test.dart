@@ -31,7 +31,7 @@ void main() {
     final progress = <(int, int)>[];
 
     await client.putFile(
-      client.path(const ['blobs', 'book.epub']),
+      client.rootPath(const ['books', 'book', 'current.epub']),
       source,
       onProgress: (sent, total) => progress.add((sent, total)),
     );
@@ -60,7 +60,7 @@ void main() {
       final progress = <(int, int)>[];
 
       await client.downloadFile(
-        client.path(const ['blobs', 'book.epub']),
+        client.rootPath(const ['books', 'book', 'current.epub']),
         target,
         onProgress: (received, total) => progress.add((received, total)),
       );
@@ -76,7 +76,10 @@ void main() {
     final client = _client(_TransferAdapter(statusCode: 507));
 
     await expectLater(
-      client.putFile(client.path(const ['blobs', 'book.pdf']), source),
+      client.putFile(
+        client.rootPath(const ['books', 'book', 'current.pdf']),
+        source,
+      ),
       throwsA(
         isA<WebDavSyncFailure>().having(
           (failure) => failure.code,
@@ -99,7 +102,7 @@ void main() {
     final client = _client(adapter);
 
     final result = await client.putFileConditionally(
-      client.mutablePath(const ['books', 'id', 'current.txt']),
+      client.rootPath(const ['books', 'id', 'current.txt']),
       source,
       ifMatch: '"revision-1"',
     );
@@ -107,6 +110,27 @@ void main() {
     expect(adapter.lastHeaders?['If-Match'], '"revision-1"');
     expect(adapter.lastHeaders?['If-None-Match'], isNull);
     expect(result.etag, '"revision-2"');
+    expect(adapter.lastHeaders?['content-type'], 'text/plain');
+  });
+
+  test('readable EPUB upload preserves its binary media type', () async {
+    final source = File('${temporaryDirectory.path}/book.epub');
+    await source.writeAsBytes([80, 75, 3, 4]);
+    final adapter = _TransferAdapter(
+      statusCode: 201,
+      responseHeaders: {
+        'etag': ['"book"'],
+      },
+    );
+    final client = _client(adapter);
+    await client.putFileConditionally(
+      client.rootPath(const ['books', 'Title', 'book.epub']),
+      source,
+      ifNoneMatch: true,
+    );
+    expect(adapter.lastHeaders?['content-type'], 'application/epub+zip');
+    expect(adapter.lastHeaders?['If-None-Match'], '*');
+    expect(adapter.uploadedBytes, [80, 75, 3, 4]);
   });
 
   test('conditional upload maps a stale ETag to conflict', () async {
@@ -116,7 +140,7 @@ void main() {
 
     await expectLater(
       client.putFileConditionally(
-        client.mutablePath(const ['books', 'id', 'current.txt']),
+        client.rootPath(const ['books', 'id', 'current.txt']),
         source,
         ifMatch: '"stale"',
       ),

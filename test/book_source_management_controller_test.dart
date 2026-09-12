@@ -154,6 +154,45 @@ void main() {
     },
   );
 
+  test(
+    'result-page removal preserves unrelated management selection',
+    () async {
+      final registry = _Registry()..groupOrder = ['Removed group'];
+      final kept = _source('kept');
+      final removed = _source('removed', group: 'Removed group');
+      final controller = BookSourceManagementController(registry: registry);
+      addTearDown(controller.dispose);
+      controller.replaceSources([kept, removed]);
+      controller.toggleSelectionMode();
+      controller.toggleSourceSelection(kept.id);
+      controller.toggleSourceSelection(removed.id);
+      controller.setGroup('Removed group');
+      registry.mutationResult = [kept];
+      registry.groupsAfterRemoval = [];
+
+      await controller.removeSources({removed.id});
+
+      expect(registry.lastRemovedIds, {removed.id});
+      expect(controller.state.sources.single.id, kept.id);
+      expect(controller.state.selectedSourceIds, {kept.id});
+      expect(controller.state.selectionMode, isTrue);
+      expect(controller.state.selectedGroup, isNull);
+      expect(controller.state.availableGroups, isEmpty);
+    },
+  );
+
+  test('empty result-page removal does not write storage', () async {
+    final registry = _Registry();
+    final controller = BookSourceManagementController(registry: registry);
+    addTearDown(controller.dispose);
+    controller.replaceSources([_source('kept')]);
+
+    await controller.removeSources({});
+
+    expect(registry.removeAllCalls, 0);
+    expect(controller.state.sources.single.id, 'kept');
+  });
+
   test('favorites filter intersects with groups and search', () {
     final controller = BookSourceManagementController();
     addTearDown(controller.dispose);
@@ -784,6 +823,8 @@ class _Registry extends BookSourceRegistry {
   bool delayPreferences = false;
   int loadCalls = 0;
   Set<String> lastEnabledIds = const {};
+  Set<String> lastRemovedIds = const {};
+  int removeAllCalls = 0;
   List<RegisteredBookSource> mutationResult = const [];
 
   @override
@@ -825,6 +866,8 @@ class _Registry extends BookSourceRegistry {
 
   @override
   Future<List<RegisteredBookSource>> removeAll(Iterable<String> ids) async {
+    lastRemovedIds = ids.toSet();
+    removeAllCalls++;
     groupOrder = groupsAfterRemoval ?? groupOrder;
     return mutationResult;
   }

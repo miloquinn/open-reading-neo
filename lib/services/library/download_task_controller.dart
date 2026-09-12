@@ -21,6 +21,10 @@ class BookDownloadTask {
     this.total = 0,
     this.downloadedBook,
     this.error,
+    this.shelfBook,
+    this.updateMode,
+    this.sourceUpdateResult,
+    this.bookUid,
   });
 
   final String id;
@@ -31,6 +35,10 @@ class BookDownloadTask {
   final int total;
   final Book? downloadedBook;
   final Object? error;
+  final Book? shelfBook;
+  final SourceUpdateMode? updateMode;
+  final SourceUpdateResult? sourceUpdateResult;
+  final String? bookUid;
 
   double? get progress => total > 0 ? completed / total : null;
 
@@ -40,6 +48,7 @@ class BookDownloadTask {
     int? total,
     Book? downloadedBook,
     Object? error,
+    SourceUpdateResult? sourceUpdateResult,
   }) => BookDownloadTask(
     id: id,
     source: source,
@@ -49,6 +58,10 @@ class BookDownloadTask {
     total: total ?? this.total,
     downloadedBook: downloadedBook ?? this.downloadedBook,
     error: error ?? this.error,
+    shelfBook: shelfBook,
+    updateMode: updateMode,
+    sourceUpdateResult: sourceUpdateResult ?? this.sourceUpdateResult,
+    bookUid: bookUid,
   );
 }
 
@@ -66,6 +79,7 @@ class DownloadTaskController extends ChangeNotifier {
   final Map<String, BookSourceShelfService> _shelfServices =
       <String, BookSourceShelfService>{};
   final Set<String> _activeTaskIds = <String>{};
+  final Set<String> _ownedServiceTaskIds = <String>{};
 
   List<BookDownloadTask> get tasks => List.unmodifiable(_tasks);
 
@@ -86,6 +100,38 @@ class DownloadTaskController extends ChangeNotifier {
     required RegisteredBookSource source,
     required BookSourceBook book,
     required BookSourceShelfService shelfService,
+    String? bookUid,
+  }) => _enqueue(
+    source: source,
+    book: book,
+    shelfService: shelfService,
+    bookUid: bookUid,
+  );
+
+  String enqueueSourceUpdate({
+    required Book shelfBook,
+    required SourceUpdateMode mode,
+    required BookSourceShelfService shelfService,
+    required String bookUid,
+    bool closeServiceWhenDone = false,
+  }) => _enqueue(
+    source: shelfService.sourceFrom(shelfBook),
+    book: shelfService.sourceBookFrom(shelfBook),
+    shelfService: shelfService,
+    shelfBook: shelfBook,
+    updateMode: mode,
+    bookUid: bookUid,
+    closeServiceWhenDone: closeServiceWhenDone,
+  );
+
+  String _enqueue({
+    required RegisteredBookSource source,
+    required BookSourceBook book,
+    required BookSourceShelfService shelfService,
+    Book? shelfBook,
+    SourceUpdateMode? updateMode,
+    String? bookUid,
+    bool closeServiceWhenDone = false,
   }) {
     final existing = _tasks.where(
       (task) =>
@@ -94,7 +140,13 @@ class DownloadTaskController extends ChangeNotifier {
           (task.state == DownloadTaskState.queued ||
               task.state == DownloadTaskState.downloading),
     );
-    if (existing.isNotEmpty) return existing.first.id;
+    if (existing.isNotEmpty) {
+      if (closeServiceWhenDone &&
+          !identical(_shelfServices[existing.first.id], shelfService)) {
+        shelfService.close();
+      }
+      return existing.first.id;
+    }
 
     final id =
         'book:${source.id}:${book.id}:${DateTime.now().microsecondsSinceEpoch}';
@@ -105,10 +157,14 @@ class DownloadTaskController extends ChangeNotifier {
         source: source,
         book: book,
         state: DownloadTaskState.queued,
+        shelfBook: shelfBook,
+        updateMode: updateMode,
+        bookUid: bookUid,
       ),
     );
     _cancellations[id] = BookDownloadCancellation();
     _shelfServices[id] = shelfService;
+    if (closeServiceWhenDone) _ownedServiceTaskIds.add(id);
     notifyListeners();
     _scheduleQueuedTasks();
     return id;
@@ -126,7 +182,8 @@ class DownloadTaskController extends ChangeNotifier {
     _replace(index, task.copyWith(state: DownloadTaskState.cancelled));
     if (task.state == DownloadTaskState.queued) {
       _cancellations.remove(id);
-      _shelfServices.remove(id);
+      final service = _shelfServices.remove(id);
+      if (_ownedServiceTaskIds.remove(id)) service?.close();
     }
     return true;
   }
@@ -178,33 +235,49 @@ class DownloadTaskController extends ChangeNotifier {
     );
     try {
       await _notify(() => BackgroundDownloadNotifier.begin(notificationTask));
-      final downloaded = await shelfService.downloadToLocal(
-        source: task.source,
-        book: task.book,
-        cancellation: cancellation,
-        onProgress: (completed, total) {
-          final currentIndex = _tasks.indexWhere(
-            (candidate) => candidate.id == task.id,
-          );
-          if (currentIndex < 0 ||
-              _tasks[currentIndex].state != DownloadTaskState.downloading) {
-            return;
-          }
-          _replace(
-            currentIndex,
-            _tasks[currentIndex].copyWith(completed: completed, total: total),
-          );
-          unawaited(
-            _notify(
-              () => BackgroundDownloadNotifier.progress(
-                notificationTask,
-                completed: completed,
-                total: total,
-              ),
+      void onProgress(int completed, int total) {
+        final currentIndex = _tasks.indexWhere(
+          (candidate) => candidate.id == task.id,
+        );
+        if (currentIndex < 0 ||
+            _tasks[currentIndex].state != DownloadTaskState.downloading) {
+          return;
+        }
+        _replace(
+          currentIndex,
+          _tasks[currentIndex].copyWith(completed: completed, total: total),
+        );
+        unawaited(
+          _notify(
+            () => BackgroundDownloadNotifier.progress(
+              notificationTask,
+              completed: completed,
+              total: total,
             ),
-          );
-        },
-      );
+          ),
+        );
+      }
+
+      SourceUpdateResult? sourceResult;
+      final Book downloaded;
+      if (task.updateMode != null && task.shelfBook != null) {
+        sourceResult = await shelfService.updateDownloadedBook(
+          shelfBook: task.shelfBook!,
+          mode: task.updateMode!,
+          bookUid: task.bookUid,
+          cancellation: cancellation,
+          onProgress: onProgress,
+        );
+        downloaded = sourceResult.book;
+      } else {
+        downloaded = await shelfService.downloadToLocal(
+          source: task.source,
+          book: task.book,
+          bookUid: task.bookUid,
+          cancellation: cancellation,
+          onProgress: onProgress,
+        );
+      }
       cancellation.throwIfCancelled();
       final currentIndex = _tasks.indexWhere(
         (candidate) => candidate.id == task.id,
@@ -216,6 +289,7 @@ class DownloadTaskController extends ChangeNotifier {
             state: DownloadTaskState.completed,
             completed: _tasks[currentIndex].total,
             downloadedBook: downloaded,
+            sourceUpdateResult: sourceResult,
           ),
         );
       }
@@ -267,6 +341,7 @@ class DownloadTaskController extends ChangeNotifier {
       _activeTaskIds.remove(task.id);
       _cancellations.remove(task.id);
       _shelfServices.remove(task.id);
+      if (_ownedServiceTaskIds.remove(task.id)) shelfService.close();
       _scheduleQueuedTasks();
     }
   }

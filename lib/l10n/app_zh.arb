@@ -36,11 +36,23 @@
   "discoverCategoryEmpty": "这个分类暂时没有可展示的书籍。",
   "bookSourceChannelLoadFailed": "频道加载失败",
   "bookSourceChannelLoadFailedMessage": "书源没有返回可用书籍：{details}",
-  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChannelLoadFailedMessage": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceConnectionFailed": "无法连接书源服务器，已自动尝试其他网络地址，请稍后重试。",
   "bookSourceRedirectFailed": "书源网站反复跳转；客户端已保留站点 Cookie，但该地址仍未返回内容。",
   "bookSourceHttpFailed": "书源网站返回 HTTP {status}，频道地址可能已经失效或被站点拦截。",
-  "@bookSourceHttpFailed": {"placeholders":{"status":{"type":"int"}}},
+  "@bookSourceHttpFailed": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceStandardLayout": "标准布局",
   "bookSourceListLayout": "列表布局",
   "bookSourceChangeChannel": "更换",
@@ -49,13 +61,28 @@
   "bookSourceChangeTargetSource": "切换到",
   "bookSourceChangeNotSelected": "尚未选择",
   "bookSourceChangeCurrentChapter": "当前读到第 {chapter} 章",
-  "@bookSourceChangeCurrentChapter": {"placeholders":{"chapter":{"type":"int"}}},
+  "@bookSourceChangeCurrentChapter": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeSearchLabel": "按书名查找其他来源",
   "bookSourceChangeSearchAgain": "重新搜索",
   "bookSourceChangeSearchRemaining": "继续查找全部来源",
   "bookSourceChangeCheckAuthor": "校验作者",
   "bookSourceChangeSearchProgress": "已检查 {completed} / {total}",
-  "@bookSourceChangeSearchProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourceChangeSearchProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeNoOtherSources": "没有其他可用书源",
   "bookSourceChangeNoOtherSourcesHint": "请先添加并启用至少一个支持搜索的其他书源。",
   "bookSourceChangeSearching": "正在查找其他来源",
@@ -63,24 +90,60 @@
   "bookSourceChangeNoMatches": "没有找到匹配来源",
   "bookSourceChangeNoMatchesHint": "可以修改书名，或关闭作者校验后重新搜索。",
   "bookSourceChangeFailedSources": "{count} 个书源请求失败，可以重新搜索。",
-  "@bookSourceChangeFailedSources": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeFailedSources": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeAuthorDifferent": "作者不同",
   "bookSourceChangeValidating": "正在验证目录和当前章节…",
   "bookSourceChangeValidationFailed": "验证失败：{details}",
-  "@bookSourceChangeValidationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChangeValidationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChangeReadable": "当前章节可读",
   "bookSourceChangeChapterCount": "{count} 章",
-  "@bookSourceChangeChapterCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeChapterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeResponseTime": "{milliseconds} ms",
-  "@bookSourceChangeResponseTime": {"placeholders":{"milliseconds":{"type":"int"}}},
+  "@bookSourceChangeResponseTime": {
+    "placeholders": {
+      "milliseconds": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeTapToValidate": "选择后将验证目录和当前章节。",
   "bookSourceChangeAlreadyOnShelf": "该来源版本已经在书架中。",
   "bookSourceChangeSwitching": "正在换源…",
   "bookSourceChangeSwitchAction": "切换到此来源",
   "bookSourceChangeSuccess": "已切换到 {source}",
-  "@bookSourceChangeSuccess": {"placeholders":{"source":{"type":"String"}}},
+  "@bookSourceChangeSuccess": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChannelCount": "{count} 个频道",
-  "@bookSourceChannelCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceManagementTitle": "书源管理",
   "bookSourceManagementSubtitle": "管理内容来源的添加、启停与协议信息。发现页只保留找书体验。",
   "settingsContentSourcesTitle": "内容来源",
@@ -134,7 +197,16 @@
   "bookSourcesNoMatchingSources": "没有符合当前搜索和筛选条件的书源",
   "bookSourcesResetFilters": "重置",
   "bookSourcesVisibleCount": "显示 {visible} / 共 {total} 个",
-  "@bookSourcesVisibleCount": {"placeholders":{"visible":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesVisibleCount": {
+    "placeholders": {
+      "visible": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesRemove": "移除",
   "bookSourcesRemoveTitle": "移除书源",
   "bookSourcesRemoveMessage": "此操作只移除书源配置，不会删除本地书籍。",
@@ -150,7 +222,19 @@
   "bookSourcesAdvancedFeatureRequired": "当前账号或设置暂不支持此书源。",
   "bookSourcesNoWorkingSources": "没有书源通过实际搜索检测，本次未导入任何书源。",
   "bookSourcesVerificationProgress": "已检测 {completed}/{total}，可用 {available} 个",
-  "@bookSourcesVerificationProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"},"available":{"type":"int"}}},
+  "@bookSourcesVerificationProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "available": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesSelect": "多选书源",
   "bookSourcesSelectAll": "全选",
   "bookSourcesClearSelection": "取消全选",
@@ -158,24 +242,72 @@
   "bookSourcesDisableSelected": "停用所选",
   "bookSourcesDeleteSelected": "删除所选",
   "bookSourcesDeleteSelectedMessage": "确定删除选中的 {count} 个书源吗？本地书籍不会受到影响。",
-  "@bookSourcesDeleteSelectedMessage": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDeleteSelectedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCheckSelected": "校验所选",
   "bookSourcesHealthCheckSummary": "已校验 {total} 个源，{healthy} 个正常",
-  "@bookSourcesHealthCheckSummary": {"placeholders":{"healthy":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesHealthCheckSummary": {
+    "placeholders": {
+      "healthy": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupMenuLabel": "检测并清理书源",
   "bookSourcesCleanupNoCheckableSources": "没有可检测的书源",
   "bookSourcesCleanupAllFullyAvailable": "已检测的 {count} 个书源均完全可用",
-  "@bookSourcesCleanupAllFullyAvailable": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupAllFullyAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewTitle": "体检结果",
   "bookSourcesCleanupReviewSummary": "完整可用 {fullyAvailable} 个，待确认 {needsAttention} 个",
-  "@bookSourcesCleanupReviewSummary": {"placeholders":{"fullyAvailable":{"type":"int"},"needsAttention":{"type":"int"}}},
+  "@bookSourcesCleanupReviewSummary": {
+    "placeholders": {
+      "fullyAvailable": {
+        "type": "int"
+      },
+      "needsAttention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewHint": "结果供参考。部分能力缺失或超时不代表书源失效，请按需选择停用。",
   "bookSourcesCleanupDisableSelected": "关闭选中的 {count} 个",
-  "@bookSourcesCleanupDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupDisabledSummary": "已关闭 {count} 个书源",
-  "@bookSourcesCleanupDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupCancelledSummary": "已停止，已检测 {count} 个书源。之后再次运行会从上次的进度继续。",
-  "@bookSourcesCleanupCancelledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupCancelledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceTitle": "书源整理",
   "bookSourcesMaintenanceSubtitle": "清理重复项，检查书源是否可用",
   "bookSourcesMaintenanceHealthTitle": "书源体检",
@@ -185,32 +317,86 @@
   "bookSourcesMaintenanceDedupeSubtitle": "本地比对重复书源，无需联网",
   "bookSourcesMaintenanceReviewTitle": "上次体检结果",
   "bookSourcesMaintenanceReviewSubtitle": "有 {count} 个书源需要处理",
-  "@bookSourcesMaintenanceReviewSubtitle": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesMaintenanceReviewSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceSafetyHint": "确认后仅停用所选书源，配置始终保留。",
   "bookSourcesMaintenanceProgressTitle": "正在体检书源",
   "bookSourcesMaintenanceProgressHint": "正在检查搜索、详情、目录和正文能力",
   "bookSourcesMaintenanceFinishedTitle": "书源体检完成",
   "bookSourcesMaintenanceFinishedSummary": "已检查 {checked} 个书源，{attention} 个需要处理",
-  "@bookSourcesMaintenanceFinishedSummary": {"placeholders":{"checked":{"type":"int"},"attention":{"type":"int"}}},
+  "@bookSourcesMaintenanceFinishedSummary": {
+    "placeholders": {
+      "checked": {
+        "type": "int"
+      },
+      "attention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceProgress": "{completed} / {total}",
-  "@bookSourcesMaintenanceProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceStop": "停止检测",
   "bookSourcesMaintenanceBackground": "后台继续",
   "bookSourcesMaintenanceBackgroundHint": "关闭进度页后，检查将在应用运行期间静默继续。",
   "bookSourcesMaintenanceBackgroundToast": "书源体检已在后台静默继续",
   "bookSourcesMaintenanceReviewResults": "查看体检结果",
   "bookSourcesMaintenanceRunningMenuLabel": "书源整理 {completed}/{total}",
-  "@bookSourcesMaintenanceRunningMenuLabel": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceRunningMenuLabel": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeMenuLabel": "查找重复书源",
   "bookSourcesDedupeNone": "没有发现重复书源",
   "bookSourcesDedupeReviewTitle": "检查重复书源",
   "bookSourcesDedupeReviewSummary": "共 {groups} 组，{duplicates} 个重复书源",
-  "@bookSourcesDedupeReviewSummary": {"placeholders":{"groups":{"type":"int"},"duplicates":{"type":"int"}}},
+  "@bookSourcesDedupeReviewSummary": {
+    "placeholders": {
+      "groups": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeReviewHint": "将保留推荐书源，选中的重复项只会被关闭，不会删除。",
   "bookSourcesDedupeDisableSelected": "关闭选中的 {count} 个",
-  "@bookSourcesDedupeDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeDisabledSummary": "已关闭 {count} 个重复书源",
-  "@bookSourcesDedupeDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeModeExact": "精确",
   "bookSourcesDedupeModeStandard": "标准",
   "bookSourcesDedupeModeSite": "同站审查",
@@ -220,9 +406,33 @@
   "bookSourcesDedupeRecommended": "推荐保留",
   "bookSourcesDedupeReviewAction": "查看去重结果",
   "bookSourcesDedupeImportSummary": "可导入 {ready} 个，重复 {duplicates} 个，无效 {errors} 个",
-  "@bookSourcesDedupeImportSummary": {"placeholders":{"ready":{"type":"int"},"duplicates":{"type":"int"},"errors":{"type":"int"}}},
+  "@bookSourcesDedupeImportSummary": {
+    "placeholders": {
+      "ready": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "errors": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesImportTypeSummary": "书籍源 {books} 个 · 漫画源 {comics} 个 · 当前不可运行 {unsupported} 个",
-  "@bookSourcesImportTypeSummary": {"placeholders":{"books":{"type":"int"},"comics":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@bookSourcesImportTypeSummary": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "comics": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeRestoreDefaults": "恢复推荐选择",
   "bookSourcesUrlLabel": "书源地址",
   "bookSourcesUrlHint": "https://example.com 或书源 JSON 链接",
@@ -259,15 +469,31 @@
   "bookSourcesClose": "关闭",
   "sourceLoginTitle": "书源登录",
   "sourceLoginSecureStorageNotice": "登录信息仅保存在当前设备的系统安全存储中。",
-  "sourceLoginNoForm": "该书源没有可显示的登录表单，网页登录暂未接入。",
+  "sourceLoginNoForm": "该书源没有提供可用的登录方式。",
+  "sourceLoginBrowserTitle": "在原网站登录",
+  "sourceLoginBrowserNotice": "请在内置浏览器中完成登录，然后点“完成”。Cookie 和网站本地存储会保存在当前设备。",
+  "sourceLoginBrowserUnsupported": "网页登录支持 Android、iPhone、iPad 和 Mac。",
+  "sourceLoginBrowserOpen": "打开原网站登录",
   "sourceLoginSave": "登录并保存会话",
   "sourceLoginClear": "清除登录会话",
   "sourceLoginSaved": "书源登录会话已更新",
   "sourceLoginCleared": "书源登录会话已清除",
   "sourceLoginFailed": "无法更新书源登录会话：{details}",
-  "@sourceLoginFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceLoginFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "sourceLoginDiscoveryNotice": "此发现页书源“{sourceName}”提供登录功能，登录后才能使用需要账号的内容。",
-  "@sourceLoginDiscoveryNotice": {"placeholders":{"sourceName":{"type":"String"}}},
+  "@sourceLoginDiscoveryNotice": {
+    "placeholders": {
+      "sourceName": {
+        "type": "String"
+      }
+    }
+  },
   "sourceDebugMenuLabel": "调试",
   "sourceDebugTitle": "书源调试",
   "sourceDebugInputHint": "输入搜索关键词，或粘贴书籍/目录/正文链接",
@@ -283,7 +509,13 @@
   "bookSourcesFullyAvailable": "完全可用",
   "sourceHealthTimedOut": "校验超时",
   "sourceHealthFailedCapabilities": "失效项：{capabilities}",
-  "@sourceHealthFailedCapabilities": {"placeholders":{"capabilities":{"type":"String"}}},
+  "@sourceHealthFailedCapabilities": {
+    "placeholders": {
+      "capabilities": {
+        "type": "String"
+      }
+    }
+  },
   "sourceHealthCapabilitySearch": "搜索",
   "sourceHealthCapabilityDiscover": "发现",
   "sourceHealthCapabilityInfo": "详情",
@@ -297,7 +529,13 @@
   "sourceVerificationRetry": "重新打开浏览器",
   "sourceVerificationCancel": "取消验证",
   "sourceVerificationFailed": "无法打开书源验证：{details}",
-  "@sourceVerificationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceVerificationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "settings": "设置",
   "@settings": {
     "description": "设置标签"
@@ -616,7 +854,9 @@
   "customFontsCount": "已导入 {count} 款字体",
   "@customFontsCount": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "customFontsLocalOnly": "导入的字体只保存在当前设备，不会自动同步。",
@@ -630,8 +870,12 @@
   "fontVariableWeightRange": "可调字重 {min}–{max}",
   "@fontVariableWeightRange": {
     "placeholders": {
-      "min": {"type": "int"},
-      "max": {"type": "int"}
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
     }
   },
   "fontStaticWeight": "固定字重（加粗为系统合成）",
@@ -639,13 +883,17 @@
   "fontDeleteDownloadTitle": "删除已下载的“{name}”？",
   "@fontDeleteDownloadTitle": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fontDeleteDownloadMessage": "将释放 {size} 存储空间。下次使用时会重新下载。",
   "@fontDeleteDownloadMessage": {
     "placeholders": {
-      "size": {"type": "String"}
+      "size": {
+        "type": "String"
+      }
     }
   },
   "fontDownloadCancelled": "下载已取消",
@@ -674,7 +922,9 @@
   "deleteCustomFontTitle": "删除“{name}”？",
   "@deleteCustomFontTitle": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "deleteCustomFontMessage": "字体文件将从当前设备删除。",
@@ -727,8 +977,12 @@
   "readerFontWeightVariableHint": "阅读调节提供 300–700 五档；当前字体的真实完整范围为 {min}–{max}。",
   "@readerFontWeightVariableHint": {
     "placeholders": {
-      "min": {"type": "int"},
-      "max": {"type": "int"}
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
     }
   },
   "readerFontWeightSyntheticHint": "阅读调节提供 300–700 五档；当前字体未声明可变字重，由系统近似合成，效果可能因平台而异。",
@@ -1153,8 +1407,12 @@
   "readerNavigationPosition": "第 {current}/{total} 章",
   "@readerNavigationPosition": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "readerSearchChapters": "搜索章节",
@@ -1456,7 +1714,13 @@
   "libraryExportOriginalHint": "复制原文件到设备上的其他位置",
   "libraryExportDownloadedTxtHint": "导出下载后生成的 TXT 文件",
   "bookExportSuccess": "已导出到 {location}",
-  "@bookExportSuccess": {"placeholders": {"location": {"type": "String"}}},
+  "@bookExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "bookExportSourceMissing": "书籍文件不存在，无法导出",
   "bookExportUnsupported": "当前平台暂不支持导出书籍",
   "bookExportFailed": "书籍导出失败",
@@ -1491,18 +1755,60 @@
   "librarySelectMultiple": "选择多本",
   "librarySelectAll": "全选",
   "librarySelectedBooks": "已选择 {count} 本",
-  "@librarySelectedBooks": {"placeholders": {"count": {"type": "int"}}},
+  "@librarySelectedBooks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeleteSelected": "删除 {count} 本",
-  "@libraryDeleteSelected": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryDeleteSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteTitle": "删除所选书籍？",
   "libraryBatchDeleteMessage": "将永久删除所选的 {count} 本书，以及相关笔记、书签和本地文件。此操作无法撤销。",
-  "@libraryBatchDeleteMessage": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeletingSelected": "正在删除 {done}/{total}",
-  "@libraryDeletingSelected": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@libraryDeletingSelected": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteSuccess": "已删除 {count} 本书",
-  "@libraryBatchDeleteSuccess": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeletePartial": "已删除 {success} 本，{failed} 本删除失败",
-  "@libraryBatchDeletePartial": {"placeholders": {"success": {"type": "int"}, "failed": {"type": "int"}}},
+  "@libraryBatchDeletePartial": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "readerPrefaceTitle": "正文前",
   "readerModeHorizontalPage": "无动画",
   "readerModeVerticalScrollHint": "预分页内容上下连续滑动，左右滑动切换章节",
@@ -1582,19 +1888,70 @@
   "additionalSourcesUrlLabel": "书源 JSON 地址",
   "additionalSourcesLoadUrl": "从 URL 加载",
   "additionalSourcesPreview": "可使用 {supported} 个，部分支持 {partial} 个，暂不支持 {unsupported} 个",
-  "@additionalSourcesPreview": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@additionalSourcesPreview": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesPreviewDetails": "标准规则 {supported} 个，扩展规则 {partial} 个，高级规则 {unsupported} 个，跳过 {skipped} 条",
-  "@additionalSourcesPreviewDetails": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesPreviewDetails": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesQuickPreview": "{count} 个书源可导入，跳过 {skipped} 个",
-  "@additionalSourcesQuickPreview": {"placeholders":{"count":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesQuickPreview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesAvailable": "可使用",
   "additionalSourcesPartial": "部分支持",
   "additionalSourcesUnsupported": "暂不支持",
   "additionalSourcesImportConfirm": "批量导入",
   "additionalSourcesImported": "已导入 {count} 个书源",
-  "@additionalSourcesImported": {"placeholders":{"count":{"type":"int"}}},
+  "@additionalSourcesImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesImportedWithConflicts": "已导入 {count} 个书源，另有 {conflicted} 个因 ID 与已有来源不同而跳过",
-  "@additionalSourcesImportedWithConflicts": {"placeholders":{"count":{"type":"int"},"conflicted":{"type":"int"}}},
+  "@additionalSourcesImportedWithConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "conflicted": {
+        "type": "int"
+      }
+    }
+  },
   "settingsSectionAboutSupport": "关于与支持",
   "settingsKeepScreenOnTitle": "保持屏幕常亮",
   "settingsKeepScreenOnSubtitle": "阅读时防止屏幕自动关闭",
@@ -1823,7 +2180,9 @@
   "updateDownloadProgress": "已下载 {percent}%",
   "@updateDownloadProgress": {
     "placeholders": {
-      "percent": {"type": "int"}
+      "percent": {
+        "type": "int"
+      }
     }
   },
   "updatePreparingInstaller": "正在校验安装包并准备系统安装程序…",
@@ -1970,20 +2329,62 @@
   "readerAutoPageTurnSweepDurationLabel": "扫屏时长",
   "readerAutoPageTurnScrollSpeedLabel": "滚动速度",
   "readerAutoPageTurnSecondsPerScreen": "{seconds} 秒/屏",
-  "@readerAutoPageTurnSecondsPerScreen": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnSecondsPerScreen": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModeValue": "{mode} · {seconds} 秒/屏",
-  "@readerAutoPageTurnModeValue": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModeValue": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModePaused": "已暂停 · {mode} · {seconds} 秒/屏",
-  "@readerAutoPageTurnModePaused": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModePaused": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnIntervalLabel": "翻页间隔",
   "readerAutoPageTurnInterval": "每 {seconds} 秒前进一屏",
-  "@readerAutoPageTurnInterval": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnInterval": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnStart": "开始自动翻页",
   "readerAutoPageTurnResume": "继续自动翻页",
   "readerAutoPageTurnRunning": "自动 · {seconds} 秒/屏",
-  "@readerAutoPageTurnRunning": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnRunning": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnPaused": "已暂停 · {seconds} 秒/屏",
-  "@readerAutoPageTurnPaused": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnPaused": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerThemeDay": "白天",
   "readerThemeFollowSystem": "跟随系统",
   "readerThemeMist": "晨雾",
@@ -2081,7 +2482,9 @@
   "settingsAiSwitchedToModel": "已切换到 {model}",
   "@settingsAiSwitchedToModel": {
     "placeholders": {
-        "model": {"type": "String"}
+      "model": {
+        "type": "String"
+      }
     }
   },
   "settingsAiFillBaseUrlAndApiKey": "请先填写 Base URL 和 API Key",
@@ -2108,7 +2511,9 @@
   "settingsAiFetchModelsFailed": "获取模型失败：{error}",
   "@settingsAiFetchModelsFailed": {
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "settingsAiPreprocessTitle": "AI 预处理书籍",
@@ -2150,91 +2555,147 @@
   "readerAiRequestFailed": "请求失败：{error}",
   "@readerAiRequestFailed": {
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "readerAiUnknownError": "未知错误",
   "readerAiEmptyResponseError": "服务端返回为空，通常是 Base URL 配置错误、网关没有转发到模型接口，或服务端提前断开连接。\n请求地址：{endpoint}",
   "@readerAiEmptyResponseError": {
     "placeholders": {
-        "endpoint": {"type": "String"}
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiInvalidJsonError": "服务端返回的不是合法 JSON，当前接口可能与 {provider} 配置不兼容。\n请求地址：{endpoint}\n返回片段：{snippet}",
   "@readerAiInvalidJsonError": {
     "placeholders": {
-        "provider": {"type": "String"},
-        "endpoint": {"type": "String"},
-        "snippet": {"type": "String"}
+      "provider": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      },
+      "snippet": {
+        "type": "String"
+      }
     }
   },
   "readerAiFailedReadBody": "请求失败{status}：未能读取服务端返回的数据，通常是 Base URL 配错、接口返回空内容，或网络把响应截断了。\n请求地址：{endpoint}",
   "@readerAiFailedReadBody": {
     "placeholders": {
-        "status": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiNetworkRequestFailed": "网络请求失败{status}：{error}\n请求地址：{endpoint}",
   "@readerAiNetworkRequestFailed": {
     "placeholders": {
-        "status": {"type": "String"},
-        "error": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedMinimaxHint": "请求失败({status})：{text}\n建议检查：1) MiniMax 温度需在 (0,1]；2) 模型名与接口是否匹配；3) 仅使用单条 system 指令。\n请求地址：{endpoint}",
   "@readerAiRequestFailedMinimaxHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedClaudeHint": "请求失败({status})：{text}\n提示：Claude 必须携带 anthropic-version 请求头。\n请求地址：{endpoint}",
   "@readerAiRequestFailedClaudeHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedProviderMismatchHint": "请求失败({status})：{text}\n提示：请确认服务商与 API Key 对应，不可混用。\n请求地址：{endpoint}",
   "@readerAiRequestFailedProviderMismatchHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedGeneric": "请求失败({status})：{text}\n请求地址：{endpoint}",
   "@readerAiRequestFailedGeneric": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockSelectionResponse": "AI(模拟): 你选择的内容是\"{selectedText}\"。\n\n上文: {before}\n下文: {after}",
   "@readerAiMockSelectionResponse": {
     "placeholders": {
-        "selectedText": {"type": "String"},
-        "before": {"type": "String"},
-        "after": {"type": "String"}
+      "selectedText": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockPageAnalysis": "AI(模拟): 本页共 {chars} 字，建议重点关注段落开头与结尾处的论点。",
   "@readerAiMockPageAnalysis": {
     "placeholders": {
-        "chars": {"type": "int"}
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "readerAiMockGreeting": "你好",
   "readerAiMockChatResponse": "AI(模拟): 你问的是「{question}」。\n\n我已读取当前页（{chars} 字），你可以继续追问。",
   "@readerAiMockChatResponse": {
     "placeholders": {
-        "question": {"type": "String"},
-        "chars": {"type": "int"}
+      "question": {
+        "type": "String"
+      },
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "ttsSystemDefault": "系统默认",
@@ -2242,7 +2703,9 @@
   "ttsUnsupportedLanguage": "系统不支持语言: {language}",
   "@ttsUnsupportedLanguage": {
     "placeholders": {
-        "language": {"type": "String"}
+      "language": {
+        "type": "String"
+      }
     }
   },
   "ttsCallFailed": "系统 TTS 调用失败",
@@ -2278,7 +2741,9 @@
   "agreementV2VersionLabel": "条款版本 {version}",
   "@agreementV2VersionLabel": {
     "placeholders": {
-        "version": {"type": "String"}
+      "version": {
+        "type": "String"
+      }
     }
   },
   "agreementFlowStepIntroduction": "软件介绍",
@@ -2437,13 +2902,37 @@
   "webDavErrorIfMatchIgnoredDetail": "服务器忽略了仅在版本一致时才写入（If-Match）的条件，继续同步可能覆盖其他设备的新修改。",
   "webDavErrorIfNoneMatchIgnoredDetail": "服务器忽略了仅在文件不存在时才创建（If-None-Match）的条件，继续同步可能覆盖已有文件。",
   "webDavErrorReason": "具体原因：{reason}",
-  "@webDavErrorReason": {"placeholders":{"reason":{"type":"String"}}},
+  "@webDavErrorReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorHttpStatus": "HTTP 状态码：{status}",
-  "@webDavErrorHttpStatus": {"placeholders":{"status":{"type":"int"}}},
+  "@webDavErrorHttpStatus": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "webDavErrorRequestMethod": "请求方法：{method}",
-  "@webDavErrorRequestMethod": {"placeholders":{"method":{"type":"String"}}},
+  "@webDavErrorRequestMethod": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorResourcePath": "资源路径：{path}",
-  "@webDavErrorResourcePath": {"placeholders":{"path":{"type":"String"}}},
+  "@webDavErrorResourcePath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorPhase": "失败阶段：{phase}",
   "webDavPhaseConnecting": "连接远端",
   "webDavPhaseScanningLocal": "扫描本机数据",
@@ -2462,9 +2951,7 @@
   "webDavFilesOnlyLocal": "仅在本机",
   "webDavFilesOnlyRemote": "文件尚未下载到本机",
   "webDavFilesUploadPermission": "允许上传书籍原文件",
-  "webDavFilesUploadPermissionHint": "只会上传你明确选中的书籍；WebDAV 保留原文件名和原始内容，不另行加密",
-  "webDavLegacyBookDirectoryTitle": "旧版 WebDAV 书籍仍兼容",
-  "webDavLegacyBookDirectoryMessage": "无需重新同步。新上传书籍将使用“书名 - 作者/原文件名”的可读目录。",
+  "webDavFilesUploadPermissionHint": "启用后会自动备份已有的本地书籍。云端 books/ 中按书名和作者保存可直接打开的原格式文件与封面；同名书通过身份后缀区分，正文更新保留历史版本。",
   "webDavNewBookPolicyTitle": "新书文件处理",
   "webDavNewBookPolicyAsk": "每次询问（推荐）",
   "webDavNewBookPolicyAskHint": "导入完成后选择本次要上传的书籍",
@@ -2550,7 +3037,13 @@
   "accountMfaOnTitle": "双重验证已开启",
   "accountMfaEmailTitle": "先验证当前邮箱",
   "accountMfaEmailHint": "我们会向 {email} 发送一个开启验证码。",
-  "@accountMfaEmailHint": {"placeholders":{"email":{"type":"String"}}},
+  "@accountMfaEmailHint": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "accountMfaEmailCodeTitle": "输入邮件验证码",
   "accountMfaEmailCodeHint": "验证完成后，下一个页面才会展示验证器二维码和密钥。",
   "accountMfaAuthenticatorTitle": "将开元阅读添加到验证器",
@@ -2597,11 +3090,26 @@
   "accountInviteShareAction": "复制邀请链接并分享",
   "accountInviteCopied": "邀请信息已复制",
   "accountInviteStats": "已邀请 {invited} 人 · 已成功 {rewarded} 人",
-  "@accountInviteStats": {"placeholders":{"invited":{"type":"int"},"rewarded":{"type":"int"}}},
+  "@accountInviteStats": {
+    "placeholders": {
+      "invited": {
+        "type": "int"
+      },
+      "rewarded": {
+        "type": "int"
+      }
+    }
+  },
   "accountInviteStatsInvited": "已绑定人数",
   "accountInviteStatsRewarded": "已成功解锁",
   "accountInviterBound": "已绑定邀请人：{name}",
-  "@accountInviterBound": {"placeholders":{"name":{"type":"String"}}},
+  "@accountInviterBound": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "accountInviteRewarded": "邀请已成功",
   "accountInviteWaiting": "等待兑换卡密",
   "accountInviteBindLabel": "好友邀请码",
@@ -2624,25 +3132,61 @@
   "readingDataExportWholeBookHint": "导出这本书中的全部批注，不包含书籍全文或书籍文件。",
   "readingDataExportPrivacySummary": "包含高亮或下划线原文和你的私人笔记；不包含书籍文件、书籍全文、账户或设备信息。",
   "readingDataExportCounts": "{highlights} 条高亮 · {underlines} 条下划线 · {notes} 条笔记",
-  "@readingDataExportCounts": {"placeholders":{"highlights":{"type":"int"},"underlines":{"type":"int"},"notes":{"type":"int"}}},
+  "@readingDataExportCounts": {
+    "placeholders": {
+      "highlights": {
+        "type": "int"
+      },
+      "underlines": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportButton": "导出 {count} 条批注",
-  "@readingDataExportButton": {"placeholders":{"count":{"type":"int"}}},
+  "@readingDataExportButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportPreparing": "正在生成 Markdown…",
   "readingDataExportEmpty": "这本书还没有可导出的高亮、下划线或笔记。",
   "readingDataExportSuccess": "阅读数据已导出到 {location}",
-  "@readingDataExportSuccess": {"placeholders":{"location":{"type":"String"}}},
+  "@readingDataExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportFailed": "阅读数据导出失败",
   "readingDataExportUnsupported": "当前平台暂不支持导出阅读数据",
   "readingDataExportReplaceTitle": "替换已有文件？",
   "readingDataExportReplaceMessage": "{path} 已存在文件。替换后无法撤销。",
-  "@readingDataExportReplaceMessage": {"placeholders":{"path":{"type":"String"}}},
+  "@readingDataExportReplaceMessage": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportReplaceAction": "替换",
   "readingDataExportExportedAt": "导出时间",
   "readingDataExportAuthor": "作者",
   "readingDataExportContents": "内容",
   "readingDataExportMyNote": "我的笔记",
   "readingDataExportPositionPage": "第 {page} 页",
-  "@readingDataExportPositionPage": {"placeholders":{"page":{"type":"int"}}},
+  "@readingDataExportPositionPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportUnknownChapter": "未定位的批注",
   "cloudSyncTitle": "云端同步",
   "cloudSyncTagline": "换一台设备，接着上次的位置读",
@@ -2708,13 +3252,6 @@
   },
   "bookSourcesImportFileTab": "JSON 文件",
   "bookSourcesImportTimedOut": "读取超时，请检查网络，或下载 JSON 文件后导入。",
-  "cloudSyncIncrementalMode": "增量同步",
-  "cloudSyncPlainMode": "普通 TXT 文件",
-  "cloudSyncIncrementalDescription": "首次上传后，只传输变化的内容块。本机书籍仍是完整 TXT。",
-  "cloudSyncEnableIncremental": "切换为增量同步",
-  "cloudSyncIncrementalConfirmTitle": "切换这本书的云端存储方式？",
-  "cloudSyncIncrementalConfirmBody": "云端将使用 App 管理的分块格式。已有 TXT 副本会保留，但不再跟随更新。其他设备需要使用支持增量同步的新版 App。本机仍保留完整 TXT 文件。",
-  "cloudSyncIncrementalConfirm": "切换并同步",
   "bookSourcesImportUsageNotice": "书源使用说明",
   "bookSourcesMaintenanceScope": "整理范围",
   "bookSourcesMaintenanceScopeEnabled": "已启用",
@@ -2745,6 +3282,32 @@
   "bookSourcesMaintenanceAvailableReason": "主要能力已通过检测",
   "bookSourcesMaintenanceDedupeBusy": "正在整理重复项…",
   "bookSourcesMaintenanceShelfProtected": "书架正在使用 · 默认保留",
+  "bookSourcesMaintenanceDeleteReferencedWarning": "所选书源中有 {count} 个正在被书架书籍使用。删除后，这些书籍可能无法更新或加载新章节。",
+  "@bookSourcesMaintenanceDeleteReferencedWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceProblemsFilter": "有问题",
+  "bookSourcesMaintenanceSelectedCount": "已选 {count} 个书源",
+  "@bookSourcesMaintenanceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceShelfUsed": "书架正在使用",
+  "bookSourcesMaintenancePause": "暂停检测",
+  "bookSourcesMaintenancePausing": "正在暂停…",
+  "bookSourcesMaintenancePaused": "检测已暂停",
+  "bookSourcesMaintenanceCompleted": "检测完成",
+  "bookSourcesMaintenanceStart": "开始检测",
+  "bookSourcesMaintenanceRestart": "重新检测",
+  "bookSourcesMaintenanceCheckedThisRun": "本次已检测",
+  "bookSourcesMaintenancePausedHint": "可以全选处理已完成的结果，也可以继续检测剩余书源。",
   "bookSourcesMaintenanceApplyFailed": "未能保存整理结果，请重试",
   "settingsQqGroup": "QQ 群",
   "settingsOpenSourceTitle": "开源说明",
@@ -2815,7 +3378,7 @@
   "accountDeleteTermsRedemptions": "已经兑换过的卡密不会退还，也不会重新变成可用状态。",
   "accountDeleteTermsApple": "你在 App Store 购买过终身高级版。注销不会退款，也不会取消任何 App Store 交易——退款只能向 Apple 申请。购买凭证会与你的账号解绑并保留，因此你之后可以用同一个 Apple ID 在新账号里点击「恢复购买」，重新拿回高级版权益。",
   "accountDeleteTermsLocalData": "存在这台设备上的书籍、书架和阅读记录不会被删除，它们本来就只保存在你的设备里。如果也想清除，请在 App 内自行删除。",
-  "accountDeleteTermsTombstone": "我们只会保留一条注销记录，其中不含你的邮箱明文、也无法还原成个人信息。它的唯一用途是防止滥用，并让上面说的 Apple 购买恢复能够成立。",
+  "accountDeleteTermsTombstone": "我们仅保留防止滥用所需的最少量去标识化注销数据，以及恢复或验证购买所必需的 App Store 购买验证记录。这些记录不会用于重建你的账号。",
   "accountDeleteTermsRejoin": "注销之后，同一个邮箱可以重新注册。但那会是一个全新的空账号，不会带回任何旧数据或权益。",
   "accountDeleteBlockedTitle": "这个账号暂时不能注销",
   "accountDeleteBlockedOwner": "你是管理后台的所有者。请先把所有者身份移交给其他人，再回来注销账号，否则后台将无人可管理。",
@@ -2836,5 +3399,52 @@
   "accountDeleteAction": "永久注销账号",
   "accountDeleteDoneTitle": "账号已注销",
   "accountDeleteDoneBody": "你的账号和关联数据已被永久删除，所有设备上的登录状态已失效。感谢你曾经使用开元阅读。",
-  "accountDeleteDoneClose": "关闭"
+  "accountDeleteAppleManualRevocation": "关闭此提示后，请前往“Apple 账户设置”>“登录与安全性”>“使用 Apple 登录”>“开元阅读”，然后选择“停止使用 Apple 登录”。",
+  "accountDeleteDoneClose": "关闭",
+  "bookSourceDetailsTitle": "书籍详情",
+  "bookSourceDetailsDescription": "内容简介",
+  "bookSourceDetailsNoDescription": "书源暂未提供简介。",
+  "bookSourceDetailsLatestChapter": "最新章节",
+  "bookSourceDetailsLoadFailed": "完整详情加载失败，可以重试或使用现有信息阅读。",
+  "bookSourceDetailsOnShelf": "已在书架",
+  "bookSourceDetailsAddFailed": "加入书架失败，请重试。",
+  "bookSourceDetailsReadFailed": "打开书籍失败，请重试。",
+  "appTextSize": "界面字体大小",
+  "appTextSizeDescription": "仅调整应用菜单和控件，不影响阅读正文字号。",
+  "appTextSizePreview": "菜单和设置将以此字号显示。",
+  "appTextSizeDefault": "100%（默认）",
+  "bookSourceTrackUpdatesTitle": "追更与正文更新",
+  "bookSourceTrackUpdatesBody": "下载后的书仍关联书源。检查新章节只补充新增内容；刷新正文会检查已下载章节，并保留你的修改和历史版本。",
+  "bookSourceCheckNewChapters": "检查新章节",
+  "bookSourceRefreshDownloaded": "刷新已下载章节",
+  "bookSourceNoNewChapters": "目录没有新增章节。书源对旧章节的修改需要刷新正文才能检查。",
+  "bookSourceUpdateSummary": "新增 {added} 章，更新 {refreshed} 章",
+  "bookSourceBaselineUnknown": "需要先确认本地读到哪一章，才能继续追更。现有正文会完整保留。",
+  "bookSourceSelectBoundary": "确认已下载章节",
+  "bookSourceBoundaryHelp": "请选择这份本地正文已经包含的最后一章。之后只补充它后面的新章节，不替换现有正文。",
+  "bookSourceTrackingEstablished": "已确认追更起点，可以检查新章节了。",
+  "bookSourceMappingChanged": "书源目录顺序或章节标识发生变化，请重新确认已下载章节。现有正文未被替换。",
+  "bookSourceContentConflicts": "正文有待处理的修改",
+  "bookSourceContentConflictBody": "你和书源都修改了这些章节。当前继续使用你的版本；比较后选择要阅读的版本，双方历史都会保留。",
+  "bookSourceCompareVersions": "比较正文",
+  "bookSourceLocalVersion": "我的正文",
+  "bookSourceRemoteVersion": "书源正文",
+  "bookSourceBaselineVersion": "下载时的正文",
+  "bookSourceKeepLocal": "保留我的正文",
+  "bookSourceUseRemote": "采用书源正文",
+  "bookSourceUpdateFailed": "更新未完成，现有正文已保留，请重试。",
+  "cloudSyncReadableStorage": "书籍以原格式保存在 books/ 中，历史版本也可直接打开。未变化的文件不会重复上传；正文变化时会上传完整文件。",
+  "@bookSourceUpdateSummary": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "refreshed": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourceBindSource": "关联书源",
+  "bookSourceNotBound": "未关联书源",
+  "bookSourceDownloadedUnchanged": "已检查下载章节，正文没有变化。"
 }

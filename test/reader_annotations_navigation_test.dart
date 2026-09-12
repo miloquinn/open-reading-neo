@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book_note.dart';
 import 'package:xxread/utils/reader_themes.dart';
+import 'package:xxread/widgets/app_menu.dart';
 import 'package:xxread/widgets/reader_navigation_sheet.dart';
 
 void main() {
@@ -110,7 +111,7 @@ void main() {
     await tester.tap(find.text('这里是我的批注'));
     expect(selected?.annotationId, annotation.annotationId);
 
-    await tester.tap(find.byType(PopupMenuButton<String>).first);
+    await tester.tap(find.byType(AppPopupMenuButton<String>).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('删除'));
     await tester.pumpAndSettle();

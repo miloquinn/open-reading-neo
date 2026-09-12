@@ -452,6 +452,7 @@ void main() {
         expect(options.uri.path, '/api/v1/auth/apple/login');
         expect(options.data, {
           'identity_token': 'apple-identity-token',
+          'authorization_code': 'apple-authorization-code',
           'full_name': 'Jamie Reader',
         });
         return _json(
@@ -462,6 +463,7 @@ void main() {
 
       final session = await client.loginApple(
         identityToken: 'apple-identity-token',
+        authorizationCode: 'apple-authorization-code',
         fullName: 'Jamie Reader',
       );
 
@@ -474,12 +476,18 @@ void main() {
   test('apple login omits full_name when not provided', () async {
     final storage = _MemoryTokenStore();
     final adapter = _RouteAdapter((options) {
-      expect(options.data, {'identity_token': 'apple-identity-token'});
+      expect(options.data, {
+        'identity_token': 'apple-identity-token',
+        'authorization_code': 'apple-authorization-code',
+      });
       return _json(_session(access: 'access-apple', refresh: 'refresh-apple'));
     });
     final client = _client(adapter, storage);
 
-    await client.loginApple(identityToken: 'apple-identity-token');
+    await client.loginApple(
+      identityToken: 'apple-identity-token',
+      authorizationCode: 'apple-authorization-code',
+    );
   });
 
   test(

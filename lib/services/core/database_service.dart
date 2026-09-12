@@ -11,6 +11,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'package:xxread/data/migration/reading_schema_migration.dart';
 import 'package:xxread/data/migration/book_import_schema_migration.dart';
+import 'package:xxread/data/migration/book_storage_path_migration.dart';
 import 'package:xxread/data/migration/book_note_lookup_index_migration.dart';
 import 'package:xxread/data/migration/reader_annotation_schema_migration.dart';
 import 'package:xxread/data/migration/webdav_sync_schema_migration.dart';
@@ -23,7 +24,7 @@ class DatabaseService {
 
   static Database? _database;
   static const String _dbName = 'xxread_v2.db';
-  static const int _dbVersion = 24;
+  static const int _dbVersion = BookStoragePathMigration.migrationVersion;
   static Future<Database>? _openingDatabase;
 
   Future<Database> get database async {
@@ -371,6 +372,10 @@ class DatabaseService {
     }
     if (oldVersion < 23) {
       await BookNoteLookupIndexMigration.migrate(db);
+    }
+    if (!kIsWeb && oldVersion < BookStoragePathMigration.migrationVersion) {
+      final documents = await getApplicationDocumentsDirectory();
+      await BookStoragePathMigration.migrate(db, documents.path);
     }
   }
 

@@ -102,13 +102,10 @@ void main() {
         final titleSwitchFinder = find.byKey(
           const ValueKey('reader-chapter-title-page-switch'),
         );
-        final titleSwitch = tester.widget<SwitchListTile>(titleSwitchFinder);
-        expect(titleSwitch.value, isTrue);
-        titleSwitch.onChanged!(false);
-        await tester.pumpAndSettle();
+        expect(titleSwitchFinder, findsNothing);
         expect(
           (await const ReaderSettingsStore().load()).chapterTitlePageEnabled,
-          isFalse,
+          isTrue,
         );
 
         await tester.tap(find.text('Text'));
@@ -168,7 +165,7 @@ void main() {
         await tester.pumpAndSettle();
 
         final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getBool(ReaderSettingsStore.chapterTitlePageKey), isFalse);
+        expect(prefs.getBool(ReaderSettingsStore.chapterTitlePageKey), isTrue);
         expect(prefs.getInt(ReaderSettingsStore.firstLineIndentKey), 4);
         expect(prefs.getInt(ReaderSettingsStore.paragraphSpacingKey), 2);
         expect(prefs.getInt(ReaderSettingsStore.fontWeightKey), 600);

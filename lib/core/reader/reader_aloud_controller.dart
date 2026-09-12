@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import 'reader_aloud_text.dart';
+
 bool get isReaderAloudPlatformSupported =>
     kIsWeb ||
     defaultTargetPlatform == TargetPlatform.android ||
@@ -619,15 +621,21 @@ class ReaderAloudController extends ChangeNotifier {
   }
 
   Future<bool> _movePrevious() async {
-    if (_segmentIndex > 0) {
-      _segmentIndex--;
-      notifyListeners();
-      return true;
+    while (true) {
+      if (_segmentIndex > 0) {
+        _segmentIndex--;
+      } else {
+        final chapterIndex = (_currentChapter?.index ?? 0) - 1;
+        if (chapterIndex < 0) return false;
+        if (!await _loadChapterAt(chapterIndex, startFromEnd: true)) {
+          return false;
+        }
+      }
+      if (ReaderAloudText(currentSegment!.text).text.isNotEmpty) {
+        notifyListeners();
+        return true;
+      }
     }
-    final chapterIndex = (_currentChapter?.index ?? 0) - 1;
-    if (chapterIndex < 0) return false;
-    final loaded = await _loadChapterAt(chapterIndex, startFromEnd: true);
-    return loaded;
   }
 
   Future<bool> _moveNext() async {
@@ -702,22 +710,32 @@ class ReaderAloudController extends ChangeNotifier {
       }
       final chapter = _currentChapter;
       final queuedTexts = queued
-          ? <String>[
-              segment.text.substring(startAt),
+          ? [
               for (
-                var index = firstSegmentIndex + 1;
+                var index = firstSegmentIndex;
                 index <= utteranceEndSegmentIndex;
                 index++
               )
-                _segments[index].text,
-            ]
-          : const <String>[];
-      final spokenText = queued
-          ? queuedTexts.join()
-          : continuous && chapter != null
-          ? chapter.text.substring(utteranceStartOffset, utteranceEndOffset)
-          : segment.text.substring(startAt);
-      if (spokenText.trim().isEmpty) {
+                (
+                  segmentIndex: index,
+                  startAt: index == firstSegmentIndex ? startAt : 0,
+                  speech: ReaderAloudText(
+                    _segments[index].text.substring(
+                      index == firstSegmentIndex ? startAt : 0,
+                    ),
+                  ),
+                ),
+            ].where((item) => item.speech.text.isNotEmpty).toList()
+          : null;
+      final speech = ReaderAloudText(
+        continuous && chapter != null
+            ? chapter.text.substring(utteranceStartOffset, utteranceEndOffset)
+            : segment.text.substring(startAt),
+      );
+      if (queued ? queuedTexts!.isEmpty : speech.text.isEmpty) {
+        // Nothing in this batch is speakable; advance without submitting an
+        // empty utterance (some native engines never complete those).
+        _segmentIndex = utteranceEndSegmentIndex;
         bool moved;
         try {
           moved = await _moveNext();
@@ -726,7 +744,7 @@ class ReaderAloudController extends ChangeNotifier {
           return;
         }
         if (!moved) {
-          _resumeOffset = segment.text.length;
+          _resumeOffset = currentSegment!.text.length;
           await stop();
           return;
         }
@@ -734,18 +752,28 @@ class ReaderAloudController extends ChangeNotifier {
         continue;
       }
 
-      _utteranceBaseOffset = startAt;
+      _utteranceBaseOffset = startAt + speech.leadingOffset;
+      if (queued) {
+        final first = queuedTexts!.first;
+        _segmentIndex = first.segmentIndex;
+        _utteranceBaseOffset = first.startAt + first.speech.leadingOffset;
+      }
       if (continuous) {
-        _continuousUtteranceStartOffset = utteranceStartOffset;
+        _continuousUtteranceStartOffset =
+            utteranceStartOffset + speech.leadingOffset;
         _continuousUtteranceEndSegmentIndex = utteranceEndSegmentIndex;
+        _syncContinuousSegmentAt(_continuousUtteranceStartOffset!);
       } else {
         _clearContinuousUtterance();
       }
       try {
+        final revealedSegment = currentSegment!;
         await source.revealPosition(
           ReaderAloudPosition(
-            chapterIndex: segment.chapterIndex,
-            offset: segment.startOffset + startAt,
+            chapterIndex: revealedSegment.chapterIndex,
+            offset: continuous
+                ? _continuousUtteranceStartOffset!
+                : revealedSegment.startOffset + _utteranceBaseOffset,
           ),
         );
       } catch (error) {
@@ -758,21 +786,19 @@ class ReaderAloudController extends ChangeNotifier {
       try {
         if (queued) {
           await (engine as ReaderAloudQueuedEngine).speakQueued(
-            queuedTexts,
+            queuedTexts!.map((item) => item.speech.text).toList(),
             onTextStarted: (relativeIndex) {
               if (!_isCurrent(generation) ||
                   _state != ReaderAloudPlaybackState.playing) {
                 return;
               }
-              final nextIndex = firstSegmentIndex + relativeIndex;
-              if (relativeIndex < 0 ||
-                  nextIndex < firstSegmentIndex ||
-                  nextIndex > utteranceEndSegmentIndex ||
-                  nextIndex >= _segments.length) {
+              if (relativeIndex < 0 || relativeIndex >= queuedTexts.length) {
                 return;
               }
+              final item = queuedTexts[relativeIndex];
+              final nextIndex = item.segmentIndex;
               _segmentIndex = nextIndex;
-              _utteranceBaseOffset = relativeIndex == 0 ? startAt : 0;
+              _utteranceBaseOffset = item.startAt + item.speech.leadingOffset;
               _resumeOffset = _utteranceBaseOffset;
               final startedSegment = _segments[nextIndex];
               notifyListeners();
@@ -792,7 +818,7 @@ class ReaderAloudController extends ChangeNotifier {
             },
           );
         } else {
-          await engine.speak(spokenText);
+          await engine.speak(speech.text);
         }
       } catch (error) {
         _fail(error, generation);

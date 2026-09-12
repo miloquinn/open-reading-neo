@@ -222,13 +222,13 @@ class MemberAccountApiClient {
         await _jsonRequest('POST', '$authRoot/security/deletion/code'),
       );
 
-  Future<void> deleteAccount({
+  Future<bool> deleteAccount({
     required String challengeId,
     required String code,
     required String confirmation,
     String? mfaCode,
   }) async {
-    await _emptyRequest(
+    final result = await _jsonRequest(
       'POST',
       '$authRoot/security/deletion',
       data: {
@@ -240,9 +240,10 @@ class MemberAccountApiClient {
           'mfa_code': mfaCode.trim(),
       },
     );
-    // Only on success: a rejected code must leave the member signed in to retry.
-    await _tokenStore.clear();
+    return result['apple_manual_revocation_required'] == true;
   }
+
+  Future<void> clearLocalSession() => _tokenStore.clear();
 
   Future<MemberMfaStatus> mfaStatus() async => MemberMfaStatus.fromJson(
     await _jsonRequest('GET', '$authRoot/security/mfa/status'),
@@ -303,9 +304,11 @@ class MemberAccountApiClient {
 
   Future<MemberSession> loginApple({
     required String identityToken,
+    required String authorizationCode,
     String? fullName,
   }) => _sessionRequest('$authRoot/apple/login', {
     'identity_token': identityToken,
+    'authorization_code': authorizationCode,
     if (fullName != null && fullName.trim().isNotEmpty)
       'full_name': fullName.trim(),
   }, authenticated: false);
@@ -596,6 +599,8 @@ MemberAccountException _friendlyError(DioException error) {
         'authorization_pending' => '等待在浏览器中完成授权',
         'slow_down' => '授权查询过于频繁，请稍后重试',
         'expired_token' => '授权请求已过期，请重新开始',
+        'appleReauthenticationRequired' ||
+        'apple_reauthentication_required' => '请重新使用 Apple 登录，然后再次尝试注销账号',
         _ => null,
       } ??
       switch (statusCode) {

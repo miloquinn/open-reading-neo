@@ -139,13 +139,14 @@ class SyncChangeStore {
     });
   }
 
-  Future<int> cursorFor(String deviceId) async {
+  Future<int> cursorFor(String deviceId, {String? namespace}) async {
     final db = await _db;
+    final remoteDeviceId = _remoteCursorId(deviceId, namespace);
     final rows = await db.query(
       'sync_device_cursors',
       columns: ['applied_sequence'],
       where: 'remote_device_id = ?',
-      whereArgs: [deviceId],
+      whereArgs: [remoteDeviceId],
       limit: 1,
     );
     return rows.isEmpty ? 0 : rows.first['applied_sequence'] as int;
@@ -305,6 +306,7 @@ class SyncChangeStore {
     normalizeWinner,
     Future<void> Function(Transaction txn, SyncOperation operation)?
     cleanupWinnerAliases,
+    String? cursorNamespace,
   }) async {
     final db = await _db;
     final winners = <SyncOperation>[];
@@ -431,7 +433,7 @@ class SyncChangeStore {
         }
       }
       await txn.insert('sync_device_cursors', {
-        'remote_device_id': batch.deviceId,
+        'remote_device_id': _remoteCursorId(batch.deviceId, cursorNamespace),
         'applied_sequence': batch.sequence,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -468,6 +470,11 @@ class SyncChangeStore {
     });
   }
 }
+
+String _remoteCursorId(String deviceId, String? namespace) =>
+    namespace == null || namespace.isEmpty
+    ? deviceId
+    : '$namespace\u0000$deviceId';
 
 Future<void> _storeProgressCandidate(
   Transaction txn,

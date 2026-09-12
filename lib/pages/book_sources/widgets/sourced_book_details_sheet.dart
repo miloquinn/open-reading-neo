@@ -224,7 +224,7 @@ class _SourcedBookDetailsSheetState extends State<SourcedBookDetailsSheet> {
       onCancel: controller.showShelfOptions,
       onRetry: () => _addOnline(controller),
     ),
-    SourcedBookDetailsStep.downloading => _DownloadView(
+    SourcedBookDetailsStep.downloading => SourcedBookDownloadView(
       task: state.downloadTask,
       onCancel: controller.cancelDownload,
       onBackground: _continueDownloadInBackground,
@@ -409,8 +409,9 @@ class _AddFailedView extends StatelessWidget {
   );
 }
 
-class _DownloadView extends StatelessWidget {
-  const _DownloadView({
+class SourcedBookDownloadView extends StatelessWidget {
+  const SourcedBookDownloadView({
+    super.key,
     required this.task,
     required this.onCancel,
     required this.onBackground,

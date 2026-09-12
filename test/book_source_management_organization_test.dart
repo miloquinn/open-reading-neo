@@ -7,6 +7,7 @@ import 'package:xxread/book_sources/models/registered_book_source.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/book_sources/book_source_management_page.dart';
+import 'package:xxread/widgets/app_menu.dart';
 
 void main() {
   Future<void> mount(WidgetTester tester, BookSourceRegistry registry) async {
@@ -84,7 +85,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: card,
-          matching: find.byType(PopupMenuButton<String>),
+          matching: find.byType(AppPopupMenuButton<String>),
         ),
       );
       await tester.pumpAndSettle();

@@ -54,6 +54,7 @@ import 'utils/font_catalog_helper.dart';
 import 'utils/reader_themes.dart';
 import 'utils/ui_style.dart';
 import 'widgets/app_brand_icon.dart';
+import 'widgets/app_text_scale.dart';
 import 'widgets/restartable_app.dart';
 import 'widgets/side_toast.dart';
 import 'widgets/update_check_gate.dart';
@@ -636,8 +637,7 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
                 ],
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: Builder(builder: (context) => _buildHome(context)),
-                // 移除 builder 中的系统UI更新，让各页面自行控制
-                // 避免与阅读页面的全屏模式冲突
+                builder: (context, child) => AppTextScale(child: child!),
               );
             },
           ),

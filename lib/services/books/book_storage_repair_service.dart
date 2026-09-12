@@ -21,35 +21,40 @@ import 'package:xxread/services/books/book_dao.dart';
 /// 2) 不可用 -> 在当前 documents/books 与 documents/covers 按文件名尝试恢复
 /// 3) 找到后只更新数据库路径，不改业务数据
 class BookStorageRepairService {
-  final BookDao _bookDao = BookDao();
+  BookStorageRepairService({
+    BookDao? bookDao,
+    Future<Directory> Function()? documentsDirectory,
+  }) : _bookDao = bookDao ?? BookDao(),
+       _documentsDirectory =
+           documentsDirectory ?? getApplicationDocumentsDirectory;
+
+  final BookDao _bookDao;
+  final Future<Directory> Function() _documentsDirectory;
 
   Future<int> repairAllBooksIfNeeded() async {
+    if (kIsWeb) return 0;
     final books = await _bookDao.getAllBooks();
-    return _repairBooks(books);
-  }
-
-  Future<int> _repairBooks(List<Book> books) async {
-    final docsDir = await getApplicationDocumentsDirectory();
+    if (books.isEmpty) return 0;
+    final docsDir = await _documentsDirectory();
     final booksDir = Directory(p.join(docsDir.path, 'books'));
     final coversDir = Directory(p.join(docsDir.path, 'covers'));
-    int repairedCount = 0;
+    var repairedCount = 0;
 
     for (final book in books) {
-      final repaired = await _repairSingleBookIfNeeded(
-        book,
-        booksDir: booksDir,
-        coversDir: coversDir,
-      );
-      if (repaired.filePath != book.filePath ||
-          repaired.coverImagePath != book.coverImagePath) {
-        repairedCount++;
+      try {
+        final repaired = await _repairSingleBookIfNeeded(
+          book,
+          booksDir: booksDir,
+          coversDir: coversDir,
+        );
+        if (repaired.filePath != book.filePath ||
+            repaired.coverImagePath != book.coverImagePath) {
+          repairedCount++;
+        }
+      } catch (error) {
+        // 某本书暂时不可访问时保留原记录，不能让整个书库加载失败。
+        debugPrint('⚠️ 书籍存储路径修复暂缓: ${book.id}, $error');
       }
-    }
-
-    if (repairedCount > 0) {
-      debugPrint('🔧 已修复 $repairedCount 本书的存储路径');
-    } else {
-      debugPrint('✅ 书籍存储路径检查完成，无需修复');
     }
 
     return repairedCount;
@@ -61,7 +66,7 @@ class BookStorageRepairService {
   /// - `books/`、`covers/` 目录下明确的临时文件后缀
   /// - `book_images/` 中没有对应书籍ID的 `image_map_*.json`
   Future<int> cleanupUnusedStorageArtifacts() async {
-    final docsDir = await getApplicationDocumentsDirectory();
+    final docsDir = await _documentsDirectory();
     final booksDir = Directory(p.join(docsDir.path, 'books'));
     final coversDir = Directory(p.join(docsDir.path, 'covers'));
     final imagesDir = Directory(p.join(docsDir.path, 'book_images'));
@@ -83,7 +88,7 @@ class BookStorageRepairService {
   }
 
   Future<Book> repairSingleBookIfNeeded(Book book) async {
-    final docsDir = await getApplicationDocumentsDirectory();
+    final docsDir = await _documentsDirectory();
     return _repairSingleBookIfNeeded(
       book,
       booksDir: Directory(p.join(docsDir.path, 'books')),
@@ -121,16 +126,14 @@ class BookStorageRepairService {
     final repairedCoverPath = await _repairFilePath(
       currentPath: coverPath,
       targetDir: coversDir,
+      allowRenamedSuffix: false,
     );
-    if (repairedCoverPath != coverPath) {
+    // 查找失败不代表封面已被删除；保留文件名供下次加载重试。
+    if (repairedCoverPath != null && repairedCoverPath != coverPath) {
       coverPath = repairedCoverPath;
       await _bookDao.updateBookCoverPath(book.id!, coverPath);
       changed = true;
-      if (coverPath != null) {
-        debugPrint('🖼️ 修复封面路径: ${book.title} -> $coverPath');
-      } else {
-        debugPrint('🖼️ 清理失效封面路径: ${book.title}');
-      }
+      debugPrint('🖼️ 修复封面路径: ${book.title} -> $coverPath');
     }
 
     if (!changed) {
@@ -143,6 +146,7 @@ class BookStorageRepairService {
   Future<String?> _repairFilePath({
     required String? currentPath,
     required Directory targetDir,
+    bool allowRenamedSuffix = true,
   }) async {
     if (currentPath == null || currentPath.isEmpty) {
       return null;
@@ -166,6 +170,9 @@ class BookStorageRepairService {
       return exactPath;
     }
 
+    // 封面同名前缀可能属于另一版本或另一本书，不能猜测替换。
+    if (!allowRenamedSuffix) return null;
+
     // 再按去扩展名模糊匹配，兼容重命名后缀 _1/_2 的情况
     final oldStem = p.basenameWithoutExtension(fileName);
     final oldExt = p.extension(fileName).toLowerCase();
@@ -183,7 +190,7 @@ class BookStorageRepairService {
       debugPrint('⚠️ 扫描目录失败: ${targetDir.path}, $e');
     }
 
-    // 找不到时返回 null，调用方可清理无效路径
+    // 找不到时返回 null，调用方保留原路径供后续重试。
     return null;
   }
 

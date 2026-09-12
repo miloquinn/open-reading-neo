@@ -25,6 +25,10 @@ class SourcedBookDetailsState {
   const SourcedBookDetailsState({
     required this.result,
     this.step = SourcedBookDetailsStep.details,
+    this.isLoadingDetails = false,
+    this.detailError,
+    this.checkingShelf = false,
+    this.hasShelfBook = false,
     this.addError,
     this.downloadTaskId,
     this.downloadTask,
@@ -32,6 +36,10 @@ class SourcedBookDetailsState {
 
   final SourcedBook result;
   final SourcedBookDetailsStep step;
+  final bool isLoadingDetails;
+  final Object? detailError;
+  final bool checkingShelf;
+  final bool hasShelfBook;
   final Object? addError;
   final String? downloadTaskId;
   final BookDownloadTask? downloadTask;
@@ -39,16 +47,28 @@ class SourcedBookDetailsState {
   SourcedBookDetailsState copyWith({
     SourcedBook? result,
     SourcedBookDetailsStep? step,
+    bool? isLoadingDetails,
+    Object? detailError,
+    bool clearDetailError = false,
+    bool? checkingShelf,
+    bool? hasShelfBook,
     Object? addError,
     bool clearAddError = false,
     String? downloadTaskId,
     BookDownloadTask? downloadTask,
+    bool clearDownloadTask = false,
   }) => SourcedBookDetailsState(
     result: result ?? this.result,
     step: step ?? this.step,
+    isLoadingDetails: isLoadingDetails ?? this.isLoadingDetails,
+    detailError: clearDetailError ? null : detailError ?? this.detailError,
+    checkingShelf: checkingShelf ?? this.checkingShelf,
+    hasShelfBook: hasShelfBook ?? this.hasShelfBook,
     addError: clearAddError ? null : addError ?? this.addError,
-    downloadTaskId: downloadTaskId ?? this.downloadTaskId,
-    downloadTask: downloadTask ?? this.downloadTask,
+    downloadTaskId: clearDownloadTask
+        ? null
+        : downloadTaskId ?? this.downloadTaskId,
+    downloadTask: clearDownloadTask ? null : downloadTask ?? this.downloadTask,
   );
 }
 
@@ -144,6 +164,7 @@ class SourcedBookDetailsController extends ChangeNotifier {
   final SourcedBookDownloadPort _downloads;
   SourcedBookDetailsState _state;
   int _detailRevision = 0;
+  int _shelfRevision = 0;
   int _submitRevision = 0;
   bool _submitting = false;
   bool _listeningToDownloads = false;
@@ -154,6 +175,7 @@ class SourcedBookDetailsController extends ChangeNotifier {
   Future<void> loadDetails() async {
     final revision = ++_detailRevision;
     final initial = _state.result;
+    _update(_state.copyWith(isLoadingDetails: true, clearDetailError: true));
     try {
       final book = await _gateway.getBook(
         initial.source,
@@ -165,23 +187,60 @@ class SourcedBookDetailsController extends ChangeNotifier {
       // Keep it when the response has no visible content, including empty HTML.
       final merged = BookSourceBook(
         id: book.id,
-        title: book.title,
+        title: _nonEmptyOrFallback(book.title, initial.book.title),
         author: book.author.trim().isEmpty ? initial.book.author : book.author,
         description: normalizeBookSourceDescription(book.description).isEmpty
             ? initial.book.description
             : book.description,
         type: book.type,
-        coverUrl: book.coverUrl,
-        coverHeaders: book.coverHeaders,
-        categories: book.categories,
-        status: book.status,
-        latestChapter: book.latestChapter,
-        updatedAt: book.updatedAt,
-        sourceVariables: book.sourceVariables,
+        coverUrl: book.coverUrl ?? initial.book.coverUrl,
+        coverHeaders: {...initial.book.coverHeaders, ...book.coverHeaders},
+        categories: book.categories.isEmpty
+            ? initial.book.categories
+            : book.categories,
+        status: _optionalNonEmptyOrFallback(book.status, initial.book.status),
+        latestChapter: _optionalNonEmptyOrFallback(
+          book.latestChapter,
+          initial.book.latestChapter,
+        ),
+        updatedAt: book.updatedAt ?? initial.book.updatedAt,
+        sourceVariables: {
+          ...initial.book.sourceVariables,
+          ...book.sourceVariables,
+        },
       );
-      _update(_state.copyWith(result: initial.copyWith(book: merged)));
+      _update(
+        _state.copyWith(
+          result: initial.copyWith(book: merged),
+          isLoadingDetails: false,
+          clearDetailError: true,
+        ),
+      );
+    } catch (error) {
+      if (!_isCurrentDetail(revision)) return;
+      _update(_state.copyWith(isLoadingDetails: false, detailError: error));
+    }
+  }
+
+  Future<void> retryLoadDetails() => loadDetails();
+
+  Future<void> loadShelfStatus() async {
+    final revision = ++_shelfRevision;
+    final result = _state.result;
+    _update(_state.copyWith(checkingShelf: true));
+    try {
+      final existing = await _shelf.findShelfBook(
+        sourceId: result.source.id,
+        sourceBookId: result.book.id,
+      );
+      if (!_isCurrentShelf(revision)) return;
+      _update(
+        _state.copyWith(checkingShelf: false, hasShelfBook: existing != null),
+      );
     } catch (_) {
-      // The discovery/search summary remains usable when detail loading fails.
+      if (!_isCurrentShelf(revision)) return;
+      // Shelf status is supplementary; its failure must not block details.
+      _update(_state.copyWith(checkingShelf: false));
     }
   }
 
@@ -216,11 +275,14 @@ class SourcedBookDetailsController extends ChangeNotifier {
         await _shelf.addOnline(source: result.source, book: result.book);
       }
       if (!_isCurrentSubmit(revision)) return false;
+      _shelfRevision += 1;
       _update(
         _state.copyWith(
           step: existing == null
               ? SourcedBookDetailsStep.added
               : SourcedBookDetailsStep.alreadyAdded,
+          checkingShelf: false,
+          hasShelfBook: true,
         ),
       );
       return true;
@@ -254,6 +316,19 @@ class SourcedBookDetailsController extends ChangeNotifier {
     );
   }
 
+  void dismissDownload() {
+    if (_disposed ||
+        _state.downloadTask?.state != DownloadTaskState.cancelled) {
+      return;
+    }
+    _update(
+      _state.copyWith(
+        step: SourcedBookDetailsStep.details,
+        clearDownloadTask: true,
+      ),
+    );
+  }
+
   void cancelDownload() {
     final taskId = _state.downloadTaskId;
     if (_disposed || taskId == null) return;
@@ -271,7 +346,16 @@ class SourcedBookDetailsController extends ChangeNotifier {
     if (_disposed) return;
     final taskId = _state.downloadTaskId;
     if (taskId == null) return;
-    _update(_state.copyWith(downloadTask: _downloads.taskById(taskId)));
+    final task = _downloads.taskById(taskId);
+    final completed = task?.state == DownloadTaskState.completed;
+    if (completed) _shelfRevision += 1;
+    _update(
+      _state.copyWith(
+        downloadTask: task,
+        checkingShelf: completed ? false : null,
+        hasShelfBook: completed ? true : null,
+      ),
+    );
   }
 
   void _setStep(SourcedBookDetailsStep step) {
@@ -288,6 +372,9 @@ class SourcedBookDetailsController extends ChangeNotifier {
   bool _isCurrentDetail(int revision) =>
       !_disposed && revision == _detailRevision;
 
+  bool _isCurrentShelf(int revision) =>
+      !_disposed && revision == _shelfRevision;
+
   bool _isCurrentSubmit(int revision) =>
       !_disposed && revision == _submitRevision;
 
@@ -296,6 +383,7 @@ class SourcedBookDetailsController extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _detailRevision += 1;
+    _shelfRevision += 1;
     _submitRevision += 1;
     if (_listeningToDownloads) {
       _downloads.removeListener(_handleDownloadUpdate);
@@ -304,3 +392,9 @@ class SourcedBookDetailsController extends ChangeNotifier {
     super.dispose();
   }
 }
+
+String _nonEmptyOrFallback(String value, String fallback) =>
+    value.trim().isEmpty ? fallback : value;
+
+String? _optionalNonEmptyOrFallback(String? value, String? fallback) =>
+    value == null || value.trim().isEmpty ? fallback : value;

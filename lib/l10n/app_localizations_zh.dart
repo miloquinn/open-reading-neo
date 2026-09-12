@@ -670,7 +670,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sourceLoginSecureStorageNotice => '登录信息仅保存在当前设备的系统安全存储中。';
 
   @override
-  String get sourceLoginNoForm => '该书源没有可显示的登录表单，网页登录暂未接入。';
+  String get sourceLoginNoForm => '该书源没有提供可用的登录方式。';
+
+  @override
+  String get sourceLoginBrowserTitle => '在原网站登录';
+
+  @override
+  String get sourceLoginBrowserNotice =>
+      '请在内置浏览器中完成登录，然后点“完成”。Cookie 和网站本地存储会保存在当前设备。';
+
+  @override
+  String get sourceLoginBrowserUnsupported =>
+      '网页登录支持 Android、iPhone、iPad 和 Mac。';
+
+  @override
+  String get sourceLoginBrowserOpen => '打开原网站登录';
 
   @override
   String get sourceLoginSave => '登录并保存会话';
@@ -5032,14 +5046,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      '只会上传你明确选中的书籍；WebDAV 保留原文件名和原始内容，不另行加密';
-
-  @override
-  String get webDavLegacyBookDirectoryTitle => '旧版 WebDAV 书籍仍兼容';
-
-  @override
-  String get webDavLegacyBookDirectoryMessage =>
-      '无需重新同步。新上传书籍将使用“书名 - 作者/原文件名”的可读目录。';
+      '启用后会自动备份已有的本地书籍。云端 books/ 中按书名和作者保存可直接打开的原格式文件与封面；同名书通过身份后缀区分，正文更新保留历史版本。';
 
   @override
   String get webDavNewBookPolicyTitle => '新书文件处理';
@@ -5764,28 +5771,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesImportTimedOut => '读取超时，请检查网络，或下载 JSON 文件后导入。';
 
   @override
-  String get cloudSyncIncrementalMode => '增量同步';
-
-  @override
-  String get cloudSyncPlainMode => '普通 TXT 文件';
-
-  @override
-  String get cloudSyncIncrementalDescription => '首次上传后，只传输变化的内容块。本机书籍仍是完整 TXT。';
-
-  @override
-  String get cloudSyncEnableIncremental => '切换为增量同步';
-
-  @override
-  String get cloudSyncIncrementalConfirmTitle => '切换这本书的云端存储方式？';
-
-  @override
-  String get cloudSyncIncrementalConfirmBody =>
-      '云端将使用 App 管理的分块格式。已有 TXT 副本会保留，但不再跟随更新。其他设备需要使用支持增量同步的新版 App。本机仍保留完整 TXT 文件。';
-
-  @override
-  String get cloudSyncIncrementalConfirm => '切换并同步';
-
-  @override
   String get bookSourcesImportUsageNotice => '书源使用说明';
 
   @override
@@ -5880,6 +5865,46 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookSourcesMaintenanceShelfProtected => '书架正在使用 · 默认保留';
+
+  @override
+  String bookSourcesMaintenanceDeleteReferencedWarning(int count) {
+    return '所选书源中有 $count 个正在被书架书籍使用。删除后，这些书籍可能无法更新或加载新章节。';
+  }
+
+  @override
+  String get bookSourcesMaintenanceProblemsFilter => '有问题';
+
+  @override
+  String bookSourcesMaintenanceSelectedCount(int count) {
+    return '已选 $count 个书源';
+  }
+
+  @override
+  String get bookSourcesMaintenanceShelfUsed => '书架正在使用';
+
+  @override
+  String get bookSourcesMaintenancePause => '暂停检测';
+
+  @override
+  String get bookSourcesMaintenancePausing => '正在暂停…';
+
+  @override
+  String get bookSourcesMaintenancePaused => '检测已暂停';
+
+  @override
+  String get bookSourcesMaintenanceCompleted => '检测完成';
+
+  @override
+  String get bookSourcesMaintenanceStart => '开始检测';
+
+  @override
+  String get bookSourcesMaintenanceRestart => '重新检测';
+
+  @override
+  String get bookSourcesMaintenanceCheckedThisRun => '本次已检测';
+
+  @override
+  String get bookSourcesMaintenancePausedHint => '可以全选处理已完成的结果，也可以继续检测剩余书源。';
 
   @override
   String get bookSourcesMaintenanceApplyFailed => '未能保存整理结果，请重试';
@@ -6120,7 +6145,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountDeleteTermsTombstone =>
-      '我们只会保留一条注销记录，其中不含你的邮箱明文、也无法还原成个人信息。它的唯一用途是防止滥用，并让上面说的 Apple 购买恢复能够成立。';
+      '我们仅保留防止滥用所需的最少量去标识化注销数据，以及恢复或验证购买所必需的 App Store 购买验证记录。这些记录不会用于重建你的账号。';
 
   @override
   String get accountDeleteTermsRejoin =>
@@ -6190,7 +6215,125 @@ class AppLocalizationsZh extends AppLocalizations {
       '你的账号和关联数据已被永久删除，所有设备上的登录状态已失效。感谢你曾经使用开元阅读。';
 
   @override
+  String get accountDeleteAppleManualRevocation =>
+      '关闭此提示后，请前往“Apple 账户设置”>“登录与安全性”>“使用 Apple 登录”>“开元阅读”，然后选择“停止使用 Apple 登录”。';
+
+  @override
   String get accountDeleteDoneClose => '关闭';
+
+  @override
+  String get bookSourceDetailsTitle => '书籍详情';
+
+  @override
+  String get bookSourceDetailsDescription => '内容简介';
+
+  @override
+  String get bookSourceDetailsNoDescription => '书源暂未提供简介。';
+
+  @override
+  String get bookSourceDetailsLatestChapter => '最新章节';
+
+  @override
+  String get bookSourceDetailsLoadFailed => '完整详情加载失败，可以重试或使用现有信息阅读。';
+
+  @override
+  String get bookSourceDetailsOnShelf => '已在书架';
+
+  @override
+  String get bookSourceDetailsAddFailed => '加入书架失败，请重试。';
+
+  @override
+  String get bookSourceDetailsReadFailed => '打开书籍失败，请重试。';
+
+  @override
+  String get appTextSize => '界面字体大小';
+
+  @override
+  String get appTextSizeDescription => '仅调整应用菜单和控件，不影响阅读正文字号。';
+
+  @override
+  String get appTextSizePreview => '菜单和设置将以此字号显示。';
+
+  @override
+  String get appTextSizeDefault => '100%（默认）';
+
+  @override
+  String get bookSourceTrackUpdatesTitle => '追更与正文更新';
+
+  @override
+  String get bookSourceTrackUpdatesBody =>
+      '下载后的书仍关联书源。检查新章节只补充新增内容；刷新正文会检查已下载章节，并保留你的修改和历史版本。';
+
+  @override
+  String get bookSourceCheckNewChapters => '检查新章节';
+
+  @override
+  String get bookSourceRefreshDownloaded => '刷新已下载章节';
+
+  @override
+  String get bookSourceNoNewChapters => '目录没有新增章节。书源对旧章节的修改需要刷新正文才能检查。';
+
+  @override
+  String bookSourceUpdateSummary(int added, int refreshed) {
+    return '新增 $added 章，更新 $refreshed 章';
+  }
+
+  @override
+  String get bookSourceBaselineUnknown => '需要先确认本地读到哪一章，才能继续追更。现有正文会完整保留。';
+
+  @override
+  String get bookSourceSelectBoundary => '确认已下载章节';
+
+  @override
+  String get bookSourceBoundaryHelp =>
+      '请选择这份本地正文已经包含的最后一章。之后只补充它后面的新章节，不替换现有正文。';
+
+  @override
+  String get bookSourceTrackingEstablished => '已确认追更起点，可以检查新章节了。';
+
+  @override
+  String get bookSourceMappingChanged => '书源目录顺序或章节标识发生变化，请重新确认已下载章节。现有正文未被替换。';
+
+  @override
+  String get bookSourceContentConflicts => '正文有待处理的修改';
+
+  @override
+  String get bookSourceContentConflictBody =>
+      '你和书源都修改了这些章节。当前继续使用你的版本；比较后选择要阅读的版本，双方历史都会保留。';
+
+  @override
+  String get bookSourceCompareVersions => '比较正文';
+
+  @override
+  String get bookSourceLocalVersion => '我的正文';
+
+  @override
+  String get bookSourceRemoteVersion => '书源正文';
+
+  @override
+  String get bookSourceBaselineVersion => '下载时的正文';
+
+  @override
+  String get bookSourceKeepLocal => '保留我的正文';
+
+  @override
+  String get bookSourceUseRemote => '采用书源正文';
+
+  @override
+  String get bookSourceUpdateFailed => '更新未完成，现有正文已保留，请重试。';
+
+  @override
+  String get cloudSyncReadableStorage =>
+      '书籍以原格式保存在 books/ 中，历史版本也可直接打开。未变化的文件不会重复上传；正文变化时会上传完整文件。';
+
+  @override
+  String get bookSourceBindSource => '关联书源';
+
+  @override
+  String get bookSourceNotBound => '未关联书源';
+
+  @override
+  String get bookSourceDownloadedUnchanged => '已检查下载章节，正文没有变化。';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -6859,7 +7002,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sourceLoginSecureStorageNotice => '登入資訊只會保存在目前裝置的系統安全儲存空間。';
 
   @override
-  String get sourceLoginNoForm => '此書源沒有可顯示的登入表單，網頁登入尚未接入。';
+  String get sourceLoginNoForm => '此書源沒有提供可用的登入方式。';
+
+  @override
+  String get sourceLoginBrowserTitle => '在原網站登入';
+
+  @override
+  String get sourceLoginBrowserNotice =>
+      '請在內建瀏覽器中完成登入，然後點「完成」。Cookie 和網站本機儲存空間會保存在目前裝置。';
+
+  @override
+  String get sourceLoginBrowserUnsupported =>
+      '網頁登入支援 Android、iPhone、iPad 和 Mac。';
+
+  @override
+  String get sourceLoginBrowserOpen => '開啟原網站登入';
 
   @override
   String get sourceLoginSave => '登入並儲存工作階段';
@@ -11181,14 +11338,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      '只會上傳你明確選取的書籍；WebDAV 保留原始檔名與內容，不另行加密';
-
-  @override
-  String get webDavLegacyBookDirectoryTitle => '舊版 WebDAV 書籍仍相容';
-
-  @override
-  String get webDavLegacyBookDirectoryMessage =>
-      '無需重新同步。新上傳書籍將使用「書名 - 作者/原始檔名」的可讀目錄。';
+      '啟用後會自動備份已有的本機書籍。雲端 books/ 中依書名和作者保存可直接開啟的原格式檔案與封面；同名書以識別後綴區分，正文更新保留歷史版本。';
 
   @override
   String get webDavNewBookPolicyTitle => '新書檔案處理';
@@ -11833,29 +11983,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesImportTimedOut => '讀取逾時，請檢查網路，或下載 JSON 檔案後匯入。';
 
   @override
-  String get cloudSyncIncrementalMode => '增量同步';
-
-  @override
-  String get cloudSyncPlainMode => '一般 TXT 檔案';
-
-  @override
-  String get cloudSyncIncrementalDescription =>
-      '首次上傳後，只傳輸變更的內容區塊。本機書籍仍是完整 TXT。';
-
-  @override
-  String get cloudSyncEnableIncremental => '切換為增量同步';
-
-  @override
-  String get cloudSyncIncrementalConfirmTitle => '切換這本書的雲端儲存方式？';
-
-  @override
-  String get cloudSyncIncrementalConfirmBody =>
-      '雲端將使用 App 管理的分塊格式。現有 TXT 副本會保留，但不再跟隨更新。其他裝置需要使用支援增量同步的新版 App。本機仍保留完整 TXT 檔案。';
-
-  @override
-  String get cloudSyncIncrementalConfirm => '切換並同步';
-
-  @override
   String get bookSourcesImportUsageNotice => '書源使用說明';
 
   @override
@@ -11950,6 +12077,46 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get bookSourcesMaintenanceShelfProtected => '書架正在使用 · 預設保留';
+
+  @override
+  String bookSourcesMaintenanceDeleteReferencedWarning(int count) {
+    return '所選書源中有 $count 個正在被書架書籍使用。刪除後，這些書籍可能無法更新或載入新章節。';
+  }
+
+  @override
+  String get bookSourcesMaintenanceProblemsFilter => '有問題';
+
+  @override
+  String bookSourcesMaintenanceSelectedCount(int count) {
+    return '已選 $count 個書源';
+  }
+
+  @override
+  String get bookSourcesMaintenanceShelfUsed => '書架正在使用';
+
+  @override
+  String get bookSourcesMaintenancePause => '暫停檢測';
+
+  @override
+  String get bookSourcesMaintenancePausing => '正在暫停…';
+
+  @override
+  String get bookSourcesMaintenancePaused => '檢測已暫停';
+
+  @override
+  String get bookSourcesMaintenanceCompleted => '檢測完成';
+
+  @override
+  String get bookSourcesMaintenanceStart => '開始檢測';
+
+  @override
+  String get bookSourcesMaintenanceRestart => '重新檢測';
+
+  @override
+  String get bookSourcesMaintenanceCheckedThisRun => '本次已檢測';
+
+  @override
+  String get bookSourcesMaintenancePausedHint => '可以全選處理已完成的結果，也可以繼續檢測剩餘書源。';
 
   @override
   String get bookSourcesMaintenanceApplyFailed => '未能儲存整理結果，請重試';
@@ -12190,7 +12357,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accountDeleteTermsTombstone =>
-      '我們只會保留一條註銷記錄，其中不含你的電子郵件明文、也無法還原成個人資訊。它的唯一用途是防止濫用，並讓上面說的 Apple 購買恢復能夠成立。';
+      '我們僅保留防止濫用所需的最少量去識別化註銷資料，以及恢復或驗證購買所必需的 App Store 購買驗證記錄。這些記錄不會用於重建你的帳號。';
 
   @override
   String get accountDeleteTermsRejoin =>
@@ -12260,5 +12427,124 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '你的帳號和關聯資料已被永久刪除，所有裝置上的登入狀態已失效。感謝你曾經使用開元閱讀。';
 
   @override
+  String get accountDeleteAppleManualRevocation =>
+      '關閉此提示後，請前往「Apple 帳號設定」>「登入與安全性」>「使用 Apple 登入」>「開元閱讀」，然後選擇「停止使用 Apple 登入」。';
+
+  @override
   String get accountDeleteDoneClose => '關閉';
+
+  @override
+  String get bookSourceDetailsTitle => '書籍詳情';
+
+  @override
+  String get bookSourceDetailsDescription => '內容簡介';
+
+  @override
+  String get bookSourceDetailsNoDescription => '書源暫未提供簡介。';
+
+  @override
+  String get bookSourceDetailsLatestChapter => '最新章節';
+
+  @override
+  String get bookSourceDetailsLoadFailed => '完整詳情載入失敗，可以重試或使用現有資訊閱讀。';
+
+  @override
+  String get bookSourceDetailsOnShelf => '已在書架';
+
+  @override
+  String get bookSourceDetailsAddFailed => '加入書架失敗，請重試。';
+
+  @override
+  String get bookSourceDetailsReadFailed => '開啟書籍失敗，請重試。';
+
+  @override
+  String get appTextSize => '介面字體大小';
+
+  @override
+  String get appTextSizeDescription => '僅調整應用程式選單和控制項，不影響閱讀正文字級。';
+
+  @override
+  String get appTextSizePreview => '選單和設定將以此字級顯示。';
+
+  @override
+  String get appTextSizeDefault => '100%（預設）';
+
+  @override
+  String get bookSourceTrackUpdatesTitle => '追更與正文更新';
+
+  @override
+  String get bookSourceTrackUpdatesBody =>
+      '下載後的書仍關聯書源。檢查新章節只補充新增內容；重新整理正文會檢查已下載章節，並保留你的修改與歷史版本。';
+
+  @override
+  String get bookSourceCheckNewChapters => '檢查新章節';
+
+  @override
+  String get bookSourceRefreshDownloaded => '重新整理已下載章節';
+
+  @override
+  String get bookSourceNoNewChapters => '目錄沒有新增章節。書源對舊章節的修改需要重新整理正文才能檢查。';
+
+  @override
+  String bookSourceUpdateSummary(int added, int refreshed) {
+    return '新增 $added 章，更新 $refreshed 章';
+  }
+
+  @override
+  String get bookSourceBaselineUnknown => '需要先確認本地下載到哪一章，才能繼續追更。現有正文會完整保留。';
+
+  @override
+  String get bookSourceSelectBoundary => '確認已下載章節';
+
+  @override
+  String get bookSourceBoundaryHelp =>
+      '請選擇這份本地正文已經包含的最後一章。之後只補充它後面的新章節，不替換現有正文。';
+
+  @override
+  String get bookSourceTrackingEstablished => '已確認追更起點，可以檢查新章節了。';
+
+  @override
+  String get bookSourceMappingChanged =>
+      '書源目錄順序或章節識別碼發生變化，請重新確認已下載章節。現有正文未被替換。';
+
+  @override
+  String get bookSourceContentConflicts => '正文有待處理的修改';
+
+  @override
+  String get bookSourceContentConflictBody =>
+      '你和書源都修改了這些章節。目前繼續使用你的版本；比較後選擇要閱讀的版本，雙方歷史都會保留。';
+
+  @override
+  String get bookSourceCompareVersions => '比較正文';
+
+  @override
+  String get bookSourceLocalVersion => '我的正文';
+
+  @override
+  String get bookSourceRemoteVersion => '書源正文';
+
+  @override
+  String get bookSourceBaselineVersion => '下載時的正文';
+
+  @override
+  String get bookSourceKeepLocal => '保留我的正文';
+
+  @override
+  String get bookSourceUseRemote => '採用書源正文';
+
+  @override
+  String get bookSourceUpdateFailed => '更新未完成，現有正文已保留，請重試。';
+
+  @override
+  String get cloudSyncReadableStorage =>
+      '書籍以原格式儲存在 books/ 中，歷史版本也可直接開啟。未變化的檔案不會重複上傳；正文變化時會上傳完整檔案。';
+
+  @override
+  String get bookSourceBindSource => '關聯書源';
+
+  @override
+  String get bookSourceNotBound => '未關聯書源';
+
+  @override
+  String get bookSourceDownloadedUnchanged => '已檢查下載章節，正文沒有變化。';
 }

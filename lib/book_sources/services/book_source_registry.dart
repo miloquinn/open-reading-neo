@@ -32,6 +32,15 @@ class BookSourceUpsertAllResult {
   final List<RegisteredBookSource> conflicted;
 }
 
+class ReadingSourceEditConflictException extends BookSourceProtocolException {
+  const ReadingSourceEditConflictException({required this.conflictingSourceId})
+    : super(
+        'Another registered reading source already uses the edited source URL.',
+      );
+
+  final String conflictingSourceId;
+}
+
 class BookSourceRegistry {
   BookSourceRegistry({BookSourceRegistryStorage? storage})
     : _storage = storage ?? const DefaultBookSourceRegistryStorage();
@@ -261,6 +270,79 @@ class BookSourceRegistry {
                 source.id == id ? source.copyWith(isFavorite: value) : source,
           )
           .toList(growable: false);
+      return _saveAndPublish(sources);
+    });
+  }
+
+  /// Replaces the editable configuration of one compatible reading source.
+  ///
+  /// The source id and local bookkeeping remain stable even when the edited
+  /// URL would normally produce a different imported-source id. Runtime
+  /// health and reading-chain evidence are retained only for an equivalent
+  /// JSON configuration; any actual edit must be verified again.
+  Future<List<RegisteredBookSource>> updateReadingSource(
+    String id,
+    Map<String, dynamic> config,
+  ) async {
+    return _mutate(() async {
+      final sources = (await _load()).toList();
+      final index = sources.indexWhere((source) => source.id == id);
+      if (index < 0) {
+        throw BookSourceProtocolException(
+          'Reading source "$id" is not registered.',
+        );
+      }
+      final previous = sources[index];
+      if (previous.sourceProtocol != BookSourceProtocolKind.readingSource) {
+        throw const BookSourceProtocolException(
+          'Only compatible reading sources can be edited.',
+        );
+      }
+
+      final nextConfig = _copyJsonMap(config);
+      final previousConfig = previous.sourceConfig ?? const {};
+      if (!_deepJsonEqualsForEdit(previousConfig, nextConfig)) {
+        nextConfig
+          ..remove('_openReadingHealthCheck')
+          ..remove('_openReadingReadingChainVerifiedAt');
+      }
+      final edited = ReadingSourceConfig.fromJson(
+        nextConfig,
+      ).toRegisteredSource(id: previous.id, addedAt: previous.addedAt);
+      final editedIdentity = _sourceIdentity(edited);
+      final conflict = sources.indexed.where(
+        (entry) =>
+            entry.$1 != index && _sourceIdentity(entry.$2) == editedIdentity,
+      );
+      if (conflict.isNotEmpty) {
+        throw ReadingSourceEditConflictException(
+          conflictingSourceId: conflict.first.$2.id,
+        );
+      }
+
+      sources[index] = RegisteredBookSource(
+        id: previous.id,
+        name: edited.name,
+        description: edited.description,
+        manifestUrl: edited.manifestUrl,
+        apiBaseUrl: edited.apiBaseUrl,
+        iconUrl: previous.iconUrl,
+        websiteUrl: edited.websiteUrl,
+        operatorName: previous.operatorName,
+        contactUrl: previous.contactUrl,
+        contentLicense: previous.contentLicense,
+        rightsStatement: previous.rightsStatement,
+        protocolVersion: edited.protocolVersion,
+        languages: previous.languages,
+        capabilities: edited.capabilities,
+        maxCatalogPageSize: previous.maxCatalogPageSize,
+        enabled: edited.enabled,
+        isFavorite: previous.isFavorite,
+        groups: edited.groups,
+        addedAt: previous.addedAt,
+        sourceProtocol: BookSourceProtocolKind.readingSource,
+        sourceConfig: edited.sourceConfig,
+      );
       return _saveAndPublish(sources);
     });
   }
@@ -654,4 +736,37 @@ String _sourceIdentity(RegisteredBookSource source) {
     }
   }
   return 'protocol:${source.sourceProtocol.name}:id:${source.id}';
+}
+
+Map<String, dynamic> _copyJsonMap(Map<String, dynamic> source) =>
+    source.map((key, value) => MapEntry(key, _copyJsonValue(value)));
+
+Object? _copyJsonValue(Object? value) {
+  if (value is Map) {
+    return value.map((key, nested) => MapEntry('$key', _copyJsonValue(nested)));
+  }
+  if (value is List) return value.map(_copyJsonValue).toList();
+  return value;
+}
+
+bool _deepJsonEqualsForEdit(Object? left, Object? right) {
+  if (identical(left, right)) return true;
+  if (left is Map && right is Map) {
+    if (left.length != right.length) return false;
+    for (final entry in left.entries) {
+      if (!right.containsKey(entry.key) ||
+          !_deepJsonEqualsForEdit(entry.value, right[entry.key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (left is List && right is List) {
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (!_deepJsonEqualsForEdit(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  return left == right;
 }

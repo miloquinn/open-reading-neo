@@ -323,12 +323,15 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   int? _anchorOffset;
   int? _pendingRestoreChapterIndex;
   int? _verticalCanonicalOffset;
+  bool _verticalPositionCapturePending = false;
+  int _verticalScrollRevision = 0;
   String? _savedChapterId;
   bool _savedChapterResolved = false;
   bool _restoreAnchorAfterLayout = true;
   bool _restoreContinuousAnchorCentered = false;
   bool _initialPositionRestored = false;
   bool _initialPositionRestoreScheduled = false;
+  Completer<void>? _continuousRestoreCompletion;
   bool _exitInProgress = false;
   bool _exitPositionCommitted = false;
   String? _lastSavedLocation;
@@ -455,6 +458,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     final savedLocator = widget.book.toCanonicalLocator();
     _anchorOffset = savedLocator?.textAnchor?.startOffsetUtf16;
     _verticalCanonicalOffset = _anchorOffset;
+    _restoreContinuousAnchorCentered = (_anchorOffset ?? 0) > 0;
     _savedChapterId =
         savedLocator?.chapterId ?? savedLocator?.textAnchor?.chapterId;
     _initialPositionRestored = _anchorOffset == null;
@@ -687,6 +691,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
 
   @override
   void dispose() {
+    _continuousRestoreCompletion?.complete();
+    _continuousRestoreCompletion = null;
     final cacheKey = _readerMemoryCacheKey;
     if (widget.book.format.toLowerCase() == 'epub' && cacheKey != null) {
       // Lazy EPUB chapters reference extracted files. Once this reader closes,
@@ -753,27 +759,38 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     _ReaderPageData page,
     int chapterIndex,
   ) {
-    _anchorOffset = page.startOffset;
-    final bookId = widget.book.id;
-    if (bookId == null) return Future<void>.value();
-    final excerptEnd = (page.startOffset + 72).clamp(
-      0,
+    // Layout/restore callbacks describe provisional pixels, not a new reading
+    // position. Keep the saved target until it has actually been positioned.
+    if (_pageMode == NativePageMode.verticalScroll &&
+        !_initialPositionRestored) {
+      return Future<void>.value();
+    }
+    final startOffset = page.startOffset.clamp(0, chapter.plainText.length);
+    final endOffset = page.endOffset.clamp(
+      startOffset,
       chapter.plainText.length,
     );
-    final excerpt = chapter.plainText.substring(page.startOffset, excerptEnd);
+    _anchorOffset = startOffset;
+    if (_pageMode == NativePageMode.verticalScroll) {
+      _verticalCanonicalOffset = startOffset;
+    }
+    final bookId = widget.book.id;
+    if (bookId == null) return Future<void>.value();
+    final excerptEnd = (startOffset + 72).clamp(0, chapter.plainText.length);
+    final excerpt = chapter.plainText.substring(startOffset, excerptEnd);
     final locator = CanonicalLocator.fromComponents(
       format: BookFormat.fromFileExtension(widget.book.format),
       chapterId: chapter.id,
-      offset: page.startOffset,
+      offset: startOffset,
       excerpt: excerpt,
       progression: chapter.plainText.isEmpty
           ? 0
-          : page.startOffset / chapter.plainText.length,
+          : startOffset / chapter.plainText.length,
       contentSignature: _currentContentSignature,
     );
     final chapterProgress = chapter.plainText.isEmpty
         ? 1.0
-        : (page.endOffset / chapter.plainText.length).clamp(0.0, 1.0);
+        : (endOffset / chapter.plainText.length).clamp(0.0, 1.0);
     final chapterCount = _loadedChapters.length;
     final readingProgress = chapterCount <= 0
         ? null
@@ -827,6 +844,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Future<void> _setPageMode(NativePageMode mode) async {
     if (_pageMode == mode) return;
     _autoPageTurnController.stop();
+    await _persistCurrentReaderPosition(reason: 'mode-change');
+    if (!mounted) return;
     final previousPageController = _pageController;
     _pageController = null;
     _pageControllerGeneration++;
@@ -834,7 +853,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
       _retainWholeBookAfterAutoScroll = false;
       _pageMode = mode;
       _pageIndex = 0;
-      _restoreAnchorAfterLayout = true;
+      _requestPositionRestore();
       _lastSavedLocation = null;
       _resetHorizontalPagingWindow(
         _chapterIndex,
@@ -855,9 +874,12 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Future<void> _setScrollByChapter(bool value) async {
     if (_scrollByChapter == value) return;
     _autoPageTurnController.stop();
+    await _persistCurrentReaderPosition(reason: 'scroll-scope-change');
+    if (!mounted) return;
     setState(() {
       _retainWholeBookAfterAutoScroll = false;
       _scrollByChapter = value;
+      _requestPositionRestore();
       _controlsVisible = false;
     });
     await _readerSettingsStore.saveScrollByChapter(value);

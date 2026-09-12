@@ -203,6 +203,10 @@ class MemberAccountController extends ChangeNotifier {
     if (identityToken == null || identityToken.isEmpty) {
       throw const MemberAccountException('Apple 未返回身份令牌');
     }
+    final authorizationCode = credential.authorizationCode;
+    if (authorizationCode.isEmpty) {
+      throw const MemberAccountException('Apple 未返回授权码，请重新使用 Apple 登录');
+    }
     final fullName = [credential.givenName, credential.familyName]
         .whereType<String>()
         .map((value) => value.trim())
@@ -210,6 +214,7 @@ class MemberAccountController extends ChangeNotifier {
         .join(' ');
     return _api.loginApple(
       identityToken: identityToken,
+      authorizationCode: authorizationCode,
       fullName: fullName.isEmpty ? null : fullName,
     );
   });
@@ -562,13 +567,13 @@ class MemberAccountController extends ChangeNotifier {
       _runValue(_api.requestAccountDeletionCode);
 
   /// 注销成功后本地状态必须和退出登录一样彻底清空，否则界面仍会显示已删除的账号。
-  Future<void> deleteAccount({
+  Future<bool> deleteAccount({
     required String challengeId,
     required String code,
     required String confirmation,
     String? mfaCode,
-  }) => _run(() async {
-    await _api.deleteAccount(
+  }) => _runValue(() async {
+    final appleManualRevocationRequired = await _api.deleteAccount(
       challengeId: challengeId,
       code: code,
       confirmation: confirmation,
@@ -581,6 +586,12 @@ class MemberAccountController extends ChangeNotifier {
     _mfaStatus = null;
     notifyListeners();
     await _clearSummary();
+    try {
+      await _api.clearLocalSession();
+    } catch (_) {
+      _error = '账号已注销，但本地登录信息清理失败，请重新打开应用后重试';
+    }
+    return appleManualRevocationRequired;
   });
 
   Future<void> logout() => _run(() async {

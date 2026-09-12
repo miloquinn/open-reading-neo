@@ -223,7 +223,7 @@ void main() {
     );
 
     test(
-      'resumes from the engine progress without replaying earlier text',
+      'skips remaining punctuation on resume without replaying earlier text',
       () async {
         source.initialPosition = const ReaderAloudPosition(
           chapterIndex: 0,
@@ -239,8 +239,8 @@ void main() {
 
         unawaited(controller.resume());
         await _flush();
-        expect(engine.spokenTexts.last, '。');
-        expect(controller.currentOffset, 2);
+        expect(engine.spokenTexts.last, '乙句。');
+        expect(controller.currentOffset, 3);
       },
     );
 
@@ -258,9 +258,9 @@ void main() {
         await controller.refreshPlayback();
         await _flush();
 
-        expect(engine.spokenTexts, ['甲句。', '。']);
-        expect(controller.currentOffset, 2);
-        expect(controller.currentSegment?.startOffset, 0);
+        expect(engine.spokenTexts, ['甲句。', '乙句。']);
+        expect(controller.currentOffset, 3);
+        expect(controller.currentSegment?.startOffset, 3);
       },
     );
 
@@ -325,7 +325,8 @@ void main() {
         await _flush();
 
         expect(engine.spokenTexts.length, 2);
-        expect(controller.currentOffset, 2);
+        expect(engine.spokenTexts.last, '乙句。');
+        expect(controller.currentOffset, 3);
         expect(controller.state, ReaderAloudPlaybackState.playing);
       },
     );
@@ -366,6 +367,172 @@ void main() {
         isNot(contains(const ReaderAloudPosition(chapterIndex: 0, offset: 3))),
       );
     });
+  });
+  group('speech punctuation normalization', () {
+    late _FakeReaderAloudEngine engine;
+    late _FakeReaderAloudSource source;
+    late ReaderAloudController controller;
+    const text = '***\n“甲😀……乙。”\n***\n【丙丁。】';
+
+    setUp(() {
+      engine = _FakeReaderAloudEngine();
+      source = _FakeReaderAloudSource(
+        chapters: [
+          const ReaderAloudChapter(
+            index: 0,
+            id: 'c1',
+            title: '第一章',
+            text: text,
+          ),
+        ],
+        initialPosition: const ReaderAloudPosition(chapterIndex: 0, offset: 0),
+      );
+      controller = ReaderAloudController(engine: engine, source: source);
+    });
+
+    tearDown(() async {
+      await controller.stop();
+      controller.dispose();
+    });
+
+    test('single speech keeps original display and resume offsets', () async {
+      unawaited(controller.start());
+      await _flush();
+
+      expect(engine.spokenTexts, ['甲😀, 乙。']);
+      expect(controller.currentSegment?.text, '“甲😀……乙。');
+      expect(controller.highlight?.startOffset, text.indexOf('“'));
+      expect(controller.currentOffset, text.indexOf('甲'));
+
+      engine.reportProgress(engine.spokenTexts.single.indexOf('乙'));
+      await controller.pause();
+      expect(controller.currentOffset, text.indexOf('乙'));
+
+      unawaited(controller.resume());
+      await _flush();
+      expect(engine.spokenTexts.last, '乙。');
+      expect(controller.currentOffset, text.indexOf('乙'));
+
+      engine.completeUtterance();
+      await _flush();
+      expect(engine.spokenTexts.last, '丙丁。');
+    });
+
+    test(
+      'queue skips symbols and maps callbacks to original segments',
+      () async {
+        engine.supportsQueuedText = true;
+        unawaited(controller.start());
+        await _flush();
+
+        expect(engine.queuedTexts, ['甲😀, 乙。', '丙丁。']);
+        expect(controller.currentOffset, text.indexOf('甲'));
+        expect(source.revealed.first.offset, text.indexOf('甲'));
+        expect(source.persisted.first.offset, text.indexOf('甲'));
+
+        engine.startQueuedText(1);
+        expect(controller.highlight?.startOffset, text.indexOf('【'));
+        expect(controller.currentOffset, text.indexOf('丙'));
+        engine.reportProgress(1);
+        await controller.pause();
+        expect(controller.currentOffset, text.indexOf('丁'));
+
+        unawaited(controller.resume());
+        await _flush();
+        expect(engine.queuedTexts, ['丁。']);
+        engine.completeUtterance();
+        await _flush();
+        expect(controller.state, ReaderAloudPlaybackState.stopped);
+        expect(source.persisted.last.offset, text.length);
+      },
+    );
+
+    test('continuous speech maps progress across normalized symbols', () async {
+      engine.supportsContinuousText = true;
+      unawaited(controller.start());
+      await _flush();
+
+      final spoken = engine.spokenTexts.single;
+      expect(spoken, startsWith('甲😀, 乙。'));
+      expect(spoken, endsWith('丙丁。'));
+      expect(spoken, isNot(contains('*')));
+      expect(spoken, isNot(contains('【')));
+      expect(source.persisted.first.offset, text.indexOf('甲'));
+      expect(controller.highlight?.startOffset, text.indexOf('“'));
+      engine.reportProgress(spoken.indexOf('丁'));
+      expect(controller.highlight?.startOffset, text.indexOf('【'));
+      expect(controller.currentOffset, text.indexOf('丁'));
+      await controller.pause();
+      expect(controller.currentOffset, text.indexOf('丁'));
+
+      unawaited(controller.resume());
+      await _flush();
+      expect(engine.spokenTexts.last, '丁。');
+    });
+
+    test('previous skips symbol segments in reverse', () async {
+      unawaited(controller.start());
+      await _flush();
+      await controller.next();
+      await _flush();
+      expect(engine.spokenTexts.last, '丙丁。');
+
+      await controller.previous();
+      await _flush();
+      expect(engine.spokenTexts.last, '甲😀, 乙。');
+      expect(controller.currentOffset, text.indexOf('甲'));
+    });
+
+    test('previous crosses punctuation-only chapters in reverse', () async {
+      source.chapters
+        ..clear()
+        ..addAll(const [
+          ReaderAloudChapter(index: 0, id: 'c1', title: '一', text: '前文。***'),
+          ReaderAloudChapter(index: 1, id: 'c2', title: '二', text: '***\n……！'),
+          ReaderAloudChapter(index: 2, id: 'c3', title: '三', text: '后文。'),
+        ]);
+      source.initialPosition = const ReaderAloudPosition(
+        chapterIndex: 2,
+        offset: 0,
+      );
+      unawaited(controller.start());
+      await _flush();
+
+      await controller.previous();
+      await _flush();
+      expect(engine.spokenTexts, ['后文。', '前文。']);
+      expect(controller.currentChapter?.index, 0);
+    });
+
+    for (final mode in ['single', 'queued', 'continuous']) {
+      test('$mode skips punctuation-only chapters and finishes', () async {
+        engine.supportsQueuedText = mode == 'queued';
+        engine.supportsContinuousText = mode == 'continuous';
+        source.chapters
+          ..clear()
+          ..addAll(const [
+            ReaderAloudChapter(
+              index: 0,
+              id: 'c1',
+              title: '一',
+              text: '***\n……！',
+            ),
+            ReaderAloudChapter(index: 1, id: 'c2', title: '二', text: '正文。'),
+            ReaderAloudChapter(index: 2, id: 'c3', title: '三', text: '”***'),
+          ]);
+
+        unawaited(controller.start());
+        await _flush();
+        expect(controller.currentChapter?.index, 1);
+        expect(mode == 'queued' ? engine.queuedTexts : engine.spokenTexts, [
+          '正文。',
+        ]);
+        engine.completeUtterance();
+        await _flush();
+        expect(controller.state, ReaderAloudPlaybackState.stopped);
+        expect(controller.lastError, isNull);
+      });
+    }
   });
 }
 

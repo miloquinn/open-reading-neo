@@ -30,7 +30,7 @@ void main() {
                 .having(
                   (e) => e.resourcePath,
                   'path',
-                  contains('/.capabilities/'),
+                  contains('/sync/.capabilities/'),
                 ),
           ),
         );
@@ -50,7 +50,7 @@ void main() {
     final adapter = _DavAdapter(propertyEtag: true);
     await _client(adapter).verifyMutableWritePreconditions();
     expect(adapter.preconditions, ['If-None-Match', 'If-Match']);
-    expect(adapter.propertyQueries, 2);
+    expect(adapter.propertyQueries, 1);
     expect(adapter.deleted, isTrue);
   });
 
@@ -162,7 +162,13 @@ class _DavAdapter implements HttpClientAdapter {
       return ResponseBody.fromString('', 204);
     }
     if (options.method == 'GET') {
-      return ResponseBody.fromString(content, getStatus);
+      return ResponseBody.fromString(
+        content,
+        getStatus,
+        headers: {
+          'etag': ['"probe-revision"'],
+        },
+      );
     }
     if (options.method == 'HEAD') return ResponseBody.fromString('', 200);
     if (options.method == 'PROPFIND') {
@@ -171,7 +177,7 @@ class _DavAdapter implements HttpClientAdapter {
       return ResponseBody.fromString(
         '<d:multistatus xmlns:d="DAV:"><d:response>'
         '<d:href>${options.uri.path}</d:href><d:propstat><d:prop>'
-        '<d:getetag>&quot;v1&quot;</d:getetag></d:prop>'
+        '<d:getetag>&quot;probe-revision&quot;</d:getetag></d:prop>'
         '<d:status>HTTP/1.1 200 OK</d:status></d:propstat>'
         '</d:response></d:multistatus>',
         207,
@@ -203,7 +209,7 @@ class _DavAdapter implements HttpClientAdapter {
         '',
         201,
         headers: {
-          if (!propertyEtag) 'etag': ['"v1"'],
+          if (!propertyEtag) 'etag': ['"probe-revision"'],
         },
       );
     }

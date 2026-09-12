@@ -3,22 +3,26 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../models/book.dart';
+import '../books/book_storage_codec.dart';
 import '../library/library_event_bus_service.dart';
 import '../reader/replace_rule_service.dart';
 import '../books/txt_content_change_bus.dart';
+import '../core/database_service.dart';
 
 import 'adapters/metadata_sync_adapters.dart';
 import 'automatic_sync_scheduler.dart';
 import 'book_sync_identity.dart';
-import 'mutable_txt_sync_service.dart';
+import 'book_content_sync_service.dart';
 import 'reading_progress_sync_service.dart';
 import 'secure_sync_config.dart';
 import 'sync_change_store.dart';
 import 'sync_dataset_catalog.dart';
 import 'sync_engine.dart';
 import 'sync_models.dart';
-import 'webdav_book_file_service.dart';
+import 'book_file_sync_service.dart';
 import 'webdav_client.dart';
+import 'storage/sync_storage.dart';
+import 'storage/webdav_sync_storage.dart';
 
 class WebDavSyncController extends ChangeNotifier {
   WebDavSyncController({
@@ -26,25 +30,22 @@ class WebDavSyncController extends ChangeNotifier {
     SyncChangeStore? changeStore,
     SyncEngine? engine,
     WebDavClientFactory? clientFactory,
-    WebDavBookFileService? bookFileService,
-    MutableTxtSyncService? mutableTxtService,
+    BookFileSyncService? bookFileService,
+    BookContentSyncService? contentSyncService,
+    this.localBooksLoader,
     this._replaceRuleService,
   }) : _configStore = configStore ?? SecureSyncConfigStore(),
        _changeStore = changeStore ?? SyncChangeStore(),
        _clientFactory = clientFactory ?? WebDavClient.standard {
     _engine = engine;
-    _mutableTxt =
-        mutableTxtService ??
-        MutableTxtSyncService(
-          configStore: _configStore,
-          clientFactory: _clientFactory,
-        );
+    _contentSync =
+        contentSyncService ??
+        BookContentSyncService(storageProvider: _storageProvider);
     _bookFileService =
         bookFileService ??
-        WebDavBookFileService(
-          configStore: _configStore,
-          clientFactory: _clientFactory,
-          mutableTxtSyncService: _mutableTxt,
+        BookFileSyncService(
+          storageProvider: _storageProvider,
+          contentSyncService: _contentSync,
         );
     _scheduler = AutomaticSyncScheduler(
       run: _runAutomaticCycle,
@@ -56,8 +57,9 @@ class WebDavSyncController extends ChangeNotifier {
   final SyncChangeStore _changeStore;
   final WebDavClientFactory _clientFactory;
   final ReplaceRuleService? _replaceRuleService;
+  final Future<List<Book>> Function()? localBooksLoader;
   SyncEngine? _engine;
-  late final WebDavBookFileService _bookFileService;
+  late final BookFileSyncService _bookFileService;
   Future<WebDavSyncRunResult>? _running;
   WebDavSyncConfiguration? _configuration;
   WebDavSyncScope _scope = const WebDavSyncScope();
@@ -68,6 +70,7 @@ class WebDavSyncController extends ChangeNotifier {
   int _pendingChanges = 0;
   WebDavSyncFailure? _metadataFailure;
   WebDavSyncFailure? _fileFailure;
+  WebDavSyncFailure? _backgroundUploadFailure;
   WebDavSyncFailure? _visibleFailure;
   WebDavSyncRunResult? _lastResult;
   List<RemoteBookDescriptor> _remoteBooks = const [];
@@ -76,20 +79,27 @@ class WebDavSyncController extends ChangeNotifier {
   final List<Book> _backgroundUploadQueue = <Book>[];
   final Set<String> _backgroundUploadTitles = <String>{};
   bool _backgroundUploadRunning = false;
-  late final MutableTxtSyncService _mutableTxt;
+  late final BookContentSyncService _contentSync;
   StreamSubscription<ReadingProgressSyncEvent>? _progressSubscription;
   StreamSubscription<TxtContentChanged>? _textSubscription;
   Future<void>? _fileRun;
-  List<MutableTxtBookState> _textStates = const [];
+  List<BookContentState> _textStates = const [];
   bool get syncingText => _fileRun != null;
-  List<MutableTxtBookState> get textStates => List.unmodifiable(_textStates);
-  MutableTxtSyncService get mutableTxtService => _mutableTxt;
+  List<BookContentState> get textStates => List.unmodifiable(_textStates);
+  BookContentSyncService get contentSyncService => _contentSync;
 
   Future<void> refreshTextStates() async {
-    _textStates = await _mutableTxt.listStates();
+    _textStates = await _contentSync.listStates();
     _restorePersistedFileFailure();
     _restoreSettledStatus();
     notifyListeners();
+  }
+
+  Future<SyncStorage?> _storageProvider() async {
+    final credentials = await _configStore.readCredentials();
+    return credentials == null
+        ? null
+        : WebDavSyncStorage(_clientFactory(credentials));
   }
 
   late final AutomaticSyncScheduler _scheduler;
@@ -145,31 +155,7 @@ class WebDavSyncController extends ChangeNotifier {
   Future<void> _runTextFiles({required bool automatic}) async {
     final connection = '$serverUrl|$username|$rootPath';
     try {
-      // Follow a storage upgrade on the file lane. Waiting for another file
-      // operation must never delay the independent reading-progress lane.
-      final boundUids = (await _mutableTxt.listStates())
-          .map((state) => state.bookUid)
-          .toSet();
-      for (final remote in _remoteBooks.toList(growable: false)) {
-        final remotePath = remote.remotePath;
-        final hash = remote.blobSha256;
-        final size = remote.sizeBytes;
-        if (!boundUids.contains(remote.bookUid) ||
-            remote.format.toLowerCase() != 'txt' ||
-            remotePath == null ||
-            !remotePath.startsWith('v3:') ||
-            hash == null ||
-            size == null) {
-          continue;
-        }
-        await _mutableTxt.followRemoteStorage(
-          bookUid: remote.bookUid,
-          remotePath: remotePath,
-          contentHash: hash,
-          fileSize: size,
-        );
-      }
-      final result = await _mutableTxt.reconcile(
+      final result = await _contentSync.reconcile(
         shouldContinue: () =>
             !_disposed &&
             isConfigured &&
@@ -177,12 +163,12 @@ class WebDavSyncController extends ChangeNotifier {
             connection == '$serverUrl|$username|$rootPath' &&
             (!automatic || autoSync),
       );
-      _textStates = await _mutableTxt.listStates();
+      _textStates = await _contentSync.listStates();
       final hasFailedState = _textStates.any(
-        (state) => state.status == MutableTxtSyncStatus.failed,
+        (state) => state.status == BookContentSyncStatus.failed,
       );
       final hasConflictState = _textStates.any(
-        (state) => state.status == MutableTxtSyncStatus.conflict,
+        (state) => state.status == BookContentSyncStatus.conflict,
       );
       if (result.failed > 0 || hasFailedState) {
         _setFileFailure(
@@ -200,6 +186,9 @@ class WebDavSyncController extends ChangeNotifier {
             'A book file has conflicting changes that require attention.',
           ),
         );
+      } else if (_backgroundUploadFailure != null &&
+          _backgroundUploadQueue.isNotEmpty) {
+        _setFileFailure(_backgroundUploadFailure!);
       } else {
         _clearFileFailure();
       }
@@ -217,6 +206,11 @@ class WebDavSyncController extends ChangeNotifier {
       }
       _restoreSettledStatus();
       rethrow;
+    } on SyncStorageException catch (error) {
+      final failure = _storageFailure(error);
+      _setFileFailure(failure);
+      _restoreSettledStatus();
+      throw failure;
     } catch (error, stackTrace) {
       debugPrint('WebDAV book-file sync failed: ${error.runtimeType}');
       debugPrintStack(stackTrace: stackTrace);
@@ -238,10 +232,10 @@ class WebDavSyncController extends ChangeNotifier {
     }
     try {
       final uid = await stableBookUid(event.book);
-      final bindings = await _mutableTxt.listStates();
+      final bindings = await _contentSync.listStates();
       if (!bindings.any((state) => state.bookUid == uid)) return;
-      await _mutableTxt.enqueueLocalUpdate(event.book, bookUid: uid);
-      _textStates = await _mutableTxt.listStates();
+      await _contentSync.enqueueLocalUpdate(event.book, bookUid: uid);
+      _textStates = await _contentSync.listStates();
       notifyListeners();
       requestAutomaticSync();
     } catch (error) {
@@ -294,7 +288,7 @@ class WebDavSyncController extends ChangeNotifier {
   Future<void> initialize() async {
     // Finishing an interrupted local file swap does not require credentials
     // or permission to make a network request.
-    await _mutableTxt.recoverLocalState();
+    await _contentSync.recoverLocalState();
     _configuration = await _configStore.readConfiguration();
     _scope = SyncDatasetCatalog.normalizeScope(await _configStore.readScope());
     _newBookUploadPolicy = await _configStore.readNewBookUploadPolicy();
@@ -307,6 +301,7 @@ class WebDavSyncController extends ChangeNotifier {
     _status = isConfigured
         ? WebDavSyncStatus.idle
         : WebDavSyncStatus.unconfigured;
+    await _discoverUnuploadedBooks();
     await _refreshRemoteBooks();
     _progressSubscription ??= ReadingProgressSyncService.instance.events.listen(
       (event) {
@@ -321,7 +316,7 @@ class WebDavSyncController extends ChangeNotifier {
     _textSubscription ??= TxtContentChangeBus.instance.stream.listen(
       (event) => unawaited(_onTextChanged(event)),
     );
-    _textStates = await _mutableTxt.listStates();
+    _textStates = await _contentSync.listStates();
     _restorePersistedFileFailure();
     _restoreSettledStatus(successStatus: WebDavSyncStatus.idle);
     _scheduler.start();
@@ -378,10 +373,6 @@ class WebDavSyncController extends ChangeNotifier {
     final configuration = draft.withoutPassword(
       autoSync: _configuration?.autoSync ?? true,
     );
-    if (_configuration == null) {
-      _scope = await _configStore.readScope();
-      await _configStore.saveScope(_scope);
-    }
     final old = _configuration;
     if (old == null ||
         old.serverUrl != configuration.serverUrl ||
@@ -398,8 +389,16 @@ class WebDavSyncController extends ChangeNotifier {
     }
     await _configStore.save(configuration, password);
     _configuration = configuration;
+    if (old == null) {
+      // Read after saving credentials so an already persisted scope (including
+      // explicit false values) wins over the complete first-connection default.
+      _scope = await _configStore.readScope();
+      await _configStore.saveScope(_scope);
+    }
+    _newBookUploadPolicy = await _configStore.readNewBookUploadPolicy();
     _status = WebDavSyncStatus.idle;
     _clearFailures();
+    await _discoverUnuploadedBooks();
     notifyListeners();
     requestAutomaticSync(immediate: true);
   }
@@ -437,15 +436,22 @@ class WebDavSyncController extends ChangeNotifier {
     _clearMetadataFailure();
     notifyListeners();
     try {
-      final engine = _engine ??= SyncEngine(
-        configStore: _configStore,
-        changeStore: _changeStore,
-        adapters: MetadataSyncAdapters(
-          store: _changeStore,
-          replaceRuleService: _replaceRuleService,
-        ),
-        clientFactory: _clientFactory,
-      );
+      final engine =
+          _engine ??
+          SyncEngine(
+            storage:
+                await _storageProvider() ??
+                (throw const WebDavSyncFailure(
+                  WebDavSyncErrorCode.authentication,
+                  'WebDAV credentials are unavailable.',
+                )),
+            scope: _scope,
+            changeStore: _changeStore,
+            adapters: MetadataSyncAdapters(
+              store: _changeStore,
+              replaceRuleService: _replaceRuleService,
+            ),
+          );
       final result = await engine.run(
         onPhase: (phase) {
           _phase = phase;
@@ -484,6 +490,13 @@ class WebDavSyncController extends ChangeNotifier {
       _phase = WebDavSyncPhase.none;
       notifyListeners();
       rethrow;
+    } on SyncStorageException catch (error) {
+      final failure = _storageFailure(error);
+      _lastFailedPhase = _phase;
+      _setMetadataFailure(failure);
+      _phase = WebDavSyncPhase.none;
+      notifyListeners();
+      throw failure;
     } catch (error, stackTrace) {
       _lastFailedPhase = _phase;
       debugPrint('WebDAV sync failed at ${_phase.name}: ${error.runtimeType}');
@@ -513,6 +526,7 @@ class WebDavSyncController extends ChangeNotifier {
     await _configStore.save(updated, credentials.password);
     _configuration = updated;
     if (enabled) {
+      await _discoverUnuploadedBooks();
       _scheduler.request(immediate: true);
     } else {
       _scheduler.cancelPending();
@@ -527,6 +541,7 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   Future<void> setScope(WebDavSyncScope scope) async {
+    final filesWereEnabled = _scope.bookFiles;
     final normalized = SyncDatasetCatalog.normalizeScope(scope);
     await _configStore.saveScope(normalized);
     _scope = normalized;
@@ -535,6 +550,9 @@ class WebDavSyncController extends ChangeNotifier {
       _restoreSettledStatus();
     }
     _pendingChanges = await _enabledPendingCount();
+    if (normalized.bookFiles && !filesWereEnabled) {
+      await _discoverUnuploadedBooks();
+    }
     notifyListeners();
   }
 
@@ -588,7 +606,6 @@ class WebDavSyncController extends ChangeNotifier {
 
   Future<RemoteBookDescriptor> uploadBookFile(
     Book book, {
-    bool incrementalTxt = false,
     void Function(BookFileTransferProgress progress)? onProgress,
   }) async {
     if (!_scope.bookFiles) {
@@ -597,25 +614,81 @@ class WebDavSyncController extends ChangeNotifier {
         'Enable book-file uploads before selecting a book to upload.',
       );
     }
-    final descriptor = await _bookFileService.upload(
-      book,
-      incrementalTxt: incrementalTxt,
-      onProgress: onProgress,
-    );
-    await syncNow();
-    return descriptor;
+    try {
+      final descriptor = await _bookFileService.upload(
+        book,
+        onProgress: onProgress,
+      );
+      if (!_backgroundUploadRunning) await syncNow();
+      return descriptor;
+    } on SyncStorageException catch (error) {
+      throw _storageFailure(error);
+    }
+  }
+
+  Future<void> _discoverUnuploadedBooks() async {
+    if (!isConfigured || !autoSync || !scope.bookFiles) return;
+    final connection = '$serverUrl|$username|$rootPath';
+    try {
+      final books = await (localBooksLoader?.call() ?? _loadLocalBooks());
+      final states = await _contentSync.listStates();
+      if (_disposed || connection != '$serverUrl|$username|$rootPath') return;
+      enqueueNewBookUploads(
+        books.where(
+          (book) => !states.any(
+            (state) =>
+                !state.enabled &&
+                ((book.id != null && state.localBookId == book.id) ||
+                    state.localPath == book.filePath),
+          ),
+        ),
+      );
+    } catch (error) {
+      // Discovery is a restart/first-connect safety net; metadata sync remains
+      // independent if the local library is temporarily unavailable.
+      debugPrint('WebDAV book discovery will retry: ${error.runtimeType}');
+    }
+  }
+
+  Future<List<Book>> _loadLocalBooks() async {
+    final db = await DatabaseService().database;
+    // sync_book_files predates per-space ownership. Always inspect the books
+    // table for the current connection; an old binding must not hide a local
+    // file from a newly selected WebDAV space.
+    final rows = await db.rawQuery('''
+      SELECT b.* FROM books b
+      WHERE COALESCE(b.storage_type, 'local') != 'online'
+        AND COALESCE(b.filePath, '') != ''
+        AND NOT EXISTS (
+          SELECT 1 FROM sync_book_files f
+          WHERE f.local_book_id = b.id AND f.sync_enabled = 0
+        )
+    ''');
+    final books = <Book>[];
+    for (final row in rows) {
+      try {
+        books.add(await bookFromStorageMap(row));
+      } catch (_) {
+        // A malformed library row must not block discovery of other books.
+      }
+    }
+    return books;
   }
 
   Future<Book> downloadBookFile(
     RemoteBookDescriptor descriptor, {
     void Function(BookFileTransferProgress progress)? onProgress,
   }) async {
-    final book = await _bookFileService.download(
-      descriptor,
-      onProgress: onProgress,
-    );
-    await refreshRemoteBooks();
-    return book;
+    try {
+      final book = await _bookFileService.download(
+        descriptor,
+        onProgress: onProgress,
+      );
+      await refreshRemoteBooks();
+      return book;
+    } on SyncStorageException catch (error) {
+      throw _storageFailure(error);
+    }
   }
 
   Future<String> _resolvePassword(String draftPassword) async {
@@ -660,17 +733,48 @@ class WebDavSyncController extends ChangeNotifier {
     if (_backgroundUploadRunning) return;
     _backgroundUploadRunning = true;
     try {
-      while (_backgroundUploadQueue.isNotEmpty) {
+      // Give every book already in this batch one attempt. Failed books move
+      // to the back for a later automatic cycle instead of blocking the rest
+      // of the library or spinning forever in this cycle.
+      var attemptsRemaining = _backgroundUploadQueue.length;
+      while (_backgroundUploadQueue.isNotEmpty && attemptsRemaining > 0) {
         if (!isConfigured || !autoSync || !scope.bookFiles) break;
         final book = _backgroundUploadQueue.removeAt(0);
+        attemptsRemaining--;
+        if (_textStates.any(
+          (state) =>
+              !state.enabled &&
+              ((book.id != null && state.localBookId == book.id) ||
+                  state.localPath == book.filePath),
+        )) {
+          _backgroundUploadTitles.remove('${book.id ?? book.filePath}');
+          continue;
+        }
         try {
           await uploadBookFile(book);
         } catch (error, stackTrace) {
-          _backgroundUploadQueue.insert(0, book);
+          _backgroundUploadQueue.add(book);
+          final failure = error is WebDavSyncFailure
+              ? error
+              : WebDavSyncFailure(
+                  WebDavSyncErrorCode.unknown,
+                  'The book file "${book.title}" could not be uploaded and will be retried.',
+                );
+          _backgroundUploadFailure = failure;
+          _setFileFailure(failure);
+          _restoreSettledStatus();
+          notifyListeners();
           debugPrint('Background WebDAV book upload failed: $error');
           debugPrintStack(stackTrace: stackTrace);
-          break;
         }
+      }
+      if (_backgroundUploadQueue.isEmpty) {
+        if (identical(_fileFailure, _backgroundUploadFailure)) {
+          _clearFileFailure();
+        }
+        _backgroundUploadFailure = null;
+        _restoreSettledStatus();
+        notifyListeners();
       }
     } finally {
       _backgroundUploadRunning = false;
@@ -701,15 +805,17 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   void _clearFailures() {
+    _backgroundUploadFailure = null;
     _metadataFailure = null;
     _fileFailure = null;
+    _backgroundUploadFailure = null;
     _visibleFailure = null;
   }
 
   void _restorePersistedFileFailure() {
     if (!scope.bookFiles || _fileFailure != null) return;
     final failed = _textStates.where(
-      (state) => state.status == MutableTxtSyncStatus.failed,
+      (state) => state.status == BookContentSyncStatus.failed,
     );
     if (failed.isNotEmpty) {
       final detail = failed.first.error?.trim();
@@ -724,7 +830,7 @@ class WebDavSyncController extends ChangeNotifier {
       return;
     }
     if (_textStates.any(
-      (state) => state.status == MutableTxtSyncStatus.conflict,
+      (state) => state.status == BookContentSyncStatus.conflict,
     )) {
       _setFileFailure(
         const WebDavSyncFailure(
@@ -766,4 +872,24 @@ class WebDavSyncController extends ChangeNotifier {
     unawaited(_textSubscription?.cancel());
     super.dispose();
   }
+}
+
+WebDavSyncFailure _storageFailure(SyncStorageException error) {
+  if (error.cause case final WebDavSyncFailure failure) return failure;
+  final code = switch (error.code) {
+    SyncStorageErrorCode.authentication => WebDavSyncErrorCode.authentication,
+    SyncStorageErrorCode.permissionDenied =>
+      WebDavSyncErrorCode.permissionDenied,
+    SyncStorageErrorCode.notFound => WebDavSyncErrorCode.notFound,
+    SyncStorageErrorCode.versionConflict => WebDavSyncErrorCode.conflict,
+    SyncStorageErrorCode.rateLimited => WebDavSyncErrorCode.rateLimited,
+    SyncStorageErrorCode.storageFull => WebDavSyncErrorCode.storageFull,
+    SyncStorageErrorCode.timeout => WebDavSyncErrorCode.timeout,
+    SyncStorageErrorCode.network => WebDavSyncErrorCode.network,
+    SyncStorageErrorCode.tls => WebDavSyncErrorCode.tls,
+    SyncStorageErrorCode.unsupported => WebDavSyncErrorCode.serverIncompatible,
+    SyncStorageErrorCode.invalidData => WebDavSyncErrorCode.corruptRemoteData,
+    SyncStorageErrorCode.serverError => WebDavSyncErrorCode.serverError,
+  };
+  return WebDavSyncFailure(code, error.message);
 }

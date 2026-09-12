@@ -10,6 +10,7 @@ import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/utils/localization_extension.dart';
+import 'package:xxread/widgets/app_menu.dart';
 import 'package:xxread/widgets/generated_book_cover.dart';
 
 part 'parts/detailed_stats_achievements_part.dart';
@@ -432,7 +433,7 @@ class _DetailedStatsPageState extends State<DetailedStatsPage>
 
   Widget _buildTimeRangeSelector({required bool compact}) {
     final palette = _palette;
-    return PopupMenuButton<String>(
+    return AppPopupMenuButton<String>(
       initialValue: _selectedTimeRange,
       tooltip: _timeRangeLabel(_selectedTimeRange),
       onSelected: (value) => setState(() => _selectedTimeRange = value),

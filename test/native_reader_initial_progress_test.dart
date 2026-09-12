@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,11 +17,16 @@ import 'package:xxread/core/reader/reader_layout.dart';
 import 'package:xxread/core/reader/reader_settings.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
+import 'package:xxread/models/bookmark.dart';
 import 'package:xxread/pages/reader/native/native_reader_page.dart';
 import 'package:xxread/services/books/book_dao.dart';
+import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/widgets/reader_annotated_text_page.dart';
 import 'package:xxread/widgets/reader_paper_page_leaf.dart';
+import 'package:xxread/widgets/reader_settings_controls.dart';
+import 'package:xxread/widgets/reader_navigation_sheet.dart';
+import 'package:xxread/widgets/reader_control_chrome.dart';
 
 import 'support/reader_cache_test_utils.dart';
 
@@ -470,6 +476,422 @@ void main() {
       }
     },
   );
+
+  for (final scrollByChapter in [false, true]) {
+    for (final initialOffset in [0, 2400, 1000000]) {
+      testWidgets(
+        'EPUB scroll preserves its exact offset on background and exit '
+        '(scrollByChapter=$scrollByChapter, initialOffset=$initialOffset)',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.android;
+          await tester.binding.setSurfaceSize(const Size(480, 800));
+          SharedPreferences.setMockInitialValues({
+            ReaderSettingsStore.pageModeKey: ReaderPageMode.verticalScroll.name,
+            ReaderSettingsStore.scrollByChapterKey: scrollByChapter,
+            ReadingResumeService.enabledPreferenceKey: true,
+          });
+          final directory = Directory.systemTemp.createTempSync(
+            'open-reading-epub-scroll-exit-',
+          );
+          final epub = File('${directory.path}/scroll-exit.epub')
+            ..writeAsBytesSync(_epubFixture());
+          final bookId = (await tester.runAsync(
+            () => BookDao().insertBook(
+              Book(
+                title: 'EPUB scroll exit fixture',
+                filePath: epub.path,
+                format: 'epub',
+                currentPage: initialOffset > 0 ? 1 : 0,
+                lastCanonicalLocator: initialOffset > 0
+                    ? LocatorCodec.encodeCanonicalLocator(
+                        CanonicalLocator.fromComponents(
+                          format: BookFormat.epub,
+                          chapterId: 'chapter2.xhtml',
+                          offset: initialOffset,
+                        ),
+                      )
+                    : null,
+                fileModifiedTime: epub
+                    .lastModifiedSync()
+                    .millisecondsSinceEpoch,
+              ),
+            ),
+          ))!;
+          final navigatorKey = GlobalKey<NavigatorState>();
+
+          Future<Book> savedBook() async =>
+              (await tester.runAsync(() => BookDao().getBookById(bookId)))!;
+
+          Future<void> settleWrites() async {
+            await tester.runAsync(() async {
+              for (var i = 0; i < 10; i++) {
+                await Future<void>.delayed(const Duration(milliseconds: 50));
+                await tester.pump();
+              }
+            });
+          }
+
+          Future<void> openReader(Book book) async {
+            navigatorKey.currentState!.push(
+              MaterialPageRoute<void>(
+                builder: (_) => NativeReaderPage(
+                  book: book,
+                  replaceRuleService: replaceRuleService,
+                ),
+              ),
+            );
+            await tester.pump();
+            await tester.runAsync(() async {
+              for (var i = 0; i < 60; i++) {
+                await Future<void>.delayed(const Duration(milliseconds: 50));
+                await tester.pump();
+                if (find
+                    .byType(ScrollablePositionedList)
+                    .evaluate()
+                    .isNotEmpty) {
+                  return;
+                }
+              }
+            });
+            if (book.toCanonicalLocator() != null) {
+              expect(
+                find.byKey(
+                  const ValueKey('native-reader-positioning-placeholder'),
+                ),
+                findsOneWidget,
+              );
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.inactive,
+              );
+              await tester.runAsync(() async {
+                await Future<void>.delayed(const Duration(milliseconds: 100));
+              });
+              expect(
+                (await savedBook()).lastCanonicalLocator,
+                book.lastCanonicalLocator,
+                reason:
+                    'Backgrounding mid-restore must not save provisional pixels.',
+              );
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+            }
+            await _pumpUntil(
+              tester,
+              () =>
+                  find.byType(ScrollablePositionedList).evaluate().isNotEmpty &&
+                  find
+                      .byKey(
+                        const ValueKey('native-reader-positioning-placeholder'),
+                      )
+                      .evaluate()
+                      .isEmpty,
+            );
+            await tester.pumpAndSettle();
+          }
+
+          Future<void> changeMode(ReaderPageMode mode) async {
+            tester
+                .widget<ReaderChromeOverlay>(find.byType(ReaderChromeOverlay))
+                .onSettings();
+            await tester.pumpAndSettle();
+            tester
+                .widget<ReaderSettingsSheet>(find.byType(ReaderSettingsSheet))
+                .onPageModeTap();
+            await tester.pumpAndSettle();
+            tester
+                .widget<ReaderPageModeSheet>(find.byType(ReaderPageModeSheet))
+                .onSelected(mode);
+            await tester.pumpAndSettle();
+            await settleWrites();
+            await tester.pumpAndSettle();
+          }
+
+          try {
+            await tester.pumpWidget(
+              MaterialApp(
+                navigatorKey: navigatorKey,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: const SizedBox.shrink(),
+              ),
+            );
+            await openReader(await savedBook());
+            await settleWrites();
+            if (initialOffset > 0) {
+              final chapterLength = tester
+                  .widgetList<ReaderAnnotatedTextPage>(
+                    find.byType(ReaderAnnotatedTextPage),
+                  )
+                  .firstWhere((page) => page.chapterId == 'chapter2.xhtml')
+                  .sourceText
+                  .length;
+              final expected = initialOffset.clamp(0, chapterLength);
+              expect(
+                (await savedBook())
+                    .toCanonicalLocator()!
+                    .textAnchor!
+                    .startOffsetUtf16,
+                expected,
+                reason:
+                    'Restoration preserves valid offsets and bounds outdated offsets to the chapter.',
+              );
+              if (initialOffset > chapterLength) {
+                tester.binding.handleAppLifecycleStateChanged(
+                  AppLifecycleState.inactive,
+                );
+                await settleWrites();
+                await tester.binding.handlePopRoute();
+                await settleWrites();
+                await _pumpUntil(
+                  tester,
+                  () => find.byType(NativeReaderPage).evaluate().isEmpty,
+                );
+                expect(
+                  (await savedBook())
+                      .toCanonicalLocator()!
+                      .textAnchor!
+                      .startOffsetUtf16,
+                  expected,
+                );
+                expect(find.byType(NativeReaderPage), findsNothing);
+                return;
+              }
+            }
+            await tester.drag(
+              find.byKey(const ValueKey('native-vertical-reading-window')),
+              const Offset(0, -537),
+            );
+            await tester.pumpAndSettle();
+            await settleWrites();
+            final before = (await savedBook()).toCanonicalLocator()!;
+            final offset = before.textAnchor!.startOffsetUtf16!;
+            expect(offset, greaterThan(0));
+
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.inactive,
+            );
+            await settleWrites();
+            expect(
+              (await savedBook())
+                  .toCanonicalLocator()!
+                  .textAnchor!
+                  .startOffsetUtf16,
+              offset,
+              reason: 'Backgrounding must keep the visible text anchor.',
+            );
+            final resume = await tester.runAsync(
+              ReadingResumeService.takePendingResume,
+            );
+            expect(
+              LocatorCodec.decodeCanonicalLocator(
+                resume!.canonicalLocator!,
+              )!.textAnchor!.startOffsetUtf16,
+              offset,
+            );
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+            await tester.binding.handlePopRoute();
+            await settleWrites();
+            await _pumpUntil(
+              tester,
+              () => find.byType(NativeReaderPage).evaluate().isEmpty,
+            );
+            final after = (await savedBook()).toCanonicalLocator()!;
+            expect(after.chapterId, before.chapterId);
+            expect(
+              after.textAnchor!.startOffsetUtf16,
+              offset,
+              reason:
+                  'Exiting must not replace the anchor with the part opening.',
+            );
+            for (var reopen = 0; reopen < 3; reopen++) {
+              await openReader(await savedBook());
+              final scrollable = tester.state<ScrollableState>(
+                find
+                    .descendant(
+                      of: find.byType(ScrollablePositionedList),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              );
+              expect(
+                scrollable.position.pixels,
+                greaterThan(0),
+                reason: 'Reopening must scroll inside the saved text part.',
+              );
+              await settleWrites();
+              expect(
+                (await savedBook())
+                    .toCanonicalLocator()!
+                    .textAnchor!
+                    .startOffsetUtf16,
+                offset,
+                reason:
+                    'Restoring without reading must not advance the saved anchor.',
+              );
+              final viewportCenter =
+                  MediaQuery.sizeOf(
+                    tester.element(find.byType(NativeReaderPage)),
+                  ).height /
+                  2;
+              final anchorPageFinder = find.byWidgetPredicate(
+                (widget) =>
+                    widget is ReaderAnnotatedTextPage &&
+                    widget.chapterId == before.chapterId &&
+                    widget.page.startOffset <= offset &&
+                    widget.page.endOffset > offset,
+              );
+              expect(anchorPageFinder, findsOneWidget);
+              final anchorPage = tester.widget<ReaderAnnotatedTextPage>(
+                anchorPageFinder,
+              );
+              final paragraph = tester.renderObject<RenderParagraph>(
+                find
+                    .descendant(
+                      of: anchorPageFinder,
+                      matching: find.byType(RichText),
+                    )
+                    .first,
+              );
+              final caret = paragraph.getOffsetForCaret(
+                TextPosition(
+                  offset: anchorPage.page.textOffsetForSourceOffset(offset),
+                ),
+                Rect.zero,
+              );
+              expect(
+                paragraph.localToGlobal(caret).dy,
+                closeTo(viewportCenter, 1),
+                reason:
+                    'The saved text must be painted at the same viewport reference.',
+              );
+
+              await tester.binding.handlePopRoute();
+              await settleWrites();
+              await _pumpUntil(
+                tester,
+                () => find.byType(NativeReaderPage).evaluate().isEmpty,
+              );
+              expect(
+                (await savedBook())
+                    .toCanonicalLocator()!
+                    .textAnchor!
+                    .startOffsetUtf16,
+                offset,
+                reason: 'Repeated reopening/closing must not drift.',
+              );
+            }
+
+            await openReader(await savedBook());
+            await tester.drag(
+              find.byKey(const ValueKey('native-vertical-reading-window')),
+              const Offset(0, 250),
+            );
+            await tester.pumpAndSettle();
+            await settleWrites();
+            final backward = (await savedBook()).toCanonicalLocator()!;
+            expect(backward.chapterId, before.chapterId);
+            expect(
+              backward.textAnchor!.startOffsetUtf16,
+              lessThan(offset),
+              reason: 'An actual backward scroll must still update progress.',
+            );
+            if (initialOffset > 0) {
+              await changeMode(ReaderPageMode.horizontalSlide);
+              final paged = (await savedBook()).toCanonicalLocator()!;
+              await changeMode(ReaderPageMode.verticalScroll);
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.inactive,
+              );
+              await settleWrites();
+              expect(
+                (await savedBook())
+                    .toCanonicalLocator()!
+                    .textAnchor!
+                    .startOffsetUtf16,
+                paged.textAnchor!.startOffsetUtf16,
+                reason:
+                    'Mode changes must not revive an earlier vertical anchor.',
+              );
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+
+              tester
+                  .widget<ReaderChromeOverlay>(find.byType(ReaderChromeOverlay))
+                  .onTableOfContents!();
+              await tester.pumpAndSettle();
+              final target = LocatorCodec.encodeCanonicalLocator(
+                CanonicalLocator.fromComponents(
+                  format: BookFormat.epub,
+                  chapterId: 'chapter3.xhtml',
+                  offset: 4500,
+                ),
+              );
+              tester
+                  .widget<ReaderNavigationSheet>(
+                    find.byType(ReaderNavigationSheet),
+                  )
+                  .onBookmarkSelected(
+                    Bookmark(
+                      bookId: bookId,
+                      pageNumber: 2,
+                      chapterIndex: 2,
+                      canonicalLocator: target,
+                    ),
+                  );
+              await settleWrites();
+              await tester.pumpAndSettle();
+              await settleWrites();
+              final jumped = (await savedBook()).toCanonicalLocator()!;
+              expect(jumped.chapterId, 'chapter3.xhtml');
+              expect(
+                jumped.textAnchor!.startOffsetUtf16,
+                4500,
+                reason:
+                    'Bookmark restoration must persist its exact target, not an intermediate scroll.',
+              );
+              tester
+                  .widget<ReaderChromeOverlay>(find.byType(ReaderChromeOverlay))
+                  .onTableOfContents!();
+              await tester.pumpAndSettle();
+              tester
+                  .widget<ReaderNavigationSheet>(
+                    find.byType(ReaderNavigationSheet),
+                  )
+                  .onChapterSelected(0);
+              await settleWrites();
+              await tester.pumpAndSettle();
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.inactive,
+              );
+              await settleWrites();
+              final chapterOpening = (await savedBook()).toCanonicalLocator()!;
+              expect(chapterOpening.chapterId, 'chapter1.xhtml');
+              expect(
+                chapterOpening.textAnchor!.startOffsetUtf16,
+                0,
+                reason:
+                    'A chapter jump must not reuse the preceding chapter anchor.',
+              );
+            }
+          } finally {
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+            await tester.pumpWidget(const SizedBox.shrink());
+            await tester.pump();
+            await drainReaderCache(tester);
+            await tester.binding.setSurfaceSize(null);
+            debugDefaultTargetPlatformOverride = null;
+            directory.deleteSync(recursive: true);
+          }
+        },
+      );
+    }
+  }
 
   testWidgets(
     'EPUB system back persists the pending horizontal page before reopening',

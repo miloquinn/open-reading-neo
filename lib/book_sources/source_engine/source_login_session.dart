@@ -2,18 +2,23 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'source_browser_session.dart';
+
 class SourceLoginSession {
   const SourceLoginSession({
     this.loginInfo = const {},
     this.loginHeaders = const {},
+    this.browserSession = const SourceBrowserSession(),
   });
 
   final Map<String, String> loginInfo;
   final Map<String, String> loginHeaders;
+  final SourceBrowserSession browserSession;
 
   Map<String, Object?> toJson() => {
     'loginInfo': loginInfo,
     'loginHeaders': loginHeaders,
+    'browserSession': browserSession.toJson(),
   };
 
   factory SourceLoginSession.fromJson(Object? value) {
@@ -21,6 +26,7 @@ class SourceLoginSession {
     return SourceLoginSession(
       loginInfo: _stringMap(value['loginInfo']),
       loginHeaders: _stringMap(value['loginHeaders']),
+      browserSession: SourceBrowserSession.fromJson(value['browserSession']),
     );
   }
 }

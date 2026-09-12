@@ -1457,70 +1457,55 @@ void main() {
     },
   );
 
-  testWidgets('details sheet keeps its drag handle below the top safe area', (
+  testWidgets('tapping a discovery book pushes its details page and returns', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(430, 900);
-    tester.view.padding = const FakeViewPadding(top: 44);
-    tester.view.viewPadding = const FakeViewPadding(top: 44);
     addTearDown(tester.view.reset);
+    final source = _source('source-a', 'Source A');
+    SharedPreferences.setMockInitialValues({
+      'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
+    });
 
     await tester.pumpWidget(
-      _bookActionsHarness(
-        _FakeShelfService(),
-        description: List.filled(
-          40,
-          'A long description keeps the details content scrollable.',
-        ).join(' '),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => DownloadTaskController()),
+          ChangeNotifierProvider(create: (_) => ReplaceRuleService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: BookSourcesPage(
+              client: _DetailsDiscoveryClient(),
+              shelfService: _FakeShelfService(),
+            ),
+          ),
+        ),
       ),
     );
-
-    await tester.tap(find.byKey(const Key('openBookDetails')));
     await tester.pumpAndSettle();
 
-    final sheetRect = tester.getRect(find.byType(BottomSheet));
-    expect(sheetRect.top, greaterThanOrEqualTo(60));
+    await tester.tap(find.text('Source A pick'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
+    expect(find.text('Source A pick details'), findsOneWidget);
+    expect(find.byKey(const Key('bookSourceReadButton')), findsOneWidget);
+    expect(find.byKey(const Key('bookSourceAddToShelfButton')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('floating-subpage-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bookSourceDetailsPage')), findsNothing);
+    expect(find.text('Source A picks'), findsOneWidget);
+    expect(find.text('Source A pick'), findsOneWidget);
   });
 
   testWidgets(
-    'switching to shelf options smoothly shrinks the existing sheet',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(430, 900);
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        _bookActionsHarness(
-          _FakeShelfService(),
-          description: List.filled(
-            40,
-            'A long description keeps the details content scrollable.',
-          ).join(' '),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('openBookDetails')));
-      await tester.pumpAndSettle();
-      final initialHeight = tester.getSize(find.byType(BottomSheet)).height;
-
-      await tester.tap(find.byKey(const Key('bookSourceAddToShelfButton')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 110));
-      final animatedHeight = tester.getSize(find.byType(BottomSheet)).height;
-
-      await tester.pumpAndSettle();
-      final optionsHeight = tester.getSize(find.byType(BottomSheet)).height;
-
-      expect(optionsHeight, lessThan(initialHeight - 100));
-      expect(animatedHeight, lessThan(initialHeight));
-      expect(animatedHeight, greaterThan(optionsHeight));
-      expect(find.byKey(const Key('bookSourceShelfOptions')), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'adding online stays in the details sheet for feedback then closes',
+    'adding online stays on the details page and disables the shelf action',
     (tester) async {
       final shelfService = _FakeShelfService();
       await tester.pumpWidget(_bookActionsHarness(shelfService));
@@ -1528,31 +1513,23 @@ void main() {
       await tester.tap(find.byKey(const Key('openBookDetails')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('bookSourceAddToShelfButton')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 230));
-
-      expect(find.byKey(const Key('bookSourceShelfOptions')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('bookSourceAddOnlineOption')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pumpAndSettle();
 
       expect(shelfService.addCalls, 1);
+      expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
+      expect(find.byKey(const Key('bookSourceOnShelf')), findsOneWidget);
       expect(
-        find.byKey(const Key('bookSourceAddedCompletion')),
-        findsOneWidget,
+        tester
+            .widget<ButtonStyleButton>(
+              find.byKey(const Key('bookSourceAddToShelfButton')),
+            )
+            .onPressed,
+        isNull,
       );
-      expect(
-        find.byKey(const Key('bookSourceShelfDropAnimation')),
-        findsOneWidget,
-      );
-
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('bookSourceDetailsContent')), findsNothing);
     },
   );
 
-  testWidgets('an existing shelf book uses an information state without drop', (
+  testWidgets('an existing shelf book becomes an on-shelf page state', (
     tester,
   ) async {
     final shelfService = _FakeShelfService(existing: true);
@@ -1561,25 +1538,14 @@ void main() {
     await tester.tap(find.byKey(const Key('openBookDetails')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourceAddToShelfButton')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 230));
-    await tester.tap(find.byKey(const Key('bookSourceAddOnlineOption')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 220));
+    await tester.pumpAndSettle();
 
     expect(shelfService.addCalls, 0);
-    expect(
-      find.byKey(const Key('bookSourceAlreadyAddedCompletion')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('bookSourceShelfDropAnimation')), findsNothing);
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bookSourceOnShelf')), findsOneWidget);
+    expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
   });
 
-  testWidgets('a failed online add keeps the sheet open for retry', (
-    tester,
-  ) async {
+  testWidgets('a failed online add stays inline and can retry', (tester) async {
     final shelfService = _FakeShelfService(
       addError: StateError('Could not save the shelf book.'),
     );
@@ -1588,18 +1554,19 @@ void main() {
     await tester.tap(find.byKey(const Key('openBookDetails')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bookSourceAddToShelfButton')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 230));
-    await tester.tap(find.byKey(const Key('bookSourceAddOnlineOption')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 230));
+    await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('bookSourceAddFailed')), findsOneWidget);
     expect(find.byKey(const Key('bookSourceAddRetryButton')), findsOneWidget);
-    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('bookSourceAddRetryButton')));
+    await tester.pumpAndSettle();
+    expect(shelfService.addCalls, 2);
+    expect(find.byKey(const Key('bookSourceAddFailed')), findsOneWidget);
   });
 
-  testWidgets('local download progress stays in the sheet and can continue', (
+  testWidgets('local download stays inline and backgrounding returns', (
     tester,
   ) async {
     final shelfService = _FakeShelfService();
@@ -1607,10 +1574,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('openBookDetails')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('bookSourceAddToShelfButton')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 230));
-    await tester.tap(find.byKey(const Key('bookSourceDownloadLocalOption')));
+    final downloadOption = find.byKey(
+      const Key('bookSourceDownloadLocalOption'),
+    );
+    await tester.ensureVisible(downloadOption);
+    await tester.tap(downloadOption);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
 
@@ -1621,15 +1589,19 @@ void main() {
       findsOneWidget,
     );
 
+    await tester.ensureVisible(
+      find.byKey(const Key('bookSourceDownloadBackgroundButton')),
+    );
     await tester.tap(
       find.byKey(const Key('bookSourceDownloadBackgroundButton')),
     );
     shelfService.completeDownload();
     await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byKey(const Key('bookSourceDetailsPage')), findsNothing);
+    expect(find.byKey(const Key('openBookDetails')), findsOneWidget);
   });
 
-  testWidgets('reading from the details sheet hands off to paper transition', (
+  testWidgets('reading uses paper transition and returns to details', (
     tester,
   ) async {
     await tester.pumpWidget(_bookActionsHarness(_FakeShelfService()));
@@ -1649,6 +1621,14 @@ void main() {
     );
     expect(position.position.value.dx, 0);
     expect(position.position.value.dy, greaterThan(0));
+    expect(
+      find.byKey(const Key('bookSourceDetailsPage'), skipOffstage: false),
+      findsOneWidget,
+    );
+
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
   });
 }
 
@@ -1682,7 +1662,7 @@ Widget _bookActionsHarness(
               key: const Key('openBookDetails'),
               onPressed: () => SourcedBookActions(
                 context: context,
-                client: _EmptyDiscoveryClient(),
+                client: _BookActionsClient(result.book),
                 shelfService: shelfService,
               ).showBookDetails(result),
               child: const Text('Open details'),
@@ -1734,6 +1714,7 @@ class _FakeShelfService extends BookSourceShelfService {
   Future<Book> downloadToLocal({
     required RegisteredBookSource source,
     required BookSourceBook book,
+    String? bookUid,
     void Function(int completed, int total)? onProgress,
     BookDownloadCancellation? cancellation,
   }) {
@@ -1825,6 +1806,15 @@ class _DiscoveryClient extends BookSourceClient {
       ),
     ]);
   }
+}
+
+class _DetailsDiscoveryClient extends _DiscoveryClient {
+  @override
+  Future<BookSourceBook> getBook(
+    RegisteredBookSource source,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => _book(bookId, '${source.name} pick details');
 }
 
 class _DelayedRefreshDiscoveryClient extends _DiscoveryClient {
@@ -1972,6 +1962,26 @@ class _CategoryFailingDiscoveryClient extends _DiscoveryClient {
   }) {
     throw const BookSourceProtocolException('Channel endpoint failed.');
   }
+}
+
+class _BookActionsClient extends _EmptyDiscoveryClient {
+  _BookActionsClient(this.book);
+
+  final BookSourceBook book;
+
+  @override
+  Future<BookSourceBook> getBook(
+    RegisteredBookSource source,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => book;
+
+  @override
+  Future<List<BookSourceChapter>> getChapters(
+    RegisteredBookSource source,
+    String bookId, {
+    Map<String, String> sourceVariables = const {},
+  }) async => const [];
 }
 
 class _EmptyDiscoveryClient extends BookSourceClient {

@@ -8,10 +8,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/settings/about/open_source_licenses_page.dart';
 import 'package:xxread/pages/settings/settings_page.dart';
+import 'package:xxread/pages/settings/cloud_tts_settings_page.dart';
+import 'package:xxread/services/reader_aloud_service.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/account/account.dart';
 import 'package:xxread/services/core/core_services.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
+
+class _SettingsAloudService extends ChangeNotifier
+    implements ReaderAloudService {
+  @override
+  ReaderAloudCloudSettings get cloudSettings =>
+      const ReaderAloudCloudSettings();
+  @override
+  bool get hasCloudApiKey => false;
+  @override
+  Future<void> initialize() async {}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _FakeCacheManager extends AppCacheManager {
   @override
@@ -36,6 +51,7 @@ Future<ValueNotifier<double>> _pumpSettingsPage(
   WidgetTester tester, {
   required Locale locale,
   double textScaleFactor = 1,
+  ReaderAloudService? aloudService,
   Size surfaceSize = const Size(390, 1200),
 }) async {
   tester.view.devicePixelRatio = 1;
@@ -60,6 +76,8 @@ Future<ValueNotifier<double>> _pumpSettingsPage(
         ChangeNotifierProvider.value(value: appSettings),
         ChangeNotifierProvider.value(value: webDav),
         ChangeNotifierProvider.value(value: account),
+        if (aloudService != null)
+          ChangeNotifierProvider<ReaderAloudService>.value(value: aloudService),
       ],
       child: MaterialApp(
         locale: locale,
@@ -137,6 +155,40 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
+  testWidgets('cloud TTS settings entry uses the shared playback service', (
+    tester,
+  ) async {
+    final aloud = _SettingsAloudService();
+    addTearDown(aloud.dispose);
+    await _pumpSettingsPage(
+      tester,
+      locale: const Locale('zh'),
+      aloudService: aloud,
+    );
+    await tester.scrollUntilVisible(
+      find.text('云端 TTS'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('云端 TTS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('云端 TTS'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<CloudTtsSettingsPage>(find.byType(CloudTtsSettingsPage))
+          .service,
+      same(aloud),
+    );
+    expect(
+      find.byKey(const ValueKey('cloud-tts-save')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await _disposeSettingsPage(tester);
+  });
+
   testWidgets(
     'complete settings page mounts with its provider graph',
     (tester) async {
@@ -203,55 +255,90 @@ void main() {
     (label: 'English', locale: Locale('en'), textScaleFactor: 1.0),
     (label: 'Japanese', locale: Locale('ja'), textScaleFactor: 1.0),
     (label: 'large English text', locale: Locale('en'), textScaleFactor: 1.6),
+    (
+      label: 'maximum Chinese app text',
+      locale: Locale('zh'),
+      textScaleFactor: 1.3,
+    ),
+    (
+      label: 'maximum English app text',
+      locale: Locale('en'),
+      textScaleFactor: 1.3,
+    ),
+    (
+      label: 'maximum Japanese app text',
+      locale: Locale('ja'),
+      textScaleFactor: 1.3,
+    ),
   ]) {
     testWidgets(
       'keeps wrapped about links within the card at 320 pixels in ${testCase.label}',
       (tester) async {
-        final textScale = await _pumpSettingsPage(
+        await _pumpSettingsPage(
           tester,
           locale: testCase.locale,
-          surfaceSize: const Size(390, 1200),
+          textScaleFactor: testCase.textScaleFactor,
+          surfaceSize: const Size(320, 1200),
         );
         await _scrollToAboutCard(tester);
-        // Narrow-screen section titles elsewhere on this page already overflow
-        // with the test font. Keep this regression scoped to the about card and
-        // forward every other rendering error to the normal test handler.
-        final previousErrorHandler = FlutterError.onError;
-        FlutterError.onError = (details) {
-          final diagnostic = details.toString();
-          if (details.exceptionAsString().contains('A RenderFlex overflowed') &&
-              diagnostic.contains('settings_layout_part.dart:52')) {
-            return;
-          }
-          previousErrorHandler?.call(details);
-        };
-        try {
-          tester.view.physicalSize = const Size(320, 1200);
-          textScale.value = testCase.textScaleFactor;
-          await tester.pump();
 
-          final cardRect = tester.getRect(
-            find.byKey(const ValueKey('settings-about-card')),
-          );
-          for (final key in const [
-            'settings-qq-group-link',
-            'settings-qq-channel-link',
-            'settings-telegram-link',
-            'settings-github-link',
-            'settings-website-link',
-          ]) {
-            final linkRect = tester.getRect(find.byKey(ValueKey(key)));
-            expect(linkRect.left, greaterThanOrEqualTo(cardRect.left));
-            expect(linkRect.right, lessThanOrEqualTo(cardRect.right));
-          }
-          expect(tester.takeException(), isNull);
-          await _disposeSettingsPage(tester);
-        } finally {
-          FlutterError.onError = previousErrorHandler;
+        final cardRect = tester.getRect(
+          find.byKey(const ValueKey('settings-about-card')),
+        );
+        for (final key in const [
+          'settings-qq-group-link',
+          'settings-qq-channel-link',
+          'settings-telegram-link',
+          'settings-github-link',
+          'settings-website-link',
+        ]) {
+          final linkRect = tester.getRect(find.byKey(ValueKey(key)));
+          expect(linkRect.left, greaterThanOrEqualTo(cardRect.left));
+          expect(linkRect.right, lessThanOrEqualTo(cardRect.right));
         }
+        expect(tester.takeException(), isNull);
+        await _disposeSettingsPage(tester);
       },
     );
   }
+
+  testWidgets('offers five app text sizes and persists every selection', (
+    tester,
+  ) async {
+    await _pumpSettingsPage(tester, locale: const Locale('zh'));
+    final settingsContext = tester.element(find.byType(SettingsPage));
+    final settings = Provider.of<AppSettingsNotifier>(
+      settingsContext,
+      listen: false,
+    );
+    final l10n = AppLocalizations.of(settingsContext);
+
+    await tester.scrollUntilVisible(
+      find.text(l10n.appTextSize),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.appTextSize));
+    await tester.pumpAndSettle();
+
+    for (var level = 0; level < 5; level++) {
+      final option = find.byKey(ValueKey('app-text-size-$level'));
+      expect(option, findsOneWidget);
+      await tester.tap(option);
+      await tester.pump();
+
+      expect(settings.appTextScaleLevel, level);
+      expect(
+        settings.appTextScaleFactor,
+        AppSettingsNotifier.appTextScaleFactors[level],
+      );
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getInt('app_text_scale_level_v1'), level);
+    }
+    expect(tester.takeException(), isNull);
+    await _disposeSettingsPage(tester);
+  });
 
   testWidgets('reveals localized open-source details only after tapping info', (
     tester,

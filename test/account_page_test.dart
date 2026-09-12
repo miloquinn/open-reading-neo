@@ -1,17 +1,130 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:flutter_web_auth_2_platform_interface/flutter_web_auth_2_platform_interface.dart';
+// ignore: depend_on_referenced_packages
+import 'package:flutter_web_auth_2_platform_interface/method_channel/method_channel.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/account/account_page.dart';
 import 'package:xxread/services/account/account.dart';
 import 'package:xxread/widgets/settings_account_card.dart';
 
+Future<void> _pumpExternalLoginPage(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(390, 1000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+  addTearDown(() => debugDefaultTargetPlatformOverride = null);
+  final previousWebAuthPlatform = FlutterWebAuth2Platform.instance;
+  FlutterWebAuth2Platform.instance = FlutterWebAuth2MethodChannel();
+  addTearDown(() => FlutterWebAuth2Platform.instance = previousWebAuthPlatform);
+  final controller = MemberAccountController(
+    api: MemberAccountApiClient(
+      dio: Dio()..httpClientAdapter = _AccountAdapter(),
+      tokenStore: _EmptyTokenStore(),
+    ),
+  );
+  await tester.runAsync(controller.initialize);
+  await tester.pumpWidget(
+    ChangeNotifierProvider.value(
+      value: controller,
+      child: MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const AccountPage(),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('iOS external login cancellation quietly stops authorization', (
+    tester,
+  ) async {
+    const channel = MethodChannel('flutter_web_auth_2');
+    var authenticateCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'authenticate');
+          expect(call.arguments, containsPair('callbackUrlScheme', 'xxread'));
+          authenticateCalls++;
+          throw PlatformException(code: 'CANCELED');
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    await _pumpExternalLoginPage(tester);
+
+    final githubButton = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const ValueKey('account-provider-github')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.runAsync(() async {
+      githubButton.onTap!();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(authenticateCalls, 1);
+    expect(find.text('ABCD-EFGH'), findsNothing);
+    expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
+  });
+
+  testWidgets('iOS external login platform failures are shown to the user', (
+    tester,
+  ) async {
+    const channel = MethodChannel('flutter_web_auth_2');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          throw PlatformException(
+            code: 'AUTH_SESSION_FAILED',
+            message: 'authentication unavailable',
+          );
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    await _pumpExternalLoginPage(tester);
+
+    final githubButton = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const ValueKey('account-provider-github')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.runAsync(() async {
+      githubButton.onTap!();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(find.textContaining('AUTH_SESSION_FAILED'), findsOneWidget);
+    expect(find.textContaining('authentication unavailable'), findsOneWidget);
+  });
+
   testWidgets('guest account card opens the complete account center', (
     tester,
   ) async {
@@ -456,6 +569,13 @@ class _AccountAdapter implements HttpClientAdapter {
         'product': 'premium_lifetime',
         'purchase_url': 'https://pay.ldxp.cn/item/m3rfxi',
         'features': ['supporter_badge'],
+      },
+      '/api/v1/auth/device/github/begin' => {
+        'device_code': 'device-code',
+        'user_code': 'ABCD-EFGH',
+        'verification_uri': 'https://github.com/login/device',
+        'expires_in': 600,
+        'interval': 5,
       },
       _ => throw StateError('Unexpected route ${options.uri.path}'),
     };

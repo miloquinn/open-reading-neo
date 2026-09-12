@@ -15,7 +15,7 @@ import 'package:xxread/pages/settings/sync/webdav_sync_content_page.dart';
 import 'package:xxread/pages/settings/sync/webdav_sync_page.dart';
 import 'package:xxread/services/sync/secure_sync_config.dart';
 import 'package:xxread/services/sync/sync_models.dart';
-import 'package:xxread/services/sync/mutable_txt_sync_service.dart';
+import 'package:xxread/services/sync/book_content_sync_service.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 
 void main() {
@@ -557,13 +557,13 @@ class _PreviewController extends _ScopeController {
   @override
   bool get lastFailureIsFile => failed;
   @override
-  List<MutableTxtBookState> get textStates => const [
-    MutableTxtBookState(
+  List<BookContentState> get textStates => const [
+    BookContentState(
       bookUid: 'book',
       localBookId: 1,
       localPath: '/books/book.txt',
-      remotePath: 'v2:books/book/current.txt',
-      status: MutableTxtSyncStatus.synced,
+      remotePath: 'books/book/current.txt',
+      status: BookContentSyncStatus.synced,
     ),
   ];
 }

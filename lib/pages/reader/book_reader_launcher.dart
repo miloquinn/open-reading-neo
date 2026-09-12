@@ -167,11 +167,11 @@ class BookReaderLauncher {
       if (sync?.autoSync == true && sync?.scope.bookFiles == true) {
         try {
           final uid = await stableBookUid(repaired);
-          final states = await sync!.mutableTxtService.listStates();
+          final states = await sync!.contentSyncService.listStates();
           final enabled = states.any(
             (state) => state.bookUid == uid && state.enabled,
           );
-          if (enabled && await sync.mutableTxtService.applyPendingRemote(uid)) {
+          if (enabled && await sync.contentSyncService.applyPendingRemote(uid)) {
             repaired = await BookDao().getBookById(repaired.id!) ?? repaired;
           }
         } catch (error) {

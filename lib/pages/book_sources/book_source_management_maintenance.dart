@@ -2,121 +2,21 @@ part of 'book_source_management_page.dart';
 
 extension _BookSourceManagementMaintenance on _BookSourceManagementPageState {
   Future<void> _showMaintenanceMenu() async {
-    final request = await showModalBottomSheet<BookSourceMaintenanceRequest>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => BookSourceMaintenanceSheet(
-        maintenance: _maintenance,
-        sources: _controller.state.sources,
-        selectedSourceIds: _controller.state.selectedSourceIds,
-      ),
-    );
-    if (!mounted || request == null) return;
-    switch (request.action) {
-      case BookSourceMaintenanceAction.healthCheck:
-        if (!_maintenance.state.isRunning) {
-          unawaited(
-            _maintenance.start(
-              _controller.state.sources.where(
-                (source) => request.sourceIds.contains(source.id),
-              ),
-            ),
-          );
-        }
-        await _showMaintenanceProgress();
-      case BookSourceMaintenanceAction.dedupe:
-        await _reviewInstalledDuplicates(sourceIds: request.sourceIds);
-      case BookSourceMaintenanceAction.reviewHealthResult:
-        await _reviewHealthResult();
-      case BookSourceMaintenanceAction.resumeHealth:
-        unawaited(_maintenance.resume());
-        await _showMaintenanceProgress();
-      case BookSourceMaintenanceAction.retryHealth:
-        unawaited(_maintenance.retryIssues());
-        await _showMaintenanceProgress();
-    }
-  }
-
-  Future<void> _showMaintenanceProgress() async {
-    if (_maintenanceProgressOpen || !mounted) return;
-    _maintenanceProgressOpen = true;
-    var reviewAfterClose = false;
+    if (_maintenancePageOpen || !mounted) return;
+    _maintenancePageOpen = true;
     try {
-      final continued = await showModalBottomSheet<bool>(
-        context: context,
-        useSafeArea: true,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (sheetContext) => BookSourceMaintenanceProgressSheet(
-          maintenance: _maintenance,
-          onReview: () {
-            reviewAfterClose = true;
-            Navigator.pop(sheetContext, false);
-          },
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => BookSourceMaintenancePage(
+            controller: _controller,
+            maintenance: _maintenance,
+            readReferencedSourceIds: widget.readReferencedSourceIds,
+            onDedupe: (ids) => _reviewInstalledDuplicates(sourceIds: ids),
+          ),
         ),
       );
-      if (!mounted) return;
-      if (reviewAfterClose) {
-        await _reviewHealthResult();
-      } else if (continued != false && _maintenance.state.isRunning) {
-        showSideToast(
-          context,
-          context.l10n.bookSourcesMaintenanceBackgroundToast,
-          kind: SideToastKind.info,
-        );
-      }
     } finally {
-      _maintenanceProgressOpen = false;
-    }
-  }
-
-  Future<void> _reviewHealthResult() async {
-    final result = _maintenance.state.result;
-    if (result == null) return;
-    if (result.total == 0) {
-      showSideToast(
-        context,
-        context.l10n.bookSourcesCleanupNoCheckableSources,
-        kind: SideToastKind.info,
-      );
-      return;
-    }
-    try {
-      final references = await widget.readReferencedSourceIds();
-      if (!mounted) return;
-      final current = {
-        for (final source in _controller.state.sources) source.id: source,
-      };
-      // A background check may outlive edits or removal in the source list.
-      final attention = [
-        for (final assessment in result.assessments)
-          if (assessment.needsAttention &&
-              !result.reviewedSourceIds.contains(assessment.source.id))
-            ?current[assessment.source.id],
-      ];
-      final available = [
-        for (final source in result.fullyAvailable) ?current[source.id],
-      ];
-      final toDisable = await showModalBottomSheet<Set<String>>(
-        context: context,
-        useSafeArea: true,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (_) => BookSourceCleanupReviewSheet(
-          fullyAvailableCount: available.length,
-          fullyAvailableSources: available,
-          needsAttention: attention,
-          assessments: result.assessments,
-          referencedSourceIds: references,
-        ),
-      );
-      if (!mounted || toDisable == null || toDisable.isEmpty) return;
-      final applied = await _applyMaintenanceSelection(toDisable);
-      if (applied.isNotEmpty) await _maintenance.dismissReviewed(applied);
-    } on Object catch (error) {
-      if (mounted) showSideToast(context, '$error', kind: SideToastKind.error);
+      _maintenancePageOpen = false;
     }
   }
 

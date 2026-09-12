@@ -12,6 +12,7 @@ import 'package:xxread/core/reader/reader_text_pagination.dart';
 import 'package:xxread/models/book_note.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/reader_themes.dart';
+import 'package:xxread/widgets/app_menu.dart';
 import 'package:xxread/widgets/reader_control_chrome.dart';
 import 'package:xxread/widgets/reader_chapter_title_page.dart';
 import 'package:xxread/widgets/reader_text_page_content.dart';
@@ -391,7 +392,7 @@ class _ReaderSelectionMoreAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
+    return AppPopupMenuButton<String>(
       key: const ValueKey('reader-selection-more'),
       tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
       color: palette.background,

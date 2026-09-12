@@ -802,13 +802,16 @@ class _DeleteAccountPageState extends State<_DeleteAccountPage> {
       );
       return;
     }
+    late final bool appleManualRevocationRequired;
     try {
-      await context.read<MemberAccountController>().deleteAccount(
-        challengeId: challenge.id,
-        code: _code.text,
-        confirmation: _confirmation.text,
-        mfaCode: preview.mfaRequired ? _mfaCode.text : null,
-      );
+      appleManualRevocationRequired = await context
+          .read<MemberAccountController>()
+          .deleteAccount(
+            challengeId: challenge.id,
+            code: _code.text,
+            confirmation: _confirmation.text,
+            mfaCode: preview.mfaRequired ? _mfaCode.text : null,
+          );
     } catch (error) {
       if (mounted) {
         showSideToast(context, error.toString(), kind: SideToastKind.error);
@@ -821,8 +824,22 @@ class _DeleteAccountPageState extends State<_DeleteAccountPage> {
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         key: const ValueKey('account-delete-done'),
+        scrollable: true,
         title: Text(dialogContext.l10n.accountDeleteDoneTitle),
-        content: Text(dialogContext.l10n.accountDeleteDoneBody),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(dialogContext.l10n.accountDeleteDoneBody),
+            if (appleManualRevocationRequired) ...[
+              const SizedBox(height: 16),
+              Text(
+                dialogContext.l10n.accountDeleteAppleManualRevocation,
+                key: const ValueKey('account-delete-apple-manual-revocation'),
+              ),
+            ],
+          ],
+        ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),

@@ -24,11 +24,23 @@
   "discoverCategoryEmpty": "這個分類暫時沒有可顯示的書籍。",
   "bookSourceChannelLoadFailed": "頻道載入失敗",
   "bookSourceChannelLoadFailedMessage": "書源沒有傳回可用書籍：{details}",
-  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChannelLoadFailedMessage": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceConnectionFailed": "無法連線書源伺服器，已自動嘗試其他網路位址，請稍後重試。",
   "bookSourceRedirectFailed": "書源網站反覆跳轉；用戶端已保留網站 Cookie，但該位址仍未傳回內容。",
   "bookSourceHttpFailed": "書源網站傳回 HTTP {status}，頻道位址可能已失效或被網站阻擋。",
-  "@bookSourceHttpFailed": {"placeholders":{"status":{"type":"int"}}},
+  "@bookSourceHttpFailed": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceStandardLayout": "標準版面",
   "bookSourceListLayout": "清單版面",
   "bookSourceChangeChannel": "更換",
@@ -37,13 +49,28 @@
   "bookSourceChangeTargetSource": "切換到",
   "bookSourceChangeNotSelected": "尚未選擇",
   "bookSourceChangeCurrentChapter": "目前讀到第 {chapter} 章",
-  "@bookSourceChangeCurrentChapter": {"placeholders":{"chapter":{"type":"int"}}},
+  "@bookSourceChangeCurrentChapter": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeSearchLabel": "依書名尋找其他來源",
   "bookSourceChangeSearchAgain": "重新搜尋",
   "bookSourceChangeSearchRemaining": "繼續搜尋全部來源",
   "bookSourceChangeCheckAuthor": "核對作者",
   "bookSourceChangeSearchProgress": "已檢查 {completed} / {total}",
-  "@bookSourceChangeSearchProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourceChangeSearchProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeNoOtherSources": "沒有其他可用書源",
   "bookSourceChangeNoOtherSourcesHint": "請先新增並啟用至少一個支援搜尋的其他書源。",
   "bookSourceChangeSearching": "正在尋找其他來源",
@@ -51,24 +78,60 @@
   "bookSourceChangeNoMatches": "找不到相符來源",
   "bookSourceChangeNoMatchesHint": "可以修改書名，或關閉作者核對後重新搜尋。",
   "bookSourceChangeFailedSources": "{count} 個書源請求失敗，可以重新搜尋。",
-  "@bookSourceChangeFailedSources": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeFailedSources": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeAuthorDifferent": "作者不同",
   "bookSourceChangeValidating": "正在驗證目錄與目前章節…",
   "bookSourceChangeValidationFailed": "驗證失敗：{details}",
-  "@bookSourceChangeValidationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChangeValidationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChangeReadable": "目前章節可讀",
   "bookSourceChangeChapterCount": "{count} 章",
-  "@bookSourceChangeChapterCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeChapterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeResponseTime": "{milliseconds} ms",
-  "@bookSourceChangeResponseTime": {"placeholders":{"milliseconds":{"type":"int"}}},
+  "@bookSourceChangeResponseTime": {
+    "placeholders": {
+      "milliseconds": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeTapToValidate": "選擇後將驗證目錄與目前章節。",
   "bookSourceChangeAlreadyOnShelf": "此來源版本已在書架中。",
   "bookSourceChangeSwitching": "正在更換來源…",
   "bookSourceChangeSwitchAction": "切換到此來源",
   "bookSourceChangeSuccess": "已切換到 {source}",
-  "@bookSourceChangeSuccess": {"placeholders":{"source":{"type":"String"}}},
+  "@bookSourceChangeSuccess": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChannelCount": "{count} 個頻道",
-  "@bookSourceChannelCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceManagementTitle": "書源管理",
   "bookSourceManagementSubtitle": "管理內容來源的新增、啟停與協定資訊。探索頁只保留找書體驗。",
   "settingsContentSourcesTitle": "內容來源",
@@ -122,7 +185,16 @@
   "bookSourcesNoMatchingSources": "沒有符合目前搜尋和篩選條件的書源",
   "bookSourcesResetFilters": "重設",
   "bookSourcesVisibleCount": "顯示 {visible} / 共 {total} 個",
-  "@bookSourcesVisibleCount": {"placeholders":{"visible":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesVisibleCount": {
+    "placeholders": {
+      "visible": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesRemove": "移除",
   "bookSourcesRemoveTitle": "移除書源",
   "bookSourcesRemoveMessage": "此操作只移除書源設定，不會刪除本機書籍。",
@@ -138,7 +210,19 @@
   "bookSourcesAdvancedFeatureRequired": "目前的帳號或設定暫不支援此書源。",
   "bookSourcesNoWorkingSources": "沒有書源通過實際搜尋檢測，本次未匯入任何書源。",
   "bookSourcesVerificationProgress": "已檢測 {completed}/{total}，可用 {available} 個",
-  "@bookSourcesVerificationProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"},"available":{"type":"int"}}},
+  "@bookSourcesVerificationProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "available": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesSelect": "多選書源",
   "bookSourcesSelectAll": "全選",
   "bookSourcesClearSelection": "取消全選",
@@ -146,24 +230,72 @@
   "bookSourcesDisableSelected": "停用所選",
   "bookSourcesDeleteSelected": "刪除所選",
   "bookSourcesDeleteSelectedMessage": "確定刪除選取的 {count} 個書源嗎？本機書籍不受影響。",
-  "@bookSourcesDeleteSelectedMessage": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDeleteSelectedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCheckSelected": "檢查所選",
   "bookSourcesHealthCheckSummary": "已檢查 {total} 個來源，{healthy} 個正常",
-  "@bookSourcesHealthCheckSummary": {"placeholders":{"healthy":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesHealthCheckSummary": {
+    "placeholders": {
+      "healthy": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupMenuLabel": "檢測並清理書源",
   "bookSourcesCleanupNoCheckableSources": "沒有可檢測的書源",
   "bookSourcesCleanupAllFullyAvailable": "已檢測的 {count} 個書源均完全可用",
-  "@bookSourcesCleanupAllFullyAvailable": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupAllFullyAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewTitle": "體檢結果",
   "bookSourcesCleanupReviewSummary": "完整可用 {fullyAvailable} 個，待確認 {needsAttention} 個",
-  "@bookSourcesCleanupReviewSummary": {"placeholders":{"fullyAvailable":{"type":"int"},"needsAttention":{"type":"int"}}},
+  "@bookSourcesCleanupReviewSummary": {
+    "placeholders": {
+      "fullyAvailable": {
+        "type": "int"
+      },
+      "needsAttention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewHint": "結果供參考。部分能力缺失或逾時不代表書源失效，請按需選擇停用。",
   "bookSourcesCleanupDisableSelected": "關閉選中的 {count} 個",
-  "@bookSourcesCleanupDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupDisabledSummary": "已關閉 {count} 個書源",
-  "@bookSourcesCleanupDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupCancelledSummary": "已停止，已檢測 {count} 個書源。之後再次執行會從上次的進度繼續。",
-  "@bookSourcesCleanupCancelledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupCancelledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceTitle": "書源整理",
   "bookSourcesMaintenanceSubtitle": "整理重複項目，檢查書源是否可用",
   "bookSourcesMaintenanceHealthTitle": "書源體檢",
@@ -173,32 +305,86 @@
   "bookSourcesMaintenanceDedupeSubtitle": "本機比對重複書源，無需連網",
   "bookSourcesMaintenanceReviewTitle": "上次體檢結果",
   "bookSourcesMaintenanceReviewSubtitle": "有 {count} 個書源需要處理",
-  "@bookSourcesMaintenanceReviewSubtitle": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesMaintenanceReviewSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceSafetyHint": "確認後僅停用所選書源，設定始終保留。",
   "bookSourcesMaintenanceProgressTitle": "正在體檢書源",
   "bookSourcesMaintenanceProgressHint": "正在檢查搜尋、詳情、目錄和正文能力",
   "bookSourcesMaintenanceFinishedTitle": "書源體檢完成",
   "bookSourcesMaintenanceFinishedSummary": "已檢查 {checked} 個書源，{attention} 個需要處理",
-  "@bookSourcesMaintenanceFinishedSummary": {"placeholders":{"checked":{"type":"int"},"attention":{"type":"int"}}},
+  "@bookSourcesMaintenanceFinishedSummary": {
+    "placeholders": {
+      "checked": {
+        "type": "int"
+      },
+      "attention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceProgress": "{completed} / {total}",
-  "@bookSourcesMaintenanceProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceStop": "停止檢測",
   "bookSourcesMaintenanceBackground": "背景繼續",
   "bookSourcesMaintenanceBackgroundHint": "關閉進度頁後，檢查將在應用程式執行期間靜默繼續。",
   "bookSourcesMaintenanceBackgroundToast": "書源體檢已在背景靜默繼續",
   "bookSourcesMaintenanceReviewResults": "查看體檢結果",
   "bookSourcesMaintenanceRunningMenuLabel": "書源整理 {completed}/{total}",
-  "@bookSourcesMaintenanceRunningMenuLabel": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceRunningMenuLabel": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeMenuLabel": "尋找重複書源",
   "bookSourcesDedupeNone": "沒有發現重複書源",
   "bookSourcesDedupeReviewTitle": "檢查重複書源",
   "bookSourcesDedupeReviewSummary": "共 {groups} 組，{duplicates} 個重複書源",
-  "@bookSourcesDedupeReviewSummary": {"placeholders":{"groups":{"type":"int"},"duplicates":{"type":"int"}}},
+  "@bookSourcesDedupeReviewSummary": {
+    "placeholders": {
+      "groups": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeReviewHint": "將保留建議書源，選取的重複項只會被停用，不會刪除。",
   "bookSourcesDedupeDisableSelected": "停用選取的 {count} 個",
-  "@bookSourcesDedupeDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeDisabledSummary": "已停用 {count} 個重複書源",
-  "@bookSourcesDedupeDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeModeExact": "精確",
   "bookSourcesDedupeModeStandard": "標準",
   "bookSourcesDedupeModeSite": "同站審查",
@@ -208,9 +394,33 @@
   "bookSourcesDedupeRecommended": "建議保留",
   "bookSourcesDedupeReviewAction": "檢視去重結果",
   "bookSourcesDedupeImportSummary": "可匯入 {ready} 個，重複 {duplicates} 個，無效 {errors} 個",
-  "@bookSourcesDedupeImportSummary": {"placeholders":{"ready":{"type":"int"},"duplicates":{"type":"int"},"errors":{"type":"int"}}},
+  "@bookSourcesDedupeImportSummary": {
+    "placeholders": {
+      "ready": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "errors": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesImportTypeSummary": "書籍源 {books} 個 · 漫畫源 {comics} 個 · 目前無法執行 {unsupported} 個",
-  "@bookSourcesImportTypeSummary": {"placeholders":{"books":{"type":"int"},"comics":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@bookSourcesImportTypeSummary": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "comics": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeRestoreDefaults": "恢復建議選取",
   "bookSourcesUrlLabel": "書源位址",
   "bookSourcesUrlHint": "https://example.com 或書源 JSON 連結",
@@ -247,15 +457,31 @@
   "bookSourcesClose": "關閉",
   "sourceLoginTitle": "書源登入",
   "sourceLoginSecureStorageNotice": "登入資訊只會保存在目前裝置的系統安全儲存空間。",
-  "sourceLoginNoForm": "此書源沒有可顯示的登入表單，網頁登入尚未接入。",
+  "sourceLoginNoForm": "此書源沒有提供可用的登入方式。",
+  "sourceLoginBrowserTitle": "在原網站登入",
+  "sourceLoginBrowserNotice": "請在內建瀏覽器中完成登入，然後點「完成」。Cookie 和網站本機儲存空間會保存在目前裝置。",
+  "sourceLoginBrowserUnsupported": "網頁登入支援 Android、iPhone、iPad 和 Mac。",
+  "sourceLoginBrowserOpen": "開啟原網站登入",
   "sourceLoginSave": "登入並儲存工作階段",
   "sourceLoginClear": "清除登入工作階段",
   "sourceLoginSaved": "書源登入工作階段已更新",
   "sourceLoginCleared": "書源登入工作階段已清除",
   "sourceLoginFailed": "無法更新書源登入工作階段：{details}",
-  "@sourceLoginFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceLoginFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "sourceLoginDiscoveryNotice": "「{sourceName}」提供登入功能，登入後才能使用需要帳號的內容。",
-  "@sourceLoginDiscoveryNotice": {"placeholders":{"sourceName":{"type":"String"}}},
+  "@sourceLoginDiscoveryNotice": {
+    "placeholders": {
+      "sourceName": {
+        "type": "String"
+      }
+    }
+  },
   "sourceDebugMenuLabel": "偵錯",
   "sourceDebugTitle": "書源偵錯",
   "sourceDebugInputHint": "輸入搜尋關鍵字，或貼上書籍/目錄/正文連結",
@@ -271,7 +497,13 @@
   "bookSourcesFullyAvailable": "完全可用",
   "sourceHealthTimedOut": "檢查逾時",
   "sourceHealthFailedCapabilities": "失效項目：{capabilities}",
-  "@sourceHealthFailedCapabilities": {"placeholders":{"capabilities":{"type":"String"}}},
+  "@sourceHealthFailedCapabilities": {
+    "placeholders": {
+      "capabilities": {
+        "type": "String"
+      }
+    }
+  },
   "sourceHealthCapabilitySearch": "搜尋",
   "sourceHealthCapabilityDiscover": "發現",
   "sourceHealthCapabilityInfo": "詳情",
@@ -285,7 +517,13 @@
   "sourceVerificationRetry": "重新開啟瀏覽器",
   "sourceVerificationCancel": "取消驗證",
   "sourceVerificationFailed": "無法開啟書源驗證：{details}",
-  "@sourceVerificationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceVerificationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "settings": "設定",
   "statistics": "統計",
   "reading": "閱讀",
@@ -368,7 +606,13 @@
   "customFontsEmpty": "尚未匯入字體",
   "customFontsEmptyHint": "匯入一次 TTF 或 OTF 檔案，即可用於 App 介面或閱讀正文。",
   "customFontsCount": "已匯入 {count} 款字體",
-  "@customFontsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@customFontsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "customFontsLocalOnly": "匯入的字體只儲存在目前裝置，不會自動同步。",
   "builtInFonts": "內建字體",
   "importFont": "匯入字體",
@@ -391,7 +635,13 @@
   "setAsBothFonts": "同時用於兩者",
   "renameFont": "重新命名字體",
   "deleteCustomFontTitle": "刪除「{name}」？",
-  "@deleteCustomFontTitle": {"placeholders": {"name": {"type": "String"}}},
+  "@deleteCustomFontTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "deleteCustomFontMessage": "字體檔案將從目前裝置刪除。",
   "deleteCustomFontInUse": "此字體正在使用。刪除後，受影響的字體設定將恢復為預設值。",
   "deleteAndReset": "刪除並恢復預設",
@@ -543,8 +793,12 @@
   "readerNavigationPosition": "第 {current}/{total} 章",
   "@readerNavigationPosition": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "readerSearchChapters": "搜尋章節",
@@ -903,7 +1157,13 @@
   "libraryExportOriginalHint": "將原始檔案複製到裝置上的其他位置",
   "libraryExportDownloadedTxtHint": "匯出下載後產生的 TXT 檔案",
   "bookExportSuccess": "已匯出到 {location}",
-  "@bookExportSuccess": {"placeholders": {"location": {"type": "String"}}},
+  "@bookExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "bookExportSourceMissing": "書籍檔案不存在，無法匯出",
   "bookExportUnsupported": "目前平台暫不支援匯出書籍",
   "bookExportFailed": "書籍匯出失敗",
@@ -980,18 +1240,60 @@
   "librarySelectMultiple": "選擇多本",
   "librarySelectAll": "全選",
   "librarySelectedBooks": "已選擇 {count} 本",
-  "@librarySelectedBooks": {"placeholders": {"count": {"type": "int"}}},
+  "@librarySelectedBooks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeleteSelected": "刪除 {count} 本",
-  "@libraryDeleteSelected": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryDeleteSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteTitle": "刪除所選書籍？",
   "libraryBatchDeleteMessage": "將永久刪除所選的 {count} 本書，以及相關筆記、書籤和本機檔案。此操作無法復原。",
-  "@libraryBatchDeleteMessage": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeletingSelected": "正在刪除 {done}/{total}",
-  "@libraryDeletingSelected": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@libraryDeletingSelected": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteSuccess": "已刪除 {count} 本書",
-  "@libraryBatchDeleteSuccess": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeletePartial": "已刪除 {success} 本，{failed} 本刪除失敗",
-  "@libraryBatchDeletePartial": {"placeholders": {"success": {"type": "int"}, "failed": {"type": "int"}}},
+  "@libraryBatchDeletePartial": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "readerPrefaceTitle": "內文前",
   "readerModeHorizontalPage": "無動畫",
   "readerModeVerticalScrollHint": "預先分頁後上下連續滑動，左右滑動切換章節",
@@ -1160,19 +1462,70 @@
   "additionalSourcesUrlLabel": "書源 JSON 網址",
   "additionalSourcesLoadUrl": "從 URL 載入",
   "additionalSourcesPreview": "可使用 {supported} 個，部分支援 {partial} 個，暫不支援 {unsupported} 個",
-  "@additionalSourcesPreview": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@additionalSourcesPreview": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesPreviewDetails": "標準規則 {supported} 個，擴充規則 {partial} 個，進階規則 {unsupported} 個，略過 {skipped} 條",
-  "@additionalSourcesPreviewDetails": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesPreviewDetails": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesQuickPreview": "{count} 個書源可匯入，略過 {skipped} 個",
-  "@additionalSourcesQuickPreview": {"placeholders":{"count":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesQuickPreview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesAvailable": "可使用",
   "additionalSourcesPartial": "部分支援",
   "additionalSourcesUnsupported": "暫不支援",
   "additionalSourcesImportConfirm": "批次匯入",
   "additionalSourcesImported": "已匯入 {count} 個書源",
-  "@additionalSourcesImported": {"placeholders":{"count":{"type":"int"}}},
+  "@additionalSourcesImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesImportedWithConflicts": "已匯入 {count} 個書源，另有 {conflicted} 個因 ID 與現有來源不同而跳過",
-  "@additionalSourcesImportedWithConflicts": {"placeholders":{"count":{"type":"int"},"conflicted":{"type":"int"}}},
+  "@additionalSourcesImportedWithConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "conflicted": {
+        "type": "int"
+      }
+    }
+  },
   "settingsSectionAboutSupport": "關於與支持",
   "settingsKeepScreenOnTitle": "保持螢幕恆亮",
   "settingsKeepScreenOnSubtitle": "閱讀時防止螢幕自動關閉",
@@ -1441,7 +1794,9 @@
   "updateDownloadProgress": "已下載 {percent}%",
   "@updateDownloadProgress": {
     "placeholders": {
-      "percent": {"type": "int"}
+      "percent": {
+        "type": "int"
+      }
     }
   },
   "updatePreparingInstaller": "正在驗證安裝檔並準備系統安裝程式…",
@@ -1696,20 +2051,62 @@
   "readerAutoPageTurnSweepDurationLabel": "掃屏時長",
   "readerAutoPageTurnScrollSpeedLabel": "捲動速度",
   "readerAutoPageTurnSecondsPerScreen": "{seconds} 秒/屏",
-  "@readerAutoPageTurnSecondsPerScreen": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnSecondsPerScreen": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModeValue": "{mode} · {seconds} 秒/屏",
-  "@readerAutoPageTurnModeValue": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModeValue": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModePaused": "已暫停 · {mode} · {seconds} 秒/屏",
-  "@readerAutoPageTurnModePaused": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModePaused": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnIntervalLabel": "翻頁間隔",
   "readerAutoPageTurnInterval": "每 {seconds} 秒前進一屏",
-  "@readerAutoPageTurnInterval": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnInterval": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnStart": "開始自動翻頁",
   "readerAutoPageTurnResume": "繼續自動翻頁",
   "readerAutoPageTurnRunning": "自動 · {seconds} 秒/屏",
-  "@readerAutoPageTurnRunning": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnRunning": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnPaused": "已暫停 · {seconds} 秒/屏",
-  "@readerAutoPageTurnPaused": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnPaused": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerThemeDay": "白天",
   "readerThemeFollowSystem": "跟隨系統",
   "readerThemeMist": "晨霧",
@@ -1807,7 +2204,9 @@
   "settingsAiSwitchedToModel": "已切換到 {model}",
   "@settingsAiSwitchedToModel": {
     "placeholders": {
-        "model": {"type": "String"}
+      "model": {
+        "type": "String"
+      }
     }
   },
   "settingsAiFillBaseUrlAndApiKey": "請先填寫 Base URL 和 API Key",
@@ -1834,7 +2233,9 @@
   "settingsAiFetchModelsFailed": "取得模型失敗：{error}",
   "@settingsAiFetchModelsFailed": {
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "settingsAiPreprocessTitle": "AI 預處理書籍",
@@ -1876,91 +2277,147 @@
   "readerAiRequestFailed": "請求失敗：{error}",
   "@readerAiRequestFailed": {
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "readerAiUnknownError": "未知錯誤",
   "readerAiEmptyResponseError": "服務端返回為空，通常是 Base URL 設定錯誤、閘道沒有轉發到模型介面，或服務端提前斷開連線。\n請求位址：{endpoint}",
   "@readerAiEmptyResponseError": {
     "placeholders": {
-        "endpoint": {"type": "String"}
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiInvalidJsonError": "服務端返回的不是合法 JSON，目前介面可能與 {provider} 設定不相容。\n請求位址：{endpoint}\n返回片段：{snippet}",
   "@readerAiInvalidJsonError": {
     "placeholders": {
-        "provider": {"type": "String"},
-        "endpoint": {"type": "String"},
-        "snippet": {"type": "String"}
+      "provider": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      },
+      "snippet": {
+        "type": "String"
+      }
     }
   },
   "readerAiFailedReadBody": "請求失敗{status}：無法讀取服務端返回的資料，通常是 Base URL 設定錯誤、介面返回空內容，或網路將回應截斷了。\n請求位址：{endpoint}",
   "@readerAiFailedReadBody": {
     "placeholders": {
-        "status": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiNetworkRequestFailed": "網路請求失敗{status}：{error}\n請求位址：{endpoint}",
   "@readerAiNetworkRequestFailed": {
     "placeholders": {
-        "status": {"type": "String"},
-        "error": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedMinimaxHint": "請求失敗({status})：{text}\n建議檢查：1) MiniMax 溫度需在 (0,1]；2) 模型名與介面是否匹配；3) 僅使用單條 system 指令。\n請求位址：{endpoint}",
   "@readerAiRequestFailedMinimaxHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedClaudeHint": "請求失敗({status})：{text}\n提示：Claude 必須攜帶 anthropic-version 請求標頭。\n請求位址：{endpoint}",
   "@readerAiRequestFailedClaudeHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedProviderMismatchHint": "請求失敗({status})：{text}\n提示：請確認服務商與 API Key 對應，不可混用。\n請求位址：{endpoint}",
   "@readerAiRequestFailedProviderMismatchHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedGeneric": "請求失敗({status})：{text}\n請求位址：{endpoint}",
   "@readerAiRequestFailedGeneric": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockSelectionResponse": "AI(模擬): 你選擇的內容是\"{selectedText}\"。\n\n上文: {before}\n下文: {after}",
   "@readerAiMockSelectionResponse": {
     "placeholders": {
-        "selectedText": {"type": "String"},
-        "before": {"type": "String"},
-        "after": {"type": "String"}
+      "selectedText": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockPageAnalysis": "AI(模擬): 本頁共 {chars} 字，建議重點關注段落開頭與結尾處的論點。",
   "@readerAiMockPageAnalysis": {
     "placeholders": {
-        "chars": {"type": "int"}
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "readerAiMockGreeting": "你好",
   "readerAiMockChatResponse": "AI(模擬): 你問的是「{question}」。\n\n我已讀取目前頁（{chars} 字），你可以繼續追問。",
   "@readerAiMockChatResponse": {
     "placeholders": {
-        "question": {"type": "String"},
-        "chars": {"type": "int"}
+      "question": {
+        "type": "String"
+      },
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "ttsSystemDefault": "系統預設",
@@ -1968,7 +2425,9 @@
   "ttsUnsupportedLanguage": "系統不支援語言: {language}",
   "@ttsUnsupportedLanguage": {
     "placeholders": {
-        "language": {"type": "String"}
+      "language": {
+        "type": "String"
+      }
     }
   },
   "ttsCallFailed": "系統 TTS 呼叫失敗",
@@ -2004,7 +2463,9 @@
   "agreementV2VersionLabel": "條款版本 {version}",
   "@agreementV2VersionLabel": {
     "placeholders": {
-        "version": {"type": "String"}
+      "version": {
+        "type": "String"
+      }
     }
   },
   "agreementFlowStepIntroduction": "軟體介紹",
@@ -2163,13 +2624,37 @@
   "webDavErrorIfMatchIgnoredDetail": "伺服器忽略了僅在版本一致時才寫入（If-Match）的條件，繼續同步可能覆蓋其他裝置的新修改。",
   "webDavErrorIfNoneMatchIgnoredDetail": "伺服器忽略了僅在檔案不存在時才建立（If-None-Match）的條件，繼續同步可能覆蓋已有檔案。",
   "webDavErrorReason": "具體原因：{reason}",
-  "@webDavErrorReason": {"placeholders":{"reason":{"type":"String"}}},
+  "@webDavErrorReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorHttpStatus": "HTTP 狀態碼：{status}",
-  "@webDavErrorHttpStatus": {"placeholders":{"status":{"type":"int"}}},
+  "@webDavErrorHttpStatus": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "webDavErrorRequestMethod": "請求方法：{method}",
-  "@webDavErrorRequestMethod": {"placeholders":{"method":{"type":"String"}}},
+  "@webDavErrorRequestMethod": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorResourcePath": "資源路徑：{path}",
-  "@webDavErrorResourcePath": {"placeholders":{"path":{"type":"String"}}},
+  "@webDavErrorResourcePath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorPhase": "失敗階段：{phase}",
   "webDavPhaseConnecting": "連接遠端",
   "webDavPhaseScanningLocal": "掃描本機資料",
@@ -2188,9 +2673,7 @@
   "webDavFilesOnlyLocal": "僅在本機",
   "webDavFilesOnlyRemote": "檔案尚未下載到本機",
   "webDavFilesUploadPermission": "允許上傳書籍原始檔案",
-  "webDavFilesUploadPermissionHint": "只會上傳你明確選取的書籍；WebDAV 保留原始檔名與內容，不另行加密",
-  "webDavLegacyBookDirectoryTitle": "舊版 WebDAV 書籍仍相容",
-  "webDavLegacyBookDirectoryMessage": "無需重新同步。新上傳書籍將使用「書名 - 作者/原始檔名」的可讀目錄。",
+  "webDavFilesUploadPermissionHint": "啟用後會自動備份已有的本機書籍。雲端 books/ 中依書名和作者保存可直接開啟的原格式檔案與封面；同名書以識別後綴區分，正文更新保留歷史版本。",
   "webDavNewBookPolicyTitle": "新書檔案處理",
   "webDavNewBookPolicyAsk": "每次詢問（建議）",
   "webDavNewBookPolicyAskHint": "匯入完成後選擇這次要上傳的書籍",
@@ -2322,25 +2805,61 @@
   "readingDataExportWholeBookHint": "匯出這本書中的全部批註，不包含書籍全文或書籍檔案。",
   "readingDataExportPrivacySummary": "包含螢光標記或底線原文和你的私人筆記；不包含書籍檔案、書籍全文、帳號或裝置資訊。",
   "readingDataExportCounts": "{highlights} 條螢光標記 · {underlines} 條底線 · {notes} 條筆記",
-  "@readingDataExportCounts": {"placeholders":{"highlights":{"type":"int"},"underlines":{"type":"int"},"notes":{"type":"int"}}},
+  "@readingDataExportCounts": {
+    "placeholders": {
+      "highlights": {
+        "type": "int"
+      },
+      "underlines": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportButton": "匯出 {count} 條批註",
-  "@readingDataExportButton": {"placeholders":{"count":{"type":"int"}}},
+  "@readingDataExportButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportPreparing": "正在產生 Markdown…",
   "readingDataExportEmpty": "這本書還沒有可匯出的螢光標記、底線或筆記。",
   "readingDataExportSuccess": "閱讀資料已匯出到 {location}",
-  "@readingDataExportSuccess": {"placeholders":{"location":{"type":"String"}}},
+  "@readingDataExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportFailed": "閱讀資料匯出失敗",
   "readingDataExportUnsupported": "目前平台尚不支援匯出閱讀資料",
   "readingDataExportReplaceTitle": "取代現有檔案？",
   "readingDataExportReplaceMessage": "{path} 已有檔案。取代後無法復原。",
-  "@readingDataExportReplaceMessage": {"placeholders":{"path":{"type":"String"}}},
+  "@readingDataExportReplaceMessage": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportReplaceAction": "取代",
   "readingDataExportExportedAt": "匯出時間",
   "readingDataExportAuthor": "作者",
   "readingDataExportContents": "內容",
   "readingDataExportMyNote": "我的筆記",
   "readingDataExportPositionPage": "第 {page} 頁",
-  "@readingDataExportPositionPage": {"placeholders":{"page":{"type":"int"}}},
+  "@readingDataExportPositionPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportUnknownChapter": "未定位的批註",
   "cloudSyncTitle": "雲端同步",
   "cloudSyncTagline": "換一台裝置，接著上次的位置讀",
@@ -2406,13 +2925,6 @@
   },
   "bookSourcesImportFileTab": "JSON 檔案",
   "bookSourcesImportTimedOut": "讀取逾時，請檢查網路，或下載 JSON 檔案後匯入。",
-  "cloudSyncIncrementalMode": "增量同步",
-  "cloudSyncPlainMode": "一般 TXT 檔案",
-  "cloudSyncIncrementalDescription": "首次上傳後，只傳輸變更的內容區塊。本機書籍仍是完整 TXT。",
-  "cloudSyncEnableIncremental": "切換為增量同步",
-  "cloudSyncIncrementalConfirmTitle": "切換這本書的雲端儲存方式？",
-  "cloudSyncIncrementalConfirmBody": "雲端將使用 App 管理的分塊格式。現有 TXT 副本會保留，但不再跟隨更新。其他裝置需要使用支援增量同步的新版 App。本機仍保留完整 TXT 檔案。",
-  "cloudSyncIncrementalConfirm": "切換並同步",
   "bookSourcesImportUsageNotice": "書源使用說明",
   "bookSourcesMaintenanceScope": "整理範圍",
   "bookSourcesMaintenanceScopeEnabled": "已啟用",
@@ -2443,6 +2955,32 @@
   "bookSourcesMaintenanceAvailableReason": "主要能力已通過檢測",
   "bookSourcesMaintenanceDedupeBusy": "正在整理重複項…",
   "bookSourcesMaintenanceShelfProtected": "書架正在使用 · 預設保留",
+  "bookSourcesMaintenanceDeleteReferencedWarning": "所選書源中有 {count} 個正在被書架書籍使用。刪除後，這些書籍可能無法更新或載入新章節。",
+  "@bookSourcesMaintenanceDeleteReferencedWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceProblemsFilter": "有問題",
+  "bookSourcesMaintenanceSelectedCount": "已選 {count} 個書源",
+  "@bookSourcesMaintenanceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceShelfUsed": "書架正在使用",
+  "bookSourcesMaintenancePause": "暫停檢測",
+  "bookSourcesMaintenancePausing": "正在暫停…",
+  "bookSourcesMaintenancePaused": "檢測已暫停",
+  "bookSourcesMaintenanceCompleted": "檢測完成",
+  "bookSourcesMaintenanceStart": "開始檢測",
+  "bookSourcesMaintenanceRestart": "重新檢測",
+  "bookSourcesMaintenanceCheckedThisRun": "本次已檢測",
+  "bookSourcesMaintenancePausedHint": "可以全選處理已完成的結果，也可以繼續檢測剩餘書源。",
   "bookSourcesMaintenanceApplyFailed": "未能儲存整理結果，請重試",
   "settingsQqGroup": "QQ 群",
   "settingsOpenSourceTitle": "開源說明",
@@ -2513,7 +3051,7 @@
   "accountDeleteTermsRedemptions": "已經兌換過的卡密不會退還，也不會重新變成可用狀態。",
   "accountDeleteTermsApple": "你在 App Store 購買過終身進階版。註銷不會退款，也不會取消任何 App Store 交易——退款只能向 Apple 申請。購買憑證會與你的帳號解除綁定並保留，因此你之後可以用同一個 Apple ID 在新帳號裡點擊「恢復購買」，重新拿回進階版權益。",
   "accountDeleteTermsLocalData": "存在這台裝置上的書籍、書架和閱讀記錄不會被刪除，它們本來就只保存在你的裝置裡。如果也想清除，請在 App 內自行刪除。",
-  "accountDeleteTermsTombstone": "我們只會保留一條註銷記錄，其中不含你的電子郵件明文、也無法還原成個人資訊。它的唯一用途是防止濫用，並讓上面說的 Apple 購買恢復能夠成立。",
+  "accountDeleteTermsTombstone": "我們僅保留防止濫用所需的最少量去識別化註銷資料，以及恢復或驗證購買所必需的 App Store 購買驗證記錄。這些記錄不會用於重建你的帳號。",
   "accountDeleteTermsRejoin": "註銷之後，同一個電子郵件可以重新註冊。但那會是一個全新的空帳號，不會帶回任何舊資料或權益。",
   "accountDeleteBlockedTitle": "這個帳號暫時不能註銷",
   "accountDeleteBlockedOwner": "你是管理後台的擁有者。請先把擁有者身分移交給其他人，再回來註銷帳號，否則後台將無人可管理。",
@@ -2534,5 +3072,52 @@
   "accountDeleteAction": "永久註銷帳號",
   "accountDeleteDoneTitle": "帳號已註銷",
   "accountDeleteDoneBody": "你的帳號和關聯資料已被永久刪除，所有裝置上的登入狀態已失效。感謝你曾經使用開元閱讀。",
-  "accountDeleteDoneClose": "關閉"
+  "accountDeleteAppleManualRevocation": "關閉此提示後，請前往「Apple 帳號設定」>「登入與安全性」>「使用 Apple 登入」>「開元閱讀」，然後選擇「停止使用 Apple 登入」。",
+  "accountDeleteDoneClose": "關閉",
+  "bookSourceDetailsTitle": "書籍詳情",
+  "bookSourceDetailsDescription": "內容簡介",
+  "bookSourceDetailsNoDescription": "書源暫未提供簡介。",
+  "bookSourceDetailsLatestChapter": "最新章節",
+  "bookSourceDetailsLoadFailed": "完整詳情載入失敗，可以重試或使用現有資訊閱讀。",
+  "bookSourceDetailsOnShelf": "已在書架",
+  "bookSourceDetailsAddFailed": "加入書架失敗，請重試。",
+  "bookSourceDetailsReadFailed": "開啟書籍失敗，請重試。",
+  "appTextSize": "介面字體大小",
+  "appTextSizeDescription": "僅調整應用程式選單和控制項，不影響閱讀正文字級。",
+  "appTextSizePreview": "選單和設定將以此字級顯示。",
+  "appTextSizeDefault": "100%（預設）",
+  "bookSourceTrackUpdatesTitle": "追更與正文更新",
+  "bookSourceTrackUpdatesBody": "下載後的書仍關聯書源。檢查新章節只補充新增內容；重新整理正文會檢查已下載章節，並保留你的修改與歷史版本。",
+  "bookSourceCheckNewChapters": "檢查新章節",
+  "bookSourceRefreshDownloaded": "重新整理已下載章節",
+  "bookSourceNoNewChapters": "目錄沒有新增章節。書源對舊章節的修改需要重新整理正文才能檢查。",
+  "bookSourceUpdateSummary": "新增 {added} 章，更新 {refreshed} 章",
+  "bookSourceBaselineUnknown": "需要先確認本地下載到哪一章，才能繼續追更。現有正文會完整保留。",
+  "bookSourceSelectBoundary": "確認已下載章節",
+  "bookSourceBoundaryHelp": "請選擇這份本地正文已經包含的最後一章。之後只補充它後面的新章節，不替換現有正文。",
+  "bookSourceTrackingEstablished": "已確認追更起點，可以檢查新章節了。",
+  "bookSourceMappingChanged": "書源目錄順序或章節識別碼發生變化，請重新確認已下載章節。現有正文未被替換。",
+  "bookSourceContentConflicts": "正文有待處理的修改",
+  "bookSourceContentConflictBody": "你和書源都修改了這些章節。目前繼續使用你的版本；比較後選擇要閱讀的版本，雙方歷史都會保留。",
+  "bookSourceCompareVersions": "比較正文",
+  "bookSourceLocalVersion": "我的正文",
+  "bookSourceRemoteVersion": "書源正文",
+  "bookSourceBaselineVersion": "下載時的正文",
+  "bookSourceKeepLocal": "保留我的正文",
+  "bookSourceUseRemote": "採用書源正文",
+  "bookSourceUpdateFailed": "更新未完成，現有正文已保留，請重試。",
+  "cloudSyncReadableStorage": "書籍以原格式儲存在 books/ 中，歷史版本也可直接開啟。未變化的檔案不會重複上傳；正文變化時會上傳完整檔案。",
+  "@bookSourceUpdateSummary": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "refreshed": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourceBindSource": "關聯書源",
+  "bookSourceNotBound": "未關聯書源",
+  "bookSourceDownloadedUnchanged": "已檢查下載章節，正文沒有變化。"
 }

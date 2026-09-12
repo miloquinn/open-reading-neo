@@ -156,9 +156,9 @@ class BookSourceChangeService {
     } catch (_) {
       // A broken current source must not prevent the user from finding a new one.
     }
-    final shelfIndex = shelfBook == null
-        ? 0
-        : shelfBook.currentPage ~/ BookSourceShelfService.unitsPerChapter;
+    final shelfIndex = shelfBook?.isOnline == true
+        ? shelfBook!.currentPage ~/ BookSourceShelfService.unitsPerChapter
+        : 0;
     final requestedIndex = saved?.chapterIndex ?? shelfIndex;
     final index = chapters.isEmpty
         ? requestedIndex.clamp(0, 1 << 30)
@@ -166,10 +166,11 @@ class BookSourceChangeService {
     return BookSourceChangePosition(
       chapterIndex: index,
       chapterProgress:
-          saved?.chapterProgress ?? _shelfChapterProgress(shelfBook),
+          saved?.chapterProgress ??
+          (shelfBook?.isOnline == true ? _shelfChapterProgress(shelfBook) : 0),
       chapterTitle: chapters.isEmpty ? '' : chapters[index].title,
       chapterCount: chapters.isEmpty
-          ? _shelfChapterCount(shelfBook)
+          ? (shelfBook?.isOnline == true ? _shelfChapterCount(shelfBook) : 0)
           : chapters.length,
     );
   }
@@ -333,15 +334,21 @@ class BookSourceChangeService {
   Future<BookSourceChangeResult> commit({
     required ValidatedBookSourceChange validated,
     Book? shelfBook,
+    bool mappingConfirmed = false,
   }) async {
     final targetSource = validated.candidate.source;
     final targetBook = validated.book;
     if (shelfBook?.id != null) {
+      if (!shelfBook!.isOnline && !mappingConfirmed) {
+        throw const BookSourceProtocolException(
+          'Changing the source of a downloaded book requires an explicitly confirmed chapter mapping.',
+        );
+      }
       final existing = await shelfService.findShelfBook(
         sourceId: targetSource.id,
         sourceBookId: targetBook.id,
       );
-      if (existing != null && existing.id != shelfBook!.id) {
+      if (existing != null && existing.id != shelfBook.id) {
         throw const BookSourceChangeConflict();
       }
     }

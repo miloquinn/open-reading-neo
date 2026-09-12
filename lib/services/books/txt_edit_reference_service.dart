@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:xxread/core/reader/canonical_locator.dart';
 import 'package:xxread/models/book.dart';
+import 'package:xxread/services/books/book_storage_codec.dart';
 import 'package:xxread/services/books/txt_edit_service.dart';
 import 'package:xxread/services/core/database_service.dart';
 
@@ -24,11 +26,14 @@ bool isTxtBookmarkLocatorResolved(String? anchorKey) =>
     !(anchorKey?.startsWith(txtUnresolvedLocatorMarker) ?? false);
 
 class TxtEditReferenceService {
-  TxtEditReferenceService({Future<Database> Function()? databaseProvider})
-    : _databaseProvider =
-          databaseProvider ?? (() => DatabaseService().database);
+  TxtEditReferenceService({
+    Future<Database> Function()? databaseProvider,
+    this.documentsDirectory,
+  }) : _databaseProvider =
+           databaseProvider ?? (() => DatabaseService().database);
 
   final Future<Database> Function() _databaseProvider;
+  final Future<Directory> Function()? documentsDirectory;
 
   Future<Book> commitRevision({
     required Book book,
@@ -67,6 +72,14 @@ class TxtEditReferenceService {
       values['layout_signature'] = null;
       await _migrateNotes(transaction, id, mapping, commit.contentHash);
       await _migrateBookmarks(transaction, id, mapping, commit.contentHash);
+    } else if (commit.preserveReferenceOffsets) {
+      values['last_canonical_locator'] = _rewriteLocatorRevision(
+        values['last_canonical_locator'] as String?,
+        commit.contentHash,
+      );
+      values['last_rendered_locator'] = null;
+      values['layout_signature'] = null;
+      await _rewriteReferenceRevisions(transaction, id, commit.contentHash);
     } else if (commit.invalidateAllReferences) {
       values['last_canonical_locator'] = null;
       values['last_rendered_locator'] = null;
@@ -87,7 +100,70 @@ class TxtEditReferenceService {
       contentHash: commit.contentHash,
     );
     await transaction.update('books', values, where: 'id = ?', whereArgs: [id]);
-    return Book.fromMap(values);
+    return bookFromStorageMap(values, documentsDirectory: documentsDirectory);
+  }
+
+  Future<void> _rewriteReferenceRevisions(
+    DatabaseExecutor db,
+    int bookId,
+    String contentHash,
+  ) async {
+    final notes = await db.query(
+      'book_notes',
+      where: 'book_id = ?',
+      whereArgs: [bookId],
+    );
+    for (final raw in notes) {
+      final encoded = _rewriteLocatorRevision(
+        raw['canonical_locator'] as String?,
+        contentHash,
+      );
+      if (encoded == null) continue;
+      await db.update(
+        'book_notes',
+        {'canonical_locator': encoded},
+        where: 'id = ?',
+        whereArgs: [raw['id']],
+      );
+    }
+    final bookmarks = await db.query(
+      'bookmarks',
+      where: 'bookId = ?',
+      whereArgs: [bookId],
+    );
+    for (final raw in bookmarks) {
+      final encoded = _rewriteLocatorRevision(
+        raw['canonical_locator'] as String?,
+        contentHash,
+      );
+      if (encoded == null) continue;
+      await db.update(
+        'bookmarks',
+        {'canonical_locator': encoded},
+        where: 'id = ?',
+        whereArgs: [raw['id']],
+      );
+    }
+  }
+
+  String? _rewriteLocatorRevision(String? raw, String contentHash) {
+    final locator = _decodeLocator(raw);
+    if (locator == null) return raw;
+    return LocatorCodec.encodeCanonicalLocator(
+      CanonicalLocator.create(
+        version: locator.version,
+        format: locator.format,
+        href: locator.href,
+        chapterId: locator.chapterId,
+        resourceHref: locator.resourceHref,
+        progression: locator.progression,
+        positionHint: locator.positionHint,
+        totalPositionsHint: locator.totalPositionsHint,
+        fragments: locator.fragments,
+        textAnchor: locator.textAnchor,
+        contentSignature: contentHash,
+      ),
+    );
   }
 
   Future<void> _updateProgressRevision(

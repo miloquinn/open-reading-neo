@@ -33,10 +33,7 @@ extension _NativeReaderAutoPageTurn on _NativeReaderPageState {
                 .startOffset;
       _anchorOffset =
           _verticalCanonicalOffset ?? _anchorOffset ?? visibleOffset ?? 0;
-      _restoreAnchorAfterLayout = true;
-      _restoreContinuousAnchorCentered = true;
-      _initialPositionRestored = false;
-      _initialPositionRestoreScheduled = false;
+      _requestPositionRestore();
       _lastSavedLocation = null;
     }
     if (enteringContinuousSurface) {

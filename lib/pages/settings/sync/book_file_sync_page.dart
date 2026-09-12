@@ -1,4 +1,3 @@
-import 'txt_sync_storage_mode_control.dart';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -6,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_dao.dart';
-import 'package:xxread/services/sync/adapters/metadata_sync_adapters.dart';
+import 'package:xxread/services/sync/book_sync_identity.dart';
 import 'package:xxread/services/sync/sync_models.dart';
-import 'package:xxread/services/sync/webdav_book_file_service.dart';
+import 'package:xxread/services/sync/book_file_sync_service.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
@@ -33,8 +32,6 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
   List<_LocalFileEntry> _synced = const [];
   bool _loading = true;
   bool _transferring = false;
-  bool _incrementalTxtUploads = false;
-  bool _hasLegacyRemoteFiles = false;
   String? _currentTitle;
   double? _currentProgress;
   WebDavSyncErrorCode? _loadError;
@@ -75,7 +72,7 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
         if (book.isOnline || book.id == null) continue;
         final file = File(book.filePath);
         if (!await file.exists()) continue;
-        final uid = await bookUidForMap(book.toMap());
+        final uid = await stableBookUid(book);
         final coverBlobSha256 = await _coverBlobSha256(book.coverImagePath);
         local.add(
           _LocalFileEntry(
@@ -101,9 +98,6 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
               (item) => item.fileAvailable && !localUids.contains(item.bookUid),
             )
             .toList(growable: false);
-        _hasLegacyRemoteFiles = remoteByUid.values.any(
-          (item) => item.remotePath?.startsWith('blobs/books/sha256/') ?? false,
-        );
         _selected.clear();
         _loadError = null;
         _loading = false;
@@ -190,7 +184,6 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
           });
           await sync.uploadBookFile(
             item.book,
-            incrementalTxt: _incrementalTxtUploads,
             onProgress: (progress) {
               if (mounted) setState(() => _currentProgress = progress.fraction);
             },
@@ -321,11 +314,6 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
             )
           : Column(
               children: [
-                if (_hasLegacyRemoteFiles)
-                  _LegacyBookDirectoryNotice(
-                    title: l10n.webDavLegacyBookDirectoryTitle,
-                    message: l10n.webDavLegacyBookDirectoryMessage,
-                  ),
                 if (_tabController.index == 0)
                   _UploadPermissionCard(
                     enabled: sync.scope.bookFiles,
@@ -341,23 +329,6 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
                     onPolicyTap: _transferring || !sync.scope.bookFiles
                         ? null
                         : () => _pickNewBookPolicy(sync),
-                  ),
-                if (_tabController.index == 0)
-                  SwitchListTile.adaptive(
-                    title: Text(l10n.cloudSyncIncrementalMode),
-                    subtitle: Text(l10n.cloudSyncIncrementalDescription),
-                    value: _incrementalTxtUploads,
-                    onChanged: _transferring || !sync.scope.bookFiles
-                        ? null
-                        : (enabled) async {
-                            if (enabled &&
-                                !await confirmIncrementalTxtStorage(context)) {
-                              return;
-                            }
-                            if (mounted) {
-                              setState(() => _incrementalTxtUploads = enabled);
-                            }
-                          },
                   ),
                 Expanded(
                   child: TabBarView(
@@ -421,30 +392,6 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
                 ),
               ),
             ),
-    );
-  }
-}
-
-class _LegacyBookDirectoryNotice extends StatelessWidget {
-  const _LegacyBookDirectoryNotice({
-    required this.title,
-    required this.message,
-  });
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Card(
-        child: ListTile(
-          leading: const Icon(Icons.info_outline_rounded),
-          title: Text(title),
-          subtitle: Text(message),
-        ),
-      ),
     );
   }
 }
@@ -704,7 +651,7 @@ Future<String?> _coverBlobSha256(String? coverImagePath) async {
   try {
     if (!await file.exists()) return null;
     final size = await file.length();
-    if (size <= 0 || size > WebDavBookFileService.maxCoverFileBytes) {
+    if (size <= 0 || size > BookFileSyncService.maxCoverFileBytes) {
       return null;
     }
     return '${await sha256.bind(file.openRead()).first}';
@@ -724,4 +671,4 @@ String _formatBytes(int bytes) {
 
 bool _exceedsFileLimit(int bytes, String format) =>
     format.toLowerCase() != 'txt' &&
-    bytes > WebDavBookFileService.maxRecoverableFileBytes;
+    bytes > BookFileSyncService.maxRecoverableFileBytes;

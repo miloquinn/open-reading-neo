@@ -682,8 +682,21 @@ class AppLocalizationsJa extends AppLocalizations {
       'ログイン情報はこの端末の安全なシステムストレージにのみ保存されます。';
 
   @override
-  String get sourceLoginNoForm =>
-      'このソースには表示可能なログインフォームがありません。ブラウザーによるログインはまだ利用できません。';
+  String get sourceLoginNoForm => 'このソースには利用可能なログイン方法がありません。';
+
+  @override
+  String get sourceLoginBrowserTitle => '元のウェブサイトでログイン';
+
+  @override
+  String get sourceLoginBrowserNotice =>
+      '内蔵ブラウザーでログインを完了してから、「完了」をタップしてください。Cookie とウェブサイトのローカルストレージはこの端末に保存されます。';
+
+  @override
+  String get sourceLoginBrowserUnsupported =>
+      'ウェブサイトでのログインは Android、iPhone、iPad、Mac で利用できます。';
+
+  @override
+  String get sourceLoginBrowserOpen => 'ウェブサイトを開いてログイン';
 
   @override
   String get sourceLoginSave => 'ログインしてセッションを保存';
@@ -5093,14 +5106,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      '選択した書籍だけをアップロードし、WebDAV には暗号化せず元のファイル名と内容のまま保存します';
-
-  @override
-  String get webDavLegacyBookDirectoryTitle => '旧形式の WebDAV 書籍も引き続き利用できます';
-
-  @override
-  String get webDavLegacyBookDirectoryMessage =>
-      '再同期は不要です。新しいアップロードは「書名 - 著者/元のファイル名」の読みやすいディレクトリを使用します。';
+      '既存のローカル書籍を自動バックアップします。クラウドの books/ に、書名と著者ごとに直接開ける元形式のファイルと表紙を保存します。同名の書籍は識別子で区別し、本文の更新履歴を残します。';
 
   @override
   String get webDavNewBookPolicyTitle => '新しい書籍ファイル';
@@ -5854,29 +5860,6 @@ class AppLocalizationsJa extends AppLocalizations {
       '読み込みがタイムアウトしました。接続を確認するか、JSON ファイルをダウンロードして追加してください。';
 
   @override
-  String get cloudSyncIncrementalMode => '差分同期';
-
-  @override
-  String get cloudSyncPlainMode => '通常の TXT ファイル';
-
-  @override
-  String get cloudSyncIncrementalDescription =>
-      '初回アップロード後は変更された部分だけを転送します。端末には完全な TXT が残ります。';
-
-  @override
-  String get cloudSyncEnableIncremental => '差分同期に切り替える';
-
-  @override
-  String get cloudSyncIncrementalConfirmTitle => 'この本のクラウド保存形式を変更しますか？';
-
-  @override
-  String get cloudSyncIncrementalConfirmBody =>
-      'クラウドではアプリ専用の分割形式を使います。既存の TXT は残りますが、更新されなくなります。他の端末にも差分同期に対応した新版アプリが必要です。端末には完全な TXT が残ります。';
-
-  @override
-  String get cloudSyncIncrementalConfirm => '切り替えて同期';
-
-  @override
   String get bookSourcesImportUsageNotice => '書源の利用について';
 
   @override
@@ -5972,6 +5955,47 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get bookSourcesMaintenanceShelfProtected => '本棚で使用中・既定で保持';
+
+  @override
+  String bookSourcesMaintenanceDeleteReferencedWarning(int count) {
+    return '選択した書源のうち $count 件は本棚の本で使用されています。削除すると、更新や新しい章の読み込みができなくなる場合があります。';
+  }
+
+  @override
+  String get bookSourcesMaintenanceProblemsFilter => '問題あり';
+
+  @override
+  String bookSourcesMaintenanceSelectedCount(int count) {
+    return '$count 件のブックソースを選択';
+  }
+
+  @override
+  String get bookSourcesMaintenanceShelfUsed => '本棚で使用中';
+
+  @override
+  String get bookSourcesMaintenancePause => '一時停止';
+
+  @override
+  String get bookSourcesMaintenancePausing => '停止中…';
+
+  @override
+  String get bookSourcesMaintenancePaused => 'チェックを一時停止中';
+
+  @override
+  String get bookSourcesMaintenanceCompleted => 'チェック完了';
+
+  @override
+  String get bookSourcesMaintenanceStart => 'チェック開始';
+
+  @override
+  String get bookSourcesMaintenanceRestart => '最初からチェック';
+
+  @override
+  String get bookSourcesMaintenanceCheckedThisRun => '今回チェック済み';
+
+  @override
+  String get bookSourcesMaintenancePausedHint =>
+      '完了した結果を選択して管理するか、残りのソースのチェックを続けられます。';
 
   @override
   String get bookSourcesMaintenanceApplyFailed => '変更を保存できませんでした。再試行してください';
@@ -6221,7 +6245,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get accountDeleteTermsTombstone =>
-      '削除記録を 1 件だけ保持します。メールアドレスの平文は含まれず、個人情報に戻すこともできません。目的は不正利用の防止と、上記の Apple 購入の復元を可能にすることだけです。';
+      '不正利用の防止に必要な最小限の匿名化された削除データと、購入の復元または検証に必要な App Store の購入検証記録のみを保持します。これらの記録からアカウントを復元することはありません。';
 
   @override
   String get accountDeleteTermsRejoin =>
@@ -6292,5 +6316,127 @@ class AppLocalizationsJa extends AppLocalizations {
       'アカウントと関連データは完全に削除され、すべての端末でログアウトされました。Open Reading をご利用いただきありがとうございました。';
 
   @override
+  String get accountDeleteAppleManualRevocation =>
+      'このダイアログを閉じた後、「Apple Accountの設定」>「サインインとセキュリティ」>「Appleでサインイン」>「Open Reading」を開き、「Appleでサインインの使用を停止」を選択してください。';
+
+  @override
   String get accountDeleteDoneClose => '閉じる';
+
+  @override
+  String get bookSourceDetailsTitle => '書籍の詳細';
+
+  @override
+  String get bookSourceDetailsDescription => 'あらすじ';
+
+  @override
+  String get bookSourceDetailsNoDescription => 'このソースにはあらすじがありません。';
+
+  @override
+  String get bookSourceDetailsLatestChapter => '最新の章';
+
+  @override
+  String get bookSourceDetailsLoadFailed =>
+      '詳細を読み込めませんでした。再試行するか、現在の情報で読書を開始できます。';
+
+  @override
+  String get bookSourceDetailsOnShelf => '本棚に追加済み';
+
+  @override
+  String get bookSourceDetailsAddFailed => '本棚に追加できませんでした。もう一度お試しください。';
+
+  @override
+  String get bookSourceDetailsReadFailed => '書籍を開けませんでした。もう一度お試しください。';
+
+  @override
+  String get appTextSize => '画面の文字サイズ';
+
+  @override
+  String get appTextSizeDescription => 'メニューや操作項目の文字だけを変更します。読書本文には影響しません。';
+
+  @override
+  String get appTextSizePreview => 'メニューや設定はこの文字サイズで表示されます。';
+
+  @override
+  String get appTextSizeDefault => '100%（標準）';
+
+  @override
+  String get bookSourceTrackUpdatesTitle => '更新とダウンロード本文';
+
+  @override
+  String get bookSourceTrackUpdatesBody =>
+      'ダウンロード後も配信元との関連は保持されます。新しい章を追加するか、編集内容と履歴を残しながら本文の改訂を確認できます。';
+
+  @override
+  String get bookSourceCheckNewChapters => '新しい章を確認';
+
+  @override
+  String get bookSourceRefreshDownloaded => 'ダウンロード済みの章を更新';
+
+  @override
+  String get bookSourceNoNewChapters =>
+      '目次に新しい章はありません。既存の本文の変更は、ダウンロード済みの章を更新して確認できます。';
+
+  @override
+  String bookSourceUpdateSummary(int added, int refreshed) {
+    return '$added 章を追加、$refreshed 章を更新';
+  }
+
+  @override
+  String get bookSourceBaselineUnknown =>
+      '更新を続けるには、ダウンロード済みの最後の章を確認してください。現在の本文は保持されます。';
+
+  @override
+  String get bookSourceSelectBoundary => 'ダウンロード済みの章を確認';
+
+  @override
+  String get bookSourceBoundaryHelp =>
+      '現在の本文に含まれる最後の章を選んでください。それ以降の章だけを追加し、既存の本文は置き換えません。';
+
+  @override
+  String get bookSourceTrackingEstablished => '更新の開始位置を保存しました。新しい章を確認できます。';
+
+  @override
+  String get bookSourceMappingChanged =>
+      '配信元の章の順序または識別子が変わりました。ダウンロード済みの章を再確認してください。本文は保持されています。';
+
+  @override
+  String get bookSourceContentConflicts => '本文の変更を確認してください';
+
+  @override
+  String get bookSourceContentConflictBody =>
+      '編集した章が配信元でも変更されました。現在は自分の版を表示します。比較して読む版を選んでください。両方の履歴を保持します。';
+
+  @override
+  String get bookSourceCompareVersions => '本文を比較';
+
+  @override
+  String get bookSourceLocalVersion => '自分の本文';
+
+  @override
+  String get bookSourceRemoteVersion => '配信元の本文';
+
+  @override
+  String get bookSourceBaselineVersion => 'ダウンロード時の本文';
+
+  @override
+  String get bookSourceKeepLocal => '自分の本文を保持';
+
+  @override
+  String get bookSourceUseRemote => '配信元の本文を使用';
+
+  @override
+  String get bookSourceUpdateFailed => '更新できませんでした。現在の本文は保持されています。再試行してください。';
+
+  @override
+  String get cloudSyncReadableStorage =>
+      '書籍は元の形式で books/ に保存され、履歴も直接開けます。未変更のファイルは再送せず、本文が変わるとファイル全体を転送します。';
+
+  @override
+  String get bookSourceBindSource => '配信元を関連付ける';
+
+  @override
+  String get bookSourceNotBound => '配信元未設定';
+
+  @override
+  String get bookSourceDownloadedUnchanged => 'ダウンロード済みの章に変更はありません。';
 }

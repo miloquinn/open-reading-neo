@@ -2,6 +2,7 @@
 // 技术要点：DefaultTabController、DownloadTaskController、AiPreprocessTaskController。
 
 import 'package:flutter/material.dart';
+import 'source_book_updates_page.dart';
 import 'package:provider/provider.dart';
 import 'package:xxread/reader_core/ai/ai_error_translator.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
@@ -60,6 +61,15 @@ class _DownloadTaskList extends StatelessWidget {
         };
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          onTap: task.sourceUpdateResult == null
+              ? null
+              : () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => SourceBookUpdatesPage(
+                      book: task.sourceUpdateResult!.book,
+                    ),
+                  ),
+                ),
           leading: Icon(switch (task.state) {
             DownloadTaskState.queued => Icons.schedule_rounded,
             DownloadTaskState.downloading => Icons.downloading_rounded,
@@ -76,7 +86,15 @@ class _DownloadTaskList extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 4),
-              Text(status),
+              Text(
+                task.sourceUpdateResult == null
+                    ? status
+                    : sourceUpdateResultText(
+                        context,
+                        task.sourceUpdateResult!,
+                        mode: task.updateMode,
+                      ),
+              ),
               if (task.state == DownloadTaskState.downloading) ...[
                 const SizedBox(height: 8),
                 LinearProgressIndicator(value: progress),
@@ -255,7 +273,15 @@ class BookDownloadTaskDialog extends StatelessWidget {
               value: task?.state == DownloadTaskState.failed ? 0 : progress,
             ),
             const SizedBox(height: 12),
-            Text(status),
+            Text(
+              task?.sourceUpdateResult == null
+                  ? status
+                  : sourceUpdateResultText(
+                      context,
+                      task!.sourceUpdateResult!,
+                      mode: task.updateMode,
+                    ),
+            ),
             if (task != null && task.total > 0) ...[
               const SizedBox(height: 4),
               Text(
@@ -278,7 +304,12 @@ class BookDownloadTaskDialog extends StatelessWidget {
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.l10n.downloadContinueInBackground),
+            child: Text(
+              task?.state == DownloadTaskState.queued ||
+                      task?.state == DownloadTaskState.downloading
+                  ? context.l10n.downloadContinueInBackground
+                  : context.l10n.confirm,
+            ),
           ),
         ],
       ),

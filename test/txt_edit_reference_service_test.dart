@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -235,6 +236,70 @@ void main() {
   );
 
   test(
+    'append revisions preserve offsets and advance locator hashes',
+    () async {
+      final originalLocator = locator('保留', 4);
+      final book = Book(
+        id: 8,
+        title: '连载',
+        filePath: '/tmp/serial.txt',
+        format: 'txt',
+        contentHash: 'old',
+        cachedContent: 'cached',
+        lastCanonicalLocator: originalLocator,
+      );
+      await database.insert('books', book.toMap());
+      await database.insert('book_notes', <String, Object?>{
+        'id': 8,
+        'book_id': 8,
+        'content': '保留',
+        'canonical_locator': originalLocator,
+      });
+      await database.insert('bookmarks', <String, Object?>{
+        'id': 8,
+        'bookId': 8,
+        'canonical_locator': originalLocator,
+        'anchor_key': 'txt-0:4',
+      });
+
+      final updated =
+          await TxtEditReferenceService(
+            databaseProvider: () async => database,
+          ).commitRevision(
+            book: book,
+            commit: TxtEditCommit(
+              contentHash: 'appended',
+              modifiedAt: DateTime(2026, 9, 12),
+              textEncoding: 'utf8',
+              preserveReferenceOffsets: true,
+            ),
+          );
+
+      final bookLocator = LocatorCodec.decodeCanonicalLocator(
+        updated.lastCanonicalLocator!,
+      );
+      final note = (await database.query('book_notes')).single;
+      final bookmark = (await database.query('bookmarks')).single;
+      expect(bookLocator!.textAnchor!.startOffsetUtf16, 4);
+      expect(bookLocator.contentSignature, 'appended');
+      expect(
+        LocatorCodec.decodeCanonicalLocator(
+          note['canonical_locator']! as String,
+        )!.contentSignature,
+        'appended',
+      );
+      expect(
+        LocatorCodec.decodeCanonicalLocator(
+          bookmark['canonical_locator']! as String,
+        )!.contentSignature,
+        'appended',
+      );
+      expect(bookmark['anchor_key'], 'txt-0:4');
+      expect(updated.cachedContent, isNull);
+    },
+  );
+
+  test(
     'does not retarget an overlapping quote to another occurrence',
     () async {
       final book = Book(
@@ -455,4 +520,35 @@ void main() {
       );
     },
   );
+
+  test('keeps managed paths relative in storage after a TXT commit', () async {
+    final book = Book(
+      id: 4,
+      title: '书',
+      filePath: 'books/book.txt',
+      format: 'txt',
+    );
+    await database.insert('books', book.toMap());
+    final service = TxtEditReferenceService(
+      databaseProvider: () async => database,
+      documentsDirectory: () async => Directory('/current/Documents'),
+    );
+
+    final updated = await service.commitRevision(
+      book: book,
+      commit: TxtEditCommit(
+        contentHash: 'new',
+        modifiedAt: DateTime(2026, 9, 5),
+        textEncoding: 'utf8',
+      ),
+    );
+
+    expect(updated.filePath, '/current/Documents/books/book.txt');
+    final stored = (await database.query(
+      'books',
+      where: 'id = ?',
+      whereArgs: [book.id],
+    )).single;
+    expect(stored['filePath'], 'books/book.txt');
+  });
 }

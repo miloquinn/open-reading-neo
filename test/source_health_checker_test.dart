@@ -9,6 +9,40 @@ import 'package:xxread/book_sources/services/book_download_cancellation.dart';
 import 'package:xxread/book_sources/source_engine/scripting/source_script_contract.dart';
 
 void main() {
+  test(
+    'malformed availability requirements cannot certify a partial check',
+    () {
+      for (final required in <Object?>[
+        ['info'],
+        [],
+        ['search', 'info', 'catalog', 'content', 'unknown'],
+        'info',
+        null,
+      ]) {
+        final result = SourceHealthCheckResult.fromJson({
+          'checked': ['search', 'info', 'catalog', 'content'],
+          'failed': [],
+          'checkedAt': DateTime.utc(2026).toIso8601String(),
+          'requiredForFullAvailability': required,
+        });
+        expect(result.fullyAvailable, isFalse, reason: '$required');
+        expect(
+          result.requiredForFullAvailability,
+          SourceHealthCheckResult.fullAvailabilityCapabilities,
+        );
+      }
+      expect(
+        SourceHealthCheckResult(
+          checked: const {SourceHealthCapability.info},
+          failed: const {},
+          checkedAt: DateTime.utc(2026),
+          requiredForFullAvailability: const {SourceHealthCapability.info},
+        ).fullyAvailable,
+        isFalse,
+      );
+    },
+  );
+
   group('SourceHealthChecker', () {
     test(
       'reports every capability healthy when the full chain succeeds',
@@ -56,6 +90,10 @@ void main() {
           SourceHealthCapability.content,
         });
         expect(result.respondTimeMs, isNotNull);
+        expect(
+          result.requiredForFullAvailability,
+          SourceHealthCheckResult.fullAvailabilityCapabilities,
+        );
       },
     );
 
@@ -383,6 +421,12 @@ void main() {
         },
         failed: const {SourceHealthCapability.content},
         checkedAt: DateTime.utc(2026, 8, 8, 12),
+        requiredForFullAvailability: const {
+          SourceHealthCapability.search,
+          SourceHealthCapability.info,
+          SourceHealthCapability.catalog,
+          SourceHealthCapability.content,
+        },
         respondTimeMs: 842,
       );
 
@@ -393,6 +437,10 @@ void main() {
       expect(read!.healthy, isFalse);
       expect(read.checked, result.checked);
       expect(read.failed, result.failed);
+      expect(
+        read.requiredForFullAvailability,
+        result.requiredForFullAvailability,
+      );
       expect(read.respondTimeMs, 842);
       expect(read.checkedAt, DateTime.utc(2026, 8, 8, 12));
     });
@@ -400,6 +448,27 @@ void main() {
     test('returns null for a source that has never been checked', () {
       final source = _fixtureSource().toRegisteredSource(enabled: true);
       expect(sourceHealthCheckResultOf(source), isNull);
+    });
+
+    test('legacy stored results still require every historical capability', () {
+      final source = _fixtureSource()
+          .toRegisteredSource(enabled: true)
+          .copyWith(
+            sourceConfig: {
+              '_openReadingHealthCheck': {
+                'checked': ['search', 'discover', 'info', 'content'],
+                'failed': <String>[],
+                'checkedAt': '2026-08-08T12:00:00.000Z',
+              },
+            },
+          );
+
+      final read = sourceHealthCheckResultOf(source);
+
+      expect(read?.fullyAvailable, isFalse);
+      expect(read?.missingForFullAvailability, {
+        SourceHealthCapability.catalog,
+      });
     });
   });
 }

@@ -12,6 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'source_book_updates_page.dart';
+import '../../services/sync/book_sync_identity.dart';
+import '../../book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_change_service.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
@@ -42,6 +45,7 @@ import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/utils/system_ui_helper.dart';
 import 'package:xxread/utils/ui_style.dart';
 import 'package:xxread/widgets/app_brand_icon.dart';
+import 'package:xxread/widgets/app_menu.dart';
 import 'package:xxread/widgets/generated_book_cover.dart';
 import 'package:xxread/widgets/scrolling_text.dart';
 import 'package:xxread/widgets/side_toast.dart';
@@ -353,11 +357,9 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<void> _showFilterMenu(Rect anchor) async {
-    final overlay =
-        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
-    final selected = await showMenu<_LibraryFilter>(
+    final selected = await showAppMenu<_LibraryFilter>(
       context: context,
-      position: RelativeRect.fromRect(anchor, Offset.zero & overlay.size),
+      anchor: anchor,
       initialValue: _selectedFilter,
       items: [
         _buildFilterMenuItem(
@@ -391,16 +393,14 @@ class _LibraryPageState extends State<LibraryPage> {
     final scheme = Theme.of(context).colorScheme;
     return PopupMenuItem<_LibraryFilter>(
       value: filter,
-      child: Row(
-        children: [
-          Icon(
-            selected ? Icons.radio_button_checked : Icons.radio_button_off,
-            size: 18,
-            color: selected ? scheme.primary : scheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 10),
-          Text(label),
-        ],
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(
+          selected ? Icons.radio_button_checked : Icons.radio_button_off,
+          size: 18,
+          color: selected ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+        title: Text(label),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:xxread/services/sync/mutable_txt_sync_service.dart';
+import 'package:xxread/services/sync/book_content_sync_service.dart';
 import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
@@ -250,8 +250,8 @@ class _SyncActivity extends StatelessWidget {
         sync.lastFailureIsFile ||
         sync.textStates.any(
           (state) =>
-              state.status == MutableTxtSyncStatus.failed ||
-              state.status == MutableTxtSyncStatus.conflict,
+              state.status == BookContentSyncStatus.failed ||
+              state.status == BookContentSyncStatus.conflict,
         );
     final progress = !sync.scope.progress
         ? l10n.cloudSyncLocalOnly
@@ -275,7 +275,7 @@ class _SyncActivity extends StatelessWidget {
         : sync.textStates.isEmpty
         ? l10n.cloudSyncNoBooks
         : sync.textStates.every(
-            (state) => state.status == MutableTxtSyncStatus.synced,
+            (state) => state.status == BookContentSyncStatus.synced,
           )
         ? l10n.cloudSyncCurrent
         : l10n.cloudSyncFileIdle;

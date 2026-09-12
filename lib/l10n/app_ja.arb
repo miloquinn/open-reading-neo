@@ -24,11 +24,23 @@
   "discoverCategoryEmpty": "このカテゴリには表示できる書籍がまだありません。",
   "bookSourceChannelLoadFailed": "チャンネルを読み込めませんでした",
   "bookSourceChannelLoadFailedMessage": "ソースから利用可能な書籍が返されませんでした: {details}",
-  "@bookSourceChannelLoadFailedMessage": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChannelLoadFailedMessage": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceConnectionFailed": "利用可能なネットワークアドレスを試しましたが、ソースサーバーに接続できませんでした。後でもう一度お試しください。",
   "bookSourceRedirectFailed": "ソースサイトがリダイレクトを繰り返しました。Cookie は保持しましたが、コンテンツが返されませんでした。",
   "bookSourceHttpFailed": "ソースサイトが HTTP {status} を返しました。チャンネルのアドレスが古いか、サイトに拒否された可能性があります。",
-  "@bookSourceHttpFailed": {"placeholders":{"status":{"type":"int"}}},
+  "@bookSourceHttpFailed": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceStandardLayout": "標準レイアウト",
   "bookSourceListLayout": "リストレイアウト",
   "bookSourceChangeChannel": "変更",
@@ -37,13 +49,28 @@
   "bookSourceChangeTargetSource": "変更先",
   "bookSourceChangeNotSelected": "未選択",
   "bookSourceChangeCurrentChapter": "現在第 {chapter} 章",
-  "@bookSourceChangeCurrentChapter": {"placeholders":{"chapter":{"type":"int"}}},
+  "@bookSourceChangeCurrentChapter": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeSearchLabel": "ほかのソースから同じ本を探す",
   "bookSourceChangeSearchAgain": "再検索",
   "bookSourceChangeSearchRemaining": "残りのソースをすべて検索",
   "bookSourceChangeCheckAuthor": "著者を照合",
   "bookSourceChangeSearchProgress": "{completed} / {total} 件を確認",
-  "@bookSourceChangeSearchProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourceChangeSearchProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeNoOtherSources": "利用できるほかのソースがありません",
   "bookSourceChangeNoOtherSourcesHint": "検索対応のソースを追加して有効にしてください。",
   "bookSourceChangeSearching": "ほかのソースを検索中",
@@ -51,24 +78,60 @@
   "bookSourceChangeNoMatches": "一致するソースが見つかりません",
   "bookSourceChangeNoMatchesHint": "書名を変更するか、著者照合をオフにして再検索してください。",
   "bookSourceChangeFailedSources": "{count} 件のソース要求が失敗しました。再検索できます。",
-  "@bookSourceChangeFailedSources": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeFailedSources": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeAuthorDifferent": "著者が異なります",
   "bookSourceChangeValidating": "目次と現在の章を確認中…",
   "bookSourceChangeValidationFailed": "確認に失敗しました: {details}",
-  "@bookSourceChangeValidationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@bookSourceChangeValidationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChangeReadable": "現在の章を読めます",
   "bookSourceChangeChapterCount": "{count} 章",
-  "@bookSourceChangeChapterCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChangeChapterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeResponseTime": "{milliseconds} ms",
-  "@bookSourceChangeResponseTime": {"placeholders":{"milliseconds":{"type":"int"}}},
+  "@bookSourceChangeResponseTime": {
+    "placeholders": {
+      "milliseconds": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceChangeTapToValidate": "選択すると目次と現在の章を確認します。",
   "bookSourceChangeAlreadyOnShelf": "このソース版はすでに本棚にあります。",
   "bookSourceChangeSwitching": "ソースを変更中…",
   "bookSourceChangeSwitchAction": "このソースに変更",
   "bookSourceChangeSuccess": "{source} に変更しました",
-  "@bookSourceChangeSuccess": {"placeholders":{"source":{"type":"String"}}},
+  "@bookSourceChangeSuccess": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
   "bookSourceChannelCount": "{count} チャンネル",
-  "@bookSourceChannelCount": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourceChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourceManagementTitle": "ソース管理",
   "bookSourceManagementSubtitle": "コンテンツ提供元の追加、有効化、削除、プロトコル情報を管理します。",
   "settingsContentSourcesTitle": "コンテンツソース",
@@ -122,7 +185,16 @@
   "bookSourcesNoMatchingSources": "現在の検索とフィルターに一致するソースはありません",
   "bookSourcesResetFilters": "リセット",
   "bookSourcesVisibleCount": "{total} 件中 {visible} 件を表示",
-  "@bookSourcesVisibleCount": {"placeholders":{"visible":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesVisibleCount": {
+    "placeholders": {
+      "visible": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesRemove": "削除",
   "bookSourcesRemoveTitle": "ソースを削除",
   "bookSourcesRemoveMessage": "ソースの設定のみを削除します。ローカルの書籍には影響しません。",
@@ -138,7 +210,19 @@
   "bookSourcesAdvancedFeatureRequired": "現在のアカウントまたは設定では、このソースを利用できません。",
   "bookSourcesNoWorkingSources": "実際の検索確認に合格したソースがないため、インポートしませんでした。",
   "bookSourcesVerificationProgress": "確認済み {completed}/{total}、利用可能 {available}",
-  "@bookSourcesVerificationProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"},"available":{"type":"int"}}},
+  "@bookSourcesVerificationProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "available": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesSelect": "ソースを複数選択",
   "bookSourcesSelectAll": "すべて選択",
   "bookSourcesClearSelection": "選択を解除",
@@ -146,24 +230,72 @@
   "bookSourcesDisableSelected": "選択項目を無効化",
   "bookSourcesDeleteSelected": "選択項目を削除",
   "bookSourcesDeleteSelectedMessage": "選択した {count} 件のソースを削除しますか？ローカルの本には影響しません。",
-  "@bookSourcesDeleteSelectedMessage": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDeleteSelectedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCheckSelected": "選択項目をチェック",
   "bookSourcesHealthCheckSummary": "{total} 件のソースをチェックし、{healthy} 件が正常でした",
-  "@bookSourcesHealthCheckSummary": {"placeholders":{"healthy":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesHealthCheckSummary": {
+    "placeholders": {
+      "healthy": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupMenuLabel": "ソースを検査して整理",
   "bookSourcesCleanupNoCheckableSources": "検査できるソースがありません",
   "bookSourcesCleanupAllFullyAvailable": "検査した {count} 件のソースはすべて完全に利用可能です",
-  "@bookSourcesCleanupAllFullyAvailable": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupAllFullyAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewTitle": "検査結果",
   "bookSourcesCleanupReviewSummary": "完全に利用可能：{fullyAvailable} 件・要確認：{needsAttention} 件",
-  "@bookSourcesCleanupReviewSummary": {"placeholders":{"fullyAvailable":{"type":"int"},"needsAttention":{"type":"int"}}},
+  "@bookSourcesCleanupReviewSummary": {
+    "placeholders": {
+      "fullyAvailable": {
+        "type": "int"
+      },
+      "needsAttention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupReviewHint": "機能の不足やタイムアウトだけでは利用不可とは限りません。無効にする書源を選んでください。",
   "bookSourcesCleanupDisableSelected": "選択した {count} 件を無効化",
-  "@bookSourcesCleanupDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupDisabledSummary": "{count} 件のソースを無効化しました",
-  "@bookSourcesCleanupDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesCleanupCancelledSummary": "停止しました。{count} 件を検査済みです。後でもう一度実行すると続きから再開します。",
-  "@bookSourcesCleanupCancelledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesCleanupCancelledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceTitle": "書籍ソースの整理",
   "bookSourcesMaintenanceSubtitle": "重複を整理し、書籍ソースの動作を確認",
   "bookSourcesMaintenanceHealthTitle": "ソースのヘルスチェック",
@@ -173,32 +305,86 @@
   "bookSourcesMaintenanceDedupeSubtitle": "通信せずに端末内で重複を比較",
   "bookSourcesMaintenanceReviewTitle": "前回のチェック結果",
   "bookSourcesMaintenanceReviewSubtitle": "{count} 件のソースに対応が必要です",
-  "@bookSourcesMaintenanceReviewSubtitle": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesMaintenanceReviewSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceSafetyHint": "確認したソースのみ無効にし、設定は保持します。",
   "bookSourcesMaintenanceProgressTitle": "ソースを確認中",
   "bookSourcesMaintenanceProgressHint": "検索、詳細、目次、本文の機能を確認しています",
   "bookSourcesMaintenanceFinishedTitle": "ヘルスチェック完了",
   "bookSourcesMaintenanceFinishedSummary": "{checked} 件を確認し、{attention} 件に対応が必要です",
-  "@bookSourcesMaintenanceFinishedSummary": {"placeholders":{"checked":{"type":"int"},"attention":{"type":"int"}}},
+  "@bookSourcesMaintenanceFinishedSummary": {
+    "placeholders": {
+      "checked": {
+        "type": "int"
+      },
+      "attention": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceProgress": "{completed} / {total}",
-  "@bookSourcesMaintenanceProgress": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesMaintenanceStop": "チェックを停止",
   "bookSourcesMaintenanceBackground": "バックグラウンドで続行",
   "bookSourcesMaintenanceBackgroundHint": "進捗画面を閉じても、アプリの実行中は静かにチェックを続行します。",
   "bookSourcesMaintenanceBackgroundToast": "ヘルスチェックをバックグラウンドで続行しています",
   "bookSourcesMaintenanceReviewResults": "結果を確認",
   "bookSourcesMaintenanceRunningMenuLabel": "ソース整理 {completed}/{total}",
-  "@bookSourcesMaintenanceRunningMenuLabel": {"placeholders":{"completed":{"type":"int"},"total":{"type":"int"}}},
+  "@bookSourcesMaintenanceRunningMenuLabel": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeMenuLabel": "重複ソースを検索",
   "bookSourcesDedupeNone": "重複ソースは見つかりませんでした",
   "bookSourcesDedupeReviewTitle": "重複ソースを確認",
   "bookSourcesDedupeReviewSummary": "{groups} グループ、重複 {duplicates} 件",
-  "@bookSourcesDedupeReviewSummary": {"placeholders":{"groups":{"type":"int"},"duplicates":{"type":"int"}}},
+  "@bookSourcesDedupeReviewSummary": {
+    "placeholders": {
+      "groups": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeReviewHint": "推奨ソースを残し、選択した重複項目は削除せず無効化します。",
   "bookSourcesDedupeDisableSelected": "選択した {count} 件を無効化",
-  "@bookSourcesDedupeDisableSelected": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisableSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeDisabledSummary": "重複ソース {count} 件を無効化しました",
-  "@bookSourcesDedupeDisabledSummary": {"placeholders":{"count":{"type":"int"}}},
+  "@bookSourcesDedupeDisabledSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeModeExact": "完全一致",
   "bookSourcesDedupeModeStandard": "標準",
   "bookSourcesDedupeModeSite": "同一サイト",
@@ -208,9 +394,33 @@
   "bookSourcesDedupeRecommended": "推奨",
   "bookSourcesDedupeReviewAction": "重複排除を確認",
   "bookSourcesDedupeImportSummary": "インポート可能 {ready} 件、重複 {duplicates} 件、無効 {errors} 件",
-  "@bookSourcesDedupeImportSummary": {"placeholders":{"ready":{"type":"int"},"duplicates":{"type":"int"},"errors":{"type":"int"}}},
+  "@bookSourcesDedupeImportSummary": {
+    "placeholders": {
+      "ready": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "errors": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesImportTypeSummary": "書籍ソース {books} 件 · 漫画ソース {comics} 件 · 現在実行不可 {unsupported} 件",
-  "@bookSourcesImportTypeSummary": {"placeholders":{"books":{"type":"int"},"comics":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@bookSourcesImportTypeSummary": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "comics": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "bookSourcesDedupeRestoreDefaults": "推奨選択に戻す",
   "bookSourcesUrlLabel": "ソースのアドレス",
   "bookSourcesUrlHint": "https://example.com またはソース JSON の URL",
@@ -247,15 +457,31 @@
   "bookSourcesClose": "閉じる",
   "sourceLoginTitle": "ソースにログイン",
   "sourceLoginSecureStorageNotice": "ログイン情報はこの端末の安全なシステムストレージにのみ保存されます。",
-  "sourceLoginNoForm": "このソースには表示可能なログインフォームがありません。ブラウザーによるログインはまだ利用できません。",
+  "sourceLoginNoForm": "このソースには利用可能なログイン方法がありません。",
+  "sourceLoginBrowserTitle": "元のウェブサイトでログイン",
+  "sourceLoginBrowserNotice": "内蔵ブラウザーでログインを完了してから、「完了」をタップしてください。Cookie とウェブサイトのローカルストレージはこの端末に保存されます。",
+  "sourceLoginBrowserUnsupported": "ウェブサイトでのログインは Android、iPhone、iPad、Mac で利用できます。",
+  "sourceLoginBrowserOpen": "ウェブサイトを開いてログイン",
   "sourceLoginSave": "ログインしてセッションを保存",
   "sourceLoginClear": "ログインセッションを消去",
   "sourceLoginSaved": "ソースのログインセッションを更新しました",
   "sourceLoginCleared": "ソースのログインセッションを消去しました",
   "sourceLoginFailed": "ソースのログインセッションを更新できませんでした: {details}",
-  "@sourceLoginFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceLoginFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "sourceLoginDiscoveryNotice": "「{sourceName}」はアカウント限定コンテンツのログインに対応しています。",
-  "@sourceLoginDiscoveryNotice": {"placeholders":{"sourceName":{"type":"String"}}},
+  "@sourceLoginDiscoveryNotice": {
+    "placeholders": {
+      "sourceName": {
+        "type": "String"
+      }
+    }
+  },
   "sourceDebugMenuLabel": "デバッグ",
   "sourceDebugTitle": "ソースデバッグ",
   "sourceDebugInputHint": "検索キーワードを入力するか、書籍/目次/本文のURLを貼り付けてください",
@@ -271,7 +497,13 @@
   "bookSourcesFullyAvailable": "完全に利用可能",
   "sourceHealthTimedOut": "チェックがタイムアウトしました",
   "sourceHealthFailedCapabilities": "失効項目：{capabilities}",
-  "@sourceHealthFailedCapabilities": {"placeholders":{"capabilities":{"type":"String"}}},
+  "@sourceHealthFailedCapabilities": {
+    "placeholders": {
+      "capabilities": {
+        "type": "String"
+      }
+    }
+  },
   "sourceHealthCapabilitySearch": "検索",
   "sourceHealthCapabilityDiscover": "発見",
   "sourceHealthCapabilityInfo": "詳細",
@@ -285,7 +517,13 @@
   "sourceVerificationRetry": "ブラウザーを再度開く",
   "sourceVerificationCancel": "確認をキャンセル",
   "sourceVerificationFailed": "ソースの確認を開けませんでした: {details}",
-  "@sourceVerificationFailed": {"placeholders":{"details":{"type":"String"}}},
+  "@sourceVerificationFailed": {
+    "placeholders": {
+      "details": {
+        "type": "String"
+      }
+    }
+  },
   "settings": "設定",
   "statistics": "統計",
   "reading": "読書",
@@ -368,7 +606,13 @@
   "customFontsEmpty": "インポートしたフォントはありません",
   "customFontsEmptyHint": "TTF または OTF を一度インポートすると、アプリ画面や本文に使用できます。",
   "customFontsCount": "{count} 個のフォントをインポート済み",
-  "@customFontsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@customFontsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "customFontsLocalOnly": "インポートしたフォントはこの端末だけに保存され、自動同期されません。",
   "builtInFonts": "内蔵フォント",
   "importFont": "フォントをインポート",
@@ -391,7 +635,13 @@
   "setAsBothFonts": "両方に使用",
   "renameFont": "フォント名を変更",
   "deleteCustomFontTitle": "「{name}」を削除しますか？",
-  "@deleteCustomFontTitle": {"placeholders": {"name": {"type": "String"}}},
+  "@deleteCustomFontTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "deleteCustomFontMessage": "フォントファイルをこの端末から削除します。",
   "deleteCustomFontInUse": "このフォントは使用中です。削除すると影響する設定は初期値に戻ります。",
   "deleteAndReset": "削除して初期値に戻す",
@@ -543,8 +793,12 @@
   "readerNavigationPosition": "第 {current}/{total} 章",
   "@readerNavigationPosition": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "readerSearchChapters": "章を検索",
@@ -903,7 +1157,13 @@
   "libraryExportOriginalHint": "元のファイルをデバイス上の別の場所へコピーします",
   "libraryExportDownloadedTxtHint": "ダウンロード後に生成された TXT ファイルを書き出します",
   "bookExportSuccess": "{location} に書き出しました",
-  "@bookExportSuccess": {"placeholders": {"location": {"type": "String"}}},
+  "@bookExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "bookExportSourceMissing": "書籍ファイルが見つからないため書き出せません",
   "bookExportUnsupported": "このプラットフォームでは書籍の書き出しにまだ対応していません",
   "bookExportFailed": "書籍を書き出せませんでした",
@@ -980,18 +1240,60 @@
   "librarySelectMultiple": "複数選択",
   "librarySelectAll": "すべて選択",
   "librarySelectedBooks": "{count} 冊を選択",
-  "@librarySelectedBooks": {"placeholders": {"count": {"type": "int"}}},
+  "@librarySelectedBooks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeleteSelected": "{count} 冊を削除",
-  "@libraryDeleteSelected": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryDeleteSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteTitle": "選択した本を削除しますか？",
   "libraryBatchDeleteMessage": "選択した {count} 冊と、関連するメモ、ブックマーク、ローカルファイルを完全に削除します。この操作は取り消せません。",
-  "@libraryBatchDeleteMessage": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryDeletingSelected": "削除中 {done}/{total}",
-  "@libraryDeletingSelected": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@libraryDeletingSelected": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeleteSuccess": "{count} 冊を削除しました",
-  "@libraryBatchDeleteSuccess": {"placeholders": {"count": {"type": "int"}}},
+  "@libraryBatchDeleteSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryBatchDeletePartial": "{success} 冊を削除、{failed} 冊は失敗しました",
-  "@libraryBatchDeletePartial": {"placeholders": {"success": {"type": "int"}, "failed": {"type": "int"}}},
+  "@libraryBatchDeletePartial": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "readerPrefaceTitle": "前付",
   "readerModeHorizontalPage": "アニメーションなし",
   "readerModeVerticalScrollHint": "事前に分割したページを縦に送り、左右スワイプで章を切り替え",
@@ -1160,19 +1462,70 @@
   "additionalSourcesUrlLabel": "ソース JSON URL",
   "additionalSourcesLoadUrl": "URL から読み込む",
   "additionalSourcesPreview": "利用可能 {supported}、一部対応 {partial}、未対応 {unsupported}",
-  "@additionalSourcesPreview": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"}}},
+  "@additionalSourcesPreview": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesPreviewDetails": "標準ルール {supported}、拡張ルール {partial}、高度なルール {unsupported}、スキップ {skipped}",
-  "@additionalSourcesPreviewDetails": {"placeholders":{"supported":{"type":"int"},"partial":{"type":"int"},"unsupported":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesPreviewDetails": {
+    "placeholders": {
+      "supported": {
+        "type": "int"
+      },
+      "partial": {
+        "type": "int"
+      },
+      "unsupported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesQuickPreview": "{count} 件をインポート可能、{skipped} 件をスキップ",
-  "@additionalSourcesQuickPreview": {"placeholders":{"count":{"type":"int"},"skipped":{"type":"int"}}},
+  "@additionalSourcesQuickPreview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesAvailable": "利用可能",
   "additionalSourcesPartial": "一部対応",
   "additionalSourcesUnsupported": "未対応",
   "additionalSourcesImportConfirm": "一括インポート",
   "additionalSourcesImported": "{count} 件のソースをインポートしました",
-  "@additionalSourcesImported": {"placeholders":{"count":{"type":"int"}}},
+  "@additionalSourcesImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "additionalSourcesImportedWithConflicts": "{count} 件をインポートし、別のオリジンで既に登録済みの {conflicted} 件をスキップしました",
-  "@additionalSourcesImportedWithConflicts": {"placeholders":{"count":{"type":"int"},"conflicted":{"type":"int"}}},
+  "@additionalSourcesImportedWithConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "conflicted": {
+        "type": "int"
+      }
+    }
+  },
   "settingsSectionAboutSupport": "アプリ情報とサポート",
   "settingsKeepScreenOnTitle": "画面を常にオン",
   "settingsKeepScreenOnSubtitle": "読書中に画面が自動で消えないようにします",
@@ -1441,7 +1794,9 @@
   "updateDownloadProgress": "{percent}% ダウンロード済み",
   "@updateDownloadProgress": {
     "placeholders": {
-      "percent": {"type": "int"}
+      "percent": {
+        "type": "int"
+      }
     }
   },
   "updatePreparingInstaller": "パッケージを検証し、システムインストーラーを準備しています…",
@@ -1696,20 +2051,62 @@
   "readerAutoPageTurnSweepDurationLabel": "スイープ時間",
   "readerAutoPageTurnScrollSpeedLabel": "スクロール速度",
   "readerAutoPageTurnSecondsPerScreen": "1画面 {seconds}秒",
-  "@readerAutoPageTurnSecondsPerScreen": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnSecondsPerScreen": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModeValue": "{mode} · 1画面{seconds}秒",
-  "@readerAutoPageTurnModeValue": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModeValue": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnModePaused": "一時停止 · {mode} · 1画面{seconds}秒",
-  "@readerAutoPageTurnModePaused": {"placeholders":{"mode":{"type":"String"},"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnModePaused": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnIntervalLabel": "ページ間隔",
   "readerAutoPageTurnInterval": "{seconds}秒ごとに1画面",
-  "@readerAutoPageTurnInterval": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnInterval": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnStart": "自動ページめくりを開始",
   "readerAutoPageTurnResume": "自動ページめくりを再開",
   "readerAutoPageTurnRunning": "自動 · {seconds}秒/画面",
-  "@readerAutoPageTurnRunning": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnRunning": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerAutoPageTurnPaused": "一時停止 · {seconds}秒/画面",
-  "@readerAutoPageTurnPaused": {"placeholders":{"seconds":{"type":"int"}}},
+  "@readerAutoPageTurnPaused": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "readerThemeDay": "昼",
   "readerThemeFollowSystem": "システムに合わせる",
   "readerThemeMist": "ミスト",
@@ -1807,7 +2204,9 @@
   "settingsAiSwitchedToModel": "{model} に切り替えました",
   "@settingsAiSwitchedToModel": {
     "placeholders": {
-        "model": {"type": "String"}
+      "model": {
+        "type": "String"
+      }
     }
   },
   "settingsAiFillBaseUrlAndApiKey": "先に Base URL と API Key を入力してください",
@@ -1834,7 +2233,9 @@
   "settingsAiFetchModelsFailed": "モデルの取得に失敗しました：{error}",
   "@settingsAiFetchModelsFailed": {
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "settingsAiPreprocessTitle": "AI による書籍前処理",
@@ -1876,91 +2277,147 @@
   "readerAiRequestFailed": "リクエスト失敗：{error}",
   "@readerAiRequestFailed": {
     "placeholders": {
-        "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "readerAiUnknownError": "不明なエラー",
   "readerAiEmptyResponseError": "サーバーの応答が空です。通常は Base URL の設定ミス、ゲートウェイがモデル API へ転送していない、またはサーバーが接続を早期に切断したことが原因です。\nリクエスト URL：{endpoint}",
   "@readerAiEmptyResponseError": {
     "placeholders": {
-        "endpoint": {"type": "String"}
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiInvalidJsonError": "サーバーの応答が有効な JSON ではありません。現在のエンドポイントは {provider} 設定と互換性がない可能性があります。\nリクエスト URL：{endpoint}\n応答断片：{snippet}",
   "@readerAiInvalidJsonError": {
     "placeholders": {
-        "provider": {"type": "String"},
-        "endpoint": {"type": "String"},
-        "snippet": {"type": "String"}
+      "provider": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      },
+      "snippet": {
+        "type": "String"
+      }
     }
   },
   "readerAiFailedReadBody": "リクエスト失敗{status}：サーバーの応答データを読み取れませんでした。通常は Base URL の設定ミス、エンドポイントが空の内容を返した、またはネットワークが応答を途中で切断したことが原因です。\nリクエスト URL：{endpoint}",
   "@readerAiFailedReadBody": {
     "placeholders": {
-        "status": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiNetworkRequestFailed": "ネットワークリクエスト失敗{status}：{error}\nリクエスト URL：{endpoint}",
   "@readerAiNetworkRequestFailed": {
     "placeholders": {
-        "status": {"type": "String"},
-        "error": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedMinimaxHint": "リクエスト失敗({status})：{text}\n確認事項：1) MiniMax の temperature は (0,1] の範囲；2) モデル名とエンドポイントが一致しているか；3) system 指令は1件のみ。\nリクエスト URL：{endpoint}",
   "@readerAiRequestFailedMinimaxHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedClaudeHint": "リクエスト失敗({status})：{text}\nヒント：Claude には anthropic-version リクエストヘッダーが必要です。\nリクエスト URL：{endpoint}",
   "@readerAiRequestFailedClaudeHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedProviderMismatchHint": "リクエスト失敗({status})：{text}\nヒント：プロバイダーと API Key が一致しているか確認してください。混用はできません。\nリクエスト URL：{endpoint}",
   "@readerAiRequestFailedProviderMismatchHint": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiRequestFailedGeneric": "リクエスト失敗({status})：{text}\nリクエスト URL：{endpoint}",
   "@readerAiRequestFailedGeneric": {
     "placeholders": {
-        "status": {"type": "String"},
-        "text": {"type": "String"},
-        "endpoint": {"type": "String"}
+      "status": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      },
+      "endpoint": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockSelectionResponse": "AI（モック）: 選択したテキストは「{selectedText}」です。\n\n前文: {before}\n後文: {after}",
   "@readerAiMockSelectionResponse": {
     "placeholders": {
-        "selectedText": {"type": "String"},
-        "before": {"type": "String"},
-        "after": {"type": "String"}
+      "selectedText": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
     }
   },
   "readerAiMockPageAnalysis": "AI（モック）: このページは {chars} 文字です。段落の冒頭と末尾の論点に注目することをおすすめします。",
   "@readerAiMockPageAnalysis": {
     "placeholders": {
-        "chars": {"type": "int"}
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "readerAiMockGreeting": "こんにちは",
   "readerAiMockChatResponse": "AI（モック）: 質問は「{question}」ですね。\n\n現在のページ（{chars} 文字）を読みました。続けて質問できます。",
   "@readerAiMockChatResponse": {
     "placeholders": {
-        "question": {"type": "String"},
-        "chars": {"type": "int"}
+      "question": {
+        "type": "String"
+      },
+      "chars": {
+        "type": "int"
+      }
     }
   },
   "ttsSystemDefault": "システム標準",
@@ -1968,7 +2425,9 @@
   "ttsUnsupportedLanguage": "システムが対応していない言語です: {language}",
   "@ttsUnsupportedLanguage": {
     "placeholders": {
-        "language": {"type": "String"}
+      "language": {
+        "type": "String"
+      }
     }
   },
   "ttsCallFailed": "システム TTS の呼び出しに失敗しました",
@@ -2004,7 +2463,9 @@
   "agreementV2VersionLabel": "規約バージョン {version}",
   "@agreementV2VersionLabel": {
     "placeholders": {
-        "version": {"type": "String"}
+      "version": {
+        "type": "String"
+      }
     }
   },
   "agreementFlowStepIntroduction": "アプリ紹介",
@@ -2163,13 +2624,37 @@
   "webDavErrorIfMatchIgnoredDetail": "サーバーがファイルのバージョン一致時だけ書き込む条件（If-Match）を無視しました。続行すると別の端末の新しい変更を上書きする可能性があります。",
   "webDavErrorIfNoneMatchIgnoredDetail": "サーバーがファイルが存在しない場合だけ作成する条件（If-None-Match）を無視しました。続行すると既存のファイルを上書きする可能性があります。",
   "webDavErrorReason": "理由: {reason}",
-  "@webDavErrorReason": {"placeholders":{"reason":{"type":"String"}}},
+  "@webDavErrorReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorHttpStatus": "HTTP ステータス: {status}",
-  "@webDavErrorHttpStatus": {"placeholders":{"status":{"type":"int"}}},
+  "@webDavErrorHttpStatus": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "webDavErrorRequestMethod": "リクエストメソッド: {method}",
-  "@webDavErrorRequestMethod": {"placeholders":{"method":{"type":"String"}}},
+  "@webDavErrorRequestMethod": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorResourcePath": "リソースパス: {path}",
-  "@webDavErrorResourcePath": {"placeholders":{"path":{"type":"String"}}},
+  "@webDavErrorResourcePath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "webDavErrorPhase": "失敗した段階: {phase}",
   "webDavPhaseConnecting": "リモートへの接続",
   "webDavPhaseScanningLocal": "端末データのスキャン",
@@ -2188,9 +2673,7 @@
   "webDavFilesOnlyLocal": "この端末のみ",
   "webDavFilesOnlyRemote": "この端末にファイルがありません",
   "webDavFilesUploadPermission": "書籍ファイルのアップロードを許可",
-  "webDavFilesUploadPermissionHint": "選択した書籍だけをアップロードし、WebDAV には暗号化せず元のファイル名と内容のまま保存します",
-  "webDavLegacyBookDirectoryTitle": "旧形式の WebDAV 書籍も引き続き利用できます",
-  "webDavLegacyBookDirectoryMessage": "再同期は不要です。新しいアップロードは「書名 - 著者/元のファイル名」の読みやすいディレクトリを使用します。",
+  "webDavFilesUploadPermissionHint": "既存のローカル書籍を自動バックアップします。クラウドの books/ に、書名と著者ごとに直接開ける元形式のファイルと表紙を保存します。同名の書籍は識別子で区別し、本文の更新履歴を残します。",
   "webDavNewBookPolicyTitle": "新しい書籍ファイル",
   "webDavNewBookPolicyAsk": "毎回確認（推奨）",
   "webDavNewBookPolicyAskHint": "インポート後にアップロードする書籍を選択します",
@@ -2322,25 +2805,61 @@
   "readingDataExportWholeBookHint": "この本の注釈をすべて書き出します。本文全体や書籍ファイルは含まれません。",
   "readingDataExportPrivacySummary": "ハイライトまたは下線を付けた引用と個人ノートを含みます。書籍ファイル、本文全体、アカウント情報、端末情報は含まれません。",
   "readingDataExportCounts": "ハイライト {highlights} 件 · 下線 {underlines} 件 · ノート {notes} 件",
-  "@readingDataExportCounts": {"placeholders":{"highlights":{"type":"int"},"underlines":{"type":"int"},"notes":{"type":"int"}}},
+  "@readingDataExportCounts": {
+    "placeholders": {
+      "highlights": {
+        "type": "int"
+      },
+      "underlines": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportButton": "注釈 {count} 件を書き出す",
-  "@readingDataExportButton": {"placeholders":{"count":{"type":"int"}}},
+  "@readingDataExportButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportPreparing": "Markdown を作成中…",
   "readingDataExportEmpty": "書き出せるハイライト、下線、ノートはまだありません。",
   "readingDataExportSuccess": "読書データを {location} に書き出しました",
-  "@readingDataExportSuccess": {"placeholders":{"location":{"type":"String"}}},
+  "@readingDataExportSuccess": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportFailed": "読書データを書き出せませんでした",
   "readingDataExportUnsupported": "このプラットフォームでは読書データの書き出しにまだ対応していません",
   "readingDataExportReplaceTitle": "既存のファイルを置き換えますか？",
   "readingDataExportReplaceMessage": "{path} にはすでにファイルがあります。置き換えると元に戻せません。",
-  "@readingDataExportReplaceMessage": {"placeholders":{"path":{"type":"String"}}},
+  "@readingDataExportReplaceMessage": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "readingDataExportReplaceAction": "置き換える",
   "readingDataExportExportedAt": "書き出し日時",
   "readingDataExportAuthor": "著者",
   "readingDataExportContents": "内容",
   "readingDataExportMyNote": "自分のノート",
   "readingDataExportPositionPage": "{page} ページ",
-  "@readingDataExportPositionPage": {"placeholders":{"page":{"type":"int"}}},
+  "@readingDataExportPositionPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
   "readingDataExportUnknownChapter": "位置不明の注釈",
   "cloudSyncTitle": "クラウド同期",
   "cloudSyncTagline": "別のデバイスで続きから読む",
@@ -2406,13 +2925,6 @@
   },
   "bookSourcesImportFileTab": "JSON ファイル",
   "bookSourcesImportTimedOut": "読み込みがタイムアウトしました。接続を確認するか、JSON ファイルをダウンロードして追加してください。",
-  "cloudSyncIncrementalMode": "差分同期",
-  "cloudSyncPlainMode": "通常の TXT ファイル",
-  "cloudSyncIncrementalDescription": "初回アップロード後は変更された部分だけを転送します。端末には完全な TXT が残ります。",
-  "cloudSyncEnableIncremental": "差分同期に切り替える",
-  "cloudSyncIncrementalConfirmTitle": "この本のクラウド保存形式を変更しますか？",
-  "cloudSyncIncrementalConfirmBody": "クラウドではアプリ専用の分割形式を使います。既存の TXT は残りますが、更新されなくなります。他の端末にも差分同期に対応した新版アプリが必要です。端末には完全な TXT が残ります。",
-  "cloudSyncIncrementalConfirm": "切り替えて同期",
   "bookSourcesImportUsageNotice": "書源の利用について",
   "bookSourcesMaintenanceScope": "対象範囲",
   "bookSourcesMaintenanceScopeEnabled": "有効",
@@ -2443,6 +2955,32 @@
   "bookSourcesMaintenanceAvailableReason": "主要な検査に合格しました",
   "bookSourcesMaintenanceDedupeBusy": "重複を確認中…",
   "bookSourcesMaintenanceShelfProtected": "本棚で使用中・既定で保持",
+  "bookSourcesMaintenanceDeleteReferencedWarning": "選択した書源のうち {count} 件は本棚の本で使用されています。削除すると、更新や新しい章の読み込みができなくなる場合があります。",
+  "@bookSourcesMaintenanceDeleteReferencedWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceProblemsFilter": "問題あり",
+  "bookSourcesMaintenanceSelectedCount": "{count} 件のブックソースを選択",
+  "@bookSourcesMaintenanceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourcesMaintenanceShelfUsed": "本棚で使用中",
+  "bookSourcesMaintenancePause": "一時停止",
+  "bookSourcesMaintenancePausing": "停止中…",
+  "bookSourcesMaintenancePaused": "チェックを一時停止中",
+  "bookSourcesMaintenanceCompleted": "チェック完了",
+  "bookSourcesMaintenanceStart": "チェック開始",
+  "bookSourcesMaintenanceRestart": "最初からチェック",
+  "bookSourcesMaintenanceCheckedThisRun": "今回チェック済み",
+  "bookSourcesMaintenancePausedHint": "完了した結果を選択して管理するか、残りのソースのチェックを続けられます。",
   "bookSourcesMaintenanceApplyFailed": "変更を保存できませんでした。再試行してください",
   "settingsQqGroup": "QQ グループ",
   "settingsOpenSourceTitle": "オープンソースについて",
@@ -2513,7 +3051,7 @@
   "accountDeleteTermsRedemptions": "使用済みの引き換えコードは返金されず、再び使用可能になることもありません。",
   "accountDeleteTermsApple": "App Store で買い切りのプレミアムを購入済みです。アカウントを削除しても返金されず、App Store の取引が取り消されることもありません。返金は Apple にのみ申請できます。購入レシートはアカウントとの紐づけを解除したうえで保持されるため、後日同じ Apple ID で新しいアカウントから「購入を復元」を実行すればプレミアムを取り戻せます。",
   "accountDeleteTermsLocalData": "この端末に保存された書籍・本棚・読書記録は削除されません。もともと端末内にのみ保存されています。あわせて消したい場合はアプリ内で削除してください。",
-  "accountDeleteTermsTombstone": "削除記録を 1 件だけ保持します。メールアドレスの平文は含まれず、個人情報に戻すこともできません。目的は不正利用の防止と、上記の Apple 購入の復元を可能にすることだけです。",
+  "accountDeleteTermsTombstone": "不正利用の防止に必要な最小限の匿名化された削除データと、購入の復元または検証に必要な App Store の購入検証記録のみを保持します。これらの記録からアカウントを復元することはありません。",
   "accountDeleteTermsRejoin": "削除後も同じメールアドレスで再登録できますが、以前のデータや特典を引き継がない、まったく新しい空のアカウントになります。",
   "accountDeleteBlockedTitle": "このアカウントはまだ削除できません",
   "accountDeleteBlockedOwner": "あなたは管理コンソールのオーナーです。先に他の方へオーナー権限を引き継いでから、もう一度お試しください。そうしないと管理する人がいなくなります。",
@@ -2534,5 +3072,52 @@
   "accountDeleteAction": "アカウントを完全に削除",
   "accountDeleteDoneTitle": "アカウントを削除しました",
   "accountDeleteDoneBody": "アカウントと関連データは完全に削除され、すべての端末でログアウトされました。Open Reading をご利用いただきありがとうございました。",
-  "accountDeleteDoneClose": "閉じる"
+  "accountDeleteAppleManualRevocation": "このダイアログを閉じた後、「Apple Accountの設定」>「サインインとセキュリティ」>「Appleでサインイン」>「Open Reading」を開き、「Appleでサインインの使用を停止」を選択してください。",
+  "accountDeleteDoneClose": "閉じる",
+  "bookSourceDetailsTitle": "書籍の詳細",
+  "bookSourceDetailsDescription": "あらすじ",
+  "bookSourceDetailsNoDescription": "このソースにはあらすじがありません。",
+  "bookSourceDetailsLatestChapter": "最新の章",
+  "bookSourceDetailsLoadFailed": "詳細を読み込めませんでした。再試行するか、現在の情報で読書を開始できます。",
+  "bookSourceDetailsOnShelf": "本棚に追加済み",
+  "bookSourceDetailsAddFailed": "本棚に追加できませんでした。もう一度お試しください。",
+  "bookSourceDetailsReadFailed": "書籍を開けませんでした。もう一度お試しください。",
+  "appTextSize": "画面の文字サイズ",
+  "appTextSizeDescription": "メニューや操作項目の文字だけを変更します。読書本文には影響しません。",
+  "appTextSizePreview": "メニューや設定はこの文字サイズで表示されます。",
+  "appTextSizeDefault": "100%（標準）",
+  "bookSourceTrackUpdatesTitle": "更新とダウンロード本文",
+  "bookSourceTrackUpdatesBody": "ダウンロード後も配信元との関連は保持されます。新しい章を追加するか、編集内容と履歴を残しながら本文の改訂を確認できます。",
+  "bookSourceCheckNewChapters": "新しい章を確認",
+  "bookSourceRefreshDownloaded": "ダウンロード済みの章を更新",
+  "bookSourceNoNewChapters": "目次に新しい章はありません。既存の本文の変更は、ダウンロード済みの章を更新して確認できます。",
+  "bookSourceUpdateSummary": "{added} 章を追加、{refreshed} 章を更新",
+  "bookSourceBaselineUnknown": "更新を続けるには、ダウンロード済みの最後の章を確認してください。現在の本文は保持されます。",
+  "bookSourceSelectBoundary": "ダウンロード済みの章を確認",
+  "bookSourceBoundaryHelp": "現在の本文に含まれる最後の章を選んでください。それ以降の章だけを追加し、既存の本文は置き換えません。",
+  "bookSourceTrackingEstablished": "更新の開始位置を保存しました。新しい章を確認できます。",
+  "bookSourceMappingChanged": "配信元の章の順序または識別子が変わりました。ダウンロード済みの章を再確認してください。本文は保持されています。",
+  "bookSourceContentConflicts": "本文の変更を確認してください",
+  "bookSourceContentConflictBody": "編集した章が配信元でも変更されました。現在は自分の版を表示します。比較して読む版を選んでください。両方の履歴を保持します。",
+  "bookSourceCompareVersions": "本文を比較",
+  "bookSourceLocalVersion": "自分の本文",
+  "bookSourceRemoteVersion": "配信元の本文",
+  "bookSourceBaselineVersion": "ダウンロード時の本文",
+  "bookSourceKeepLocal": "自分の本文を保持",
+  "bookSourceUseRemote": "配信元の本文を使用",
+  "bookSourceUpdateFailed": "更新できませんでした。現在の本文は保持されています。再試行してください。",
+  "cloudSyncReadableStorage": "書籍は元の形式で books/ に保存され、履歴も直接開けます。未変更のファイルは再送せず、本文が変わるとファイル全体を転送します。",
+  "@bookSourceUpdateSummary": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "refreshed": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSourceBindSource": "配信元を関連付ける",
+  "bookSourceNotBound": "配信元未設定",
+  "bookSourceDownloadedUnchanged": "ダウンロード済みの章に変更はありません。"
 }

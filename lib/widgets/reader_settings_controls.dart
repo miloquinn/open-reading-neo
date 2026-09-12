@@ -83,6 +83,7 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.bottomMarginLabel,
     required this.chapterTitlePageTitle,
     required this.chapterTitlePageHint,
+    this.showChapterTitlePageToggle = true,
     required this.themeId,
     required this.fontSize,
     required this.textBrightness,
@@ -176,6 +177,7 @@ class ReaderSettingsSheet extends StatefulWidget {
   final String bottomMarginLabel;
   final String chapterTitlePageTitle;
   final String chapterTitlePageHint;
+  final bool showChapterTitlePageToggle;
   final String themeId;
   final double fontSize;
   final int textBrightness;
@@ -536,18 +538,19 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
   ];
 
   List<Widget> _layoutTabChildren() => [
-    SwitchListTile(
-      key: const ValueKey('reader-chapter-title-page-switch'),
-      contentPadding: EdgeInsets.zero,
-      secondary: const Icon(Icons.title_rounded),
-      value: _chapterTitlePageEnabled,
-      title: Text(widget.chapterTitlePageTitle),
-      subtitle: Text(widget.chapterTitlePageHint),
-      onChanged: (value) {
-        setState(() => _chapterTitlePageEnabled = value);
-        widget.onChapterTitlePageChanged(value);
-      },
-    ),
+    if (widget.showChapterTitlePageToggle)
+      SwitchListTile(
+        key: const ValueKey('reader-chapter-title-page-switch'),
+        contentPadding: EdgeInsets.zero,
+        secondary: const Icon(Icons.title_rounded),
+        value: _chapterTitlePageEnabled,
+        title: Text(widget.chapterTitlePageTitle),
+        subtitle: Text(widget.chapterTitlePageHint),
+        onChanged: (value) {
+          setState(() => _chapterTitlePageEnabled = value);
+          widget.onChapterTitlePageChanged(value);
+        },
+      ),
     ReaderSettingSlider(
       key: const ValueKey('reader-horizontal-margin-slider'),
       label: widget.horizontalMarginLabel,

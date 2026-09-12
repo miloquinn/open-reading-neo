@@ -710,7 +710,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sourceLoginNoForm =>
-      'This source does not provide a sign-in form. Browser-based sign-in is not available yet.';
+      'This source does not provide an available sign-in method.';
+
+  @override
+  String get sourceLoginBrowserTitle => 'Sign in on the original website';
+
+  @override
+  String get sourceLoginBrowserNotice =>
+      'Complete sign-in in the browser, then tap Done. Cookies and website local storage will be saved on this device.';
+
+  @override
+  String get sourceLoginBrowserUnsupported =>
+      'Website sign-in is available on Android, iPhone, iPad, and Mac.';
+
+  @override
+  String get sourceLoginBrowserOpen => 'Open website to sign in';
 
   @override
   String get sourceLoginSave => 'Sign in and save session';
@@ -5294,15 +5308,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      'Only selected books are uploaded; WebDAV keeps the original file name and bytes without encryption';
-
-  @override
-  String get webDavLegacyBookDirectoryTitle =>
-      'Existing WebDAV books remain compatible';
-
-  @override
-  String get webDavLegacyBookDirectoryMessage =>
-      'You do not need to sync them again. New uploads use a readable Book title - Author/original file name directory.';
+      'Automatically back up existing local books. Cloud books/ keeps readable files in their original format and covers, organized by title and author. Identity suffixes distinguish same-name books, and content updates retain history.';
 
   @override
   String get webDavNewBookPolicyTitle => 'New book files';
@@ -6092,30 +6098,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reading took too long. Check your connection or try importing a downloaded JSON file.';
 
   @override
-  String get cloudSyncIncrementalMode => 'Incremental storage';
-
-  @override
-  String get cloudSyncPlainMode => 'Standard TXT file';
-
-  @override
-  String get cloudSyncIncrementalDescription =>
-      'After the first upload, only changed content blocks are transferred. Your local book stays a complete TXT.';
-
-  @override
-  String get cloudSyncEnableIncremental => 'Use incremental storage';
-
-  @override
-  String get cloudSyncIncrementalConfirmTitle =>
-      'Change this book’s cloud storage?';
-
-  @override
-  String get cloudSyncIncrementalConfirmBody =>
-      'The cloud copy will use an app-managed block format. Existing TXT copies will be kept but will stop receiving updates. Other devices need a version of this app that supports incremental storage. Your complete TXT remains available locally.';
-
-  @override
-  String get cloudSyncIncrementalConfirm => 'Switch and sync';
-
-  @override
   String get bookSourcesImportUsageNotice => 'Source usage information';
 
   @override
@@ -6214,6 +6196,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bookSourcesMaintenanceShelfProtected =>
       'Used by your shelf · kept by default';
+
+  @override
+  String bookSourcesMaintenanceDeleteReferencedWarning(int count) {
+    return '$count selected source(s) are used by books on your bookshelf. Deleting them may prevent those books from updating or loading new chapters.';
+  }
+
+  @override
+  String get bookSourcesMaintenanceProblemsFilter => 'Problems';
+
+  @override
+  String bookSourcesMaintenanceSelectedCount(int count) {
+    return 'Selected $count source(s)';
+  }
+
+  @override
+  String get bookSourcesMaintenanceShelfUsed => 'Used by your bookshelf';
+
+  @override
+  String get bookSourcesMaintenancePause => 'Pause';
+
+  @override
+  String get bookSourcesMaintenancePausing => 'Pausing…';
+
+  @override
+  String get bookSourcesMaintenancePaused => 'Check paused';
+
+  @override
+  String get bookSourcesMaintenanceCompleted => 'Check complete';
+
+  @override
+  String get bookSourcesMaintenanceStart => 'Start check';
+
+  @override
+  String get bookSourcesMaintenanceRestart => 'Start again';
+
+  @override
+  String get bookSourcesMaintenanceCheckedThisRun => 'Checked this run';
+
+  @override
+  String get bookSourcesMaintenancePausedHint =>
+      'Select and manage completed results now, or continue checking the remaining sources.';
 
   @override
   String get bookSourcesMaintenanceApplyFailed =>
@@ -6476,7 +6499,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountDeleteTermsTombstone =>
-      'We keep one deletion record. It contains no plaintext email address and cannot be turned back into personal information. Its only purposes are preventing abuse and making the Apple purchase restore above possible.';
+      'We retain only minimal deidentified deletion data needed to prevent abuse, together with App Store purchase verification records required to restore or verify purchases. These records are not used to recreate your account.';
 
   @override
   String get accountDeleteTermsRejoin =>
@@ -6552,5 +6575,135 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your account and its data are permanently gone, and every device has been signed out. Thank you for having used Open Reading.';
 
   @override
+  String get accountDeleteAppleManualRevocation =>
+      'After closing this dialog, open Apple Account Settings > Sign-In & Security > Sign in with Apple > Open Reading, then choose Stop Using Sign in with Apple.';
+
+  @override
   String get accountDeleteDoneClose => 'Close';
+
+  @override
+  String get bookSourceDetailsTitle => 'Book details';
+
+  @override
+  String get bookSourceDetailsDescription => 'About this book';
+
+  @override
+  String get bookSourceDetailsNoDescription =>
+      'No description provided by this source.';
+
+  @override
+  String get bookSourceDetailsLatestChapter => 'Latest chapter';
+
+  @override
+  String get bookSourceDetailsLoadFailed =>
+      'Could not load full details. You can retry or read with the available information.';
+
+  @override
+  String get bookSourceDetailsOnShelf => 'On shelf';
+
+  @override
+  String get bookSourceDetailsAddFailed =>
+      'Could not add this book to your shelf. Try again.';
+
+  @override
+  String get bookSourceDetailsReadFailed =>
+      'Could not open this book. Try again.';
+
+  @override
+  String get appTextSize => 'Interface text size';
+
+  @override
+  String get appTextSizeDescription =>
+      'Only changes app menus and controls, not reading text.';
+
+  @override
+  String get appTextSizePreview =>
+      'Menus and settings will use this text size.';
+
+  @override
+  String get appTextSizeDefault => '100% (Default)';
+
+  @override
+  String get bookSourceTrackUpdatesTitle => 'Updates and downloaded text';
+
+  @override
+  String get bookSourceTrackUpdatesBody =>
+      'Downloaded books keep their source. Check for new chapters to append new content, or refresh downloaded chapters while preserving your edits and history.';
+
+  @override
+  String get bookSourceCheckNewChapters => 'Check for new chapters';
+
+  @override
+  String get bookSourceRefreshDownloaded => 'Refresh downloaded chapters';
+
+  @override
+  String get bookSourceNoNewChapters =>
+      'No new chapters in the catalog. Refresh downloaded chapters to check earlier text for changes.';
+
+  @override
+  String bookSourceUpdateSummary(int added, int refreshed) {
+    return '$added chapters added, $refreshed refreshed';
+  }
+
+  @override
+  String get bookSourceBaselineUnknown =>
+      'Confirm the last chapter already downloaded before continuing updates. Your existing text will be preserved.';
+
+  @override
+  String get bookSourceSelectBoundary => 'Confirm downloaded chapters';
+
+  @override
+  String get bookSourceBoundaryHelp =>
+      'Select the last source chapter included in your local text. Only later chapters will be appended; existing text stays intact.';
+
+  @override
+  String get bookSourceTrackingEstablished =>
+      'Tracking boundary saved. You can now check for new chapters.';
+
+  @override
+  String get bookSourceMappingChanged =>
+      'The source changed its chapter order or identifiers. Confirm your downloaded chapters again. Existing text was preserved.';
+
+  @override
+  String get bookSourceContentConflicts => 'Text changes need review';
+
+  @override
+  String get bookSourceContentConflictBody =>
+      'You and the source changed these chapters. Your version remains active. Compare and choose what to read; both versions stay in history.';
+
+  @override
+  String get bookSourceCompareVersions => 'Compare text';
+
+  @override
+  String get bookSourceLocalVersion => 'My text';
+
+  @override
+  String get bookSourceRemoteVersion => 'Source text';
+
+  @override
+  String get bookSourceBaselineVersion => 'Downloaded baseline';
+
+  @override
+  String get bookSourceKeepLocal => 'Keep my text';
+
+  @override
+  String get bookSourceUseRemote => 'Use source text';
+
+  @override
+  String get bookSourceUpdateFailed =>
+      'Update did not finish. Your text was preserved. Please retry.';
+
+  @override
+  String get cloudSyncReadableStorage =>
+      'Books keep their original format in books/, with readable history. Unchanged files are not uploaded again; changed text is transferred as a complete file.';
+
+  @override
+  String get bookSourceBindSource => 'Link a book source';
+
+  @override
+  String get bookSourceNotBound => 'No source linked';
+
+  @override
+  String get bookSourceDownloadedUnchanged =>
+      'Downloaded chapters are up to date.';
 }

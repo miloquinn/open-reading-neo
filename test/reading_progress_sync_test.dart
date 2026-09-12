@@ -78,6 +78,28 @@ void main() {
     expect(await store.getState('frozen_book_uid:${row['id']}'), before);
   });
 
+  test('initial book identity resolves a managed storage path', () async {
+    final books = Directory('${tempDirectory.path}/books');
+    await books.create();
+    final file = File('${books.path}/book.txt');
+    await file.writeAsString('same bytes');
+    final row = <String, Object?>{
+      'title': 'Book',
+      'author': 'Author',
+      'filePath': 'books/book.txt',
+      'format': 'txt',
+      'importDate': 1000,
+    };
+
+    final uid = await initialBookUidForMap(
+      row,
+      documentsDirectory: () async => tempDirectory,
+    );
+
+    expect(uid, startsWith('sha256:'));
+    expect(uid, await initialBookUidForMap({...row, 'filePath': file.path}));
+  });
+
   test(
     'remote progress is staged and never overwrites the business row',
     () async {

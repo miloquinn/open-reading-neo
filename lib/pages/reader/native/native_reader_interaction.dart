@@ -72,6 +72,14 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
       _pageController = null;
       _pageControllerGeneration++;
     }
+    Future<void>? chapterRestore;
+    if (_pageMode == NativePageMode.verticalScroll &&
+        _pendingRestoreChapterIndex != next) {
+      _anchorOffset = 0;
+      _pendingRestoreChapterIndex = next;
+      _requestPositionRestore();
+      chapterRestore = _continuousRestoreCompletion!.future;
+    }
     _setReaderState(() {
       _chapterIndex = next;
       _pageIndex = 0;
@@ -89,22 +97,11 @@ extension _NativeReaderInteraction on _NativeReaderPageState {
       );
     }
     _verticalScrollProgress.value = 0;
-    if (recenterContinuousScroll &&
-        _pageMode == NativePageMode.verticalScroll &&
-        !_scrollByChapter) {
-      await WidgetsBinding.instance.endOfFrame;
-      if (mounted && _verticalChapterScrollController.isAttached) {
-        await _verticalChapterScrollController.scrollTo(
-          index: next,
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    }
     final bookId = widget.book.id;
     if (bookId != null) {
       await _queueBookProgress(bookId, next);
     }
+    if (chapterRestore != null) await chapterRestore;
   }
 
   Future<void> _nextPage(

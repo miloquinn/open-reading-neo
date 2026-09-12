@@ -8,6 +8,7 @@ import '../core/reader/reader_auto_page_turn_controller.dart';
 import '../utils/glass_config.dart';
 import '../utils/localization_extension.dart';
 import '../utils/reader_themes.dart';
+import 'app_menu.dart';
 import 'reader_top_information_bar.dart';
 
 typedef ReaderStatusBuilder =
@@ -222,7 +223,7 @@ class ReaderChromeOverlay extends StatelessWidget {
                                 : Icons.bookmark_border_rounded,
                           ),
                           if (onChangeSource != null || onEditChapter != null)
-                            PopupMenuButton<String>(
+                            AppPopupMenuButton<String>(
                               key: const ValueKey('reader-more-menu'),
                               tooltip: MaterialLocalizations.of(
                                 context,
@@ -243,23 +244,23 @@ class ReaderChromeOverlay extends StatelessWidget {
                                 if (onEditChapter != null)
                                   PopupMenuItem(
                                     value: 'edit-chapter',
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.edit_note_rounded),
-                                        const SizedBox(width: 12),
-                                        Text(editChapterTooltip ?? ''),
-                                      ],
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const Icon(
+                                        Icons.edit_note_rounded,
+                                      ),
+                                      title: Text(editChapterTooltip ?? ''),
                                     ),
                                   ),
                                 if (onChangeSource != null)
                                   PopupMenuItem(
                                     value: 'change-source',
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.swap_horiz_rounded),
-                                        const SizedBox(width: 12),
-                                        Text(changeSourceTooltip ?? ''),
-                                      ],
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const Icon(
+                                        Icons.swap_horiz_rounded,
+                                      ),
+                                      title: Text(changeSourceTooltip ?? ''),
                                     ),
                                   ),
                               ],

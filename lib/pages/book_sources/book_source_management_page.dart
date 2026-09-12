@@ -19,16 +19,17 @@ import '../../widgets/side_toast.dart';
 import 'controllers/book_source_add_controller.dart';
 import 'controllers/book_source_management_controller.dart';
 import 'source_debug_page.dart';
+import 'source_edit_page.dart';
+import 'models/source_edit_fields.dart';
 import 'source_login_page.dart';
 import 'widgets/book_source_add_flow.dart';
-import 'widgets/book_source_cleanup_review_sheet.dart';
+import 'book_source_maintenance_page.dart';
 import 'widgets/book_source_dedupe_review_sheet.dart';
 import 'widgets/book_source_group_picker.dart';
 import 'widgets/book_source_organization_actions.dart';
 import 'widgets/book_source_information_sheet.dart';
 import 'widgets/book_source_management_list.dart';
 import 'widgets/book_source_management_source_card.dart';
-import 'widgets/book_source_maintenance_sheet.dart';
 
 part 'book_source_management_add_source.dart';
 part 'book_source_management_maintenance.dart';
@@ -63,7 +64,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   late final BookSourceMaintenanceCoordinator _maintenance;
   late final bool _ownsMaintenance;
   int _handledMaintenanceRunId = 0;
-  bool _maintenanceProgressOpen = false;
+  bool _maintenancePageOpen = false;
   bool _dedupeRunning = false;
   BookSourceMaintenanceStatus? _lastMaintenanceStatus;
 
@@ -115,9 +116,9 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             if (!remainingIds.contains(source.id)) source,
         ]);
       }
-      if (!_maintenanceProgressOpen && state.failure != null) {
+      if (!_maintenancePageOpen && state.failure != null) {
         showSideToast(context, '${state.failure}', kind: SideToastKind.error);
-      } else if (!_maintenanceProgressOpen && result != null) {
+      } else if (!_maintenancePageOpen && result != null) {
         showSideToast(
           context,
           state.status == BookSourceMaintenanceStatus.cancelled
@@ -388,6 +389,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
     BookSourceManagementSourceAction action,
   ) {
     switch (action) {
+      case BookSourceManagementSourceAction.edit:
+        unawaited(_editSource(source));
       case BookSourceManagementSourceAction.favorite:
         unawaited(_toggleFavorite(source));
       case BookSourceManagementSourceAction.groups:
@@ -428,6 +431,23 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
           ? context.l10n.bookSourcesRefreshed
           : context.l10n.bookSourcesRefreshFailed,
       kind: refreshed ? SideToastKind.success : SideToastKind.error,
+    );
+  }
+
+  Future<void> _editSource(RegisteredBookSource source) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            SourceEditPage(source: source, registry: _controller.registry),
+      ),
+    );
+    if (!mounted || saved != true) return;
+    await _controller.load();
+    if (!mounted) return;
+    showSideToast(
+      context,
+      SourceEditCopy.of(context).saved,
+      kind: SideToastKind.success,
     );
   }
 

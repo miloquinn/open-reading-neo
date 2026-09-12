@@ -14,6 +14,49 @@ class SourceCookieJar {
 
   void clear() => _jars.clear();
 
+  void clearSource(String sourceId) => _jars.remove(sourceId);
+
+  List<Map<String, Object?>> exportCookies(String sourceId) {
+    final jar = _jars[sourceId];
+    if (jar == null) return const [];
+    final now = _clock().toUtc();
+    jar.removeWhere((_, cookie) => cookie.expiresAt?.isAfter(now) == false);
+    return [for (final cookie in jar.values) cookie.toJson()];
+  }
+
+  void restoreCookies(String sourceId, List<Map<String, Object?>> cookies) {
+    final jar = <String, SourceStoredCookie>{};
+    final now = _clock().toUtc();
+    for (final value in cookies) {
+      try {
+        final cookie = Cookie('${value['name']}', '${value['value']}')
+          ..secure = value['secure'] == true
+          ..httpOnly = value['httpOnly'] == true;
+        final domain = '${value['domain'] ?? ''}'.toLowerCase().replaceFirst(RegExp(r'^\.'), '');
+        if (domain.isEmpty || domain.contains('/') || domain.contains(RegExp(r'\s'))) continue;
+        final path = '${value['path'] ?? '/'}';
+        final expires = value['expiresAt'];
+        final expiresAt = expires is num
+            ? DateTime.fromMillisecondsSinceEpoch(expires.toInt(), isUtc: true)
+            : null;
+        if (expiresAt != null && !expiresAt.isAfter(now)) continue;
+        final stored = SourceStoredCookie(
+          cookie: cookie,
+          domain: domain,
+          path: path.startsWith('/') ? path : '/',
+          hostOnly: value['hostOnly'] != false,
+          expiresAt: expiresAt,
+          attributesKnown: value['attributesKnown'] != false,
+          sameSite: value['sameSite'] as String?,
+        );
+        jar['$domain\u0000${stored.path}\u0000${cookie.name}'] = stored;
+      } on FormatException {
+        // Ignore malformed persisted cookie entries independently.
+      }
+    }
+    _jars[sourceId] = jar;
+  }
+
   String scriptCookieHeader(String jarKey, Uri uri) =>
       header(jarKey, uri) ?? '';
 
@@ -148,6 +191,8 @@ class SourceStoredCookie {
     required this.path,
     required this.hostOnly,
     required this.expiresAt,
+    this.attributesKnown = true,
+    this.sameSite,
   });
 
   final Cookie cookie;
@@ -155,6 +200,21 @@ class SourceStoredCookie {
   final String path;
   final bool hostOnly;
   final DateTime? expiresAt;
+  final bool attributesKnown;
+  final String? sameSite;
+
+  Map<String, Object?> toJson() => {
+    'name': cookie.name,
+    'value': cookie.value,
+    'domain': domain,
+    'path': path,
+    'secure': cookie.secure,
+    'httpOnly': cookie.httpOnly,
+    'hostOnly': hostOnly,
+    'expiresAt': expiresAt?.millisecondsSinceEpoch,
+    'attributesKnown': attributesKnown,
+    if (sameSite != null) 'sameSite': sameSite,
+  };
 
   bool matches(Uri uri) {
     if (cookie.secure && uri.scheme != 'https') return false;
@@ -162,7 +222,9 @@ class SourceStoredCookie {
       return false;
     }
     final requestPath = uri.path.isEmpty ? '/' : uri.path;
-    return requestPath.startsWith(path);
+    return requestPath == path ||
+        (requestPath.startsWith(path) &&
+            (path.endsWith('/') || requestPath.substring(path.length).startsWith('/')));
   }
 }
 

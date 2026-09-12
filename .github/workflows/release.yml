@@ -399,7 +399,9 @@ jobs:
           )"
           test -n "$plugin_source"
           grep -F 'g_date_time_get_seconds(' "$plugin_source"
-          sed -i 's/g_date_time_get_seconds(/g_date_time_to_unix(/' "$plugin_source"
+          # Ubuntu 22.04 selects the plugin's WebKitGTK 4.0 fallback, whose
+          # soup_cookie_get_expires() returns SoupDate rather than GDateTime.
+          sed -i 's/g_date_time_get_seconds(/soup_date_to_time_t(/' "$plugin_source"
 
       - name: Build Linux release
         run: flutter build linux --release

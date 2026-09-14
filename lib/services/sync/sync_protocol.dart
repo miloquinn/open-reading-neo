@@ -84,6 +84,9 @@ class SyncBatch {
   }
 
   factory SyncBatch.decode(String raw) {
+    if (utf8.encode(raw).length > maxEncodedBytes) {
+      throw const FormatException('Encoded batch exceeds 1 MiB');
+    }
     final json = jsonDecode(raw);
     if (json is! Map<String, dynamic>) {
       throw const FormatException('Batch must be a JSON object');
@@ -99,6 +102,9 @@ class SyncBatch {
     }
     final deviceId = json['device_id'] as String;
     final sequence = json['sequence'] as int;
+    if (sequence <= 0 || sequence > 999999999999) {
+      throw const FormatException('Invalid sequence');
+    }
     final createdHlc = json['created_hlc'] as String;
     HybridLogicalTimestamp.parse(createdHlc);
     for (final operation in operations) {
@@ -136,39 +142,6 @@ class SyncBatch {
     'created_hlc': createdHlc,
     'operations': operations.map((operation) => operation.toJson()).toList(),
   };
-}
-
-class RemoteDeviceHead {
-  const RemoteDeviceHead({
-    required this.deviceId,
-    required this.latestSequence,
-    required this.latestHlc,
-    required this.updatedAt,
-  });
-
-  final String deviceId;
-  final int latestSequence;
-  final String latestHlc;
-  final DateTime updatedAt;
-
-  Map<String, Object?> toJson() => {
-    'device_id': deviceId,
-    'latest_sequence': latestSequence,
-    'latest_hlc': latestHlc,
-    'updated_at': updatedAt.toUtc().toIso8601String(),
-  };
-
-  factory RemoteDeviceHead.decode(String raw) {
-    final json = (jsonDecode(raw) as Map).cast<String, dynamic>();
-    return RemoteDeviceHead(
-      deviceId: json['device_id'] as String,
-      latestSequence: json['latest_sequence'] as int,
-      latestHlc: json['latest_hlc'] as String,
-      updatedAt: DateTime.parse(json['updated_at'] as String).toUtc(),
-    );
-  }
-
-  String encode() => jsonEncode(toJson());
 }
 
 String sha256OfCanonicalJson(Object? value) =>

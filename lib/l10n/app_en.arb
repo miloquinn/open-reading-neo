@@ -5492,7 +5492,7 @@
   "@webDavFilesUploadPermission": {
     "description": "Global permission for explicit book-file uploads"
   },
-  "webDavFilesUploadPermissionHint": "Automatically back up existing local books. Cloud books/ keeps readable files in their original format and covers, organized by title and author. Identity suffixes distinguish same-name books, and content updates retain history.",
+  "webDavFilesUploadPermissionHint": "Sync selected books and covers. TXT transfers only changed blocks after its first upload; EPUB and PDF retain their original bytes. Complete readable files are exported separately.",
   "@webDavFilesUploadPermissionHint": {
     "description": "Explains that enabling uploads does not upload every book"
   },
@@ -6413,7 +6413,7 @@
   "bookSourceKeepLocal": "Keep my text",
   "bookSourceUseRemote": "Use source text",
   "bookSourceUpdateFailed": "Update did not finish. Your text was preserved. Please retry.",
-  "cloudSyncReadableStorage": "Books keep their original format in books/, with readable history. Unchanged files are not uploaded again; changed text is transferred as a complete file.",
+  "cloudSyncReadableStorage": "TXT changes sync as reusable content blocks. Unchanged books transfer no body data. Use Export to cloud for a complete file you can open outside this app.",
   "@bookSourceUpdateSummary": {
     "placeholders": {
       "added": {
@@ -6450,6 +6450,9 @@
   "premiumSyncPending": "Syncing membership status",
   "@premiumSyncPending": {
     "description": "Membership has not yet been verified for this session."
-  }
-
+  },
+  "cloudSyncExportBook": "Export complete file to cloud",
+  "cloudSyncExportDone": "Complete file exported",
+  "cloudSyncDiagnostics": "Copy sync diagnostics",
+  "cloudSyncProtocolUpgrade": "This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept."
 }

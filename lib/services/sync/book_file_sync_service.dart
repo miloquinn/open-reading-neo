@@ -12,6 +12,7 @@ import '../books/book_import_service.dart';
 import '../books/book_storage_codec.dart';
 import '../core/database_service.dart';
 import 'book_content_sync_service.dart';
+import 'storage/immutable_object_store.dart';
 import 'book_sync_identity.dart';
 import 'storage/sync_storage.dart';
 import 'sync_dataset_catalog.dart';
@@ -19,7 +20,7 @@ import 'sync_models.dart';
 
 typedef BookFileImporterFactory = BookFileImporter Function(String bookUid);
 
-/// Imports and publishes readable book files through [SyncStorage]. WebDAV,
+/// Imports and publishes verified book revisions through [SyncStorage]. WebDAV,
 /// object storage and an official server use this same orchestration.
 class BookFileSyncService {
   BookFileSyncService({
@@ -35,6 +36,7 @@ class BookFileSyncService {
   }) : _storageProvider = storageProvider ?? _noStorage,
        _databaseService = databaseService ?? DatabaseService(),
        _databaseProvider = database,
+       // ignore: prefer_initializing_formals
        _importer = importer,
        _importerFactory =
            importerFactory ??
@@ -110,7 +112,7 @@ class BookFileSyncService {
         state.status == BookContentSyncStatus.conflict
             ? WebDavSyncErrorCode.conflict
             : WebDavSyncErrorCode.network,
-        state.error ?? 'The readable cloud book is not fully committed.',
+        state.error ?? 'The cloud revision is not fully committed.',
       );
     }
     final row = (await db.query(
@@ -186,14 +188,6 @@ class BookFileSyncService {
       );
     }
     final storage = await _requireStorage();
-    final objectPath = SyncPath(remotePath);
-    final info = await storage.stat(objectPath);
-    if (info == null) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.notFound,
-        'The readable cloud book is missing.',
-      );
-    }
     final temporary = await _temporaryDirectory();
     final partial = File(
       path.join(
@@ -203,22 +197,22 @@ class BookFileSyncService {
     );
     File? cover;
     try {
-      final sink = partial.openWrite();
       try {
-        final result = await storage.download(
-          objectPath,
-          sink,
-          expectedVersion: info.version,
+        await _content.downloadRevision(
+          descriptor.bookUid,
+          remotePath,
+          partial,
         );
-        onProgress?.call(
-          BookFileTransferProgress(
-            transferredBytes: result.info.length,
-            totalBytes: descriptor.sizeBytes ?? result.info.length,
-          ),
-        );
-      } finally {
-        await sink.close();
+      } on SyncStorageException catch (error) {
+        if (error.code != SyncStorageErrorCode.invalidData) rethrow;
+        throw _corrupt(error.message);
       }
+      onProgress?.call(
+        BookFileTransferProgress(
+          transferredBytes: await partial.length(),
+          totalBytes: descriptor.sizeBytes ?? await partial.length(),
+        ),
+      );
       if (descriptor.sizeBytes != null &&
           await partial.length() != descriptor.sizeBytes) {
         throw _corrupt('The downloaded book size does not match metadata.');
@@ -307,77 +301,23 @@ class BookFileSyncService {
     if (size <= 0 || size > maxCoverFileBytes) return null;
     final storage = await _requireStorage();
     final hash = '${await sha256.bind(file.openRead()).first}';
-    final directory = path.posix.dirname(currentPath);
     final extension = path.extension(file.path).toLowerCase();
     final safeExtension = extension.isEmpty || extension.length > 10
         ? '.img'
         : extension;
-    final remote = SyncPath('$directory/cover$safeExtension');
-    final existing = await storage.stat(remote);
-    if (existing != null) {
-      final temp = await _temporaryDirectory();
-      final verify = File(
+    final segments = currentPath.split('/');
+    final remote = SyncPath('books/${segments[1]}/assets/$hash$safeExtension');
+    final objects = ImmutableObjectStore(
+      storage,
+      Directory(
         path.join(
-          temp.path,
-          'cover-verify-${DateTime.now().microsecondsSinceEpoch}.part',
+          (await _temporaryDirectory()).path,
+          'cover-cache',
+          sha256.convert(storage.spaceKey.codeUnits).toString(),
         ),
-      );
-      try {
-        final sink = verify.openWrite();
-        try {
-          await storage.download(
-            remote,
-            sink,
-            expectedVersion: existing.version,
-          );
-        } finally {
-          await sink.close();
-        }
-        if ('${await sha256.bind(verify.openRead()).first}' == hash) {
-          return _Cover(hash, path.basename(file.path), size, remote.value);
-        }
-      } finally {
-        if (await verify.exists()) await verify.delete();
-      }
-    }
-    final write = existing == null
-        ? await storage.create(
-            remote,
-            file.openRead(),
-            length: size,
-            contentType: _coverContentType(safeExtension),
-          )
-        : await storage.compareAndSwap(
-            remote,
-            file.openRead(),
-            length: size,
-            contentType: _coverContentType(safeExtension),
-            expectedVersion: existing.version,
-          );
-    final temp = await _temporaryDirectory();
-    final verify = File(
-      path.join(
-        temp.path,
-        'cover-verify-${DateTime.now().microsecondsSinceEpoch}.part',
       ),
     );
-    try {
-      final sink = verify.openWrite();
-      try {
-        await storage.download(
-          remote,
-          sink,
-          expectedVersion: write.info.version,
-        );
-      } finally {
-        await sink.close();
-      }
-      if ('${await sha256.bind(verify.openRead()).first}' != hash) {
-        throw _corrupt('The published cover failed checksum verification.');
-      }
-    } finally {
-      if (await verify.exists()) await verify.delete();
-    }
+    await objects.putFile(remote, file, hash);
     return _Cover(hash, path.basename(file.path), size, remote.value);
   }
 
@@ -408,7 +348,7 @@ class BookFileSyncService {
     );
     final sink = file.openWrite();
     try {
-      await storage.download(remote, sink, expectedVersion: info.version);
+      await storage.download(remote, sink);
     } finally {
       await sink.close();
     }
@@ -553,13 +493,6 @@ class BookFileSyncService {
 
   static WebDavSyncFailure _corrupt(String message) =>
       WebDavSyncFailure(WebDavSyncErrorCode.corruptRemoteData, message);
-
-  static String _coverContentType(String extension) => switch (extension) {
-    '.jpg' || '.jpeg' => 'image/jpeg',
-    '.png' => 'image/png',
-    '.webp' => 'image/webp',
-    _ => 'application/octet-stream',
-  };
 }
 
 class _Cover {

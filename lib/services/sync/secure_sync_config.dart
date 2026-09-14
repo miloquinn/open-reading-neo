@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,7 +63,51 @@ class SecureSyncConfigStore {
     SyncSecretStorage? secretStorage,
     SyncPreferences? preferences,
   }) : _secretStorage = secretStorage ?? FlutterSyncSecretStorage(),
+       _identityStorage = secretStorage ?? _deviceOnlyStorage,
        _preferences = preferences ?? SharedSyncPreferences();
+
+  static final SyncSecretStorage _deviceOnlyStorage = FlutterSyncSecretStorage(
+    const FlutterSecureStorage(
+      iOptions: IOSOptions(
+        accessibility: KeychainAccessibility.first_unlock_this_device,
+      ),
+      mOptions: MacOsOptions(
+        accessibility: KeychainAccessibility.first_unlock_this_device,
+      ),
+    ),
+  );
+  final SyncSecretStorage _identityStorage;
+  static Future<String>? _defaultDeviceIdentity;
+  Future<String>? _injectedDeviceIdentity;
+
+  Future<String> deviceIdentity() {
+    if (identical(_identityStorage, _deviceOnlyStorage)) {
+      return _defaultDeviceIdentity ??= _readDeviceIdentity().onError((
+        error,
+        stack,
+      ) {
+        _defaultDeviceIdentity = null;
+        Error.throwWithStackTrace(error!, stack);
+      });
+    }
+    return _injectedDeviceIdentity ??= _readDeviceIdentity();
+  }
+
+  Future<String> _readDeviceIdentity() async {
+    const key = 'open_reading.sync.installation';
+    try {
+      final existing = await _identityStorage.read(key);
+      if (existing != null && existing.isNotEmpty) return existing;
+      final id = const Uuid().v4();
+      await _identityStorage.write(key, id);
+      return id;
+    } catch (_) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.secureStorage,
+        'The device sync identity could not be read from secure storage.',
+      );
+    }
+  }
 
   static const _configurationKey = 'webdav_sync_configuration_v1';
   static const _scopeKey = 'webdav_sync_scope_v1';

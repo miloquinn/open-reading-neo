@@ -2946,7 +2946,7 @@
   "webDavFilesOnlyLocal": "仅在本机",
   "webDavFilesOnlyRemote": "文件尚未下载到本机",
   "webDavFilesUploadPermission": "允许上传书籍原文件",
-  "webDavFilesUploadPermissionHint": "启用后会自动备份已有的本地书籍。云端 books/ 中按书名和作者保存可直接打开的原格式文件与封面；同名书通过身份后缀区分，正文更新保留历史版本。",
+  "webDavFilesUploadPermissionHint": "同步所选书籍与封面。TXT 首次上传后仅传输变化的内容块，EPUB、PDF 保留原始字节。可直接打开的完整文件需单独导出。",
   "webDavNewBookPolicyTitle": "新书文件处理",
   "webDavNewBookPolicyAsk": "每次询问（推荐）",
   "webDavNewBookPolicyAskHint": "导入完成后选择本次要上传的书籍",
@@ -3428,7 +3428,7 @@
   "bookSourceKeepLocal": "保留我的正文",
   "bookSourceUseRemote": "采用书源正文",
   "bookSourceUpdateFailed": "更新未完成，现有正文已保留，请重试。",
-  "cloudSyncReadableStorage": "书籍以原格式保存在 books/ 中，历史版本也可直接打开。未变化的文件不会重复上传；正文变化时会上传完整文件。",
+  "cloudSyncReadableStorage": "TXT 按内容块增量同步，未变化的书籍不传输正文。需要在其他软件打开时，可单独导出完整文件到云端。",
   "@bookSourceUpdateSummary": {
     "placeholders": {
       "added": {
@@ -3447,6 +3447,9 @@
   "premiumOtherChannelAccess": "你已通过其他渠道开通高级会员，无需重复购买。",
   "premiumAppleAccess": "你已通过 App Store 开通高级会员，无需重复购买。",
   "premiumExistingAccess": "你已开通高级会员，无需重复购买。",
-  "premiumSyncPending": "会员状态待同步"
-
+  "premiumSyncPending": "会员状态待同步",
+  "cloudSyncExportBook": "导出完整文件到云端",
+  "cloudSyncExportDone": "完整文件已导出",
+  "cloudSyncDiagnostics": "复制同步诊断",
+  "cloudSyncProtocolUpgrade": "此目录使用旧版同步格式，请选择一个新的空目录。本地书籍和原有云端文件都会保留。"
 }

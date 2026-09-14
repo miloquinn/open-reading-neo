@@ -5291,7 +5291,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      'Automatically back up existing local books. Cloud books/ keeps readable files in their original format and covers, organized by title and author. Identity suffixes distinguish same-name books, and content updates retain history.';
+      'Sync selected books and covers. TXT transfers only changed blocks after its first upload; EPUB and PDF retain their original bytes. Complete readable files are exported separately.';
 
   @override
   String get webDavNewBookPolicyTitle => 'New book files';
@@ -6678,7 +6678,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudSyncReadableStorage =>
-      'Books keep their original format in books/, with readable history. Unchanged files are not uploaded again; changed text is transferred as a complete file.';
+      'TXT changes sync as reusable content blocks. Unchanged books transfer no body data. Use Export to cloud for a complete file you can open outside this app.';
 
   @override
   String get bookSourceBindSource => 'Link a book source';
@@ -6712,4 +6712,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumSyncPending => 'Syncing membership status';
+
+  @override
+  String get cloudSyncExportBook => 'Export complete file to cloud';
+
+  @override
+  String get cloudSyncExportDone => 'Complete file exported';
+
+  @override
+  String get cloudSyncDiagnostics => 'Copy sync diagnostics';
+
+  @override
+  String get cloudSyncProtocolUpgrade =>
+      'This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept.';
 }

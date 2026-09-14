@@ -66,12 +66,12 @@ void main() {
 
       expect(result.downloaded, 1);
       expect(secondAdapter.appliedValue, 0.42);
-      final devices = await storage.list(SyncPath('sync/metadata/devices'));
+      final devices = await storage.list(SyncPath('changes'));
       expect(devices.prefixes, isNotEmpty);
       final deviceObjects = await storage.list(devices.prefixes.first);
       expect(
         deviceObjects.objects.map((object) => object.path.value),
-        contains(contains('/head.json')),
+        contains(endsWith('.json')),
       );
       expect(
         (await storage.readText(SyncPath('format.json'))).text,
@@ -114,6 +114,33 @@ void main() {
       expect((await storage.stat(SyncPath(legacy)))?.length, bytes.length);
     }
   });
+
+  test(
+    'restored database uses a fresh writer when installation identity changes',
+    () async {
+      final storage = MemorySyncStorage();
+      final store = SyncChangeStore(database: () async => firstDb);
+      Future<void> run(String installation, double progress) => SyncEngine(
+        storage: storage,
+        scope: const WebDavSyncScope(),
+        changeStore: store,
+        installationId: installation,
+        adapters: MetadataSyncAdapters(
+          store: store,
+          registeredAdapters: [_ProgressAdapter(store, localValue: progress)],
+        ),
+      ).run().then((_) {});
+      await run('original-install', 0.2);
+      final firstWriter = (await storage.list(
+        SyncPath('changes'),
+      )).prefixes.single;
+      final firstLog = (await storage.list(firstWriter)).objects.single;
+      final original = (await storage.readText(firstLog.path)).text;
+      await run('restored-on-another-device', 0.4);
+      expect((await storage.list(SyncPath('changes'))).prefixes, hasLength(2));
+      expect((await storage.readText(firstLog.path)).text, original);
+    },
+  );
 }
 
 final class _ProgressAdapter implements MetadataSyncAdapter {

@@ -74,6 +74,10 @@ jobs:
           set -euo pipefail
           mapfile -d '' test_files < <(
             find test -type f -name '*_test.dart' \
+              ! -name 'webdav*_test.dart' \
+              ! -name '*sync*_test.dart' \
+              ! -name 'metadata_checkpoint_test.dart' \
+              ! -name 'txt_edit_reference_service_test.dart' \
               ! -name 'book_source_management_page_test.dart' \
               ! -name 'book_source_management_organization_test.dart' \
               ! -name 'book_source_reader_page_test.dart' \
@@ -87,6 +91,9 @@ jobs:
               -print0
           )
           flutter test --coverage --exclude-tags isolated-process "${test_files[@]}"
+
+      - name: Core Flutter validation and Stateful widget tests - WebDAV isolated processes
+        run: python3 tool/test_webdav_isolated.py
 
       - name: Stateful widget tests (isolated processes)
         shell: bash

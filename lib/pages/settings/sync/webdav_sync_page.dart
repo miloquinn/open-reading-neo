@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,17 @@ class WebDavSyncPage extends StatelessWidget {
         _SyncOverview(sync: sync),
         const SizedBox(height: 18),
         _SyncActivity(sync: sync),
+        if (sync.isConfigured)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.copy_outlined),
+              label: Text(l10n.cloudSyncDiagnostics),
+              onPressed: () => Clipboard.setData(
+                ClipboardData(text: sync.diagnosticSummary),
+              ),
+            ),
+          ),
         if (sync.lastFailure case final failure?) ...[
           const SizedBox(height: 20),
           Text(

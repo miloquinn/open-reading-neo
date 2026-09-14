@@ -5090,7 +5090,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      '既存のローカル書籍を自動バックアップします。クラウドの books/ に、書名と著者ごとに直接開ける元形式のファイルと表紙を保存します。同名の書籍は識別子で区別し、本文の更新履歴を残します。';
+      '選択した書籍と表紙を同期します。TXT は初回以降、変更されたブロックのみ転送します。EPUB と PDF の元のバイトは保持されます。完全なファイルは別途書き出せます。';
 
   @override
   String get webDavNewBookPolicyTitle => '新しい書籍ファイル';
@@ -6413,7 +6413,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cloudSyncReadableStorage =>
-      '書籍は元の形式で books/ に保存され、履歴も直接開けます。未変更のファイルは再送せず、本文が変わるとファイル全体を転送します。';
+      'TXT は変更されたブロックを同期し、未変更の本文は転送しません。他のアプリで開く場合は、完全なファイルをクラウドに書き出せます。';
 
   @override
   String get bookSourceBindSource => '配信元を関連付ける';
@@ -6442,4 +6442,17 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get premiumSyncPending => '会員情報の同期待ち';
+
+  @override
+  String get cloudSyncExportBook => '完全なファイルをクラウドに書き出す';
+
+  @override
+  String get cloudSyncExportDone => '完全なファイルを書き出しました';
+
+  @override
+  String get cloudSyncDiagnostics => '同期の診断情報をコピー';
+
+  @override
+  String get cloudSyncProtocolUpgrade =>
+      'このフォルダは古い同期形式です。新しい空のフォルダを選んでください。端末の書籍と既存のクラウドファイルは保持されます。';
 }

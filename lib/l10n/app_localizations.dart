@@ -9257,7 +9257,7 @@ abstract class AppLocalizations {
   /// Explains that enabling uploads does not upload every book
   ///
   /// In en, this message translates to:
-  /// **'Automatically back up existing local books. Cloud books/ keeps readable files in their original format and covers, organized by title and author. Identity suffixes distinguish same-name books, and content updates retain history.'**
+  /// **'Sync selected books and covers. TXT transfers only changed blocks after its first upload; EPUB and PDF retain their original bytes. Complete readable files are exported separately.'**
   String get webDavFilesUploadPermissionHint;
 
   /// Newly imported book file upload policy title
@@ -11633,7 +11633,7 @@ abstract class AppLocalizations {
   /// No description provided for @cloudSyncReadableStorage.
   ///
   /// In en, this message translates to:
-  /// **'Books keep their original format in books/, with readable history. Unchanged files are not uploaded again; changed text is transferred as a complete file.'**
+  /// **'TXT changes sync as reusable content blocks. Unchanged books transfer no body data. Use Export to cloud for a complete file you can open outside this app.'**
   String get cloudSyncReadableStorage;
 
   /// No description provided for @bookSourceBindSource.
@@ -11689,6 +11689,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Syncing membership status'**
   String get premiumSyncPending;
+
+  /// No description provided for @cloudSyncExportBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Export complete file to cloud'**
+  String get cloudSyncExportBook;
+
+  /// No description provided for @cloudSyncExportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete file exported'**
+  String get cloudSyncExportDone;
+
+  /// No description provided for @cloudSyncDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy sync diagnostics'**
+  String get cloudSyncDiagnostics;
+
+  /// No description provided for @cloudSyncProtocolUpgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept.'**
+  String get cloudSyncProtocolUpgrade;
 }
 
 class _AppLocalizationsDelegate

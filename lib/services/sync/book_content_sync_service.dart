@@ -18,8 +18,11 @@ import '../books/txt_edit_reference_service.dart';
 import '../books/txt_edit_service.dart';
 import '../core/database_service.dart';
 import 'reading_progress_sync_service.dart';
+import 'book_revision_repository.dart';
+import 'storage/immutable_object_store.dart';
 import 'storage/sync_storage.dart';
 import 'sync_models.dart';
+import 'sync_space.dart';
 
 enum BookContentSyncStatus {
   localOnly,
@@ -108,17 +111,19 @@ class BookContentReconcileResult {
     required this.conflicts,
     required this.failed,
     this.uploadedBytes = 0,
+    this.downloadedBytes = 0,
   });
   final int uploaded;
   final int downloaded;
   final int conflicts;
   final int failed;
   final int uploadedBytes;
+  final int downloadedBytes;
 }
 
-/// Provider-neutral synchronization for complete, directly readable book
-/// files. There is one mutable current file, one CAS head and immutable,
-/// readable history. A content hash is a revision, never a book identity.
+/// Coordinates immutable cloud revisions with transactional local files.
+/// Cloud persistence lives in BookRevisionRepository; this service owns local
+/// recovery, reading references, source sidecars and explicit conflict choices.
 class BookContentSyncService {
   BookContentSyncService({
     SyncStorageProvider? storageProvider,
@@ -154,6 +159,9 @@ class BookContentSyncService {
   late final TxtEditReferenceService _referenceService;
   late final SourceChapterStateStore _sourceStateStore;
   Future<BookContentReconcileResult>? _activeReconcile;
+  ImmutableObjectStore? _activeObjects;
+  bool Function()? _shouldContinue;
+  final Map<String, _LocalObservation> _localObservations = {};
 
   Future<Database> get _database =>
       _databaseProvider?.call() ?? _databaseService.database;
@@ -187,10 +195,11 @@ class BookContentSyncService {
     final snapshot = await _snapshot(source, bookUid, origin: 'local');
     final sourceBundle = await _sourceBundle(book, expectedBookUid: bookUid);
     final storage = await _storageProvider();
-    final spaceKey = storage?.spaceKey ?? old?.spaceKey ?? '';
-    final folder = old?.folderName ?? _folderName(book, bookUid);
+    final spaceKey = storage == null
+        ? old?.spaceKey ?? ''
+        : await _spaceKey(storage);
+    final folder = BookRevisionRepository.folder(bookUid);
     final original = path.basename(book.filePath);
-    final extension = _extension(book.format, original);
     await db.transaction((txn) async {
       await _archiveIfSpaceChanged(txn, old, spaceKey);
       await txn.insert('book_content_bindings', {
@@ -200,7 +209,8 @@ class BookContentSyncService {
         'folder_name': folder,
         'original_file_name': old?.originalFileName ?? original,
         'format': book.format.toLowerCase(),
-        'current_path': old?.currentPath ?? 'books/$folder/current.$extension',
+        'current_path':
+            old?.currentPath ?? 'books/$folder/revisions/unpublished.json',
         'space_key': spaceKey,
         'enabled': old?.enabled == false ? 0 : 1,
         'status': old?.enabled == false
@@ -268,10 +278,11 @@ class BookContentSyncService {
   Future<BookContentReconcileResult> reconcile({
     String? bookUid,
     bool Function()? shouldContinue,
+    bool respectBackoff = false,
   }) {
     final active = _activeReconcile;
     if (active != null) return active;
-    final future = _runReconcile(bookUid, shouldContinue);
+    final future = _runReconcile(bookUid, shouldContinue, respectBackoff);
     _activeReconcile = future;
     return future.whenComplete(() {
       if (identical(_activeReconcile, future)) _activeReconcile = null;
@@ -281,6 +292,7 @@ class BookContentSyncService {
   Future<BookContentReconcileResult> _runReconcile(
     String? bookUid,
     bool Function()? shouldContinue,
+    bool respectBackoff,
   ) async {
     final db = await _database;
     await _ensureSchema(db);
@@ -294,24 +306,52 @@ class BookContentSyncService {
       }
       return _emptyResult;
     }
-    if (!storage.capabilities.strongVersions) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.serverIncompatible,
-        'Book content sync requires strong conditional object versions.',
-      );
-    }
-    var up = 0, down = 0, conflicts = 0, failed = 0, bytes = 0;
+    final activeSpace = await _spaceKey(storage);
+    _activeObjects = await _objects(storage, knownSpace: activeSpace);
+    _shouldContinue = shouldContinue;
+    var up = 0, down = 0, conflicts = 0, failed = 0;
     for (var binding in bindings.where((b) => b.enabled)) {
       if (shouldContinue?.call() == false) break;
       try {
-        binding = await _activateSpace(db, binding, storage.spaceKey);
+        binding = await _activateSpace(db, binding, activeSpace);
+        final retries = await db.query(
+          'book_content_bindings',
+          columns: ['retry_after'],
+          where: 'book_uid = ?',
+          whereArgs: [binding.bookUid],
+        );
+        final retryAt = DateTime.tryParse(
+          retries.single['retry_after'] as String? ?? '',
+        );
+        if (respectBackoff && retryAt != null && retryAt.isAfter(_now())) {
+          continue;
+        }
         final result = await _reconcileBook(db, storage, binding);
         if (result.uploaded) up++;
         if (result.downloaded) down++;
         if (result.conflict) conflicts++;
-        bytes += result.uploadedBytes;
       } catch (error) {
         failed++;
+        final rows = await db.query(
+          'book_content_bindings',
+          columns: ['failure_count'],
+          where: 'book_uid = ?',
+          whereArgs: [binding.bookUid],
+        );
+        final failures = ((rows.single['failure_count'] as int? ?? 0) + 1)
+            .clamp(1, 6);
+        await db.update(
+          'book_content_bindings',
+          {
+            'failure_count': failures,
+            'retry_after': _now()
+                .add(Duration(seconds: 5 * (1 << failures)))
+                .toUtc()
+                .toIso8601String(),
+          },
+          where: 'book_uid = ?',
+          whereArgs: [binding.bookUid],
+        );
         await _setState(
           db,
           binding.bookUid,
@@ -325,7 +365,8 @@ class BookContentSyncService {
       downloaded: down,
       conflicts: conflicts,
       failed: failed,
-      uploadedBytes: bytes,
+      uploadedBytes: _activeObjects!.uploadedBytes,
+      downloadedBytes: _activeObjects!.downloadedBytes,
     );
   }
 
@@ -347,11 +388,16 @@ class BookContentSyncService {
       local,
       binding.bookUid,
       origin: 'local',
+      allowCached: true,
     );
     final localBook = await _bookForBinding(db, binding);
     final sourceBundle = localBook == null
         ? const _SourceBundle(null, <SourceStateAsset>[])
-        : await _sourceBundle(localBook, expectedBookUid: binding.bookUid);
+        : await _sourceBundle(
+            localBook,
+            expectedBookUid: binding.bookUid,
+            contentHash: localSnapshot.hash,
+          );
     binding = binding.copyWith(
       localHash: localSnapshot.hash,
       sourceStateHash: sourceBundle.hash,
@@ -369,312 +415,241 @@ class BookContentSyncService {
       whereArgs: [binding.bookUid],
     );
 
-    final remotePaths = _RemotePaths(binding);
-    final infos = await Future.wait([
-      storage.stat(remotePaths.current),
-      storage.stat(remotePaths.head),
-    ]);
-    final currentInfo = infos[0];
-    final headInfo = infos[1];
-    if (currentInfo == null && headInfo == null) {
-      return _push(db, storage, binding, localSnapshot, null, null);
-    }
-    if (currentInfo == null) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.corruptRemoteData,
-        'book.json exists but the readable current book is missing.',
+    final repository = BookRevisionRepository(_activeObjects!);
+    final tips = await repository.tips(
+      binding.bookUid,
+      knownRevision: binding.remoteVersion,
+    );
+    if (tips.isEmpty) {
+      return _pushRevision(
+        db,
+        repository,
+        binding,
+        localSnapshot,
+        sourceBundle,
+        [],
       );
     }
-    var remote = await _readRemote(storage, binding, currentInfo, headInfo);
-    final job = await _job(db, binding.bookUid);
-
-    // A process may stop after publishing current but before publishing its
-    // head. Only the exact durable pending revision is allowed to repair it.
-    if (job?.targetHash == remote.snapshot.hash &&
-        localSnapshot.hash == remote.snapshot.hash &&
-        remote.headHash != remote.snapshot.hash) {
-      return _finishPendingHead(db, storage, binding, localSnapshot, remote);
-    }
-    if (!remote.headMatchesCurrent) {
-      if (binding.observedMismatchVersion != remote.currentInfo.version.value) {
-        await _stageRemote(
+    final localChanged =
+        localSnapshot.hash != binding.baseHash ||
+        sourceBundle.hash != binding.baseSourceStateHash;
+    if (tips.length == 1) {
+      final tip = tips.single;
+      if (localSnapshot.hash == tip.hash &&
+          sourceBundle.hash == tip.sourceHash) {
+        await _markSynced(
           db,
           binding,
-          remote,
-          BookContentSyncStatus.updateAvailable,
-        );
-        await db.update(
-          'book_content_bindings',
-          {
-            'observed_mismatch_version': remote.currentInfo.version.value,
-            'observed_mismatch_at': _utcNow(),
-          },
-          where: 'book_uid = ?',
-          whereArgs: [binding.bookUid],
+          tip.hash,
+          SyncObjectVersion(tip.id),
+          SyncObjectVersion(tip.id),
+          tip.size,
+          tip.sourceHash,
         );
         return const _Outcome();
       }
-      remote = await _adoptExternalCurrent(storage, binding, remote);
-    }
-    if (localSnapshot.hash == remote.snapshot.hash &&
-        sourceBundle.hash == remote.sourceStateHash) {
-      await _markSynced(
-        db,
-        binding,
-        localSnapshot.hash,
-        remote.currentInfo.version,
-        remote.headInfo?.version,
-        localSnapshot.size,
-        remote.sourceStateHash,
-      );
-      return const _Outcome();
-    }
-    if (localSnapshot.hash == remote.snapshot.hash) {
-      if (sourceBundle.hash == null && remote.sourceStateHash != null) {
-        return _acceptRemote(db, binding, remote);
-      }
-      if (sourceBundle.hash != null && remote.sourceStateHash == null) {
-        return _publishSourceAndHead(
+      if (tip.id == binding.remoteVersion && localChanged) {
+        return _pushRevision(
           db,
-          storage,
+          repository,
           binding,
           localSnapshot,
           sourceBundle,
-          remote,
+          tips,
         );
       }
-      if (binding.baseSourceStateHash == remote.sourceStateHash) {
-        return _publishSourceAndHead(
+      if (localSnapshot.hash == tip.hash &&
+          sourceBundle.hash != null &&
+          tip.sourceHash == null) {
+        return _pushRevision(
           db,
-          storage,
+          repository,
           binding,
           localSnapshot,
           sourceBundle,
-          remote,
+          tips,
         );
       }
-      if (binding.baseSourceStateHash == sourceBundle.hash) {
-        return _acceptRemote(db, binding, remote);
+      if (!localChanged ||
+          (localSnapshot.hash == tip.hash && sourceBundle.hash == null)) {
+        return _acceptRemote(
+          db,
+          binding,
+          await _readRevision(repository, binding, tip),
+        );
       }
-      return _recordConflict(db, binding, localSnapshot, remote);
     }
-    if (binding.baseHash == remote.snapshot.hash) {
-      return _push(
-        db,
-        storage,
-        binding,
-        localSnapshot,
-        remote.currentInfo,
-        remote.headInfo,
-      );
-    }
-    if (binding.baseHash == localSnapshot.hash) {
-      return _acceptRemote(db, binding, remote);
-    }
-    return _recordConflict(db, binding, localSnapshot, remote);
+    final remoteTip = tips.firstWhere(
+      (tip) => tip.id != binding.remoteVersion,
+      orElse: () => tips.first,
+    );
+    return _recordConflict(
+      db,
+      binding,
+      localSnapshot,
+      await _readRevision(repository, binding, remoteTip),
+      remoteTips: tips.map((tip) => tip.id).toList(),
+    );
   }
 
-  Future<_Outcome> _push(
+  Future<String> _spaceKey(SyncStorage storage) async =>
+      '${storage.spaceKey}\u0000${await SyncSpace.ensure(storage)}';
+
+  Future<ImmutableObjectStore> _objects(
+    SyncStorage storage, {
+    String? knownSpace,
+  }) async {
+    final namespace = sha256
+        .convert(utf8.encode(knownSpace ?? await _spaceKey(storage)))
+        .toString();
+    return ImmutableObjectStore(
+      storage,
+      Directory(path.join((await _rootDirectory()).path, 'objects', namespace)),
+    );
+  }
+
+  Future<_Outcome> _pushRevision(
     Database db,
-    SyncStorage storage,
+    BookRevisionRepository repository,
     _Binding binding,
     _Snapshot snapshot,
-    SyncObjectInfo? currentInfo,
-    SyncObjectInfo? headInfo,
+    _SourceBundle source,
+    List<BookRevision> parents,
   ) async {
-    final remotePaths = _RemotePaths(binding);
-    final history = remotePaths.history(snapshot.hash);
-    await _ensureImmutable(storage, history, snapshot);
-    final localBook = await _bookForBinding(db, binding);
-    final sourceBundle = localBook == null
-        ? const _SourceBundle(null, <SourceStateAsset>[])
-        : await _sourceBundle(localBook, expectedBookUid: binding.bookUid);
-    // Publish immutable/hash-bound source assets before current. If the
-    // process stops after current, an old head is never paired with new text.
-    await _publishSourceAssets(storage, binding, sourceBundle);
-    final currentWrite = currentInfo == null
-        ? await storage.create(
-            remotePaths.current,
-            snapshot.file.openRead(),
-            length: snapshot.size,
-            contentType: _contentType(binding.format),
-          )
-        : await storage.compareAndSwap(
-            remotePaths.current,
-            snapshot.file.openRead(),
-            length: snapshot.size,
-            contentType: _contentType(binding.format),
-            expectedVersion: currentInfo.version,
-          );
-    await _verifyObject(
-      storage,
-      remotePaths.current,
-      snapshot.hash,
-      currentWrite.info.version,
-    );
-    final headBytes = _headBytes(
-      binding,
-      snapshot,
-      history,
-      currentWrite.info.version,
-      sourceBundle.hash,
-      await _sourceDigests(sourceBundle),
-    );
-    final headWrite = headInfo == null
-        ? await storage.create(
-            remotePaths.head,
-            Stream.value(headBytes),
-            length: headBytes.length,
-            contentType: 'application/json; charset=utf-8',
-          )
-        : await storage.compareAndSwap(
-            remotePaths.head,
-            Stream.value(headBytes),
-            length: headBytes.length,
-            contentType: 'application/json; charset=utf-8',
-            expectedVersion: headInfo.version,
-          );
-    await _verifyHead(
-      storage,
-      remotePaths.head,
-      headWrite.info.version,
-      snapshot.hash,
-      currentWrite.info.version,
-      currentPath: binding.currentPath,
-      size: snapshot.size,
-      historyPath: history.value,
+    await _publishSourceAssets(repository.storage, binding, source);
+    final assets = await _sourceDigests(source);
+    final revision = await repository.publish(
+      bookUid: binding.bookUid,
+      file: snapshot.file,
+      hash: snapshot.hash,
+      format: binding.format,
+      fileName: binding.originalFileName,
+      parents: parents.map((r) => r.id).toList(),
+      base: parents.isEmpty ? null : parents.first,
+      shouldContinue: _shouldContinue,
+      metadata: {
+        'source_state_sha256': source.hash,
+        'source_assets': assets
+            .map(
+              (asset) => {
+                'path': asset.path,
+                'sha256': asset.hash,
+                'restore_path': asset.restorePath,
+              },
+            )
+            .toList(),
+      },
     );
     await _markSynced(
       db,
       binding,
       snapshot.hash,
-      currentWrite.info.version,
-      headWrite.info.version,
+      SyncObjectVersion(revision.id),
+      SyncObjectVersion(revision.id),
       snapshot.size,
-      sourceBundle.hash,
+      source.hash,
     );
     return _Outcome(uploaded: true, uploadedBytes: snapshot.size);
   }
 
-  Future<_Outcome> _finishPendingHead(
-    Database db,
-    SyncStorage storage,
+  Future<_Remote> _readRevision(
+    BookRevisionRepository repository,
     _Binding binding,
-    _Snapshot snapshot,
-    _Remote remote,
+    BookRevision revision,
   ) async {
-    final paths = _RemotePaths(binding);
-    final history = paths.history(snapshot.hash);
-    await _ensureImmutable(storage, history, snapshot);
-    final localBook = await _bookForBinding(db, binding);
-    final sourceBundle = localBook == null
-        ? const _SourceBundle(null, <SourceStateAsset>[])
-        : await _sourceBundle(localBook, expectedBookUid: binding.bookUid);
-    await _publishSourceAssets(storage, binding, sourceBundle);
-    final bytes = _headBytes(
-      binding,
-      snapshot,
-      history,
-      remote.currentInfo.version,
-      sourceBundle.hash,
-      await _sourceDigests(sourceBundle),
+    final file = await _revisionFile(
+      binding.bookUid,
+      revision.hash,
+      path.extension(binding.originalFileName),
     );
-    final write = remote.headInfo == null
-        ? await storage.create(
-            paths.head,
-            Stream.value(bytes),
-            length: bytes.length,
-            contentType: 'application/json; charset=utf-8',
-          )
-        : await storage.compareAndSwap(
-            paths.head,
-            Stream.value(bytes),
-            length: bytes.length,
-            contentType: 'application/json; charset=utf-8',
-            expectedVersion: remote.headInfo!.version,
-          );
-    await _verifyHead(
-      storage,
-      paths.head,
-      write.info.version,
-      snapshot.hash,
-      remote.currentInfo.version,
-      currentPath: binding.currentPath,
-      size: snapshot.size,
-      historyPath: history.value,
-    );
-    await _markSynced(
-      db,
-      binding,
-      snapshot.hash,
-      remote.currentInfo.version,
-      write.info.version,
-      snapshot.size,
-      sourceBundle.hash,
-    );
-    return const _Outcome();
-  }
-
-  Future<_Remote> _readRemote(
-    SyncStorage storage,
-    _Binding binding,
-    SyncObjectInfo currentInfo,
-    SyncObjectInfo? headInfo,
-  ) async {
-    Map<String, dynamic>? head;
-    SyncTextRead? headRead;
-    if (headInfo != null) {
-      headRead = await storage.readText(
-        _RemotePaths(binding).head,
-        expectedVersion: headInfo.version,
-      );
+    if (!await file.exists() || await _hashFile(file) != revision.hash) {
+      final partial = await _temporaryFile('reconstruct');
       try {
-        head = (jsonDecode(headRead.text) as Map).cast<String, dynamic>();
-      } catch (_) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.corruptRemoteData,
-          'book.json is not valid JSON.',
-        );
-      }
-      if (head['schema_version'] != 1 || head['book_uid'] != binding.bookUid) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.corruptRemoteData,
-          'book.json does not describe this book.',
-        );
+        await repository.materialize(revision, partial);
+        await partial.copy(file.path);
+      } finally {
+        if (await partial.exists()) await partial.delete();
       }
     }
-    final snapshot = await _downloadSnapshot(
-      storage,
-      SyncPath(binding.currentPath),
-      binding.bookUid,
-      currentInfo.version,
-      origin: head == null || head['current_sha256'] != null
-          ? 'remote'
-          : 'external_cloud_edit',
+    final snapshot = _Snapshot(file, revision.hash, revision.size);
+    await _recordRevision(await _database, binding.bookUid, snapshot, 'remote');
+    final source = await _readSourceSidecar(
+      repository.storage,
+      binding,
+      revision.sourceHash,
+      revision.sourceAssets,
     );
-    final headMatchesCurrent =
-        head?['current_sha256'] == snapshot.hash &&
-        head?['current_version'] == currentInfo.version.value &&
-        head?['current_path'] == binding.currentPath &&
-        head?['current_size'] == snapshot.size;
-    final remoteSource = headMatchesCurrent
-        ? await _readSourceSidecar(
-            storage,
-            binding,
-            head?['source_state_sha256'] as String?,
-            (head?['source_assets'] as List? ?? const <Object>[]),
-          )
-        : null;
     return _Remote(
       snapshot: snapshot,
-      currentInfo: currentInfo,
-      headInfo: headRead?.info,
-      headHash: head?['current_sha256'] as String?,
-      headMatchesCurrent: headMatchesCurrent,
-      sourceStateHash: remoteSource?.hash,
-      sourceStateJson: remoteSource?.json,
-      sourceAssets: remoteSource?.assets ?? const <String, List<int>>{},
+      revisionId: revision.id,
+      sourceStateHash: source?.hash,
+      sourceStateJson: source?.json,
+      sourceAssets: source?.assets ?? const {},
     );
+  }
+
+  Future<BookRevision> downloadRevision(
+    String bookUid,
+    String remotePath,
+    File destination,
+  ) async {
+    final storage = await _storageProvider();
+    if (storage == null) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.authentication,
+        'Cloud storage is not configured.',
+      );
+    }
+    final id = path.posix.basenameWithoutExtension(remotePath);
+    if (BookRevisionRepository.revisionPath(bookUid, id).value != remotePath) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.invalidData,
+        'The book descriptor references an invalid revision path.',
+      );
+    }
+    final repository = BookRevisionRepository(await _objects(storage));
+    final revision = await repository.read(bookUid, id);
+    await repository.materialize(revision, destination);
+    return revision;
+  }
+
+  /// Explicit export, never a second automatic synchronization lane.
+  Future<String> exportBook(String bookUid) async {
+    final db = await _database;
+    await _ensureSchema(db);
+    final binding = await _binding(db, bookUid);
+    if (binding?.remoteVersion == null) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.notFound,
+        'Sync the book before exporting it.',
+      );
+    }
+    final storage = await _storageProvider();
+    if (storage == null) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.authentication,
+        'Cloud storage is not configured.',
+      );
+    }
+    final objects = await _objects(storage);
+    final repository = BookRevisionRepository(objects);
+    final revision = await repository.read(bookUid, binding!.remoteVersion!);
+    final temporary = await _temporaryFile('export');
+    try {
+      await repository.materialize(revision, temporary);
+      final book = await _bookForBinding(db, binding);
+      final name = (book?.title ?? 'Book').replaceAll(
+        RegExp(r'[\\/:*?"<>|\x00-\x1F]'),
+        '_',
+      );
+      final remote = SyncPath(
+        'exports/$name-${binding.folderName.substring(0, 12)}/${revision.id}.${binding.format}',
+      );
+      await objects.putFile(remote, temporary, revision.hash);
+      return remote.value;
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
   }
 
   Future<_Outcome> _acceptRemote(
@@ -695,73 +670,20 @@ class BookContentSyncService {
     return const _Outcome(downloaded: true);
   }
 
-  Future<_Remote> _adoptExternalCurrent(
-    SyncStorage storage,
-    _Binding binding,
-    _Remote remote,
-  ) async {
-    final paths = _RemotePaths(binding);
-    final history = paths.history(remote.snapshot.hash);
-    await _ensureImmutable(storage, history, remote.snapshot);
-    final bytes = _headBytes(
-      binding,
-      remote.snapshot,
-      history,
-      remote.currentInfo.version,
-      remote.sourceStateHash,
-      remote.sourceAssets.entries
-          .map(
-            (entry) => _SourceAssetDigest(
-              'source/revisions/${remote.sourceStateHash}/${entry.key.substring('source/'.length)}',
-              sha256.convert(entry.value).toString(),
-              entry.key,
-            ),
-          )
-          .toList(growable: false),
-    );
-    final write = remote.headInfo == null
-        ? await storage.create(
-            paths.head,
-            Stream.value(bytes),
-            length: bytes.length,
-            contentType: 'application/json; charset=utf-8',
-          )
-        : await storage.compareAndSwap(
-            paths.head,
-            Stream.value(bytes),
-            length: bytes.length,
-            contentType: 'application/json; charset=utf-8',
-            expectedVersion: remote.headInfo!.version,
-          );
-    await _verifyHead(
-      storage,
-      paths.head,
-      write.info.version,
-      remote.snapshot.hash,
-      remote.currentInfo.version,
-      currentPath: binding.currentPath,
-      size: remote.snapshot.size,
-      historyPath: history.value,
-    );
-    return _Remote(
-      snapshot: remote.snapshot,
-      currentInfo: remote.currentInfo,
-      headInfo: write.info,
-      headHash: remote.snapshot.hash,
-      headMatchesCurrent: true,
-      sourceStateHash: remote.sourceStateHash,
-      sourceStateJson: remote.sourceStateJson,
-      sourceAssets: remote.sourceAssets,
-    );
-  }
-
   Future<_Outcome> _recordConflict(
     Database db,
     _Binding binding,
     _Snapshot local,
-    _Remote remote,
-  ) async {
+    _Remote remote, {
+    required List<String> remoteTips,
+  }) async {
     await db.transaction((txn) async {
+      await txn.delete(
+        'book_content_conflicts',
+        where:
+            'book_uid = ? AND resolved_at IS NULL AND local_hash = ? AND remote_version = ?',
+        whereArgs: [binding.bookUid, local.hash, remote.revisionId],
+      );
       await txn.insert('book_content_conflicts', {
         'book_uid': binding.bookUid,
         'space_key': binding.spaceKey,
@@ -769,8 +691,9 @@ class BookContentSyncService {
         'remote_hash': remote.snapshot.hash,
         'local_snapshot_path': local.file.path,
         'remote_snapshot_path': remote.snapshot.file.path,
-        'remote_version': remote.currentInfo.version.value,
-        'head_version': remote.headInfo?.version.value,
+        'remote_version': remote.revisionId,
+        'head_version': remote.revisionId,
+        'remote_tips_json': jsonEncode(remoteTips..sort()),
         'created_at': _utcNow(),
       });
       await _stageRemote(txn, binding, remote, BookContentSyncStatus.conflict);
@@ -789,8 +712,8 @@ class BookContentSyncService {
       'status': status.name,
       'pending_remote_hash': remote.snapshot.hash,
       'pending_remote_path': remote.snapshot.file.path,
-      'pending_remote_version': remote.currentInfo.version.value,
-      'pending_head_version': remote.headInfo?.version.value,
+      'pending_remote_version': remote.revisionId,
+      'pending_head_version': remote.revisionId,
       'pending_source_state_hash': remote.sourceStateHash,
       'pending_source_state_json': remote.sourceStateJson,
       'pending_source_assets_json': remote.sourceAssets.isEmpty
@@ -889,55 +812,81 @@ class BookContentSyncService {
     final conflict = _conflictFromRow(rows.single);
     final binding = await _binding(db, conflict.bookUid);
     if (binding == null) return;
+    if (_isBusy(binding.localBookId)) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'Close the book before resolving its content conflict.',
+      );
+    }
+    final storage = await _storageProvider();
+    if (storage == null) {
+      throw const SyncStorageException(
+        SyncStorageErrorCode.authentication,
+        'Cloud storage is not configured.',
+      );
+    }
+    _activeObjects = await _objects(storage);
+    final repository = BookRevisionRepository(_activeObjects!);
+    final tips = await repository.tips(
+      binding.bookUid,
+      knownRevision: binding.remoteVersion,
+    );
+    final observed =
+        (jsonDecode(rows.single['remote_tips_json'] as String? ?? '[]') as List)
+            .cast<String>()
+          ..sort();
+    final currentTips = tips.map((tip) => tip.id).toList()..sort();
+    if (!tips.any((tip) => tip.id == conflict.remoteVersion) ||
+        jsonEncode(observed) != jsonEncode(currentTips)) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'The cloud book changed again. Refresh its conflict before choosing.',
+      );
+    }
+    final latestLocal = File(binding.localPath);
+    if (!await latestLocal.exists() ||
+        await _hashFile(latestLocal) != conflict.localHash) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'The local book changed again. Refresh its conflict before choosing.',
+      );
+    }
     if (choice == BookContentConflictChoice.useRemote) {
-      if (_isBusy(binding.localBookId)) {
-        await _setState(
-          db,
-          binding.bookUid,
-          BookContentSyncStatus.updateAvailable,
-        );
-      } else {
-        final storage = await _storageProvider();
-        if (storage == null) {
-          throw const WebDavSyncFailure(
-            WebDavSyncErrorCode.invalidConfiguration,
-            'Cloud storage is not configured.',
-          );
-        }
-        await _applyRemote(
-          db,
-          binding,
-          await _remoteFromConflict(storage, binding, conflict),
-        );
-      }
+      final selected = tips.singleWhere(
+        (tip) => tip.id == conflict.remoteVersion,
+      );
+      final remote = await _readRevision(repository, binding, selected);
+      // Publish the explicit merge before replacing local content. A failed
+      // network commit must not leave a silently half-resolved local choice.
+      final merged = await repository.publish(
+        bookUid: binding.bookUid,
+        file: remote.snapshot.file,
+        hash: remote.snapshot.hash,
+        format: binding.format,
+        fileName: binding.originalFileName,
+        parents: currentTips,
+        base: selected,
+        metadata: {
+          'source_state_sha256': selected.sourceHash,
+          'source_assets': selected.sourceAssets,
+        },
+      );
+      await _applyRemote(
+        db,
+        binding,
+        await _readRevision(repository, binding, merged),
+      );
     } else {
-      final file = File(conflict.localSnapshotPath);
-      if (!await file.exists() || await _hashFile(file) != conflict.localHash) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.localDataCorrupt,
-          'The local conflict snapshot is unavailable or damaged.',
-        );
-      }
-      final snapshot = _Snapshot(file, conflict.localHash, await file.length());
-      await db.transaction((txn) async {
-        await _putJob(txn, binding.bookUid, snapshot, binding.sourceStateHash);
-        await txn.update(
-          'book_content_bindings',
-          {
-            'local_hash': conflict.localHash,
-            'base_hash': conflict.remoteHash,
-            'remote_version': conflict.remoteVersion,
-            'status': BookContentSyncStatus.pending.name,
-            'pending_remote_hash': null,
-            'pending_remote_path': null,
-            'pending_remote_version': null,
-            'pending_head_version': null,
-            'updated_at': _utcNow(),
-          },
-          where: 'book_uid = ?',
-          whereArgs: [binding.bookUid],
-        );
-      });
+      final book = await _bookForBinding(db, binding);
+      final source = book == null
+          ? const _SourceBundle(null, [])
+          : await _sourceBundle(book, expectedBookUid: binding.bookUid);
+      final snapshot = await _snapshot(
+        latestLocal,
+        binding.bookUid,
+        origin: 'resolution',
+      );
+      await _pushRevision(db, repository, binding, snapshot, source, tips);
     }
     await db.update(
       'book_content_conflicts',
@@ -971,20 +920,7 @@ class BookContentSyncService {
         binding.pendingRemoteHash!,
         await file.length(),
       ),
-      currentInfo: SyncObjectInfo(
-        path: SyncPath(binding.currentPath),
-        version: SyncObjectVersion(binding.pendingRemoteVersion!),
-        length: await file.length(),
-      ),
-      headInfo: binding.pendingHeadVersion == null
-          ? null
-          : SyncObjectInfo(
-              path: _RemotePaths(binding).head,
-              version: SyncObjectVersion(binding.pendingHeadVersion!),
-              length: 0,
-            ),
-      headHash: binding.pendingRemoteHash,
-      headMatchesCurrent: true,
+      revisionId: binding.pendingRemoteVersion!,
       sourceStateHash: binding.pendingSourceStateHash,
       sourceStateJson: binding.pendingSourceStateJson,
       sourceAssets: binding.pendingSourceAssets,
@@ -996,35 +932,10 @@ class BookContentSyncService {
   Future<bool> applyPendingRemote(String bookUid) =>
       applyAvailableUpdate(bookUid);
 
-  Future<_Remote> _remoteFromConflict(
-    SyncStorage storage,
-    _Binding binding,
-    BookContentConflict conflict,
-  ) async {
-    final paths = _RemotePaths(binding);
-    final current = await storage.stat(paths.current);
-    final head = await storage.stat(paths.head);
-    if (current?.version.value != conflict.remoteVersion ||
-        head?.version.value != conflict.headVersion) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.conflict,
-        'The cloud book changed again while the conflict was open.',
-      );
-    }
-    final remote = await _readRemote(storage, binding, current!, head);
-    if (remote.snapshot.hash != conflict.remoteHash ||
-        remote.headHash != conflict.remoteHash) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.conflict,
-        'The cloud conflict revision no longer matches its snapshot.',
-      );
-    }
-    return remote;
-  }
-
   Future<_SourceBundle> _sourceBundle(
     Book book, {
     required String expectedBookUid,
+    String? contentHash,
   }) async {
     SourceChapterState? state;
     try {
@@ -1033,7 +944,7 @@ class BookContentSyncService {
       return const _SourceBundle(null, <SourceStateAsset>[]);
     }
     if (state != null) {
-      final contentHash = await _hashFile(File(book.filePath));
+      contentHash ??= await _hashFile(File(book.filePath));
       if (state.bookUid != expectedBookUid ||
           state.materializedContentHash != contentHash ||
           (book.sourceId != null && state.sourceId != book.sourceId) ||
@@ -1169,226 +1080,38 @@ class BookContentSyncService {
     final assets = <String, List<int>>{};
     for (final digest in digests) {
       final remote = SyncPath('books/${binding.folderName}/${digest.path}');
-      final info = await storage.stat(remote);
-      if (info == null) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.corruptRemoteData,
-          'book.json references a missing source asset.',
-        );
-      }
-      final temp = await _temporaryFile('source');
-      try {
-        final sink = temp.openWrite();
-        try {
-          await storage.download(remote, sink, expectedVersion: info.version);
-        } finally {
-          await sink.close();
-        }
-        final bytes = await temp.readAsBytes();
-        if (sha256.convert(bytes).toString() != digest.hash) {
-          throw const WebDavSyncFailure(
-            WebDavSyncErrorCode.corruptRemoteData,
-            'A source asset failed checksum verification.',
-          );
-        }
-        assets[digest.restorePath] = bytes;
-      } finally {
-        if (await temp.exists()) await temp.delete();
-      }
+      final objects = _activeObjects ?? await _objects(storage);
+      final file = await objects.readFile(remote, digest.hash);
+      assets[digest.restorePath] = await file.readAsBytes();
     }
     final json = utf8.decode(assets['source/book.json']!);
     return _RemoteSource(expectedBundleHash, json, assets);
   }
 
-  Future<_Outcome> _publishSourceAndHead(
-    Database db,
-    SyncStorage storage,
-    _Binding binding,
-    _Snapshot snapshot,
-    _SourceBundle bundle,
-    _Remote remote,
-  ) async {
-    await _publishSourceAssets(storage, binding, bundle);
-    final paths = _RemotePaths(binding);
-    final history = paths.history(snapshot.hash);
-    await _ensureImmutable(storage, history, snapshot);
-    final bytes = _headBytes(
-      binding,
-      snapshot,
-      history,
-      remote.currentInfo.version,
-      bundle.hash,
-      await _sourceDigests(bundle),
-    );
-    final write = remote.headInfo == null
-        ? await storage.create(
-            paths.head,
-            Stream.value(bytes),
-            length: bytes.length,
-            contentType: 'application/json; charset=utf-8',
-          )
-        : await storage.compareAndSwap(
-            paths.head,
-            Stream.value(bytes),
-            length: bytes.length,
-            contentType: 'application/json; charset=utf-8',
-            expectedVersion: remote.headInfo!.version,
-          );
-    await _verifyHead(
-      storage,
-      paths.head,
-      write.info.version,
-      snapshot.hash,
-      remote.currentInfo.version,
-      currentPath: binding.currentPath,
-      size: snapshot.size,
-      historyPath: history.value,
-    );
-    await _markSynced(
-      db,
-      binding,
-      snapshot.hash,
-      remote.currentInfo.version,
-      write.info.version,
-      snapshot.size,
-      bundle.hash,
-    );
-    return const _Outcome();
-  }
-
   Future<void> _ensureImmutable(
     SyncStorage storage,
-    SyncPath remotePath,
+    SyncPath remote,
     _Snapshot snapshot,
   ) async {
-    var info = await storage.stat(remotePath);
-    if (info == null) {
-      try {
-        final write = await storage.create(
-          remotePath,
-          snapshot.file.openRead(),
-          length: snapshot.size,
-          contentType: _contentType(path.extension(snapshot.file.path)),
-        );
-        info = write.info;
-      } on SyncStorageException catch (error) {
-        if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
-        info = await storage.stat(remotePath);
-      }
-    }
-    if (info == null) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.corruptRemoteData,
-        'A cloud history revision disappeared during verification.',
-      );
-    }
-    await _verifyObject(storage, remotePath, snapshot.hash, info.version);
-  }
-
-  Future<void> _verifyObject(
-    SyncStorage storage,
-    SyncPath remotePath,
-    String expectedHash,
-    SyncObjectVersion expectedVersion,
-  ) async {
-    final temp = await _temporaryFile('verify');
-    try {
-      final sink = temp.openWrite();
-      try {
-        await storage.download(
-          remotePath,
-          sink,
-          expectedVersion: expectedVersion,
-        );
-      } finally {
-        await sink.close();
-      }
-      if (await _hashFile(temp) != expectedHash) {
-        throw const WebDavSyncFailure(
-          WebDavSyncErrorCode.corruptRemoteData,
-          'The cloud object failed checksum verification.',
-        );
-      }
-    } finally {
-      if (await temp.exists()) await temp.delete();
-    }
-  }
-
-  Future<void> _verifyHead(
-    SyncStorage storage,
-    SyncPath path,
-    SyncObjectVersion version,
-    String expectedHash,
-    SyncObjectVersion currentVersion, {
-    required String currentPath,
-    required int size,
-    required String historyPath,
-  }) async {
-    final read = await storage.readText(path, expectedVersion: version);
-    final json = (jsonDecode(read.text) as Map).cast<String, dynamic>();
-    if (json['current_sha256'] != expectedHash ||
-        json['current_version'] != currentVersion.value ||
-        json['current_path'] != currentPath ||
-        json['current_size'] != size ||
-        json['history_path'] != historyPath) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.corruptRemoteData,
-        'book.json does not match the verified readable current file.',
-      );
-    }
-  }
-
-  Future<_Snapshot> _downloadSnapshot(
-    SyncStorage storage,
-    SyncPath remotePath,
-    String bookUid,
-    SyncObjectVersion expectedVersion, {
-    required String origin,
-  }) async {
-    final temp = await _temporaryFile('remote');
-    final sink = temp.openWrite();
-    late SyncDownload result;
-    try {
-      result = await storage.download(
-        remotePath,
-        sink,
-        expectedVersion: expectedVersion,
-      );
-    } finally {
-      await sink.close();
-    }
-    if (result.info.version != expectedVersion) {
-      if (await temp.exists()) await temp.delete();
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.conflict,
-        'The cloud book changed while it was being read.',
-      );
-    }
-    final hash = await _hashFile(temp);
-    final revision = await _revisionFile(
-      bookUid,
-      hash,
-      path.extension(remotePath.value),
-    );
-    if (!await revision.exists()) await temp.copy(revision.path);
-    await temp.delete();
-    if (await _hashFile(revision) != hash) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.localDataCorrupt,
-        'A downloaded revision snapshot is damaged.',
-      );
-    }
-    final snapshot = _Snapshot(revision, hash, await revision.length());
-    await _recordRevision(await _database, bookUid, snapshot, origin);
-    return snapshot;
+    final objects = _activeObjects ?? await _objects(storage);
+    await objects.putFile(remote, snapshot.file, snapshot.hash);
   }
 
   Future<_Snapshot> _snapshot(
     File source,
     String bookUid, {
     required String origin,
+    bool allowCached = false,
   }) async {
     if (!await source.exists()) throw _notFound();
+    final stat = await source.stat();
+    final observation = _localObservations[bookUid];
+    if (allowCached &&
+        observation != null &&
+        observation.matches(source, stat, _now()) &&
+        await observation.snapshot.file.exists()) {
+      return observation.snapshot;
+    }
     final hash = await _hashFile(source);
     final revision = await _revisionFile(
       bookUid,
@@ -1397,13 +1120,36 @@ class BookContentSyncService {
     );
     if (!await revision.exists()) {
       await source.copy(revision.path);
+      if (await _hashFile(revision) != hash) {
+        await revision.delete();
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.localDataCorrupt,
+          'The local book changed while creating its revision. Retry sync.',
+        );
+      }
     } else if (await _hashFile(revision) != hash) {
       throw const WebDavSyncFailure(
         WebDavSyncErrorCode.localDataCorrupt,
         'A local revision snapshot is damaged.',
       );
     }
-    return _Snapshot(revision, hash, await revision.length());
+    final snapshot = _Snapshot(revision, hash, await revision.length());
+    final after = await source.stat();
+    if (after.size != stat.size ||
+        after.modified != stat.modified ||
+        after.changed != stat.changed) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'The local file changed while taking a snapshot. Retry sync.',
+      );
+    }
+    _localObservations[bookUid] = _LocalObservation(
+      source.path,
+      after,
+      snapshot,
+      _now(),
+    );
+    return snapshot;
   }
 
   Future<void> _applyRemote(
@@ -1423,6 +1169,13 @@ class BookContentSyncService {
       );
     }
     final originalHash = await target.exists() ? await _hashFile(target) : null;
+    if (binding.localHash != null && originalHash != binding.localHash) {
+      await incoming.delete();
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.conflict,
+        'The local book changed during download. Retry to compare both revisions.',
+      );
+    }
     final localBook = await _bookForBinding(db, binding);
     final sourceSidecar = localBook == null
         ? null
@@ -1440,7 +1193,7 @@ class BookContentSyncService {
       'incoming_path': incoming.path,
       'remote_hash': remote.snapshot.hash,
       'original_hash': originalHash,
-      'remote_version': remote.currentInfo.version.value,
+      'remote_version': remote.revisionId,
       'source_path': sourceSidecar?.path,
       'source_backup_path': sourceBackup?.path,
       'source_existed': sourceSidecarExisted ? 1 : 0,
@@ -1493,8 +1246,8 @@ class BookContentSyncService {
           txn,
           binding,
           remote.snapshot.hash,
-          remote.currentInfo.version,
-          remote.headInfo?.version,
+          SyncObjectVersion(remote.revisionId),
+          SyncObjectVersion(remote.revisionId),
           remote.snapshot.size,
           remote.sourceStateHash,
         );
@@ -1693,17 +1446,30 @@ class BookContentSyncService {
     SyncObjectVersion? headVersion,
     int size,
     String? sourceStateHash,
-  ) => db.transaction(
-    (txn) => _markSyncedInTransaction(
-      txn,
-      binding,
-      hash,
-      currentVersion,
-      headVersion,
-      size,
-      sourceStateHash,
-    ),
-  );
+  ) async {
+    final currentFile = File(binding.localPath);
+    String? localHash;
+    if (await currentFile.exists()) {
+      final stat = await currentFile.stat();
+      final observation = _localObservations[binding.bookUid];
+      localHash =
+          observation != null && observation.matches(currentFile, stat, _now())
+          ? observation.snapshot.hash
+          : await _hashFile(currentFile);
+    }
+    await db.transaction((txn) async {
+      await _markSyncedInTransaction(
+        txn,
+        binding,
+        hash,
+        currentVersion,
+        headVersion,
+        size,
+        sourceStateHash,
+        observedLocalHash: localHash,
+      );
+    });
+  }
 
   Future<void> _markSyncedInTransaction(
     DatabaseExecutor db,
@@ -1712,23 +1478,44 @@ class BookContentSyncService {
     SyncObjectVersion currentVersion,
     SyncObjectVersion? headVersion,
     int size,
-    String? sourceStateHash,
-  ) async {
-    // A missing head version means current is readable but not committed.
+    String? sourceStateHash, {
+    String? observedLocalHash,
+  }) async {
+    final latest = await db.query(
+      'book_content_bindings',
+      where: 'book_uid = ?',
+      whereArgs: [binding.bookUid],
+    );
+    final row = latest.single;
+    final recordedHash = row['local_hash'] as String?;
+    final effectiveHash =
+        recordedHash != binding.localHash && recordedHash != hash
+        ? recordedHash
+        : observedLocalHash ?? hash;
+    final changedDuringUpload = effectiveHash != hash;
+    // The existing local column stores the verified revision commit identity.
     if (headVersion == null) {
       throw const WebDavSyncFailure(
         WebDavSyncErrorCode.corruptRemoteData,
-        'The current book has no verified book.json commit.',
+        'The book has no verified revision commit.',
       );
     }
     await db.update(
       'book_content_bindings',
       {
-        'status': BookContentSyncStatus.synced.name,
-        'local_hash': hash,
+        'status': changedDuringUpload
+            ? BookContentSyncStatus.pending.name
+            : BookContentSyncStatus.synced.name,
+        'local_hash': effectiveHash,
         'base_hash': hash,
+        'failure_count': 0,
+        'retry_after': null,
         'remote_version': currentVersion.value,
         'head_version': headVersion.value,
+        'current_path': BookRevisionRepository.revisionPath(
+          binding.bookUid,
+          currentVersion.value,
+        ).value,
         'source_state_hash': sourceStateHash,
         'base_source_state_hash': sourceStateHash,
         'pending_remote_hash': null,
@@ -1746,59 +1533,37 @@ class BookContentSyncService {
       where: 'book_uid = ?',
       whereArgs: [binding.bookUid],
     );
-    await db.delete(
-      'book_content_jobs',
+    if (!changedDuringUpload) {
+      await db.delete(
+        'book_content_jobs',
+        where: 'book_uid = ?',
+        whereArgs: [binding.bookUid],
+      );
+    }
+    final existingFiles = await db.query(
+      'sync_book_files',
       where: 'book_uid = ?',
       whereArgs: [binding.bookUid],
     );
+    final existingFile = existingFiles.isEmpty
+        ? <String, Object?>{}
+        : existingFiles.single;
     await db.insert('sync_book_files', {
+      for (final entry in existingFile.entries)
+        if (entry.key.startsWith('cover_')) entry.key: entry.value,
       'book_uid': binding.bookUid,
       'local_book_id': binding.localBookId,
       'blob_sha256': hash,
       'file_name': binding.originalFileName,
       'file_size': size,
-      'remote_path': binding.currentPath,
+      'remote_path': BookRevisionRepository.revisionPath(
+        binding.bookUid,
+        currentVersion.value,
+      ).value,
       'sync_enabled': binding.enabled ? 1 : 0,
       'updated_at': _utcNow(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
-
-  List<int> _headBytes(
-    _Binding binding,
-    _Snapshot snapshot,
-    SyncPath history,
-    SyncObjectVersion currentVersion,
-    String? sourceStateHash,
-    List<_SourceAssetDigest> sourceAssets,
-  ) => utf8.encode(
-    jsonEncode({
-      'protocol': 'open-reading-book-content',
-      'schema_version': 1,
-      'book_uid': binding.bookUid,
-      'folder_name': binding.folderName,
-      'title': binding.title,
-      'author': binding.author,
-      'format': binding.format,
-      'original_file_name': binding.originalFileName,
-      'current_path': binding.currentPath,
-      'current_sha256': snapshot.hash,
-      'current_size': snapshot.size,
-      'current_revision': snapshot.hash,
-      'current_version': currentVersion.value,
-      'source_state_sha256': sourceStateHash,
-      'source_assets': sourceAssets
-          .map(
-            (asset) => {
-              'path': asset.path,
-              'sha256': asset.hash,
-              'restore_path': asset.restorePath,
-            },
-          )
-          .toList(growable: false),
-      'history_path': history.value,
-      'updated_at': _utcNow(),
-    }),
-  );
 
   Future<_Binding> _activateSpace(
     Database db,
@@ -1812,6 +1577,8 @@ class BookContentSyncService {
         'book_content_bindings',
         {
           'space_key': spaceKey,
+          'failure_count': 0,
+          'retry_after': null,
           'base_hash': null,
           'remote_version': null,
           'head_version': null,
@@ -1965,6 +1732,11 @@ class BookContentSyncService {
       'pending_source_assets_json': 'TEXT',
       'observed_mismatch_version': 'TEXT',
       'observed_mismatch_at': 'TEXT',
+      'failure_count': 'INTEGER NOT NULL DEFAULT 0',
+      'retry_after': 'TEXT',
+    });
+    await _ensureColumns(db, 'book_content_conflicts', const {
+      'remote_tips_json': 'TEXT',
     });
     await _ensureColumns(db, 'book_content_jobs', const {
       'source_state_hash': 'TEXT',
@@ -1974,6 +1746,37 @@ class BookContentSyncService {
       'source_backup_path': 'TEXT',
       'source_existed': 'INTEGER NOT NULL DEFAULT 0',
     });
+    final obsolete = await db.query(
+      'book_content_bindings',
+      where: "current_path NOT LIKE '%/revisions/%'",
+    );
+    for (final row in obsolete) {
+      final uid = row['book_uid'] as String;
+      final folder = BookRevisionRepository.folder(uid);
+      await db.update(
+        'book_content_bindings',
+        {
+          'folder_name': folder,
+          'current_path': 'books/$folder/revisions/unpublished.json',
+          'space_key': '',
+          'base_hash': null,
+          'remote_version': null,
+          'head_version': null,
+          'base_source_state_hash': null,
+          'pending_remote_path': null,
+          'pending_remote_version': null,
+          'pending_head_version': null,
+          'status': row['enabled'] == 0 ? 'paused' : 'pending',
+        },
+        where: 'book_uid = ?',
+        whereArgs: [uid],
+      );
+      await db.delete(
+        'sync_book_files',
+        where: 'book_uid = ?',
+        whereArgs: [uid],
+      );
+    }
   }
 
   Future<void> _ensureColumns(
@@ -2005,16 +1808,6 @@ class BookContentSyncService {
   Future<_Binding?> _binding(Database db, String bookUid) async {
     final rows = await _bindings(db, bookUid);
     return rows.isEmpty ? null : rows.single;
-  }
-
-  Future<_Job?> _job(Database db, String bookUid) async {
-    final rows = await db.query(
-      'book_content_jobs',
-      where: 'book_uid = ?',
-      whereArgs: [bookUid],
-      limit: 1,
-    );
-    return rows.isEmpty ? null : _Job.fromRow(rows.single);
   }
 
   Future<void> _putJob(
@@ -2141,22 +1934,6 @@ class BookContentSyncService {
   Future<String> _hashFile(File file) async =>
       '${await sha256.bind(file.openRead()).first}';
 
-  String _folderName(Book book, String uid) {
-    final title = _safeSegment(book.title.trim().isEmpty ? '未命名' : book.title);
-    final rawAuthor = book.author;
-    final author = _safeSegment(rawAuthor.trim().isEmpty ? '未知作者' : rawAuthor);
-    final suffix = sha256.convert(utf8.encode(uid)).toString().substring(0, 12);
-    return '$title - $author [$suffix]';
-  }
-
-  String _extension(String format, String original) {
-    final candidate = format.trim().isEmpty
-        ? path.extension(original).replaceFirst('.', '')
-        : format;
-    final safe = candidate.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), '');
-    return safe.isEmpty ? 'bin' : safe;
-  }
-
   String _safeSegment(String value) {
     final safe = value
         .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]'), '_')
@@ -2166,22 +1943,13 @@ class BookContentSyncService {
     return safe.substring(0, min(80, safe.length));
   }
 
-  String _contentType(String format) =>
-      switch (format.toLowerCase().replaceFirst('.', '')) {
-        'txt' => 'text/plain',
-        'epub' => 'application/epub+zip',
-        'pdf' => 'application/pdf',
-        'json' => 'application/json',
-        _ => 'application/octet-stream',
-      };
-
   String _utcNow() => _now().toUtc().toIso8601String();
   String _nonce() =>
       '${_now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
   String _safeError(Object error) => switch (error) {
     SyncStorageException() => error.message,
     WebDavSyncFailure() => error.message,
-    _ => error.toString(),
+    _ => 'Book synchronization failed (${error.runtimeType}).',
   };
 
   void _validateBook(Book book, String bookUid) {
@@ -2202,21 +1970,18 @@ class BookContentSyncService {
   );
 }
 
-class _RemotePaths {
-  const _RemotePaths(this.binding);
-  final _Binding binding;
-  SyncPath get current => SyncPath(binding.currentPath);
-  SyncPath get head => SyncPath('books/${binding.folderName}/book.json');
-  SyncPath history(String revision) => SyncPath(
-    'books/${binding.folderName}/history/$revision-${_safeName(binding.originalFileName)}',
-  );
-  static String _safeName(String value) {
-    final name = path
-        .basename(value)
-        .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]'), '_')
-        .trim();
-    return name.isEmpty ? 'book.bin' : name;
-  }
+class _LocalObservation {
+  const _LocalObservation(this.path, this.stat, this.snapshot, this.verifiedAt);
+  final String path;
+  final FileStat stat;
+  final _Snapshot snapshot;
+  final DateTime verifiedAt;
+  bool matches(File file, FileStat current, DateTime now) =>
+      file.path == path &&
+      current.size == stat.size &&
+      current.modified == stat.modified &&
+      current.changed == stat.changed &&
+      now.difference(verifiedAt).abs() < const Duration(minutes: 15);
 }
 
 class _Snapshot {
@@ -2229,19 +1994,13 @@ class _Snapshot {
 class _Remote {
   const _Remote({
     required this.snapshot,
-    required this.currentInfo,
-    required this.headInfo,
-    required this.headHash,
-    required this.headMatchesCurrent,
+    required this.revisionId,
     required this.sourceStateHash,
     required this.sourceStateJson,
     required this.sourceAssets,
   });
   final _Snapshot snapshot;
-  final SyncObjectInfo currentInfo;
-  final SyncObjectInfo? headInfo;
-  final String? headHash;
-  final bool headMatchesCurrent;
+  final String revisionId;
   final String? sourceStateHash;
   final String? sourceStateJson;
   final Map<String, List<int>> sourceAssets;
@@ -2280,18 +2039,6 @@ class _Outcome {
   final int uploadedBytes;
 }
 
-class _Job {
-  const _Job(this.targetHash, this.snapshotPath, this.sourceStateHash);
-  factory _Job.fromRow(Map<String, Object?> row) => _Job(
-    row['target_hash'] as String,
-    row['snapshot_path'] as String,
-    row['source_state_hash'] as String?,
-  );
-  final String targetHash;
-  final String snapshotPath;
-  final String? sourceStateHash;
-}
-
 class _Binding {
   const _Binding({
     required this.bookUid,
@@ -2320,8 +2067,6 @@ class _Binding {
     this.pendingSourceStateHash,
     this.pendingSourceStateJson,
     this.pendingSourceAssetsJson,
-    this.observedMismatchVersion,
-    this.observedMismatchAt,
     this.error,
   });
 
@@ -2352,8 +2097,6 @@ class _Binding {
     pendingSourceStateHash: row['pending_source_state_hash'] as String?,
     pendingSourceStateJson: row['pending_source_state_json'] as String?,
     pendingSourceAssetsJson: row['pending_source_assets_json'] as String?,
-    observedMismatchVersion: row['observed_mismatch_version'] as String?,
-    observedMismatchAt: row['observed_mismatch_at'] as String?,
     error: row['error'] as String?,
   );
 
@@ -2383,8 +2126,6 @@ class _Binding {
   final String? pendingSourceStateHash;
   final String? pendingSourceStateJson;
   final String? pendingSourceAssetsJson;
-  final String? observedMismatchVersion;
-  final String? observedMismatchAt;
   Map<String, List<int>> get pendingSourceAssets {
     final value = pendingSourceAssetsJson;
     if (value == null || value.isEmpty) return const <String, List<int>>{};
@@ -2429,8 +2170,6 @@ class _Binding {
     pendingSourceStateHash: clearRemote ? null : pendingSourceStateHash,
     pendingSourceStateJson: clearRemote ? null : pendingSourceStateJson,
     pendingSourceAssetsJson: clearRemote ? null : pendingSourceAssetsJson,
-    observedMismatchVersion: clearRemote ? null : observedMismatchVersion,
-    observedMismatchAt: clearRemote ? null : observedMismatchAt,
     error: error,
   );
 

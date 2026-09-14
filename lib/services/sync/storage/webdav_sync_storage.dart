@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import '../sync_models.dart';
 import '../webdav_client.dart';
 import 'sync_storage.dart';
 
-final class WebDavSyncStorage implements SyncStorage {
+final class WebDavSyncStorage implements SyncStorage, ImmutableWritableStorage {
   WebDavSyncStorage(this._client);
 
   final WebDavClient _client;
@@ -12,7 +15,7 @@ final class WebDavSyncStorage implements SyncStorage {
 
   @override
   SyncStorageCapabilities get capabilities =>
-      const SyncStorageCapabilities(strongVersions: true);
+      const SyncStorageCapabilities(strongVersions: false);
 
   @override
   String get spaceKey => _client.readableSpaceKey;
@@ -33,13 +36,7 @@ final class WebDavSyncStorage implements SyncStorage {
           prefixes.add(path);
           continue;
         }
-        final etag = entry.etag;
-        if (etag == null) {
-          throw const SyncStorageException(
-            SyncStorageErrorCode.unsupported,
-            'A listed WebDAV object has no strong validator.',
-          );
-        }
+        final etag = entry.etag ?? 'unversioned';
         objects.add(
           SyncObjectInfo(
             path: path,
@@ -59,18 +56,16 @@ final class WebDavSyncStorage implements SyncStorage {
   @override
   Future<SyncObjectInfo?> stat(SyncPath path) async {
     try {
-      final state = await _client.resourceState(_uri(path));
+      final state = await _client.resourceState(
+        _uri(path),
+        requireStrongEtag: false,
+      );
       if (!state.exists) return null;
       final etag = state.etag;
-      if (etag == null) {
-        throw const SyncStorageException(
-          SyncStorageErrorCode.unsupported,
-          'The WebDAV object has no strong validator.',
-        );
-      }
+
       return SyncObjectInfo(
         path: path,
-        version: SyncObjectVersion(etag),
+        version: SyncObjectVersion(etag ?? 'unversioned'),
         length: state.contentLength ?? 0,
       );
     } on WebDavSyncFailure catch (error) {
@@ -85,9 +80,21 @@ final class WebDavSyncStorage implements SyncStorage {
     SyncObjectVersion? expectedVersion,
   }) async {
     try {
+      if (expectedVersion == null) {
+        final text = (await _client.getText(_uri(path)))!;
+        final bytes = utf8.encode(text);
+        return SyncTextRead(
+          text: text,
+          info: SyncObjectInfo(
+            path: path,
+            version: SyncObjectVersion(sha256.convert(bytes).toString()),
+            length: bytes.length,
+          ),
+        );
+      }
       final result = await _client.getTextWithVersion(
         _uri(path),
-        expectedEtag: expectedVersion?.value,
+        expectedEtag: expectedVersion.value,
       );
       return SyncTextRead(
         text: result.text,
@@ -114,6 +121,7 @@ final class WebDavSyncStorage implements SyncStorage {
         _uri(path),
         destination,
         expectedEtag: expectedVersion?.value,
+        requireStrongVersion: expectedVersion != null,
       );
       return SyncDownload(
         info: SyncObjectInfo(
@@ -170,7 +178,9 @@ final class WebDavSyncStorage implements SyncStorage {
     SyncObjectVersion? expectedVersion,
   }) async {
     try {
-      await (_writeSafetyCheck ??= _client.verifyMutableWritePreconditions());
+      if (!createOnly) {
+        await (_writeSafetyCheck ??= _client.verifyMutableWritePreconditions());
+      }
       await _client.ensureRootRelativeParent(path.value);
       final result = await _client.putStreamConditionally(
         _uri(path),
@@ -179,6 +189,7 @@ final class WebDavSyncStorage implements SyncStorage {
         contentType: contentType,
         ifMatch: expectedVersion?.value,
         ifNoneMatch: createOnly,
+        requireStrongVersion: !createOnly,
       );
       return SyncWrite(
         info: SyncObjectInfo(
@@ -194,15 +205,29 @@ final class WebDavSyncStorage implements SyncStorage {
   }
 
   @override
+  Future<void> writeImmutable(SyncPath path, File source) async {
+    try {
+      await _client.ensureRootRelativeParent(path.value);
+      await _client.putFile(_uri(path), source);
+    } on WebDavSyncFailure catch (error) {
+      throw _map(error);
+    }
+  }
+
+  @override
   Future<void> delete(
     SyncPath path, {
     required SyncObjectVersion expectedVersion,
   }) async {
     try {
-      await _client.deleteConditionally(
-        _uri(path),
-        ifMatch: expectedVersion.value,
-      );
+      if (expectedVersion.value == 'unversioned') {
+        await _client.delete(_uri(path));
+      } else {
+        await _client.deleteConditionally(
+          _uri(path),
+          ifMatch: expectedVersion.value,
+        );
+      }
     } on WebDavSyncFailure catch (error) {
       throw _map(error);
     }

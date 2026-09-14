@@ -134,7 +134,7 @@ lib/
 - `pages/settings/ai_settings_page.dart`：AI 阅读助手独立设置页；快捷模型卡片支持添加/编辑/删除/激活，服务商除内置项外可选“自定义”。自定义服务商把厂商身份与接口协议拆开，可选择 OpenAI Compatible 或 Anthropic，并按协议提示 Base URL 是否需要包含 `/v1`；快捷模型 JSON 同时保存协议，旧记录缺省按服务商原协议兼容读取。AI 预处理开关也位于此页。
 - `pages/settings/sync/`：WebDAV 概览、独立连接配置、即时保存的同步内容开关和书籍文件管理页；书源、书架信息、阅读进度等元数据自动同步，原文件需先开启上传权限，再按书选择上传或下载。新导入书籍提供“每次询问（默认）/ 自动上传 / 始终手动”三种策略；自动上传只处理符合安全限制的真正新增本地文件。
 - `pages/settings/replace_rules_page.dart` 与 `services/reader/replace_rule_service.dart`：全局“替换净化”规则管理与执行边界。规则使用 SharedPreferences JSON 持久化，支持新建、编辑、启停、删除、搜索、排序、JSON 导入导出，以及常见新旧字段（`pattern`/`regex`、`name`/`replaceSummary`、`isEnabled`/`enable`、`scope`/`useTo`、`order`/`serialNumber`）；规则可按书名/书源范围、排除范围和标题/正文类型生效。设置页提供稳定入口，本地文字阅读器和在线书源阅读器控制栏提供快速入口；标题与正文都在分页前净化，EPUB/Kindle 富文本会重算样式块偏移并保留图片，规则变更后当前阅读器清理文字/分页缓存并按现有进度重排。
-- `services/sync/`：本地优先的 WebDAV v1 同步实现。每台设备写入独立的不可变变更批次，使用 HLC、tombstone 和记录级 LWW 合并；`book_sources` 按书源 ID 同步公开注册信息，在线书籍通过 `source_id + source_book_id`、书源快照和书籍快照恢复为可直接打开的书架项，在线章节进度复用 `progress` 数据集同步，但章节正文、目录、封面路径和缓存始终留在设备本地。新上传书籍以未加密的原始字节和原始文件名保存在 `books/<书名 - 作者>/`，同名异内容使用 `(2)`、`(3)` 可读编号避免覆盖。SHA-256 仅保存在同步元数据和本地索引中用于校验，历史无扩展名 blob 仍可下载；持久封面继续独立按 SHA-256 内容寻址。`sync_dataset_catalog.dart` 分离稳定协议数据集与当前版本能力，暂未开放的笔记/高亮记录可保留在同步镜像中，但不会扫描或写入业务表。
+- `services/sync/`：根格式 schema 2，设备独立不可变元数据日志及分页检查点；HLC、tombstone 和既有业务适配器保持。`book_revision_repository.dart` 为所有格式提供同一修订协议，TXT 内容定义分块，其他格式为单块；`immutable_object_store.dart` 流式传输及校验。正文通过父修订检测冲突，完整文件手动导出至 `exports/`。旧 current/history 协议已移除，旧云端文件保留而不自动迁移。详见 `docs/webdav-sync-design.md`。
 - `pages/settings/custom_fonts_page.dart`：用户字体库的导入、应用、重命名和删除入口。
 - `widgets/side_toast.dart`：应用内短反馈的统一浮层。手机在顶部居中、宽屏在右上展示，连续提示直接替换；普通/成功提示短暂停留，警告/错误略延长，并通过 `IgnorePointer` 保证通知出现时底层操作仍可点击。页面内不再直接使用底部 `SnackBar`。
 - `widgets/glass_top_bar.dart` 是首页与非首页二级页面共用的唯一顶栏玻璃表面，统一负责状态栏融合、`GlassEffectConfig.chromeSurfaceColor`、模糊强度和关闭玻璃效果时的降级；不再绘制底部分割线。`widgets/floating_subpage_scaffold.dart` 在其上提供居中 22px 标题、左右相同的 48px 圆形点击区以及统一内容基线：正文默认从玻璃顶栏底部再下移 8px，页面不再自行硬编码顶栏避让。按钮本身不执行第二次模糊，搜索、Tab 和大型页面工具仍属于内容层。设置、账号、同步、书源管理、任务、历史和阅读主题等子页面不再使用标准 AppBar；首页/设置主页面/书库主页面保留各自主框架，阅读器错误态使用阅读主题配色的同类返回控件。
@@ -396,6 +396,7 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 | `reading_stats` | 按日期汇总的阅读时长 | 独立统计 |
 | `reading_sessions` | 单次阅读会话、页数和时长 | 可选关联 `bookId` |
 | `sync_records` | WebDAV 元数据镜像、HLC、tombstone 与待上传标记 | `(dataset, record_id)` 复合主键 |
+| `sync_published_records` | 每写入者已发布记录视图，包含 tombstone，用于检查点生成 | 命名空间、数据集和记录 ID |
 | `sync_device_cursors` | 各远端设备已应用的变更序号 | `remote_device_id` 主键 |
 | `sync_local_state` | 本设备 ID、待发布批次与同步水位 | 键值状态 |
 | `sync_book_files` | 已选书籍原文件及持久封面的远端 blob 摘要、大小和路径 | `book_uid` 主键，可关联本地书 |
@@ -410,7 +411,7 @@ rights-report Issue 表单，第三方书源内容投诉优先指向其运营者
 - 应用私有目录：数据库、缓存、封面、应用管理的书籍文件，`custom_fonts/` 下的用户字体与清单，以及 `reader_theme_backgrounds/` 下由应用托管的阅读主题背景图片。书源临时封面位于平台 cache 的 `source_covers/`，公开书源元数据响应位于 `book_source_responses/`，加入书架后保存的封面位于 documents 的 `covers/`，三者清理边界分离。启动流程不并发执行全库路径回写或临时/孤儿文件删除；本地书打开前只修复该书路径，避免和导入、下载及 WebDAV 同步竞争。
 - 设置页缓存管理只允许清理 `source_covers/`、`book_source_chapters/`、`book_source_responses/`、`native_reader_cache/` 和 `updates/` 等明确归属的缓存，同时清理 SourceCoverCache 压缩内存、书源响应内存和 Flutter 解码图片缓存；不枚举或删除数据库、书籍、documents 封面、进度、偏好或安全凭据。
 - 用户授权目录：通过平台存储桥接原地管理或导入书籍。
-- 网络：仅在用户使用在线书源、封面、AI、同步或更新检查等功能时访问。WebDAV 默认要求 HTTPS，只有用户显式允许时才可对私网/localhost 使用 HTTP；书籍恢复当前以 100 MiB 为安全上限。
+- 网络：仅在用户使用在线书源、封面、AI、同步或更新检查等功能时访问。WebDAV 默认要求 HTTPS，只有用户显式允许时才可对私网/localhost 使用 HTTP；非 TXT 书籍恢复以 100 MiB 为安全上限；TXT 使用流式重组和分块限制。
 
 ### 阅读书源交互验证边界
 

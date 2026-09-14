@@ -9,6 +9,8 @@ import 'package:dio/dio.dart';
 
 import 'secure_sync_config.dart';
 import 'sync_models.dart';
+import 'sync_space.dart';
+import 'storage/sync_storage.dart';
 
 typedef WebDavClientFactory =
     WebDavClient Function(StoredSyncCredentials credentials);
@@ -17,7 +19,24 @@ class WebDavClient {
   WebDavClient({required Dio dio, required StoredSyncCredentials credentials})
     : _dio = dio,
       _credentials = credentials,
-      _origin = validateWebDavConfiguration(credentials.configuration);
+      _origin = validateWebDavConfiguration(credentials.configuration) {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          options.extra['sync_started'] = Stopwatch()..start();
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          _recordRequest(response.requestOptions, response.statusCode);
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          _recordRequest(error.requestOptions, error.response?.statusCode);
+          handler.next(error);
+        },
+      ),
+    );
+  }
 
   factory WebDavClient.standard(StoredSyncCredentials credentials) {
     return WebDavClient(
@@ -37,6 +56,31 @@ class WebDavClient {
   final StoredSyncCredentials _credentials;
   final Uri _origin;
   DateTime? lastServerDate;
+  final Set<String> _knownCollections = {};
+  final List<Map<String, Object?>> recentRequests = [];
+
+  void _recordRequest(RequestOptions options, int? status) {
+    final watch = options.extra['sync_started'] as Stopwatch?;
+    final parts = options.uri.pathSegments;
+    final kind = parts.contains('chunks')
+        ? 'chunk'
+        : parts.contains('revisions')
+        ? 'revision'
+        : parts.contains('changes')
+        ? 'metadata'
+        : parts.contains('checkpoints')
+        ? 'checkpoint'
+        : parts.contains('exports')
+        ? 'export'
+        : 'connection';
+    recentRequests.add({
+      'method': options.method,
+      'resource': kind,
+      'http_status': status,
+      'elapsed_ms': watch?.elapsedMilliseconds,
+    });
+    if (recentRequests.length > 40) recentRequests.removeAt(0);
+  }
 
   Uri uriForRootRelativePath(String relativePath) {
     final segments = relativePath.split('/');
@@ -94,8 +138,27 @@ class WebDavClient {
 
   Future<ConnectionTestResult> testConnection() async {
     try {
-      final options = await _request('OPTIONS', _origin);
+      Response<String>? options;
+      try {
+        options = await _request('OPTIONS', _origin);
+      } on WebDavSyncFailure catch (error) {
+        if (error.statusCode != 405 && error.statusCode != 501) rethrow;
+      }
       await ensureCollection([..._rootSegments]);
+      final format = await getText(
+        rootPath(['format.json']),
+        allowNotFound: true,
+      );
+      if (format != null) {
+        try {
+          SyncSpace.validate(format);
+        } on SyncStorageException catch (error) {
+          throw WebDavSyncFailure(
+            WebDavSyncErrorCode.serverIncompatible,
+            error.message,
+          );
+        }
+      }
       final rootProbe = await _request(
         'PROPFIND',
         _pathUri(_rootSegments),
@@ -125,8 +188,12 @@ class WebDavClient {
             'The server did not return the test file unchanged.',
           );
         }
-        await _request('DELETE', testFile);
-        final allow = options.headers.value('allow')?.toUpperCase() ?? '';
+        try {
+          await _request('DELETE', testFile);
+        } catch (_) {
+          /* Cleanup is optional. */
+        }
+        final allow = options?.headers.value('allow')?.toUpperCase() ?? '';
         return ConnectionTestResult(
           success: true,
           supportsEtag:
@@ -153,17 +220,37 @@ class WebDavClient {
     }
   }
 
-  Future<WebDavResourceState> resourceState(Uri uri) async {
+  Future<WebDavResourceState> resourceState(
+    Uri uri, {
+    bool requireStrongEtag = true,
+  }) async {
     try {
-      final response = await _request('HEAD', uri);
+      Response<String>? response;
+      try {
+        response = await _request('HEAD', uri);
+      } on WebDavSyncFailure catch (error) {
+        if (error.statusCode != 405 && error.statusCode != 501) rethrow;
+      }
+      if (response == null) {
+        final properties = await _request(
+          'PROPFIND',
+          uri,
+          headers: const {
+            'Depth': '0',
+            'Content-Type': 'application/xml; charset=utf-8',
+          },
+          data: _resourcePropfindBody,
+        );
+        return _parseResourceProperties(properties.data ?? '', uri, null);
+      }
       final etag = response.headers.value('etag');
       final length = int.tryParse(
         response.headers.value(Headers.contentLengthHeader) ?? '',
       );
-      if (_isStrongEtag(etag)) {
+      if (_isStrongEtag(etag) || !requireStrongEtag) {
         return WebDavResourceState(
           exists: true,
-          etag: etag!.trim(),
+          etag: etag?.trim(),
           contentLength: length,
         );
       }
@@ -375,11 +462,14 @@ class WebDavClient {
     final built = <String>[];
     for (final segment in segments) {
       built.add(segment);
+      final key = _pathUri(built).toString();
+      if (_knownCollections.contains(key)) continue;
       try {
         await _request('MKCOL', _pathUri(built));
       } on WebDavSyncFailure catch (error) {
         if (error.statusCode != 405) rethrow;
       }
+      _knownCollections.add(key);
     }
   }
 
@@ -442,6 +532,8 @@ class WebDavClient {
     Uri uri,
     IOSink destination, {
     String? expectedEtag,
+    bool requireStrongVersion = true,
+    int redirects = 0,
   }) async {
     try {
       final response = await _dio.get<ResponseBody>(
@@ -460,11 +552,33 @@ class WebDavClient {
       final status = response.statusCode ?? 0;
       _rememberServerDate(response);
       final body = response.data;
+      if (status >= 300 && status < 400) {
+        await body?.stream.listen(null).cancel();
+        final location = response.headers.value('location');
+        final redirected = location == null ? null : uri.resolve(location);
+        if (redirects >= 5 ||
+            redirected == null ||
+            !_sameOrigin(redirected, _origin)) {
+          throw const WebDavSyncFailure(
+            WebDavSyncErrorCode.serverIncompatible,
+            'The WebDAV download redirect is unsafe or repeated.',
+          );
+        }
+        return await downloadWithVersion(
+          redirected,
+          destination,
+          expectedEtag: expectedEtag,
+          requireStrongVersion: requireStrongVersion,
+          redirects: redirects + 1,
+        );
+      }
       if (status < 200 || status >= 300 || body == null) {
         await body?.stream.listen(null).cancel();
         throw _statusFailure(status);
       }
-      final etag = _requireResponseEtag(response, expectedEtag: expectedEtag);
+      final etag = requireStrongVersion
+          ? _requireResponseEtag(response, expectedEtag: expectedEtag)
+          : response.headers.value('etag') ?? 'unversioned';
       var received = 0;
       await destination.addStream(
         body.stream.map((chunk) {
@@ -501,6 +615,7 @@ class WebDavClient {
     required String contentType,
     String? ifMatch,
     bool ifNoneMatch = false,
+    bool requireStrongVersion = true,
   }) async {
     if ((ifMatch == null) == !ifNoneMatch) {
       throw const WebDavSyncFailure(
@@ -529,17 +644,17 @@ class WebDavClient {
       _rememberServerDate(response);
       if (status < 200 || status >= 300) throw _statusFailure(status);
       var etag = response.headers.value('etag');
-      if (!_isStrongEtag(etag)) {
+      if (requireStrongVersion && !_isStrongEtag(etag)) {
         etag = (await resourceState(uri)).etag;
       }
-      if (!_isStrongEtag(etag)) {
+      if (requireStrongVersion && !_isStrongEtag(etag)) {
         throw const WebDavSyncFailure(
           WebDavSyncErrorCode.serverIncompatible,
           'The WebDAV server did not provide a strong object validator.',
         );
       }
       return WebDavConditionalWriteResult(
-        etag: etag!.trim(),
+        etag: etag?.trim() ?? 'unversioned',
         contentLength: length,
         contentType: contentType,
       );
@@ -558,6 +673,7 @@ class WebDavClient {
     Uri uri,
     File file, {
     void Function(int sent, int total)? onProgress,
+    int redirects = 0,
   }) async {
     if (!_sameOrigin(uri, _origin)) {
       throw const WebDavSyncFailure(
@@ -583,6 +699,25 @@ class WebDavClient {
         ),
       );
       final status = response.statusCode ?? 0;
+      if (status >= 300 && status < 400) {
+        final location = response.headers.value('location');
+        final redirected = location == null ? null : uri.resolve(location);
+        if (redirects >= 5 ||
+            redirected == null ||
+            !_sameOrigin(redirected, _origin)) {
+          throw const WebDavSyncFailure(
+            WebDavSyncErrorCode.serverIncompatible,
+            'The WebDAV upload redirect is unsafe or repeated.',
+          );
+        }
+        return await putFile(
+          redirected,
+          file,
+          onProgress: onProgress,
+          redirects: redirects + 1,
+        );
+      }
+      _rememberServerDate(response);
       if (status < 200 || status >= 300) throw _statusFailure(status);
     } on WebDavSyncFailure catch (error) {
       throw error.withRequest('PUT', uri);
@@ -667,14 +802,28 @@ class WebDavClient {
       data: _resourcePropfindBody,
     );
     final entries = <WebDavListEntry>[];
-    for (final responseXml in _xmlValues(response.data ?? '', 'response')) {
+    final envelopes = _xmlValues(response.data ?? '', 'multistatus').toList();
+    if (envelopes.length != 1 ||
+        _xmlValues(envelopes.single, 'response').isEmpty) {
+      throw const WebDavSyncFailure(
+        WebDavSyncErrorCode.serverIncompatible,
+        'The WebDAV server returned an invalid directory listing.',
+      );
+    }
+    for (final responseXml in _xmlValues(envelopes.single, 'response')) {
       final hrefs = _xmlValues(responseXml, 'href').toList();
-      if (hrefs.length != 1) continue;
+      if (hrefs.length != 1) {
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.serverIncompatible,
+          'The WebDAV directory entry has no unique resource address.',
+        );
+      }
       final uri = collection.resolve(_decodeXml(hrefs.single.trim()));
       if (!_sameOrigin(uri, _origin) || uri == collection) continue;
       String? etag;
       int? length;
       var isCollection = false;
+      var readable = false;
       for (final propstat in _xmlValues(responseXml, 'propstat')) {
         final statuses = _xmlValues(propstat, 'status').toList();
         if (statuses.length != 1 ||
@@ -684,6 +833,7 @@ class WebDavClient {
           continue;
         }
         for (final prop in _xmlValues(propstat, 'prop')) {
+          readable = true;
           isCollection = _xmlValues(prop, 'resourcetype').any(
             (value) =>
                 RegExp(r'<(?:[A-Za-z0-9_-]+:)?collection\b').hasMatch(value),
@@ -696,6 +846,12 @@ class WebDavClient {
             length = int.tryParse(value.trim());
           }
         }
+      }
+      if (!readable) {
+        throw const WebDavSyncFailure(
+          WebDavSyncErrorCode.serverIncompatible,
+          'The WebDAV directory contains an unreadable resource.',
+        );
       }
       entries.add(
         WebDavListEntry(
@@ -757,7 +913,7 @@ class WebDavClient {
             'The WebDAV server attempted to redirect credentials to another origin.',
           );
         }
-        return _request(
+        return await _request(
           method,
           redirected,
           headers: headers,
@@ -866,7 +1022,7 @@ const _propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
 <d:propfind xmlns:d="DAV:"><d:prop><d:getetag/><d:resourcetype/></d:prop></d:propfind>''';
 
 const _resourcePropfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
-<d:propfind xmlns:d="DAV:"><d:prop><d:getetag/><d:getcontentlength/></d:prop></d:propfind>''';
+<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getetag/><d:getcontentlength/></d:prop></d:propfind>''';
 
 bool _isStrongEtag(String? value) =>
     value != null &&

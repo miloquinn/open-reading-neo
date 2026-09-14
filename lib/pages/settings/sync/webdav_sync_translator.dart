@@ -115,6 +115,9 @@ class WebDavSyncFailureDetails extends StatelessWidget {
 }
 
 String? _failureExplanation(BuildContext context, String message) {
+  if (message.contains('older or unsupported sync protocol')) {
+    return context.l10n.cloudSyncProtocolUpgrade;
+  }
   if (message ==
           'The WebDAV server did not provide an ETag for a mutable file.' ||
       message == 'Safe editable TXT sync requires a strong WebDAV ETag.') {

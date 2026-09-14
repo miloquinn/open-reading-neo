@@ -48,46 +48,45 @@ void main() {
     await root.delete(recursive: true);
   });
 
-  test('upload reports available only after current and head verify', () async {
-    final file = File('${root.path}/原书.epub');
-    await file.writeAsBytes([1, 2, 3, 4], flush: true);
-    final book = Book(
-      id: 1,
-      title: '原书',
-      author: '作者',
-      filePath: file.path,
-      format: 'epub',
-    );
-    await database.insert('books', {
-      'id': 1,
-      'title': book.title,
-      'author': book.author,
-      'filePath': book.filePath,
-      'format': book.format,
-      'currentPage': 0,
-      'totalPages': 1,
-      'importDate': book.importDate.millisecondsSinceEpoch,
-    });
-    final service = BookFileSyncService(
-      storageProvider: () async => storage,
-      database: () async => database,
-      temporaryDirectory: () async => root,
-      documentsDirectory: () async => root,
-      contentStateDirectory: () async => Directory('${root.path}/state'),
-    );
+  test(
+    'upload reports available only after content and revision verify',
+    () async {
+      final file = File('${root.path}/原书.epub');
+      await file.writeAsBytes([1, 2, 3, 4], flush: true);
+      final book = Book(
+        id: 1,
+        title: '原书',
+        author: '作者',
+        filePath: file.path,
+        format: 'epub',
+      );
+      await database.insert('books', {
+        'id': 1,
+        'title': book.title,
+        'author': book.author,
+        'filePath': book.filePath,
+        'format': book.format,
+        'currentPage': 0,
+        'totalPages': 1,
+        'importDate': book.importDate.millisecondsSinceEpoch,
+      });
+      final service = BookFileSyncService(
+        storageProvider: () async => storage,
+        database: () async => database,
+        temporaryDirectory: () async => root,
+        documentsDirectory: () async => root,
+        contentStateDirectory: () async => Directory('${root.path}/state'),
+      );
 
-    final descriptor = await service.upload(book);
-    expect(descriptor.fileAvailable, isTrue);
-    expect(descriptor.remotePath, contains('/current.epub'));
-    expect(descriptor.remotePath, isNot(startsWith('root:')));
-    expect(descriptor.remotePath, isNot(contains('/v2/')));
-    expect(await storage.stat(SyncPath(descriptor.remotePath!)), isNotNull);
-    final directory = descriptor.remotePath!.substring(
-      0,
-      descriptor.remotePath!.lastIndexOf('/'),
-    );
-    expect(await storage.stat(SyncPath('$directory/book.json')), isNotNull);
-  });
+      final descriptor = await service.upload(book);
+      expect(descriptor.fileAvailable, isTrue);
+      expect(descriptor.remotePath, contains('/revisions/'));
+      expect(descriptor.remotePath, endsWith('.json'));
+      expect(descriptor.remotePath, isNot(startsWith('root:')));
+      expect(descriptor.remotePath, isNot(contains('/v2/')));
+      expect(await storage.stat(SyncPath(descriptor.remotePath!)), isNotNull);
+    },
+  );
 
   test('corrupt download is rejected before importer sees it', () async {
     final bytes = [1, 2, 3, 4];

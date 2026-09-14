@@ -525,6 +525,7 @@ class _Files extends BookContentSyncService {
     bool allowNetwork = true,
     String? bookUid,
     bool Function()? shouldContinue,
+    bool respectBackoff = false,
   }) {
     calls++;
     events.add('reconcile');

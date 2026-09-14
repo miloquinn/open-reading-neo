@@ -12,7 +12,7 @@ void main() {
   test(
     'conditional GET binds bytes and version from the same response',
     () async {
-    final adapter = _VersionedGetAdapter(etag: '"revision-a"', body: '正文');
+      final adapter = _VersionedGetAdapter(etag: '"revision-a"', body: '正文');
       final storage = _storage(adapter);
 
       final result = await storage.readText(
@@ -31,7 +31,10 @@ void main() {
   test(
     'a GET carrying another version is rejected without a follow-up HEAD',
     () async {
-    final adapter = _VersionedGetAdapter(etag: '"revision-b"', body: 'changed');
+      final adapter = _VersionedGetAdapter(
+        etag: '"revision-b"',
+        body: 'changed',
+      );
       final storage = _storage(adapter);
 
       await expectLater(
@@ -51,20 +54,13 @@ void main() {
     },
   );
 
-  test('weak validators disable safe reads', () async {
+  test('immutable reads do not require strong validators', () async {
     final storage = _storage(
       _VersionedGetAdapter(etag: 'W/"weak"', body: '正文'),
     );
-    await expectLater(
-      storage.readText(SyncPath('books/a/current.txt')),
-      throwsA(
-        isA<SyncStorageException>().having(
-          (error) => error.code,
-          'code',
-          SyncStorageErrorCode.unsupported,
-        ),
-      ),
-    );
+    final result = await storage.readText(SyncPath('books/a/revision.json'));
+    expect(result.text, '正文');
+    expect(result.info.version.value, hasLength(64));
   });
 
   test(

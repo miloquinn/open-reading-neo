@@ -1,15 +1,19 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 
 import 'adapters/metadata_sync_adapters.dart';
 import 'storage/sync_storage.dart';
+import 'storage/immutable_object_store.dart';
 import 'sync_change_store.dart';
 import 'sync_clock.dart';
 import 'sync_dataset_catalog.dart';
 import 'sync_models.dart';
 import 'sync_protocol.dart';
+import 'metadata_checkpoint.dart';
+import 'sync_space.dart';
 
 class SyncEngine {
   SyncEngine({
@@ -17,35 +21,43 @@ class SyncEngine {
     required this.scope,
     required SyncChangeStore changeStore,
     MetadataSyncAdapters? adapters,
+    this.installationId,
   }) : _changeStore = changeStore,
        _adapters = adapters ?? MetadataSyncAdapters(store: changeStore);
 
-  static final SyncPath _formatPath = SyncPath('format.json');
-  static final SyncPath _devicesPath = SyncPath('sync/metadata/devices');
+  static final SyncPath _devicesPath = SyncPath('changes');
 
+  final String? installationId;
   final SyncStorage storage;
   final WebDavSyncScope scope;
   final SyncChangeStore _changeStore;
   final MetadataSyncAdapters _adapters;
   String _namespace = '';
+  late ImmutableObjectStore _objects;
 
   String _stateKey(String name) => 'metadata:$_namespace:$name';
 
   Future<WebDavSyncRunResult> run({
     void Function(WebDavSyncPhase phase)? onPhase,
   }) async {
-    if (!storage.capabilities.strongVersions) {
-      throw const SyncStorageException(
-        SyncStorageErrorCode.unsupported,
-        'This storage provider cannot safely perform bidirectional sync.',
-      );
-    }
     onPhase?.call(WebDavSyncPhase.connecting);
-    final spaceId = await _ensureSpace();
+    final spaceId = await SyncSpace.ensure(storage);
     _namespace = sha256
-        .convert(utf8.encode('${storage.spaceKey}\u0000$spaceId'))
+        .convert(
+          utf8.encode(
+            '${storage.spaceKey}\u0000$spaceId\u0000${installationId ?? 'local'}',
+          ),
+        )
         .toString();
-    await _prepareSpaceState();
+    await _prepareSpaceState('${storage.spaceKey}\u0000$spaceId');
+    // Cache only immutable bytes, isolated by both account and space identity.
+    _objects = ImmutableObjectStore(
+      storage,
+      Directory(
+        '${Directory.systemTemp.path}/open-reading-sync-cache/$_namespace',
+      ),
+    );
+
     _checkClockSkew(storage.serverDate);
 
     final deviceId = await _deviceId();
@@ -61,48 +73,65 @@ class SyncEngine {
     final remoteDeviceIds = <String>{};
     for (final prefix in (await _listOrEmpty(_devicesPath)).prefixes) {
       final parts = prefix.value.split('/');
-      if (parts.length == 4 &&
-          parts[0] == 'sync' &&
-          parts[1] == 'metadata' &&
-          parts[2] == 'devices' &&
-          parts[3] != deviceId) {
-        remoteDeviceIds.add(parts[3]);
+      if (parts.length == 2 && parts[0] == 'changes' && parts[1] != deviceId) {
+        remoteDeviceIds.add(parts[1]);
       }
     }
     for (final remoteDeviceId in remoteDeviceIds) {
-      final headRead = await _readOptional(_headPath(remoteDeviceId));
-      if (headRead == null) continue;
-      late final RemoteDeviceHead head;
-      try {
-        head = RemoteDeviceHead.decode(headRead.text);
-      } catch (_) {
-        throw const SyncStorageException(
-          SyncStorageErrorCode.invalidData,
-          'A remote device head is invalid.',
-        );
-      }
-      if (head.deviceId != remoteDeviceId) {
-        throw const SyncStorageException(
-          SyncStorageErrorCode.invalidData,
-          'A remote device head does not match its directory.',
-        );
-      }
+      final listing = await _listOrEmpty(_devicesPath.child(remoteDeviceId));
       var cursor = await _changeStore.cursorFor(
         remoteDeviceId,
         namespace: _namespace,
       );
-      while (cursor < head.latestSequence) {
-        final sequence = cursor + 1;
-        final batchRead = await storage.readText(
-          _batchPath(remoteDeviceId, sequence),
-        );
+      cursor = await MetadataCheckpoint(_objects, _changeStore, _namespace)
+          .restore(remoteDeviceId, cursor, (batch, checkpointNamespace) async {
+            for (final operation in batch.operations) {
+              clock.observe(HybridLogicalTimestamp.parse(operation.hlc));
+            }
+            downloaded += await _changeStore.applyRemoteBatch(
+              batch,
+              cursorNamespace: checkpointNamespace,
+              validateWinner: _adapters.validate,
+              normalizeWinner: _adapters.normalizeRemoteWinner,
+              cleanupWinnerAliases: _adapters.cleanupRemoteWinnerAliases,
+              applyWinner: (txn, operation) =>
+                  _adapters.apply(txn, operation, scope: scope),
+            );
+          });
+      final batches = <int, SyncPath>{};
+      for (final object in listing.objects) {
+        final name = object.path.value.split('/').last;
+        final match = RegExp(
+          r'^(\d{12})-([a-f0-9]{64})\.json$',
+        ).firstMatch(name);
+        if (match == null) continue;
+        final sequence = int.parse(match[1]!);
+        if (batches.containsKey(sequence)) {
+          throw const SyncStorageException(
+            SyncStorageErrorCode.versionConflict,
+            'A cloned device published two versions of the same metadata sequence.',
+          );
+        }
+        batches[sequence] = object.path;
+      }
+      final sequences =
+          batches.keys.where((sequence) => sequence > cursor).toList()..sort();
+      for (final sequence in sequences) {
+        if (sequence != cursor + 1) {
+          throw const SyncStorageException(
+            SyncStorageErrorCode.notFound,
+            'A metadata batch is not visible yet. Sync will retry without skipping it.',
+          );
+        }
+        final remotePath = batches[sequence]!;
+        final hash = remotePath.value.split('/').last.substring(13, 77);
         late final SyncBatch batch;
         try {
-          batch = SyncBatch.decode(batchRead.text);
-        } catch (_) {
+          batch = SyncBatch.decode(await _objects.readText(remotePath, hash));
+        } on FormatException {
           throw const SyncStorageException(
             SyncStorageErrorCode.invalidData,
-            'A remote metadata batch is missing or invalid.',
+            'A remote metadata batch is invalid.',
           );
         }
         if (batch.deviceId != remoteDeviceId || batch.sequence != sequence) {
@@ -149,53 +178,13 @@ class SyncEngine {
     );
   }
 
-  Future<void> _prepareSpaceState() async {
+  Future<void> _prepareSpaceState(String contentSpace) async {
     final active = await _changeStore.getState('active_metadata_space');
     if (active == _namespace) return;
-    await _changeStore.resetRemoteMirrorForNewSpace();
+    await _changeStore.resetRemoteMirrorForNewSpace(
+      preserveFileSpace: contentSpace,
+    );
     await _changeStore.setState('active_metadata_space', _namespace);
-  }
-
-  Future<String> _ensureSpace() async {
-    final existing = await _readOptional(_formatPath);
-    if (existing != null) {
-      return _validateSpace(existing.text);
-    }
-    final content = jsonEncode({
-      'protocol': 'open-reading-sync',
-      'schema_version': 1,
-      'space_id': const Uuid().v4(),
-      'created_at': DateTime.now().toUtc().toIso8601String(),
-      'metadata_encoding': 'json',
-      'content_encryption': 'none',
-    });
-    try {
-      await _createText(_formatPath, content);
-      return _validateSpace(content);
-    } on SyncStorageException catch (error) {
-      if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
-      return _validateSpace((await storage.readText(_formatPath)).text);
-    }
-  }
-
-  String _validateSpace(String existing) {
-    try {
-      final json = (jsonDecode(existing) as Map).cast<String, dynamic>();
-      if (json['protocol'] != 'open-reading-sync' ||
-          json['schema_version'] != 1 ||
-          json['metadata_encoding'] != 'json' ||
-          json['content_encryption'] != 'none') {
-        throw const FormatException();
-      }
-      final spaceId = json['space_id'];
-      if (spaceId is! String || spaceId.isEmpty) throw const FormatException();
-      return spaceId;
-    } catch (_) {
-      throw const SyncStorageException(
-        SyncStorageErrorCode.unsupported,
-        'This folder contains an unsupported Open Reading sync space.',
-      );
-    }
   }
 
   Future<int> _publish(String deviceId, HybridLogicalClock clock) async {
@@ -217,9 +206,7 @@ class SyncEngine {
         ),
       );
       if (unauthorized) {
-        final uploaded = await _readOptional(
-          _batchPath(deviceId, batch.sequence),
-        );
+        final uploaded = await _readOptional(_batchPath(batch));
         if (uploaded == null) {
           await _changeStore.setState(pendingKey, '');
           return _publish(deviceId, clock);
@@ -293,72 +280,37 @@ class SyncEngine {
       await _changeStore.setState(pendingKey, batch.encode());
     }
 
-    await _createImmutableText(
-      _batchPath(deviceId, batch.sequence),
-      batch.encode(),
-    );
-    final head = RemoteDeviceHead(
-      deviceId: deviceId,
-      latestSequence: batch.sequence,
-      latestHlc: batch.createdHlc,
-      updatedAt: DateTime.now().toUtc(),
-    ).encode();
-    await _writeMutableText(_headPath(deviceId), head);
+    await _createImmutableText(_batchPath(batch), batch.encode());
+    await MetadataCheckpoint(
+      _objects,
+      _changeStore,
+      _namespace,
+    ).recordPublished(batch);
     await _changeStore.markUploaded(records);
     await _changeStore.setState(sequenceKey, '${batch.sequence}');
     await _changeStore.setState(pendingKey, '');
+    if (batch.sequence % MetadataCheckpoint.interval == 0) {
+      try {
+        await MetadataCheckpoint(
+          _objects,
+          _changeStore,
+          _namespace,
+        ).compact(deviceId);
+        await _changeStore.deleteState(_stateKey('maintenance_error'));
+      } on SyncStorageException catch (error) {
+        // Publication is already verified. Cleanup availability must not turn
+        // a successful data sync into a failed upload or reset its sequence.
+        await _changeStore.setState(
+          _stateKey('maintenance_error'),
+          error.code.name,
+        );
+      }
+    }
     return records.length;
   }
 
-  Future<void> _createImmutableText(SyncPath path, String content) async {
-    try {
-      await _createText(path, content);
-    } on SyncStorageException catch (error) {
-      if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
-      if ((await storage.readText(path)).text != content) {
-        throw const SyncStorageException(
-          SyncStorageErrorCode.versionConflict,
-          'An immutable metadata object contains different data.',
-        );
-      }
-    }
-  }
-
-  Future<void> _writeMutableText(SyncPath path, String content) async {
-    final bytes = utf8.encode(content);
-    final current = await storage.stat(path);
-    try {
-      if (current == null) {
-        await storage.create(
-          path,
-          Stream.value(bytes),
-          length: bytes.length,
-          contentType: 'application/json; charset=utf-8',
-        );
-      } else {
-        await storage.compareAndSwap(
-          path,
-          Stream.value(bytes),
-          length: bytes.length,
-          contentType: 'application/json; charset=utf-8',
-          expectedVersion: current.version,
-        );
-      }
-    } on SyncStorageException catch (error) {
-      if (error.code != SyncStorageErrorCode.versionConflict) rethrow;
-      if ((await storage.readText(path)).text != content) rethrow;
-    }
-  }
-
-  Future<void> _createText(SyncPath path, String content) async {
-    final bytes = utf8.encode(content);
-    await storage.create(
-      path,
-      Stream.value(bytes),
-      length: bytes.length,
-      contentType: 'application/json; charset=utf-8',
-    );
-  }
+  Future<void> _createImmutableText(SyncPath path, String content) =>
+      _objects.putText(path, content);
 
   Future<SyncTextRead?> _readOptional(SyncPath path) async {
     try {
@@ -380,13 +332,11 @@ class SyncEngine {
     }
   }
 
-  SyncPath _headPath(String deviceId) =>
-      _devicesPath.child(deviceId).child('head.json');
-
-  SyncPath _batchPath(String deviceId, int sequence) => _devicesPath
-      .child(deviceId)
-      .child('changes')
-      .child('${sequence.toString().padLeft(12, '0')}.json');
+  SyncPath _batchPath(SyncBatch batch) => _devicesPath
+      .child(batch.deviceId)
+      .child(
+        '${batch.sequence.toString().padLeft(12, '0')}-${ImmutableObjectStore.hashBytes(utf8.encode(batch.encode()))}.json',
+      );
 
   Future<String> _deviceId() async {
     final key = _stateKey('device_id');

@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:uuid/uuid.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -95,11 +98,40 @@ class WebDavSyncController extends ChangeNotifier {
     notifyListeners();
   }
 
+  final List<WebDavClient> _recentClients = [];
+  String? _diagnosticRun;
+  DateTime? _diagnosticStarted;
+  BookContentReconcileResult? _fileResult;
+  String get diagnosticSummary => const JsonEncoder.withIndent('  ').convert({
+    'protocol': 2,
+    'run_id': _diagnosticRun,
+    'started_at': _diagnosticStarted?.toUtc().toIso8601String(),
+    'phase': _lastFailedPhase.name,
+    'scope': scope.toJson(),
+    'metadata_error': _metadataFailure?.code.name,
+    'file_error': _fileFailure?.code.name,
+    'pending_metadata': _pendingChanges,
+    'uploaded_records': _lastResult?.uploaded,
+    'downloaded_records': _lastResult?.downloaded,
+    'object_payload_uploaded_bytes': _fileResult?.uploadedBytes,
+    'object_payload_downloaded_bytes': _fileResult?.downloadedBytes,
+    'requests': _recentClients
+        .expand((client) => client.recentRequests)
+        .toList()
+        .reversed
+        .take(40)
+        .toList()
+        .reversed
+        .toList(),
+  });
+
   Future<SyncStorage?> _storageProvider() async {
     final credentials = await _configStore.readCredentials();
-    return credentials == null
-        ? null
-        : WebDavSyncStorage(_clientFactory(credentials));
+    if (credentials == null) return null;
+    final client = _clientFactory(credentials);
+    _recentClients.add(client);
+    if (_recentClients.length > 12) _recentClients.removeAt(0);
+    return WebDavSyncStorage(client);
   }
 
   late final AutomaticSyncScheduler _scheduler;
@@ -107,6 +139,7 @@ class WebDavSyncController extends ChangeNotifier {
   bool _autoResume = true;
   DateTime? _lastCheckedAt;
   DateTime? _lastProgressSyncAt;
+  DateTime? _lastContentCheck;
   int _progressGeneration = 0;
   bool _progressPending = false;
 
@@ -125,12 +158,43 @@ class WebDavSyncController extends ChangeNotifier {
     await _syncMetadataNow();
   }
 
+  String get _remoteFileFingerprint =>
+      (_remoteBooks
+              .where((book) => book.fileAvailable)
+              .map(
+                (book) =>
+                    '${book.bookUid}:${book.remotePath}:${book.blobSha256}',
+              )
+              .toList()
+            ..sort())
+          .join('\n');
+
   Future<void> _runAutomaticCycle() async {
-    await _syncMetadataNow();
+    final previousFiles = _remoteFileFingerprint;
+    try {
+      await _syncMetadataNow();
+    } catch (error) {
+      if (_blocksAllSync(error)) rethrow;
+    }
     if (autoSync && scope.bookFiles && _backgroundUploadQueue.isNotEmpty) {
       unawaited(_drainBackgroundBookUploads());
     }
-    if (autoSync && scope.bookFiles) {
+    final fileWorkPending = _textStates.any(
+      (state) =>
+          state.enabled &&
+          (state.status == BookContentSyncStatus.pending ||
+              state.status == BookContentSyncStatus.failed),
+    );
+    final auditDue =
+        _lastContentCheck == null ||
+        DateTime.now().difference(_lastContentCheck!) >=
+            const Duration(minutes: 15);
+    if (autoSync &&
+        scope.bookFiles &&
+        (fileWorkPending ||
+            previousFiles != _remoteFileFingerprint ||
+            auditDue)) {
+      _lastContentCheck = DateTime.now();
       unawaited(
         synchronizeTextFiles(automatic: true).catchError((Object error) {
           debugPrint('TXT synchronization will retry: ${error.runtimeType}');
@@ -156,6 +220,7 @@ class WebDavSyncController extends ChangeNotifier {
     final connection = '$serverUrl|$username|$rootPath';
     try {
       final result = await _contentSync.reconcile(
+        respectBackoff: automatic,
         shouldContinue: () =>
             !_disposed &&
             isConfigured &&
@@ -163,6 +228,7 @@ class WebDavSyncController extends ChangeNotifier {
             connection == '$serverUrl|$username|$rootPath' &&
             (!automatic || autoSync),
       );
+      _fileResult = result;
       _textStates = await _contentSync.listStates();
       final hasFailedState = _textStates.any(
         (state) => state.status == BookContentSyncStatus.failed,
@@ -336,9 +402,10 @@ class WebDavSyncController extends ChangeNotifier {
         autoSync: _configuration?.autoSync ?? true,
       );
       validateWebDavConfiguration(configuration, password: password);
-      final result = await _clientFactory(
+      final client = _clientFactory(
         StoredSyncCredentials(configuration, password),
-      ).testConnection();
+      );
+      final result = await client.testConnection();
       if (!result.success) {
         _setMetadataFailure(
           result.failure ??
@@ -403,12 +470,38 @@ class WebDavSyncController extends ChangeNotifier {
     requestAutomaticSync(immediate: true);
   }
 
-  Future<WebDavSyncRunResult> syncNow() {
-    return _syncMetadataNow().then((result) async {
-      if (scope.bookFiles) await synchronizeTextFiles();
-      return result;
-    });
+  Future<WebDavSyncRunResult> syncNow() async {
+    WebDavSyncRunResult? result;
+    Object? metadataError;
+    StackTrace? metadataStack;
+    try {
+      result = await _syncMetadataNow();
+    } catch (error, stack) {
+      metadataError = error;
+      metadataStack = stack;
+      if (_blocksAllSync(error)) rethrow;
+    }
+    if (scope.bookFiles) await synchronizeTextFiles();
+    if (metadataError != null) {
+      Error.throwWithStackTrace(metadataError, metadataStack!);
+    }
+    return result!;
   }
+
+  bool _blocksAllSync(Object error) =>
+      error is WebDavSyncFailure &&
+      const {
+        WebDavSyncErrorCode.authentication,
+        WebDavSyncErrorCode.permissionDenied,
+        WebDavSyncErrorCode.invalidConfiguration,
+        WebDavSyncErrorCode.serverIncompatible,
+        WebDavSyncErrorCode.tls,
+        WebDavSyncErrorCode.storageFull,
+        WebDavSyncErrorCode.rateLimited,
+        WebDavSyncErrorCode.network,
+        WebDavSyncErrorCode.timeout,
+        WebDavSyncErrorCode.serverError,
+      }.contains(error.code);
 
   Future<WebDavSyncRunResult> _syncMetadataNow() {
     final running = _running;
@@ -420,6 +513,8 @@ class WebDavSyncController extends ChangeNotifier {
   }
 
   Future<WebDavSyncRunResult> _runSync() async {
+    _diagnosticRun = const Uuid().v4();
+    _diagnosticStarted = DateTime.now();
     final progressGeneration = _progressGeneration;
     final syncProgress = scope.progress;
     if (!isConfigured) {
@@ -439,6 +534,7 @@ class WebDavSyncController extends ChangeNotifier {
       final engine =
           _engine ??
           SyncEngine(
+            installationId: await _configStore.deviceIdentity(),
             storage:
                 await _storageProvider() ??
                 (throw const WebDavSyncFailure(

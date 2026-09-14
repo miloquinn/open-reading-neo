@@ -209,10 +209,40 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
                       Text(txtSyncStatusText(context, state.status)),
                       Text(l10n.cloudSyncReadableStorage),
                       const SizedBox(height: 8),
-                      SelectableText(
-                        '${l10n.cloudSyncTextLocation}: ${sync.rootPath ?? ''}/${state.remotePath}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      if (state.remoteVersion != null)
+                        TextButton.icon(
+                          icon: const Icon(Icons.file_upload_outlined),
+                          label: Text(l10n.cloudSyncExportBook),
+                          onPressed: _busy
+                              ? null
+                              : () => _run(() async {
+                                  final remote = await sync.contentSyncService
+                                      .exportBook(state.bookUid);
+                                  if (!context.mounted) return;
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text(
+                                        context.l10n.cloudSyncExportDone,
+                                      ),
+                                      content: SelectableText(
+                                        '${sync.rootPath ?? ''}/$remote',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: Text(
+                                            MaterialLocalizations.of(
+                                              context,
+                                            ).closeButtonLabel,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                        ),
                       const SizedBox(height: 8),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,

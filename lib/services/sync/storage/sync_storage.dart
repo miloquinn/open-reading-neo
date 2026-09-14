@@ -172,3 +172,10 @@ abstract interface class SyncStorage {
     required SyncObjectVersion expectedVersion,
   });
 }
+
+/// Optional streaming primitive for content-addressed objects. Callers verify
+/// the hash before and after writing; retries may repair a partial PUT at the
+/// same immutable address, including on servers without conditional writes.
+abstract interface class ImmutableWritableStorage {
+  Future<void> writeImmutable(SyncPath path, File source);
+}

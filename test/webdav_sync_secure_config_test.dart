@@ -4,6 +4,34 @@ import 'package:xxread/services/sync/sync_models.dart';
 
 void main() {
   test(
+    'installation identity survives configuration clearing but not a new device vault',
+    () async {
+      final secrets = _MemorySecrets();
+      final preferences = _MemoryPreferences();
+      final first = SecureSyncConfigStore(
+        secretStorage: secrets,
+        preferences: preferences,
+      );
+      final identity = await first.deviceIdentity();
+      await first.clear();
+      expect(
+        await SecureSyncConfigStore(
+          secretStorage: secrets,
+          preferences: preferences,
+        ).deviceIdentity(),
+        identity,
+      );
+      expect(
+        await SecureSyncConfigStore(
+          secretStorage: _MemorySecrets(),
+          preferences: preferences,
+        ).deviceIdentity(),
+        isNot(identity),
+      );
+      expect(preferences.values.values, isNot(contains(identity)));
+    },
+  );
+  test(
     'unconfigured scope stays legacy, configured scope defaults complete',
     () async {
       final store = SecureSyncConfigStore(

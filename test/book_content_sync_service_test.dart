@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,9 +10,13 @@ import 'package:xxread/book_sources/services/source_chapter_state.dart';
 import 'package:xxread/data/migration/webdav_sync_schema_migration.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/sync/book_content_sync_service.dart';
+import 'package:xxread/services/sync/book_revision_repository.dart';
+import 'package:xxread/services/sync/storage/immutable_object_store.dart';
 import 'package:xxread/services/sync/reading_progress_sync_service.dart';
 import 'package:xxread/services/sync/storage/memory_sync_storage.dart';
 import 'package:xxread/services/sync/storage/sync_storage.dart';
+import 'package:xxread/services/sync/sync_change_store.dart';
+import 'package:xxread/services/sync/sync_models.dart';
 
 void main() {
   late Directory root;
@@ -39,318 +44,389 @@ void main() {
     await root.delete(recursive: true);
   });
 
+  Future<BookRevisionRepository> repo(String device) async =>
+      BookRevisionRepository(
+        ImmutableObjectStore(storage, Directory('${root.path}/$device-cache')),
+      );
+
+  Future<BookRevision> current(String uid) async {
+    final id = (await service.listStates())
+        .singleWhere((s) => s.bookUid == uid)
+        .remoteVersion!;
+    return (await repo('inspect')).read(uid, id);
+  }
+
+  Future<BookRevision> remoteEdit(String uid, String content) async {
+    final base = await current(uid);
+    final file = File('${root.path}/remote.txt');
+    await file.writeAsString(content, flush: true);
+    return (await repo('remote')).publish(
+      bookUid: uid,
+      file: file,
+      hash: await ImmutableObjectStore.hashFile(file),
+      format: 'txt',
+      fileName: 'book.txt',
+      parents: [base.id],
+      metadata: {'source_state_sha256': null, 'source_assets': []},
+      base: base,
+    );
+  }
+
   test(
-    'publishes one readable current, immutable history and CAS head',
+    'one immutable revision replaces current plus duplicate history; idle transfers zero bytes',
     () async {
       final book = await _book(database, root, '正文第一版');
-      await service.join(book, bookUid: 'stable-book-uid');
-
+      await service.join(book, bookUid: 'stable-book');
       final first = await service.reconcile();
+      expect(first.failed, 0);
       expect(first.uploaded, 1);
+      final revision = await current('stable-book');
+      expect(revision.hash, sha256.convert(utf8.encode('正文第一版')).toString());
       final objects = await _allObjects(storage, SyncPath('books'));
       expect(
-        objects.where((o) => o.path.value.endsWith('/current.txt')),
+        objects.where((o) => o.path.value.contains('/revisions/')),
         hasLength(1),
       );
       expect(
-        objects.where((o) => o.path.value.contains('/history/')),
+        objects.where((o) => o.path.value.contains('/chunks/')),
         hasLength(1),
       );
       expect(
-        objects.where((o) => o.path.value.endsWith('/book.json')),
-        hasLength(1),
-      );
-      expect(
-        objects.every(
+        objects.any(
           (o) =>
-              !o.path.value.contains('/v1/') &&
-              !o.path.value.contains('/v2/') &&
-              !o.path.value.contains('/v3/'),
+              o.path.value.endsWith('/current.txt') ||
+              o.path.value ==
+                  'books/${BookRevisionRepository.folder('stable-book')}/book.json',
         ),
-        isTrue,
+        isFalse,
       );
-
-      final current = objects.singleWhere(
-        (o) => o.path.value.endsWith('/current.txt'),
-      );
-      expect(await _read(storage, current.path), utf8.encode('正文第一版'));
-      final unchangedVersion = current.version;
       final second = await service.reconcile();
+      expect(second.failed, 0);
       expect(second.uploaded, 0);
-      expect((await storage.stat(current.path))!.version, unchangedVersion);
-
-      final state = (await service.listStates()).single;
-      expect(state.status, BookContentSyncStatus.synced);
-      expect(state.localHash, state.baseHash);
-      expect(state.remotePath, current.path.value);
+      expect(second.downloaded, 0);
+      expect(second.uploadedBytes, 0);
+      expect(second.downloadedBytes, 0);
+      expect(
+        (await service.listStates()).single.status,
+        BookContentSyncStatus.synced,
+      );
     },
   );
 
   test(
-    'head failure stays unavailable and a retry repairs the exact current',
+    'revision publication failure remains unavailable and retry reuses uploaded blocks',
     () async {
       final book = await _book(database, root, '断点恢复');
-      final failing = _FailHeadStorage(storage);
+      final failing = _RevisionFaultStorage(storage);
       final recovering = BookContentSyncService(
         storageProvider: () async => failing,
         database: () async => database,
         stateDirectory: () async => Directory('${root.path}/state'),
       );
       await recovering.join(book, bookUid: 'recover-book');
-      final first = await recovering.reconcile();
-      expect(first.failed, 1);
-      expect(
-        (await recovering.listStates()).single.status,
-        BookContentSyncStatus.failed,
-      );
+      expect((await recovering.reconcile()).failed, 1);
       expect(await database.query('sync_book_files'), isEmpty);
-
-      final second = await recovering.reconcile();
-      expect(second.failed, 0);
+      final chunks = (await _allObjects(
+        storage,
+        SyncPath('books'),
+      )).where((o) => o.path.value.contains('/chunks/')).toList();
+      final result = await recovering.reconcile();
+      expect(result.failed, 0);
       expect(
         (await recovering.listStates()).single.status,
         BookContentSyncStatus.synced,
       );
-      expect(
-        (await database.query('sync_book_files')).single['blob_sha256'],
-        isNotNull,
-      );
+      expect(await storage.stat(chunks.single.path), isNotNull);
+      expect(result.uploadedBytes, lessThan(2048));
     },
   );
 
-  test(
-    'GBK bytes remain byte-identical and retain a readable txt extension',
-    () async {
-      final bytes = gbk.encode('第一章\n中文正文');
-      final file = File('${root.path}/国标编码.txt');
-      await file.writeAsBytes(bytes, flush: true);
-      final storedBytes = await file.readAsBytes();
-      final book = Book(
-        id: 1,
-        title: '国标编码',
-        author: '作者',
-        filePath: file.path,
-        format: 'txt',
-      );
-      await database.insert('books', {
-        'id': 1,
-        'title': book.title,
-        'author': book.author,
-        'filePath': book.filePath,
-        'format': book.format,
-        'currentPage': 0,
-        'totalPages': 1,
-        'importDate': book.importDate.millisecondsSinceEpoch,
-      });
-      await service.join(book, bookUid: 'gbk-book');
-      await service.reconcile();
-      final current = (await _allObjects(
-        storage,
-        SyncPath('books'),
-      )).singleWhere((object) => object.path.value.endsWith('/current.txt'));
-      expect(await _read(storage, current.path), storedBytes);
-    },
-  );
+  test('GBK bytes remain byte identical after chunk reconstruction', () async {
+    final book = await _book(database, root, 'placeholder');
+    final bytes = gbk.encode('第一章\n中文正文');
+    await File(book.filePath).writeAsBytes(bytes);
+    await service.join(book, bookUid: 'gbk');
+    expect((await service.reconcile()).failed, 0);
+    final output = File('${root.path}/restored.txt');
+    final revision = await current('gbk');
+    await (await repo('restore')).materialize(revision, output);
+    expect(await output.readAsBytes(), await File(book.filePath).readAsBytes());
+  });
 
   test(
-    'paused books do not upload and resume with the latest revision',
+    'paused books do not upload and resume with latest local revision',
     () async {
       final book = await _book(database, root, '暂停前');
-      await service.join(book, bookUid: 'paused-book');
-      await service.setEnabled('paused-book', false);
-      await File(book.filePath).writeAsString('暂停后修改', flush: true);
-      await service.enqueueLocalUpdate(book, bookUid: 'paused-book');
+      await service.join(book, bookUid: 'paused');
+      await service.setEnabled('paused', false);
+      await File(book.filePath).writeAsString('暂停后');
+      await service.enqueueLocalUpdate(book, bookUid: 'paused');
       expect((await service.reconcile()).uploaded, 0);
-      expect((await _allObjects(storage, SyncPath('books'))), isEmpty);
-      await service.setEnabled('paused-book', true);
+      expect(await _allObjects(storage, SyncPath('books')), isEmpty);
+      await service.setEnabled('paused', true);
       expect((await service.reconcile()).uploaded, 1);
     },
   );
 
   test(
-    'changed content uploads the full current and retains both histories',
+    'a prefix insertion reuses most blocks and another device reconstructs exact bytes',
     () async {
-      final book = await _book(database, root, '第一版');
-      await service.join(book, bookUid: 'edited-book');
-      await service.reconcile();
-      final current = (await _allObjects(
-        storage,
-        SyncPath('books'),
-      )).singleWhere((o) => o.path.value.endsWith('/current.txt'));
-      final firstVersion = current.version;
-
-      await File(book.filePath).writeAsString('第二版', flush: true);
-      await service.enqueueLocalUpdate(book, bookUid: 'edited-book');
-      final result = await service.reconcile();
-
-      expect(result.uploaded, 1);
-      expect(result.uploadedBytes, utf8.encode('第二版').length);
-      expect((await storage.stat(current.path))!.version, isNot(firstVersion));
-      expect(
-        (await _allObjects(
-          storage,
-          SyncPath('books'),
-        )).where((o) => o.path.value.contains('/history/')),
-        hasLength(2),
+      final random = Random(7);
+      final bytes = List<int>.generate(
+        8 * 1024 * 1024,
+        (_) => random.nextInt(256),
       );
+      final book = await _book(database, root, 'placeholder');
+      await File(book.filePath).writeAsBytes(bytes);
+      await service.join(book, bookUid: 'large');
+      expect((await service.reconcile()).failed, 0);
+      final first = await current('large');
+      final edited = [65, 66, 67, ...bytes];
+      await File(book.filePath).writeAsBytes(edited);
+      await service.enqueueLocalUpdate(book, bookUid: 'large');
+      final result = await service.reconcile();
+      expect(result.failed, 0);
+      expect(result.uploadedBytes, lessThan(1024 * 1024));
+      final second = await current('large');
+      expect(second.parents, [first.id]);
+      final output = File('${root.path}/large-restored.txt');
+      await (await repo('second-device')).materialize(second, output);
+      expect(
+        await ImmutableObjectStore.hashFile(output),
+        sha256.convert(edited).toString(),
+      );
+      expect(await output.length(), edited.length);
     },
   );
 
-  test('external cloud edit is adopted without a GET then HEAD race', () async {
-    final book = await _book(database, root, '本地基线');
-    await service.join(book, bookUid: 'external-edit');
-    await service.reconcile();
-    final current = (await _allObjects(
-      storage,
-      SyncPath('books'),
-    )).singleWhere((o) => o.path.value.endsWith('/current.txt'));
-    final bytes = utf8.encode('坚果云里直接修改');
-    await storage.compareAndSwap(
-      current.path,
-      Stream.value(bytes),
-      length: bytes.length,
-      contentType: 'text/plain',
-      expectedVersion: current.version,
-    );
-
-    final observed = await service.reconcile();
-    expect(observed.downloaded, 0);
-    expect(
-      (await service.listStates()).single.status,
-      BookContentSyncStatus.updateAvailable,
-    );
-    final result = await service.reconcile();
-    expect(result.downloaded, 1);
-    expect(await File(book.filePath).readAsString(), '坚果云里直接修改');
-    final head = (await _allObjects(
-      storage,
-      SyncPath('books'),
-    )).singleWhere((o) => o.path.value.endsWith('/book.json'));
-    final json =
-        jsonDecode(
-              (await storage.readText(
-                head.path,
-                expectedVersion: head.version,
-              )).text,
-            )
-            as Map<String, dynamic>;
-    expect(json['current_sha256'], sha256.convert(bytes).toString());
-  });
+  test(
+    'remote successor is applied without overwriting unrelated local changes',
+    () async {
+      final book = await _book(database, root, '基线');
+      await service.join(book, bookUid: 'remote');
+      await service.reconcile();
+      await remoteEdit('remote', '远端新版');
+      final result = await service.reconcile();
+      expect(result.failed, 0);
+      expect(result.downloaded, 1);
+      expect(await File(book.filePath).readAsString(), '远端新版');
+    },
+  );
 
   test(
-    'divergent local and cloud edits preserve both conflict snapshots',
+    'concurrent edits preserve both snapshots and explicit local choice merges parents',
     () async {
       final book = await _book(database, root, '共同基线');
-      await service.join(book, bookUid: 'conflict-book');
+      await service.join(book, bookUid: 'conflict');
       await service.reconcile();
-      final current = (await _allObjects(
-        storage,
-        SyncPath('books'),
-      )).singleWhere((o) => o.path.value.endsWith('/current.txt'));
-      final remoteBytes = utf8.encode('云端编辑');
-      await storage.compareAndSwap(
-        current.path,
-        Stream.value(remoteBytes),
-        length: remoteBytes.length,
-        contentType: 'text/plain',
-        expectedVersion: current.version,
-      );
-      await File(book.filePath).writeAsString('本地编辑', flush: true);
-      await service.enqueueLocalUpdate(book, bookUid: 'conflict-book');
-
-      final observed = await service.reconcile();
-      expect(observed.conflicts, 0);
-      final result = await service.reconcile();
-      expect(result.conflicts, 1);
-      expect(await File(book.filePath).readAsString(), '本地编辑');
+      final remote = await remoteEdit('conflict', '远端修改');
+      await File(book.filePath).writeAsString('本地修改');
+      await service.enqueueLocalUpdate(book, bookUid: 'conflict');
+      expect((await service.reconcile()).conflicts, 1);
       final conflict = (await service.listConflicts()).single;
-      expect(await File(conflict.localSnapshotPath).readAsString(), '本地编辑');
-      expect(await File(conflict.remoteSnapshotPath).readAsString(), '云端编辑');
-      expect(
-        (await service.listStates()).single.status,
-        BookContentSyncStatus.conflict,
+      expect(await File(conflict.localSnapshotPath).readAsString(), '本地修改');
+      expect(await File(conflict.remoteSnapshotPath).readAsString(), '远端修改');
+      await service.resolveConflict(
+        conflict.id,
+        BookContentConflictChoice.keepLocal,
       );
+      expect((await service.reconcile()).conflicts, 0);
+      final tips = await (await repo('review')).tips('conflict');
+      expect(tips, hasLength(1));
+      expect(tips.single.parents, contains(remote.id));
+      expect(await File(book.filePath).readAsString(), '本地修改');
     },
   );
 
   test(
-    'active reader stages a remote revision until explicitly applied',
+    'active reader stages the remote revision before an explicit safe apply',
     () async {
-      final book = await _book(database, root, '正在阅读');
-      await service.join(book, bookUid: 'active-reader');
+      final book = await _book(database, root, '旧正文');
+      await service.join(book, bookUid: 'reading');
       await service.reconcile();
-      final current = (await _allObjects(
-        storage,
-        SyncPath('books'),
-      )).singleWhere((o) => o.path.value.endsWith('/current.txt'));
-      final bytes = utf8.encode('云端新正文');
-      await storage.compareAndSwap(
-        current.path,
-        Stream.value(bytes),
-        length: bytes.length,
-        contentType: 'text/plain',
-        expectedVersion: current.version,
-      );
+      await remoteEdit('reading', '新正文');
       ReadingProgressSyncService.instance.beginOpening(book);
-      await service.reconcile();
+      expect((await service.reconcile()).downloaded, 0);
       expect(
         (await service.listStates()).single.status,
         BookContentSyncStatus.updateAvailable,
       );
-      expect(await File(book.filePath).readAsString(), '正在阅读');
-      expect(await service.applyAvailableUpdate('active-reader'), isFalse);
-      ReadingProgressSyncService.instance.cancelOpening(book.id!);
-      expect(await service.applyAvailableUpdate('active-reader'), isTrue);
-      expect(await File(book.filePath).readAsString(), '云端新正文');
+      expect(await File(book.filePath).readAsString(), '旧正文');
+      ReadingProgressSyncService.instance.abandonSession(1);
+      expect(await service.applyAvailableUpdate('reading'), isTrue);
+      expect(await File(book.filePath).readAsString(), '新正文');
     },
   );
 
   test(
-    'source sidecar change advances head without rewriting current',
+    'explicit remote choice commits the decision before applying the file',
     () async {
-      final book = await _book(database, root, '连载正文');
-      await service.join(book, bookUid: 'serial-book');
+      final book = await _book(database, root, 'base');
+      await service.join(book, bookUid: 'remote-choice');
       await service.reconcile();
-      final current = (await _allObjects(
-        storage,
-        SyncPath('books'),
-      )).singleWhere((o) => o.path.value.endsWith('/current.txt'));
-      final currentVersion = current.version;
-      final hash = sha256.convert(utf8.encode('连载正文')).toString();
-      await const SourceChapterStateStore().save(
-        book,
-        SourceChapterState(
-          schemaVersion: 1,
-          bookUid: 'serial-book',
-          sourceId: 'source',
-          sourceBookId: 'novel',
-          materializedContentHash: hash,
-          baselineKnown: true,
-          chapters: const [],
-          catalogChapterIds: const [],
-          conflicts: const [],
-          revisionOrigin: SourceRevisionOrigin.sourceAppend,
-        ),
+      final remote = await remoteEdit('remote-choice', 'remote edit');
+      await File(book.filePath).writeAsString('local edit');
+      await service.enqueueLocalUpdate(book, bookUid: 'remote-choice');
+      expect((await service.reconcile()).conflicts, 1);
+      final conflict = (await service.listConflicts()).single;
+      await service.resolveConflict(
+        conflict.id,
+        BookContentConflictChoice.useRemote,
       );
-      await service.enqueueLocalUpdate(
-        book,
-        bookUid: 'serial-book',
-        origin: 'source_append',
+      expect(await File(book.filePath).readAsString(), 'remote edit');
+      expect(
+        await File(conflict.localSnapshotPath).readAsString(),
+        'local edit',
       );
-      final result = await service.reconcile();
-      expect(result.uploadedBytes, 0);
-      expect((await storage.stat(current.path))!.version, currentVersion);
-      final sourceFiles = (await storage.list(
-        SyncPath(
-          current.path.value.substring(0, current.path.value.lastIndexOf('/')),
-        ),
-      )).prefixes;
-      expect(sourceFiles.map((p) => p.value), contains(endsWith('/source')));
+      final tips = await (await repo('review')).tips('remote-choice');
+      expect(tips, hasLength(1));
+      expect(tips.single.parents, contains(remote.id));
+      expect((await service.reconcile()).conflicts, 0);
+      expect(await service.listConflicts(), isEmpty);
     },
   );
 
   test(
-    'a second device restores source baseline instead of clearing it',
+    'a new cloud branch invalidates an already displayed conflict choice',
+    () async {
+      final book = await _book(database, root, 'base');
+      await service.join(book, bookUid: 'stale-choice');
+      await service.reconcile();
+      await remoteEdit('stale-choice', 'first remote edit');
+      await File(book.filePath).writeAsString('local edit');
+      await service.enqueueLocalUpdate(book, bookUid: 'stale-choice');
+      expect((await service.reconcile()).conflicts, 1);
+      final conflict = (await service.listConflicts()).single;
+      await remoteEdit('stale-choice', 'concurrent third device');
+      await expectLater(
+        service.resolveConflict(
+          conflict.id,
+          BookContentConflictChoice.useRemote,
+        ),
+        throwsA(
+          isA<WebDavSyncFailure>().having(
+            (e) => e.code,
+            'code',
+            WebDavSyncErrorCode.conflict,
+          ),
+        ),
+      );
+      expect(await File(book.filePath).readAsString(), 'local edit');
+      expect(await service.listConflicts(), hasLength(1));
+      expect(await (await repo('review')).tips('stale-choice'), hasLength(2));
+    },
+  );
+
+  test(
+    'explicit export creates a readable immutable copy without another sync mode',
+    () async {
+      final book = await _book(database, root, '可读导出');
+      await service.join(book, bookUid: 'export');
+      await service.reconcile();
+      final remote = await service.exportBook('export');
+      expect(remote, startsWith('exports/'));
+      expect(remote, endsWith('.txt'));
+      expect(await _read(storage, SyncPath(remote)), utf8.encode('可读导出'));
+      final idle = await service.reconcile();
+      expect(idle.uploadedBytes, 0);
+      expect(idle.downloadedBytes, 0);
+    },
+  );
+
+  test(
+    'an edit during upload stays pending instead of being marked uploaded',
+    () async {
+      final book = await _book(database, root, 'first');
+      final fault = _RevisionFaultStorage(storage)..failNextRevision = false;
+      final active = BookContentSyncService(
+        storageProvider: () async => fault,
+        database: () async => database,
+        stateDirectory: () async => Directory('${root.path}/state'),
+      );
+      await active.join(book, bookUid: 'inflight');
+      fault.beforeRevision = () async {
+        await File(book.filePath).writeAsString('edited while uploading');
+        await active.enqueueLocalUpdate(book, bookUid: 'inflight');
+      };
+      final result = await active.reconcile();
+      expect(result.failed, 0);
+      expect(
+        (await active.listStates()).single.status,
+        BookContentSyncStatus.pending,
+      );
+      expect(
+        await File(book.filePath).readAsString(),
+        'edited while uploading',
+      );
+      expect((await active.reconcile()).uploaded, 1);
+      expect(
+        (await active.listStates()).single.status,
+        BookContentSyncStatus.synced,
+      );
+    },
+  );
+
+  test(
+    'recreating a cloud space cannot reuse cached upload completion',
+    () async {
+      final book = await _book(database, root, 'preserve local');
+      await service.join(book, bookUid: 'recreated');
+      await service.reconcile();
+      for (final object in await _allObjects(storage, SyncPath('books'))) {
+        await storage.delete(object.path, expectedVersion: object.version);
+      }
+      final marker = (await storage.stat(SyncPath('format.json')))!;
+      await storage.delete(marker.path, expectedVersion: marker.version);
+      final result = await service.reconcile();
+      expect(result.uploaded, 1);
+      expect(result.uploadedBytes, greaterThan(0));
+      expect(result.downloadedBytes, greaterThan(0));
+      expect(await File(book.filePath).readAsString(), 'preserve local');
+    },
+  );
+
+  test(
+    'metadata initialization preserves files already committed to the same space',
+    () async {
+      final book = await _book(database, root, 'committed first');
+      await service.join(book, bookUid: 'first-file');
+      await service.reconcile();
+      final binding = (await database.query('book_content_bindings')).single;
+      await SyncChangeStore(
+        database: () async => database,
+      ).resetRemoteMirrorForNewSpace(
+        preserveFileSpace: binding['space_key'] as String,
+      );
+      expect(
+        (await database.query('sync_book_files')).single['book_uid'],
+        'first-file',
+      );
+    },
+  );
+
+  test(
+    'manual retry bypasses durable file backoff while automatic attempts wait',
+    () async {
+      final book = await _book(database, root, 'retry');
+      final failing = _RevisionFaultStorage(storage);
+      final active = BookContentSyncService(
+        storageProvider: () async => failing,
+        database: () async => database,
+        stateDirectory: () async => Directory('${root.path}/state'),
+      );
+      await active.join(book, bookUid: 'retry');
+      expect((await active.reconcile()).failed, 1);
+      expect((await active.reconcile(respectBackoff: true)).uploaded, 0);
+      expect(
+        (await active.listStates()).single.status,
+        BookContentSyncStatus.failed,
+      );
+      expect((await active.reconcile()).uploaded, 1);
+    },
+  );
+
+  test(
+    'a second device restores source baseline and shared chapter identity',
     () async {
       final book = await _book(database, root, '连载正文');
       final contentHash = sha256.convert(utf8.encode('连载正文')).toString();
@@ -358,7 +434,7 @@ void main() {
         book,
         SourceChapterState(
           schemaVersion: 1,
-          bookUid: 'cross-device-serial',
+          bookUid: 'serial',
           sourceId: 'source',
           sourceBookId: 'novel',
           materializedContentHash: contentHash,
@@ -369,34 +445,30 @@ void main() {
           revisionOrigin: SourceRevisionOrigin.initialDownload,
         ),
       );
-      await service.join(book, bookUid: 'cross-device-serial');
-      await service.reconcile();
-
-      final secondRoot = await Directory.systemTemp.createTemp(
-        'second-device-',
-      );
+      await service.join(book, bookUid: 'serial');
+      expect((await service.reconcile()).failed, 0);
+      final secondRoot = await Directory('${root.path}/second').create();
       final secondDb = await databaseFactoryFfi.openDatabase(
         '${secondRoot.path}/second.sqlite',
       );
       try {
         await _createBookTables(secondDb);
         await WebDavSyncSchemaMigration.migrate(secondDb);
-        final second = await _book(secondDb, secondRoot, '连载正文');
-        final secondService = BookContentSyncService(
+        final secondBook = await _book(secondDb, secondRoot, '连载正文');
+        final second = BookContentSyncService(
           storageProvider: () async => storage,
           database: () async => secondDb,
           stateDirectory: () async => Directory('${secondRoot.path}/state'),
         );
-        await secondService.join(second, bookUid: 'cross-device-serial');
-        final result = await secondService.reconcile();
+        await second.join(secondBook, bookUid: 'serial');
+        final result = await second.reconcile();
+        expect(result.failed, 0);
         expect(result.downloaded, 1);
-        final restored = await const SourceChapterStateStore().load(second);
-        expect(restored?.bookUid, 'cross-device-serial');
+        final restored = await const SourceChapterStateStore().load(secondBook);
         expect(restored?.catalogChapterIds, ['chapter-1']);
         expect(restored?.materializedContentHash, contentHash);
       } finally {
         await secondDb.close();
-        await secondRoot.delete(recursive: true);
       }
     },
   );
@@ -413,7 +485,7 @@ Future<List<int>> _read(MemorySyncStorage storage, SyncPath path) async {
     } finally {
       await sink.close();
     }
-    return file.readAsBytes();
+    return await file.readAsBytes();
   } finally {
     await temp.delete(recursive: true);
   }
@@ -483,10 +555,11 @@ Future<void> _createBookTables(Database db) async {
   ''');
 }
 
-class _FailHeadStorage implements SyncStorage {
-  _FailHeadStorage(this.delegate);
+class _RevisionFaultStorage implements SyncStorage {
+  _RevisionFaultStorage(this.delegate);
   final MemorySyncStorage delegate;
-  bool failNextHead = true;
+  bool failNextRevision = true;
+  Future<void> Function()? beforeRevision;
 
   @override
   SyncStorageCapabilities get capabilities => delegate.capabilities;
@@ -515,15 +588,20 @@ class _FailHeadStorage implements SyncStorage {
     Stream<List<int>> bytes, {
     required int length,
     required String contentType,
-  }) {
-    if (failNextHead && path.value.endsWith('/book.json')) {
-      failNextHead = false;
+  }) async {
+    if (path.value.contains('/revisions/') && beforeRevision != null) {
+      final callback = beforeRevision!;
+      beforeRevision = null;
+      await callback();
+    }
+    if (failNextRevision && path.value.contains('/revisions/')) {
+      failNextRevision = false;
       throw const SyncStorageException(
         SyncStorageErrorCode.network,
         'Injected head failure',
       );
     }
-    return delegate.create(
+    return await delegate.create(
       path,
       bytes,
       length: length,

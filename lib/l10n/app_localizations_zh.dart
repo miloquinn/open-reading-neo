@@ -5031,7 +5031,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      '启用后会自动备份已有的本地书籍。云端 books/ 中按书名和作者保存可直接打开的原格式文件与封面；同名书通过身份后缀区分，正文更新保留历史版本。';
+      '同步所选书籍与封面。TXT 首次上传后仅传输变化的内容块，EPUB、PDF 保留原始字节。可直接打开的完整文件需单独导出。';
 
   @override
   String get webDavNewBookPolicyTitle => '新书文件处理';
@@ -6309,7 +6309,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cloudSyncReadableStorage =>
-      '书籍以原格式保存在 books/ 中，历史版本也可直接打开。未变化的文件不会重复上传；正文变化时会上传完整文件。';
+      'TXT 按内容块增量同步，未变化的书籍不传输正文。需要在其他软件打开时，可单独导出完整文件到云端。';
 
   @override
   String get bookSourceBindSource => '关联书源';
@@ -6337,6 +6337,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get premiumSyncPending => '会员状态待同步';
+
+  @override
+  String get cloudSyncExportBook => '导出完整文件到云端';
+
+  @override
+  String get cloudSyncExportDone => '完整文件已导出';
+
+  @override
+  String get cloudSyncDiagnostics => '复制同步诊断';
+
+  @override
+  String get cloudSyncProtocolUpgrade =>
+      '此目录使用旧版同步格式，请选择一个新的空目录。本地书籍和原有云端文件都会保留。';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -11326,7 +11339,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get webDavFilesUploadPermissionHint =>
-      '啟用後會自動備份已有的本機書籍。雲端 books/ 中依書名和作者保存可直接開啟的原格式檔案與封面；同名書以識別後綴區分，正文更新保留歷史版本。';
+      '同步所選書籍與封面。TXT 首次上傳後僅傳輸變更的內容區塊，EPUB、PDF 保留原始位元組。可直接開啟的完整檔案需另外匯出。';
 
   @override
   String get webDavNewBookPolicyTitle => '新書檔案處理';
@@ -12525,7 +12538,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get cloudSyncReadableStorage =>
-      '書籍以原格式儲存在 books/ 中，歷史版本也可直接開啟。未變化的檔案不會重複上傳；正文變化時會上傳完整檔案。';
+      'TXT 依內容區塊增量同步，未變更的書籍不傳輸正文。需要在其他軟體開啟時，可另外匯出完整檔案至雲端。';
 
   @override
   String get bookSourceBindSource => '關聯書源';
@@ -12553,4 +12566,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get premiumSyncPending => '會員狀態待同步';
+
+  @override
+  String get cloudSyncExportBook => '匯出完整檔案至雲端';
+
+  @override
+  String get cloudSyncExportDone => '完整檔案已匯出';
+
+  @override
+  String get cloudSyncDiagnostics => '複製同步診斷';
+
+  @override
+  String get cloudSyncProtocolUpgrade =>
+      '此目錄使用舊版同步格式，請選擇新的空目錄。本機書籍與原有雲端檔案都會保留。';
 }

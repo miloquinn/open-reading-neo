@@ -105,7 +105,7 @@ class SyncChangeStore {
   /// Local books, explicit progress events and frozen identities survive. All
   /// remote cursors, materialization markers, conflict candidates and legacy
   /// remote file paths are removed so they cannot leak into another account.
-  Future<void> resetRemoteMirrorForNewSpace() async {
+  Future<void> resetRemoteMirrorForNewSpace({String? preserveFileSpace}) async {
     final db = await _db;
     await db.transaction((txn) async {
       final bindings = await txn.query(
@@ -123,7 +123,21 @@ class SyncChangeStore {
       }
       await txn.delete('sync_records');
       await txn.delete('sync_device_cursors');
-      await txn.delete('sync_book_files');
+      final contentTables = await txn.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'book_content_bindings'",
+      );
+      if (preserveFileSpace != null && contentTables.isNotEmpty) {
+        await txn.delete(
+          'sync_book_files',
+          where: '''book_uid NOT IN (
+          SELECT book_uid FROM book_content_bindings
+          WHERE space_key = ? AND remote_version IS NOT NULL AND current_path LIKE '%/revisions/%'
+        )''',
+          whereArgs: [preserveFileSpace],
+        );
+      } else {
+        await txn.delete('sync_book_files');
+      }
       await txn.delete(
         'sync_local_state',
         where:
@@ -139,6 +153,49 @@ class SyncChangeStore {
     });
   }
 
+  Future<void> rememberPublished(String namespace, SyncBatch batch) async {
+    final db = await _db;
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_published_records(
+        namespace TEXT NOT NULL, dataset TEXT NOT NULL, record_id TEXT NOT NULL,
+        operation_json TEXT NOT NULL, PRIMARY KEY(namespace, dataset, record_id)
+      )
+    ''');
+    await db.transaction((txn) async {
+      for (final operation in batch.operations) {
+        await txn.insert('sync_published_records', {
+          'namespace': namespace,
+          'dataset': operation.dataset,
+          'record_id': operation.recordId,
+          'operation_json': jsonEncode(operation.toJson()),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
+  }
+
+  Stream<SyncOperation> publishedOperations(String namespace) async* {
+    final db = await _db;
+    var offset = 0;
+    while (true) {
+      final rows = await db.query(
+        'sync_published_records',
+        columns: ['operation_json'],
+        where: 'namespace = ?',
+        whereArgs: [namespace],
+        orderBy: 'dataset, record_id',
+        limit: 500,
+        offset: offset,
+      );
+      if (rows.isEmpty) return;
+      for (final row in rows) {
+        yield SyncOperation.fromJson(
+          (jsonDecode(row['operation_json'] as String) as Map).cast(),
+        );
+      }
+      offset += rows.length;
+    }
+  }
+
   Future<int> cursorFor(String deviceId, {String? namespace}) async {
     final db = await _db;
     final remoteDeviceId = _remoteCursorId(deviceId, namespace);
@@ -150,6 +207,29 @@ class SyncChangeStore {
       limit: 1,
     );
     return rows.isEmpty ? 0 : rows.first['applied_sequence'] as int;
+  }
+
+  Future<void> advanceCursor(
+    String deviceId,
+    int sequence, {
+    required String namespace,
+  }) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      final id = _remoteCursorId(deviceId, namespace);
+      final rows = await txn.query(
+        'sync_device_cursors',
+        where: 'remote_device_id = ?',
+        whereArgs: [id],
+      );
+      final current = rows.isEmpty ? 0 : rows.single['applied_sequence'] as int;
+      if (current >= sequence) return;
+      await txn.insert('sync_device_cursors', {
+        'remote_device_id': id,
+        'applied_sequence': sequence,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
   }
 
   Future<List<SyncRecord>> recordsForDataset(String dataset) async {

@@ -21,6 +21,7 @@ class AutomaticSyncScheduler {
   bool _running = false;
   bool _dirtyDuringRun = false;
   int _failures = 0;
+  bool _backingOff = false;
 
   void start() {
     if (_disposed || _poll != null || !_foreground) return;
@@ -43,6 +44,7 @@ class AutomaticSyncScheduler {
 
   void request({bool immediate = false}) {
     if (_disposed || !enabled()) return;
+    if (_backingOff) return;
     if (_running) {
       _dirtyDuringRun = true;
       return;
@@ -74,7 +76,9 @@ class AutomaticSyncScheduler {
       if (!_disposed && enabled() && _foreground) {
         if (failed) {
           _queued?.cancel();
+          _backingOff = true;
           _queued = Timer(Duration(seconds: 5 * (1 << _failures)), () {
+            _backingOff = false;
             _queued = null;
             unawaited(_attempt());
           });
@@ -90,6 +94,7 @@ class AutomaticSyncScheduler {
     _queued?.cancel();
     _queued = null;
     _dirtyDuringRun = false;
+    _backingOff = false;
   }
 
   void dispose() {

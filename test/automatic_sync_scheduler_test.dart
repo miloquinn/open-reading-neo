@@ -67,6 +67,27 @@ void main() {
     expect(runs, 2);
   });
 
+  testWidgets('periodic polling cannot bypass retry backoff', (tester) async {
+    var runs = 0;
+    final scheduler = AutomaticSyncScheduler(
+      run: () async {
+        runs++;
+        throw StateError('offline');
+      },
+      enabled: () => true,
+      pollInterval: const Duration(seconds: 1),
+    );
+    addTearDown(scheduler.dispose);
+    scheduler.start();
+    scheduler.request(immediate: true);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 9));
+    expect(runs, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(runs, 2);
+    scheduler.dispose();
+  });
+
   testWidgets('leaving foreground flushes once and stops polling', (
     tester,
   ) async {

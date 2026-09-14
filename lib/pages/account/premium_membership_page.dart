@@ -46,19 +46,8 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        widget.account.isAuthenticated &&
-        !widget.account.loading &&
-        !widget.account.applePurchase.loading) {
-      unawaited(_refreshMembership());
-    }
-  }
-
-  Future<void> _refreshMembership() async {
-    try {
-      await widget.account.loadMembership();
-    } catch (error) {
-      _showFailure(error);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(widget.account.synchronize());
     }
   }
 
@@ -155,6 +144,24 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _membershipCard(premium),
+                    if (premium) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _membershipSourceMessage(context, account),
+                        key: const ValueKey('premium-membership-source'),
+                      ),
+                    ],
+                    if (account.membershipSyncFailed ||
+                        (account.isAuthenticated &&
+                            account.membership == null)) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        account.membershipSyncFailed
+                            ? l10n.premiumSyncFailed
+                            : l10n.premiumSyncPending,
+                        key: const ValueKey('premium-sync-failed'),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     _section(l10n.premiumBenefitsTitle, [
                       _benefit(
@@ -388,6 +395,22 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
       ),
     ),
   );
+
+  String _membershipSourceMessage(
+    BuildContext context,
+    MemberAccountController account,
+  ) {
+    final l10n = context.l10n;
+    final sources = account.membership?.activePremiumSources ?? <String>{};
+    if (sources.any(
+      {'admin', 'manual', 'promotion', 'referral_card'}.contains,
+    )) {
+      return l10n.premiumGrantedAccess;
+    }
+    if (sources.contains('card')) return l10n.premiumOtherChannelAccess;
+    if (sources.contains('apple')) return l10n.premiumAppleAccess;
+    return l10n.premiumExistingAccess;
+  }
 
   Widget _membershipCard(bool premium) {
     final l10n = context.l10n;

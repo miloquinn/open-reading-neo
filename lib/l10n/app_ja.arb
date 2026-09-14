@@ -3114,5 +3114,12 @@
   },
   "bookSourceBindSource": "配信元を関連付ける",
   "bookSourceNotBound": "配信元未設定",
-  "bookSourceDownloadedUnchanged": "ダウンロード済みの章に変更はありません。"
+  "bookSourceDownloadedUnchanged": "ダウンロード済みの章に変更はありません。",
+  "premiumSyncFailed": "会員情報を同期できませんでした。自動的に再試行します。接続エラーで確認済みの権限が取り消されることはありません。",
+  "premiumGrantedAccess": "プレミアム会員特典が付与されています。追加購入は不要です。",
+  "premiumOtherChannelAccess": "別の経路でプレミアムが有効です。追加購入は不要です。",
+  "premiumAppleAccess": "App Store でプレミアムが有効です。追加購入は不要です。",
+  "premiumExistingAccess": "プレミアムが有効です。追加購入は不要です。",
+  "premiumSyncPending": "会員情報の同期待ち"
+
 }

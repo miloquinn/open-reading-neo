@@ -6426,5 +6426,30 @@
   },
   "bookSourceBindSource": "Link a book source",
   "bookSourceNotBound": "No source linked",
-  "bookSourceDownloadedUnchanged": "Downloaded chapters are up to date."
+  "bookSourceDownloadedUnchanged": "Downloaded chapters are up to date.",
+  "premiumSyncFailed": "Membership status could not be synced. It will retry automatically; a connection failure does not revoke verified access.",
+  "premiumGrantedAccess": "You have complimentary Premium access. No additional purchase is needed.",
+  "premiumOtherChannelAccess": "You have Premium through another channel. No additional purchase is needed.",
+  "premiumAppleAccess": "You have Premium through App Store. No additional purchase is needed.",
+  "premiumExistingAccess": "You already have Premium. No additional purchase is needed.",
+  "@premiumSyncFailed": {
+    "description": "Membership synchronization or existing entitlement channel notice."
+  },
+  "@premiumGrantedAccess": {
+    "description": "Membership synchronization or existing entitlement channel notice."
+  },
+  "@premiumOtherChannelAccess": {
+    "description": "Membership synchronization or existing entitlement channel notice."
+  },
+  "@premiumAppleAccess": {
+    "description": "Membership synchronization or existing entitlement channel notice."
+  },
+  "@premiumExistingAccess": {
+    "description": "Membership synchronization or existing entitlement channel notice."
+  },
+  "premiumSyncPending": "Syncing membership status",
+  "@premiumSyncPending": {
+    "description": "Membership has not yet been verified for this session."
+  }
+
 }

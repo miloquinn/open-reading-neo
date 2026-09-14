@@ -6423,4 +6423,23 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get bookSourceDownloadedUnchanged => 'ダウンロード済みの章に変更はありません。';
+
+  @override
+  String get premiumSyncFailed =>
+      '会員情報を同期できませんでした。自動的に再試行します。接続エラーで確認済みの権限が取り消されることはありません。';
+
+  @override
+  String get premiumGrantedAccess => 'プレミアム会員特典が付与されています。追加購入は不要です。';
+
+  @override
+  String get premiumOtherChannelAccess => '別の経路でプレミアムが有効です。追加購入は不要です。';
+
+  @override
+  String get premiumAppleAccess => 'App Store でプレミアムが有効です。追加購入は不要です。';
+
+  @override
+  String get premiumExistingAccess => 'プレミアムが有効です。追加購入は不要です。';
+
+  @override
+  String get premiumSyncPending => '会員情報の同期待ち';
 }

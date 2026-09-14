@@ -24,6 +24,7 @@ class MemberAccountController extends ChangeNotifier {
     PendingDeviceAuthorizationStore? pendingAuthorizationStore,
     AccountAuthCallbackBridge? authCallbackBridge,
     ApplePurchaseStore? appleStore,
+    this.membershipRetryDelay = const Duration(seconds: 30),
   }) : _api = api ?? MemberAccountApiClient(),
        _avatarCache = avatarCache ?? AccountAvatarCache.instance,
        _summaryCache = summaryCache ?? const MemberAccountSummaryCache(),
@@ -46,6 +47,8 @@ class MemberAccountController extends ChangeNotifier {
         if (_user?.id != accountId) {
           throw const MemberAccountException('账号已切换，请重新验证购买');
         }
+        _checkMembershipOwner(membership, accountId);
+        _resetMembershipSync();
         _membership = membership;
         _updateSummaryFromAccount();
         unawaited(_persistSummary());
@@ -63,6 +66,78 @@ class MemberAccountController extends ChangeNotifier {
   final PendingDeviceAuthorizationStore _pendingAuthorizationStore;
   final AccountAuthCallbackBridge _authCallbackBridge;
   late final ApplePremiumPurchaseService _applePurchase;
+
+  final Duration membershipRetryDelay;
+  Timer? _membershipRetry;
+  bool _membershipSyncFailed = false;
+  int _membershipRequest = 0;
+  bool _disposed = false;
+  Future<void>? _synchronizing;
+  bool get membershipSyncFailed => _membershipSyncFailed;
+
+  bool _isRetryableMembershipError(Object error) =>
+      error is MemberAccountException &&
+      (error.isTransientNetworkFailure ||
+          error.statusCode == 429 ||
+          (error.statusCode != null && error.statusCode! >= 500));
+
+  void _resetMembershipSync() {
+    _membershipRequest++;
+    _membershipRetry?.cancel();
+    _membershipSyncFailed = false;
+  }
+
+  void _scheduleMembershipRetry(String? accountId) {
+    _membershipRetry?.cancel();
+    _membershipRetry = Timer(membershipRetryDelay, () async {
+      if (_disposed || _user?.id != accountId) return;
+      if (_loading) {
+        _scheduleMembershipRetry(accountId);
+        return;
+      }
+      try {
+        await synchronize();
+      } catch (_) {
+        // The refresh records failure and schedules another transient retry.
+      }
+    });
+  }
+
+  /// Reconcile the account without opening StoreKit or requiring a page visit.
+  /// Callers may share this operation; temporary failures schedule recovery.
+  Future<void> synchronize() {
+    final active = _synchronizing;
+    if (active != null) return active;
+    if (_disposed) return Future<void>.value();
+    if (_loading || _applePurchase.busy) {
+      _scheduleMembershipRetry(_user?.id);
+      return Future<void>.value();
+    }
+    late final Future<void> operation;
+    operation =
+        (() async {
+          try {
+            if (_user == null) {
+              await initialize(force: true);
+            } else {
+              await loadMembership();
+            }
+          } catch (_) {
+            // Public explicit actions still throw; background lifecycle sync reports
+            // state through this controller and must not become an unhandled error.
+          }
+        })().whenComplete(() {
+          if (identical(_synchronizing, operation)) _synchronizing = null;
+        });
+    _synchronizing = operation;
+    return operation;
+  }
+
+  void _checkMembershipOwner(MemberMembership membership, String accountId) {
+    if (membership.userId != null && membership.userId != accountId) {
+      throw const MemberAccountException('会员权益账号不匹配，请重新登录');
+    }
+  }
 
   bool _initialized = false;
   bool _loading = false;
@@ -128,7 +203,7 @@ class MemberAccountController extends ChangeNotifier {
           _authConfig = configs[0] as MemberAuthConfig;
           _membershipConfig = configs[1] as MemberMembershipConfig;
         } on MemberAccountException catch (error) {
-          if (!error.isTransientNetworkFailure) rethrow;
+          if (!_isRetryableMembershipError(error)) rethrow;
           deferred = error;
         }
         try {
@@ -144,10 +219,11 @@ class MemberAccountController extends ChangeNotifier {
           if (error.statusCode == 401) {
             _user = null;
             _pendingSession = null;
+            _resetMembershipSync();
             _membership = null;
             _mfaStatus = null;
             await _clearSummary();
-          } else if (error.isTransientNetworkFailure) {
+          } else if (_isRetryableMembershipError(error)) {
             deferred ??= error;
           } else {
             rethrow;
@@ -156,10 +232,15 @@ class MemberAccountController extends ChangeNotifier {
         if (deferred != null) throw deferred;
       });
     } catch (error) {
+      if (_isRetryableMembershipError(error)) {
+        _membershipSyncFailed = true;
+        _scheduleMembershipRetry(_user?.id);
+      }
       if (error is! MemberAccountException ||
-          !error.isTransientNetworkFailure) {
+          !_isRetryableMembershipError(error)) {
         _user = null;
         _pendingSession = null;
+        _resetMembershipSync();
         _membership = null;
         _mfaStatus = null;
       }
@@ -543,14 +624,31 @@ class MemberAccountController extends ChangeNotifier {
     await _persistSummary();
   });
 
-  Future<void> purchaseApplePremium() => _applePurchase.purchase();
+  Future<void> purchaseApplePremium() async {
+    if (_user == null) throw const MemberAccountException('请先登录账号');
+    // Check authoritative access immediately before opening the payment sheet.
+    final accountId = _user!.id;
+    await loadMembership();
+    if (_user?.id != accountId || _membership == null) {
+      throw const MemberAccountException('账号已切换，请重新验证会员权益');
+    }
+    if (hasPremiumAccess || _membership!.purchaseAllowed == false) return;
+    await _applePurchase.purchase();
+  }
 
   Future<void> restoreApplePremium() => _applePurchase.restore();
 
   Future<void> loadReferral() => _run(_loadReferralValue);
 
   Future<void> redeemMembership(String code) => _run(() async {
-    _membership = await _api.redeemMembership(code);
+    final accountId = _user?.id;
+    final membership = await _api.redeemMembership(code);
+    if (accountId == null || _user?.id != accountId) {
+      throw const MemberAccountException('账号已切换，请重新验证会员权益');
+    }
+    _checkMembershipOwner(membership, accountId);
+    _resetMembershipSync();
+    _membership = membership;
     _updateSummaryFromAccount();
     await _persistSummary();
     await _loadReferralValue();
@@ -579,6 +677,7 @@ class MemberAccountController extends ChangeNotifier {
       confirmation: confirmation,
       mfaCode: mfaCode,
     );
+    _resetMembershipSync();
     _user = null;
     _pendingSession = null;
     _membership = null;
@@ -600,6 +699,7 @@ class MemberAccountController extends ChangeNotifier {
     } finally {
       _user = null;
       _pendingSession = null;
+      _resetMembershipSync();
       _membership = null;
       _referral = null;
       _mfaStatus = null;
@@ -610,6 +710,8 @@ class MemberAccountController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _resetMembershipSync();
     _applePurchase.dispose();
     super.dispose();
   }
@@ -630,6 +732,7 @@ class MemberAccountController extends ChangeNotifier {
     if (session.mfaRequired) {
       _pendingSession = session;
       _user = null;
+      _resetMembershipSync();
       _membership = null;
       _summary = null;
       _referral = null;
@@ -643,6 +746,7 @@ class MemberAccountController extends ChangeNotifier {
   void _acceptAuthenticatedSession(MemberSession session) {
     final accountChanged = _user?.id != session.user.id;
     if (accountChanged) {
+      _resetMembershipSync();
       _membership = null;
       _summary = null;
     }
@@ -700,11 +804,33 @@ class MemberAccountController extends ChangeNotifier {
   }
 
   Future<void> _loadMembershipValue() async {
+    final accountId = _user?.id;
+    if (accountId == null) return;
+    final request = ++_membershipRequest;
+    _membershipRetry?.cancel();
     try {
-      _membership = await _api.membership();
+      final membership = await _api.membership();
+      if (_disposed ||
+          _user?.id != accountId ||
+          request != _membershipRequest) {
+        return;
+      }
+      _checkMembershipOwner(membership, accountId);
+      _membership = membership;
+      _membershipSyncFailed = false;
     } catch (error) {
-      // A failed refresh must not preserve the previous account's grant.
-      _membership = null;
+      if (_disposed ||
+          _user?.id != accountId ||
+          request != _membershipRequest) {
+        rethrow;
+      }
+      _membershipSyncFailed = true;
+      if (_isRetryableMembershipError(error)) {
+        // Keep only this session's server-verified grant; never trust UI cache.
+        _scheduleMembershipRetry(accountId);
+      } else {
+        _membership = null;
+      }
       _updateSummaryFromAccount();
       notifyListeners();
       rethrow;
@@ -759,7 +885,7 @@ class MemberAccountController extends ChangeNotifier {
       throw error;
     } finally {
       _loading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 

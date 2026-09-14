@@ -39,6 +39,37 @@ void main() {
     await icons.load();
   });
 
+  for (final source in ['admin', 'card', 'apple']) {
+    testWidgets('existing $source member sees channel and retains restore', (
+      tester,
+    ) async {
+      _usePlatform(TargetPlatform.iOS);
+      final store = _FakeAppleStore();
+      final account = _TestAccount(store: store, premium: true, source: source);
+      addTearDown(account.dispose);
+      addTearDown(store.close);
+      await _pumpPage(tester, account: account);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(switch (source) {
+          'admin' => '你已获赠高级会员，无需重复购买。',
+          'card' => '你已通过其他渠道开通高级会员，无需重复购买。',
+          _ => '你已通过 App Store 开通高级会员，无需重复购买。',
+        }),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('account-apple-purchase')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('account-apple-restore')),
+        findsOneWidget,
+      );
+      _resetPlatform();
+    });
+  }
+
   testWidgets(
     'shows localized App Store price and the real premium benefits on iOS',
     (tester) async {
@@ -358,39 +389,37 @@ void main() {
   );
 
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
-    testWidgets(
-      'exports active phone membership in ${mode.name}',
-      (tester) async {
-        _usePlatform(TargetPlatform.iOS);
-        addTearDown(_resetPlatform);
-        tester.view.physicalSize = const Size(390, 844);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final store = _FakeAppleStore();
-        final account = _TestAccount(store: store, premium: true);
-        addTearDown(account.dispose);
-        addTearDown(store.close);
-        final previewKey = GlobalKey();
-        await _pumpPage(
-          tester,
-          account: account,
-          previewKey: previewKey,
-          previewFont: true,
-          themeMode: mode,
-        );
-        await tester.pumpAndSettle();
-        await _loadBrandIcon(tester);
-        expect(tester.takeException(), isNull);
-        await _capture(
-          tester,
-          previewKey,
-          '$screenshotDirectory/premium-active-phone-${mode.name}.png',
-        );
-        _resetPlatform();
-      },
-      skip: screenshotDirectory == null,
-    );
+    testWidgets('exports active phone membership in ${mode.name}', (
+      tester,
+    ) async {
+      _usePlatform(TargetPlatform.iOS);
+      addTearDown(_resetPlatform);
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = _FakeAppleStore();
+      final account = _TestAccount(store: store, premium: true);
+      addTearDown(account.dispose);
+      addTearDown(store.close);
+      final previewKey = GlobalKey();
+      await _pumpPage(
+        tester,
+        account: account,
+        previewKey: previewKey,
+        previewFont: true,
+        themeMode: mode,
+      );
+      await tester.pumpAndSettle();
+      await _loadBrandIcon(tester);
+      expect(tester.takeException(), isNull);
+      await _capture(
+        tester,
+        previewKey,
+        '$screenshotDirectory/premium-active-phone-${mode.name}.png',
+      );
+      _resetPlatform();
+    }, skip: screenshotDirectory == null);
   }
 
   testWidgets(
@@ -516,10 +545,29 @@ Future<void> _capture(WidgetTester tester, GlobalKey key, String path) async {
 }
 
 class _TestAccount extends MemberAccountController {
-  _TestAccount({required ApplePurchaseStore store, this.premium = false})
-    : super(appleStore: store);
+  _TestAccount({
+    required ApplePurchaseStore store,
+    this.premium = false,
+    this.source,
+  }) : super(appleStore: store);
 
   final bool premium;
+  final String? source;
+
+  @override
+  MemberMembership get membership => MemberMembership(
+    premium: premium,
+    features: const {},
+    entitlements: [
+      if (source != null)
+        MemberEntitlement(
+          featureKey: 'premium',
+          source: source!,
+          status: 'active',
+          grantedAt: _createdAt,
+        ),
+    ],
+  );
 
   @override
   bool get isAuthenticated => true;

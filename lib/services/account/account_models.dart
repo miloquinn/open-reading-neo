@@ -411,11 +411,15 @@ class MemberMembership {
     this.redeemed,
     this.testPurchase = false,
     this.purchaseStatus = 'active',
+    this.userId,
+    this.purchaseAllowed,
   });
 
   factory MemberMembership.fromJson(Map<String, dynamic> json) =>
       MemberMembership(
         premium: json['premium'] as bool? ?? false,
+        userId: json['user_id'] as String?,
+        purchaseAllowed: json['purchase_allowed'] as bool?,
         testPurchase: json['test_purchase'] as bool? ?? false,
         purchaseStatus: _applePurchaseStatus(json['purchase_status']),
         features: Map<String, bool>.unmodifiable(
@@ -431,6 +435,19 @@ class MemberMembership {
         redeemed: json['redeemed'] as bool?,
       );
 
+  Set<String> get activePremiumSources => entitlements
+      .where(
+        (entry) =>
+            entry.featureKey == 'premium' &&
+            entry.status == 'active' &&
+            (entry.expiresAt == null ||
+                entry.expiresAt!.isAfter(DateTime.now())),
+      )
+      .map((entry) => entry.source)
+      .toSet();
+
+  final String? userId;
+  final bool? purchaseAllowed;
   final bool premium;
   final bool testPurchase;
   final String purchaseStatus;

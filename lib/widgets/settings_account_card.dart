@@ -14,13 +14,13 @@ class SettingsAccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final account = context.watch<MemberAccountController>();
     final summary = account.summary;
-    final premium = summary?.premium == true;
+    final premium = account.hasPremiumAccess;
     final scheme = Theme.of(context).colorScheme;
     final title =
         summary?.effectiveName ?? context.l10n.settingsAccountGuestTitle;
     final subtitle = summary == null
         ? context.l10n.settingsAccountGuestSubtitle
-        : '@${summary.username} · ${context.l10n.settingsAccountVerified}';
+        : '@${summary.username} · ${account.membership == null || account.membershipSyncFailed ? context.l10n.premiumSyncPending : context.l10n.settingsAccountVerified}';
 
     return Semantics(
       button: true,

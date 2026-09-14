@@ -3114,5 +3114,12 @@
   },
   "bookSourceBindSource": "關聯書源",
   "bookSourceNotBound": "未關聯書源",
-  "bookSourceDownloadedUnchanged": "已檢查下載章節，正文沒有變化。"
+  "bookSourceDownloadedUnchanged": "已檢查下載章節，正文沒有變化。",
+  "premiumSyncFailed": "會員權益同步失敗，將自動重試；連線失敗不會撤銷已驗證的權益。",
+  "premiumGrantedAccess": "你已獲贈進階會員，無需重複購買。",
+  "premiumOtherChannelAccess": "你已透過其他管道開通進階會員，無需重複購買。",
+  "premiumAppleAccess": "你已透過 App Store 開通進階會員，無需重複購買。",
+  "premiumExistingAccess": "你已開通進階會員，無需重複購買。",
+  "premiumSyncPending": "會員狀態待同步"
+
 }

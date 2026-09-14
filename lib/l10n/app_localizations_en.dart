@@ -6689,4 +6689,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bookSourceDownloadedUnchanged =>
       'Downloaded chapters are up to date.';
+
+  @override
+  String get premiumSyncFailed =>
+      'Membership status could not be synced. It will retry automatically; a connection failure does not revoke verified access.';
+
+  @override
+  String get premiumGrantedAccess =>
+      'You have complimentary Premium access. No additional purchase is needed.';
+
+  @override
+  String get premiumOtherChannelAccess =>
+      'You have Premium through another channel. No additional purchase is needed.';
+
+  @override
+  String get premiumAppleAccess =>
+      'You have Premium through App Store. No additional purchase is needed.';
+
+  @override
+  String get premiumExistingAccess =>
+      'You already have Premium. No additional purchase is needed.';
+
+  @override
+  String get premiumSyncPending => 'Syncing membership status';
 }

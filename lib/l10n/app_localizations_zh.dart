@@ -6319,6 +6319,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookSourceDownloadedUnchanged => '已检查下载章节，正文没有变化。';
+
+  @override
+  String get premiumSyncFailed => '会员权益同步失败，将自动重试；连接失败不会撤销已验证的权益。';
+
+  @override
+  String get premiumGrantedAccess => '你已获赠高级会员，无需重复购买。';
+
+  @override
+  String get premiumOtherChannelAccess => '你已通过其他渠道开通高级会员，无需重复购买。';
+
+  @override
+  String get premiumAppleAccess => '你已通过 App Store 开通高级会员，无需重复购买。';
+
+  @override
+  String get premiumExistingAccess => '你已开通高级会员，无需重复购买。';
+
+  @override
+  String get premiumSyncPending => '会员状态待同步';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12517,4 +12535,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get bookSourceDownloadedUnchanged => '已檢查下載章節，正文沒有變化。';
+
+  @override
+  String get premiumSyncFailed => '會員權益同步失敗，將自動重試；連線失敗不會撤銷已驗證的權益。';
+
+  @override
+  String get premiumGrantedAccess => '你已獲贈進階會員，無需重複購買。';
+
+  @override
+  String get premiumOtherChannelAccess => '你已透過其他管道開通進階會員，無需重複購買。';
+
+  @override
+  String get premiumAppleAccess => '你已透過 App Store 開通進階會員，無需重複購買。';
+
+  @override
+  String get premiumExistingAccess => '你已開通進階會員，無需重複購買。';
+
+  @override
+  String get premiumSyncPending => '會員狀態待同步';
 }

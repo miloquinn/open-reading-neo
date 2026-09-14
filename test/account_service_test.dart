@@ -616,6 +616,262 @@ void main() {
     expect(controller.hasPremiumAccess, isFalse);
   });
 
+  test(
+    'transient refresh preserves access and retries without StoreKit',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      var offline = false;
+      var premium = true;
+      final recovered = Completer<void>();
+      final controller = MemberAccountController(
+        membershipRetryDelay: const Duration(milliseconds: 20),
+        api: _client(
+          _RouteAdapter((options) {
+            if (options.uri.path == '/api/v1/auth/password/login') {
+              return _json(_session(access: 'access', refresh: 'refresh'));
+            }
+            if (options.uri.path == '/api/v1/membership') {
+              if (offline) throw const SocketException('offline');
+              if (!premium && !recovered.isCompleted) recovered.complete();
+              return _json({
+                'premium': premium,
+                'features': {},
+                'entitlements': [],
+              });
+            }
+            return _json({
+              'invite_code': 'TEST',
+              'invite_url': 'https://example.test/invite',
+            });
+          }),
+          _MemoryTokenStore(),
+        ),
+      );
+      addTearDown(controller.dispose);
+      await controller.loginPassword('reader@example.com', 'secret');
+      offline = true;
+      await expectLater(
+        controller.loadMembership(),
+        throwsA(isA<MemberAccountException>()),
+      );
+      expect(controller.hasPremiumAccess, isTrue);
+      expect(controller.membershipSyncFailed, isTrue);
+      offline = false;
+      premium = false;
+      await recovered.future.timeout(const Duration(seconds: 2));
+      // Let the response finish updating the controller.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(controller.hasPremiumAccess, isFalse);
+      expect(controller.membershipSyncFailed, isFalse);
+    },
+  );
+
+  test('existing member cannot start a duplicate Apple purchase', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = _AccountAppleStore();
+    final controller = MemberAccountController(
+      appleStore: store,
+      api: _client(
+        _RouteAdapter(
+          (options) => switch (options.uri.path) {
+            '/api/v1/auth/password/login' => _json(
+              _session(
+                access: 'access',
+                refresh: 'refresh',
+                userId: _memberAccountId,
+              ),
+            ),
+            '/api/v1/membership' => _json({
+              'premium': true,
+              'features': {},
+              'entitlements': [],
+            }),
+            _ => _json({
+              'invite_code': 'TEST',
+              'invite_url': 'https://example.test/invite',
+            }),
+          },
+        ),
+        _MemoryTokenStore(),
+      ),
+    );
+    addTearDown(controller.dispose);
+    addTearDown(store.close);
+    await controller.loginPassword('reader@example.com', 'secret');
+    await controller.purchaseApplePremium();
+    expect(store.purchaseParam, isNull);
+    expect(controller.hasPremiumAccess, isTrue);
+  });
+
+  test(
+    'cold start recovers membership without restore or opening account page',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      var online = false;
+      final recovered = Completer<void>();
+      final controller = MemberAccountController(
+        membershipRetryDelay: const Duration(milliseconds: 20),
+        api: _client(
+          _RouteAdapter((options) {
+            if (!online) throw const SocketException('offline');
+            return switch (options.uri.path) {
+              '/api/v1/auth/config' => _json({'providers': {}}),
+              '/api/v1/membership/config' => _json({
+                'product': 'premium_lifetime',
+                'features': [],
+              }),
+              '/api/v1/auth/me' => _json({'user': _user()}),
+              '/api/v1/membership' => _json({
+                'premium': true,
+                'features': {},
+                'entitlements': [],
+              }),
+              '/api/v1/membership/referral' => _json({
+                'invite_code': 'TEST',
+                'invite_url': 'https://example.test/invite',
+              }),
+              _ => throw StateError('Unexpected route'),
+            };
+          }),
+          _MemoryTokenStore(accessToken: 'access', refreshToken: 'refresh'),
+        ),
+      );
+      addTearDown(controller.dispose);
+      controller.addListener(() {
+        if (controller.hasPremiumAccess && !recovered.isCompleted) {
+          recovered.complete();
+        }
+      });
+      await controller.synchronize();
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.membershipSyncFailed, isTrue);
+      online = true;
+      await recovered.future.timeout(const Duration(seconds: 2));
+      await pumpEventQueue();
+      expect(controller.hasPremiumAccess, isTrue);
+      expect(controller.membershipSyncFailed, isFalse);
+    },
+  );
+
+  test(
+    'foreground synchronization shares one request and observes revocation',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      var premium = true;
+      var reads = 0;
+      final controller = MemberAccountController(
+        api: _client(
+          _RouteAdapter((options) {
+            if (options.uri.path == '/api/v1/auth/password/login') {
+              return _json(_session(access: 'a', refresh: 'r'));
+            }
+            if (options.uri.path == '/api/v1/membership') {
+              reads++;
+              return _json({
+                'premium': premium,
+                'features': {},
+                'entitlements': [],
+              });
+            }
+            return _json({
+              'invite_code': 'TEST',
+              'invite_url': 'https://example.test/invite',
+            });
+          }),
+          _MemoryTokenStore(),
+        ),
+      );
+      addTearDown(controller.dispose);
+      await controller.loginPassword('reader@example.com', 'secret');
+      premium = false;
+      await Future.wait([controller.synchronize(), controller.synchronize()]);
+      expect(reads, 2);
+      expect(controller.hasPremiumAccess, isFalse);
+    },
+  );
+
+  for (final failure in [503, 429, 403]) {
+    test(
+      'refresh status $failure distinguishes unavailable from denied',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        var failed = false;
+        var reads = 0;
+        final controller = MemberAccountController(
+          membershipRetryDelay: const Duration(milliseconds: 20),
+          api: _client(
+            _RouteAdapter((options) {
+              if (options.uri.path == '/api/v1/auth/password/login') {
+                return _json(_session(access: 'a', refresh: 'r'));
+              }
+              if (options.uri.path == '/api/v1/membership') {
+                reads++;
+                return failed
+                    ? _json({'detail': 'failed'}, status: failure)
+                    : _json({
+                        'premium': true,
+                        'features': {},
+                        'entitlements': [],
+                      });
+              }
+              return _json({
+                'invite_code': 'TEST',
+                'invite_url': 'https://example.test/invite',
+              });
+            }),
+            _MemoryTokenStore(),
+          ),
+        );
+        addTearDown(controller.dispose);
+        await controller.loginPassword('reader@example.com', 'secret');
+        failed = true;
+        await expectLater(
+          controller.loadMembership(),
+          throwsA(isA<MemberAccountException>()),
+        );
+        expect(controller.hasPremiumAccess, failure != 403);
+        await controller.logout();
+        final readsAtLogout = reads;
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(reads, readsAtLogout);
+        expect(controller.hasPremiumAccess, isFalse);
+      },
+    );
+  }
+
+  test(
+    'membership from another server account cannot authorize this user',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = MemberAccountController(
+        api: _client(
+          _RouteAdapter(
+            (options) => switch (options.uri.path) {
+              '/api/v1/auth/password/login' => _json(
+                _session(access: 'a', refresh: 'r'),
+              ),
+              '/api/v1/membership' => _json({
+                'user_id': 'different-user',
+                'premium': true,
+                'features': {},
+                'entitlements': [],
+              }),
+              _ => _json({
+                'invite_code': 'TEST',
+                'invite_url': 'https://example.test/invite',
+              }),
+            },
+          ),
+          _MemoryTokenStore(),
+        ),
+      );
+      addTearDown(controller.dispose);
+      await controller.loginPassword('reader@example.com', 'secret');
+      expect(controller.hasPremiumAccess, isFalse);
+      expect(controller.membershipSyncFailed, isTrue);
+    },
+  );
+
   test('membership refresh revocation removes premium access', () async {
     var premium = true;
     final adapter = _RouteAdapter((options) {

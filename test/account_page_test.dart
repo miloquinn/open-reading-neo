@@ -49,6 +49,30 @@ Future<void> _pumpExternalLoginPage(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('cached premium cannot contradict live access in settings', (
+    tester,
+  ) async {
+    final controller = _CachedOnlyAccount();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<MemberAccountController>.value(
+        value: controller,
+        child: const MaterialApp(
+          locale: Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: SettingsAccountCard()),
+        ),
+      ),
+    );
+    expect(
+      find.byKey(const ValueKey('settings-account-premium-badge')),
+      findsNothing,
+    );
+    expect(find.textContaining('会员状态待同步'), findsOneWidget);
+    expect(controller.hasPremiumAccess, isFalse);
+  });
+
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('iOS external login cancellation quietly stops authorization', (
@@ -778,4 +802,14 @@ class _PageTokenStore implements MemberTokenStore {
     this.refreshToken = refreshToken;
     this.mfaPending = mfaPending;
   }
+}
+
+class _CachedOnlyAccount extends MemberAccountController {
+  @override
+  MemberAccountSummary get summary => const MemberAccountSummary(
+    userId: 'cached',
+    username: 'reader',
+    effectiveName: 'Reader',
+    premium: true,
+  );
 }

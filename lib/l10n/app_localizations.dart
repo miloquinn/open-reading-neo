@@ -11653,6 +11653,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Downloaded chapters are up to date.'**
   String get bookSourceDownloadedUnchanged;
+
+  /// Membership synchronization or existing entitlement channel notice.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership status could not be synced. It will retry automatically; a connection failure does not revoke verified access.'**
+  String get premiumSyncFailed;
+
+  /// Membership synchronization or existing entitlement channel notice.
+  ///
+  /// In en, this message translates to:
+  /// **'You have complimentary Premium access. No additional purchase is needed.'**
+  String get premiumGrantedAccess;
+
+  /// Membership synchronization or existing entitlement channel notice.
+  ///
+  /// In en, this message translates to:
+  /// **'You have Premium through another channel. No additional purchase is needed.'**
+  String get premiumOtherChannelAccess;
+
+  /// Membership synchronization or existing entitlement channel notice.
+  ///
+  /// In en, this message translates to:
+  /// **'You have Premium through App Store. No additional purchase is needed.'**
+  String get premiumAppleAccess;
+
+  /// Membership synchronization or existing entitlement channel notice.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have Premium. No additional purchase is needed.'**
+  String get premiumExistingAccess;
+
+  /// Membership has not yet been verified for this session.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing membership status'**
+  String get premiumSyncPending;
 }
 
 class _AppLocalizationsDelegate

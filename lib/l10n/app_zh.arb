@@ -3441,5 +3441,12 @@
   },
   "bookSourceBindSource": "关联书源",
   "bookSourceNotBound": "未关联书源",
-  "bookSourceDownloadedUnchanged": "已检查下载章节，正文没有变化。"
+  "bookSourceDownloadedUnchanged": "已检查下载章节，正文没有变化。",
+  "premiumSyncFailed": "会员权益同步失败，将自动重试；连接失败不会撤销已验证的权益。",
+  "premiumGrantedAccess": "你已获赠高级会员，无需重复购买。",
+  "premiumOtherChannelAccess": "你已通过其他渠道开通高级会员，无需重复购买。",
+  "premiumAppleAccess": "你已通过 App Store 开通高级会员，无需重复购买。",
+  "premiumExistingAccess": "你已开通高级会员，无需重复购买。",
+  "premiumSyncPending": "会员状态待同步"
+
 }

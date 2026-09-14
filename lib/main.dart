@@ -111,7 +111,7 @@ void main(List<String> arguments) async {
             create: (_) => BookSourceMaintenanceCoordinator(),
           ),
           provider.ChangeNotifierProvider(
-            create: (_) => MemberAccountController()..initialize(),
+            create: (_) => MemberAccountController()..synchronize(),
           ),
           provider.ChangeNotifierProvider(
             lazy: false,
@@ -376,6 +376,14 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      unawaited(
+        provider.Provider.of<MemberAccountController>(
+          context,
+          listen: false,
+        ).synchronize(),
+      );
+    }
     if (_webDavSyncInitialized && mounted) {
       provider.Provider.of<WebDavSyncController>(
         context,

@@ -373,7 +373,7 @@ class _BookIdentity extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 320 ||
+        if (constraints.maxWidth < 280 ||
             MediaQuery.textScalerOf(context).scale(14) > 20) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,

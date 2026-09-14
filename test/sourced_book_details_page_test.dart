@@ -16,6 +16,7 @@ import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/book_sources/models/sourced_book.dart';
 import 'package:xxread/pages/book_sources/sourced_book_details_page.dart';
+import 'package:xxread/pages/book_sources/widgets/sourced_book_cards.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 
 void main() {
@@ -156,6 +157,21 @@ void main() {
     );
     expect(find.byKey(const Key('bookSourceDetailsPage')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('standard Android-width phones keep book identity horizontal', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 844);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_harness());
+    await tester.pumpAndSettle();
+
+    final cover = tester.getRect(find.byType(SourcedBookCoverThumb));
+    final title = tester.getRect(find.text(_book.title));
+    expect(title.left, greaterThanOrEqualTo(cover.right + 20));
+    expect(title.top, lessThanOrEqualTo(cover.top + 4));
   });
 
   for (final variant in [

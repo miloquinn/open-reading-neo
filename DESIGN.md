@@ -93,7 +93,7 @@
 
 - Framework/styling system: Flutter、Provider、现有 Material 3/玻璃风格适配；网络层复用 Dio。
 - Design-token constraints: 不新增主题依赖和同步专属 token。
-- Performance constraints: 阅读进度写入需防抖；元数据批次上限 1 MiB；TXT 阅读/编辑共用流式索引和有界分段，文件写回与传输不整书载入内存。TXT 统一使用内容定义分块和不可变修订，完整文件独立手动导出；当前 200/500 MiB HTTP 基准、检查点及回收限制见 `docs/webdav-sync-design.md`。
+- Performance constraints: 阅读进度写入需防抖；元数据批次上限 1 MiB；TXT 阅读/编辑共用流式索引和有界分段，文件写回与传输不整书载入内存。所有书籍修改后流式整本上传，无变化文件不重传，进度独立同步；成本、检查点及回收限制见 `docs/webdav-sync-design.md`。
 - Compatibility constraints: WebDAV 服务端能力不一致；不得依赖 LOCK；Web 端受 CORS 与浏览器方法限制，首版不承诺可用。
 - Test/screenshot expectations: UI 与状态流按 `docs/webdav-sync-ux-design.md` 验收；协议和冲突策略按 `docs/webdav-sync-design.md` 的验收矩阵验证；书源分组、迁移、组合筛选和校验反馈按 `docs/book-source-group-design.md` 验收。
 
@@ -176,3 +176,7 @@
 - 菜单表面和动画共享，不强制触发器外观一致。`AppPopupMenuButton` 默认使用无底板、无描边的三点图标；仅顶栏 `FloatingSubpageMenuButton` / `FloatingSubpageMenuAction` 显式选择 `AppMenuButtonStyle.circular`。卡片、列表内保留普通三点及至少44px点击区域。
 - 书源管理卡片采用分行布局：图标/选择框与名称、网址在上部，状态与分组利用完整宽度，收藏和启停放下部操作行。更多按钮位于右上角；收藏、开关不再挤占名称宽度。
 - 名称允许两行；长分组标签可换行并受卡片宽度约束，兼容窄屏与放大字号。保留选择模式切换时文字左侧位置，所有功能及健康状态仍可用。
+
+## Cloud sync simplification (2026-09-15)
+
+首页保留状态和立即同步，四个入口为阅读进度、书籍文件、同步设置、换机指南。进度开关与自动接续进入独立页；文件选择直接进入上传/下载管理，更新与冲突再下一层；连接、自动同步、其他数据、诊断和断开操作进入设置。完整页面契约见 `docs/webdav-sync-design.md`，取代此前同步首页堆叠所有开关和状态的布局。

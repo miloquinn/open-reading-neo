@@ -5913,7 +5913,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Participating books, text updates and downloads';
 
   @override
-  String get cloudSyncActivity => 'Sync activity and attention needed';
+  String get cloudSyncActivity => 'Sync details and issues';
 
   @override
   String get cloudSyncStorage => 'Storage connection';
@@ -6001,7 +6001,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudSyncTextLocationHint =>
-      'Text edits update the TXT at the location below. Copies uploaded before the upgrade remain available but do not receive later edits.';
+      'Manage updates, pauses and conflicts for participating books here.';
 
   @override
   String get bookSourcesImportIntro =>
@@ -6678,7 +6678,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudSyncReadableStorage =>
-      'TXT changes sync as reusable content blocks. Unchanged books transfer no body data. Use Export to cloud for a complete file you can open outside this app.';
+      'Edited books upload as complete files. Unchanged books are not transferred again. Reading progress syncs separately.';
 
   @override
   String get bookSourceBindSource => 'Link a book source';
@@ -6725,4 +6725,75 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cloudSyncProtocolUpgrade =>
       'This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept.';
+
+  @override
+  String get cloudSyncSettings => 'Sync settings';
+
+  @override
+  String get cloudSyncSettingsHint =>
+      'Automatic sync, other data and connection';
+
+  @override
+  String get cloudSyncProgressOnlyHint =>
+      'Sync reading positions without uploading book files';
+
+  @override
+  String get cloudSyncProgressExplanation =>
+      'If both devices have the same book, you can sync reading progress alone. The new phone still needs a readable copy; progress records do not contain the book text.';
+
+  @override
+  String get cloudSyncFilesEntryHint =>
+      'Upload or download books; edits upload the whole file';
+
+  @override
+  String get cloudSyncOtherDataHint =>
+      'Library, sources, bookmarks, notes and reading settings';
+
+  @override
+  String get cloudSyncActivityHint =>
+      'Progress, file status and failure details';
+
+  @override
+  String get cloudSyncNeedsAttention => 'A sync issue needs attention';
+
+  @override
+  String get cloudSyncFileStatus => 'Updates and conflicts';
+
+  @override
+  String get cloudSyncTransferGuide => 'Move to a new phone';
+
+  @override
+  String get cloudSyncTransferGuideHint =>
+      'Restore books and reading progress on a new phone';
+
+  @override
+  String get cloudSyncTransferIntro =>
+      'Uploading a book is optional for progress sync. You only need a cloud copy if the new phone does not already have the book and you want to download it from here.';
+
+  @override
+  String get cloudSyncTransferOldPhone => '1. Sync progress on the old phone';
+
+  @override
+  String get cloudSyncTransferOldPhoneBody =>
+      'Leave the reader to save your latest position, enable Reading progress, and tap Sync now. Use the same WebDAV connection and sync folder on both phones.';
+
+  @override
+  String get cloudSyncTransferHasBook =>
+      '2. The new phone already has the book';
+
+  @override
+  String get cloudSyncTransferHasBookBody =>
+      'Import the same local file, or open the same online book from the same source. Sync progress, then open the book to continue. Matching titles alone do not guarantee a match.';
+
+  @override
+  String get cloudSyncTransferNeedsBook =>
+      '3. The new phone needs the book file';
+
+  @override
+  String get cloudSyncTransferNeedsBookBody =>
+      'On the old phone, open Book files, allow uploads and select the book. After upload succeeds, sync the new phone and download it from Available to download. You can also transfer the same file yourself.';
+
+  @override
+  String get cloudSyncTransferEditedBook =>
+      'If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions.';
 }

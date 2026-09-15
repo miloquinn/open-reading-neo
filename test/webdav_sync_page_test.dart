@@ -13,6 +13,9 @@ import 'package:xxread/pages/settings/sync/webdav_setup_page.dart';
 import 'package:xxread/pages/settings/sync/txt_sync_details_page.dart';
 import 'package:xxread/pages/settings/sync/webdav_sync_content_page.dart';
 import 'package:xxread/pages/settings/sync/webdav_sync_page.dart';
+import 'package:xxread/pages/settings/sync/webdav_progress_page.dart';
+import 'package:xxread/pages/settings/sync/webdav_sync_settings_page.dart';
+import 'package:xxread/pages/settings/sync/webdav_transfer_guide_page.dart';
 import 'package:xxread/services/sync/secure_sync_config.dart';
 import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/book_content_sync_service.dart';
@@ -31,7 +34,7 @@ void main() {
       )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
     }
   });
-  testWidgets('续读首页在宽屏可操作且连接参数不占据首屏', (tester) async {
+  testWidgets('首页进入阅读进度二级页后接续开关即时保存', (tester) async {
     final store = SecureSyncConfigStore(
       secretStorage: _MemorySecrets(),
       preferences: _MemoryPreferences(),
@@ -48,6 +51,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byType(SwitchListTile), findsNothing);
+    await tester.tap(find.text('阅读进度'));
+    await tester.pumpAndSettle();
     final resume = find.widgetWithText(SwitchListTile, '打开书籍自动接续');
     expect(tester.widget<SwitchListTile>(resume).value, isTrue);
     await tester.tap(resume);
@@ -57,9 +63,11 @@ void main() {
     await tester.tap(resume);
     await tester.pumpAndSettle();
     expect(await store.readAutoResume(), isTrue);
-    expect(find.text('跨设备续读'), findsOneWidget);
+    expect(find.text('换机指南'), findsOneWidget);
     expect(find.text('WebDAV 地址'), findsNothing);
     expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('floating-subpage-back')));
+    await tester.pumpAndSettle();
     const previewDir = String.fromEnvironment('SYNC_PREVIEW_DIR');
     if (previewDir.isNotEmpty) {
       await tester.runAsync(() async {
@@ -88,8 +96,8 @@ void main() {
     expect(find.text('云端同步'), findsWidgets);
     expect(find.text('尚未配置'), findsWidgets);
     expect(find.text('设置 WebDAV'), findsOneWidget);
-    expect(find.text('跨设备续读'), findsOneWidget);
-    expect(find.text('打开书籍自动接续'), findsOneWidget);
+    expect(find.text('换机指南'), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -114,12 +122,19 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
-  testWidgets('概览摘要包含所有开启的数据范围', (tester) async {
+  testWidgets('首页隐藏详细开关并通过设置进入其他同步内容', (tester) async {
     final controller = _PreviewController();
     addTearDown(controller.dispose);
     await tester.binding.setSurfaceSize(const Size(1080, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(_testApp(controller, const WebDavSyncPage()));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('笔记与高亮'), findsNothing);
+    expect(find.byType(SwitchListTile), findsNothing);
+    await tester.tap(find.text('同步设置'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(SwitchListTile, '自动同步'), findsOneWidget);
+    await tester.tap(find.text('更多同步内容'));
     await tester.pumpAndSettle();
     final summary = find.textContaining('笔记与高亮');
     expect(summary, findsOneWidget);
@@ -210,16 +225,14 @@ void main() {
       );
       await tester.pump();
       final header = find.byKey(const ValueKey('floating-subpage-header'));
-      final introduction = find.text('参与同步的书籍、正文更新与文件下载');
+      final introduction = find.text('书籍修改后重新上传整本；未修改的书籍不会重复传输。阅读进度单独同步。');
       await _savePreview(tester, key, 'book-text-${layout.name}.png');
       expect(
         tester.getTopLeft(introduction).dy,
         greaterThanOrEqualTo(tester.getBottomLeft(header).dy + 20),
       );
-      expect(
-        find.widgetWithText(OutlinedButton, '选择书籍与下载').hitTestable(),
-        findsOneWidget,
-      );
+      expect(find.text('更新与冲突'), findsOneWidget);
+      expect(find.text('选择书籍与下载'), findsNothing);
       controller.loading.completeError(StateError('layout fixture'));
       await tester.pumpAndSettle();
       expect(
@@ -229,6 +242,68 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('阅读进度开关独立保存且关闭后禁止自动接续', (tester) async {
+    final store = SecureSyncConfigStore(
+      secretStorage: _MemorySecrets(),
+      preferences: _MemoryPreferences(),
+    );
+    final controller = _ScopeController(store);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(_testApp(controller, const WebDavProgressPage()));
+    await tester.pumpAndSettle();
+    final toggle = find.widgetWithText(SwitchListTile, '阅读进度');
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect((await store.readScope()).progress, isFalse);
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.widgetWithText(SwitchListTile, '打开书籍自动接续'),
+          )
+          .onChanged,
+      isNull,
+    );
+  });
+
+  for (final page in [
+    (name: 'progress', widget: const WebDavProgressPage()),
+    (name: 'settings', widget: const WebDavSyncSettingsPage()),
+    (name: 'guide', widget: const WebDavTransferGuidePage()),
+  ]) {
+    testWidgets('二级页面 ${page.name} 在窄屏大字下可阅读', (tester) async {
+      final controller = _PreviewController();
+      addTearDown(controller.dispose);
+      await tester.binding.setSurfaceSize(const Size(360, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final key = GlobalKey();
+      await tester.pumpWidget(
+        _testApp(
+          controller,
+          RepaintBoundary(key: key, child: page.widget),
+          textScale: 1.6,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await _savePreview(tester, key, 'sync-${page.name}-large.png');
+      await tester.drag(find.byType(ListView).first, const Offset(0, -900));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('未配置用户也能从首页阅读换机指南', (tester) async {
+    final controller = WebDavSyncController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(_testApp(controller, const WebDavSyncPage()));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('换机指南'));
+    await tester.tap(find.text('换机指南'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('同步进度不要求上传书籍'), findsOneWidget);
+    expect(find.textContaining('仅书名相同不能保证匹配'), findsOneWidget);
+  });
 
   testWidgets('配置页先测试连接再允许保存', (tester) async {
     final controller = WebDavSyncController();
@@ -250,7 +325,7 @@ void main() {
     expect(find.text('书籍原文件'), findsNothing);
   });
 
-  testWidgets('同步失败时持续显示服务器返回的完整上下文', (tester) async {
+  testWidgets('首页仅显示问题摘要且点击后保留完整诊断和复制功能', (tester) async {
     final controller = _FailureController();
     addTearDown(controller.dispose);
     await tester.binding.setSurfaceSize(const Size(500, 1000));
@@ -259,6 +334,9 @@ void main() {
     await tester.pumpWidget(_testApp(controller, const WebDavSyncPage()));
     await tester.pumpAndSettle();
 
+    expect(find.text('服务器返回详情'), findsNothing);
+    await tester.tap(find.text('有同步问题需要处理'));
+    await tester.pumpAndSettle();
     expect(find.text('服务器返回的响应与同步协议不兼容。'), findsWidgets);
     expect(find.textContaining('失败阶段：书籍原文件'), findsOneWidget);
     expect(find.text('服务器返回详情'), findsOneWidget);
@@ -351,16 +429,11 @@ void main() {
     expect(tester.widget<SwitchListTile>(notesSwitch).value, isFalse);
     expect(tester.widget<SwitchListTile>(readerSettingsSwitch).value, isTrue);
     expect(tester.widget<SwitchListTile>(replaceRulesSwitch).value, isFalse);
-    final progressSwitch = find.widgetWithText(SwitchListTile, '阅读进度');
-    expect(progressSwitch, findsOneWidget);
-    expect(tester.widget<SwitchListTile>(progressSwitch).value, isTrue);
-
-    await tester.tap(progressSwitch);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-
-    expect(controller.scope.progress, isFalse);
-    expect((await store.readScope()).progress, isFalse);
+    expect(find.widgetWithText(SwitchListTile, '阅读进度'), findsNothing);
+    await tester.tap(notesSwitch);
+    await tester.pumpAndSettle();
+    expect(controller.scope.notes, isTrue);
+    expect((await store.readScope()).notes, isTrue);
   });
 }
 

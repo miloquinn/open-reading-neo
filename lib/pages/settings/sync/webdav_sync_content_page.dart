@@ -59,7 +59,6 @@ class _WebDavSyncContentPageState extends State<WebDavSyncContentPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final sync = context.watch<WebDavSyncController>();
     return FloatingSubpageScaffold(
       title: l10n.webDavSyncContent,
       actions: [
@@ -102,14 +101,6 @@ class _WebDavSyncContentPageState extends State<WebDavSyncContentPage> {
                         enabled: !_saving,
                         onChanged: (value) =>
                             _updateScope(_scope.copyWith(books: value)),
-                      ),
-                      _ScopeSwitch(
-                        title: l10n.webDavScopeProgress,
-                        icon: Icons.auto_stories_outlined,
-                        value: _scope.progress,
-                        enabled: !_saving,
-                        onChanged: (value) =>
-                            _updateScope(_scope.copyWith(progress: value)),
                       ),
                       _ScopeSwitch(
                         title: l10n.webDavScopeBookmarks,
@@ -163,28 +154,6 @@ class _WebDavSyncContentPageState extends State<WebDavSyncContentPage> {
                         enabled: !_saving,
                         onChanged: (value) =>
                             _updateScope(_scope.copyWith(replaceRules: value)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _ScopeSection(
-                    key: const ValueKey('webdav-book-files-section'),
-                    title: l10n.webDavBookFilesTitle,
-                    icon: Icons.folder_copy_outlined,
-                    children: [
-                      _ScopeSwitch(
-                        title: l10n.webDavScopeBookFiles,
-                        subtitle: sync.fileCapabilities.uploadSupported
-                            ? l10n.cloudSyncBooksHint
-                            : l10n.webDavBookFilesUnavailable,
-                        icon: Icons.cloud_upload_outlined,
-                        value:
-                            _scope.bookFiles &&
-                            sync.fileCapabilities.uploadSupported,
-                        enabled:
-                            !_saving && sync.fileCapabilities.uploadSupported,
-                        onChanged: (value) =>
-                            _updateScope(_scope.copyWith(bookFiles: value)),
                       ),
                     ],
                   ),

@@ -68,7 +68,6 @@ void main() {
       fileName: 'book.txt',
       parents: [base.id],
       metadata: {'source_state_sha256': null, 'source_assets': []},
-      base: base,
     );
   }
 
@@ -169,7 +168,7 @@ void main() {
   );
 
   test(
-    'a prefix insertion reuses most blocks and another device reconstructs exact bytes',
+    'a prefix insertion uploads the complete book and another device restores exact bytes',
     () async {
       final random = Random(7);
       final bytes = List<int>.generate(
@@ -186,9 +185,12 @@ void main() {
       await service.enqueueLocalUpdate(book, bookUid: 'large');
       final result = await service.reconcile();
       expect(result.failed, 0);
-      expect(result.uploadedBytes, lessThan(1024 * 1024));
+      expect(result.uploadedBytes, greaterThanOrEqualTo(edited.length));
+      expect(result.uploadedBytes, lessThan(edited.length + 4096));
       final second = await current('large');
       expect(second.parents, [first.id]);
+      expect(second.chunks, hasLength(1));
+      expect(second.chunks.single['size'], edited.length);
       final output = File('${root.path}/large-restored.txt');
       await (await repo('second-device')).materialize(second, output);
       expect(

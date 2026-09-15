@@ -5858,7 +5858,7 @@
   "cloudSyncMoreContent": "More sync options",
   "cloudSyncBooks": "Books and text",
   "cloudSyncBooksHint": "Participating books, text updates and downloads",
-  "cloudSyncActivity": "Sync activity and attention needed",
+  "cloudSyncActivity": "Sync details and issues",
   "cloudSyncStorage": "Storage connection",
   "cloudSyncNoActivity": "No sync activity yet",
   "cloudSyncProgress": "Reading position",
@@ -5885,7 +5885,7 @@
   "cloudSyncParticipate": "Sync this book’s text",
   "cloudSyncCloseReaderToUpdate": "Close this book’s reader or editor before applying the text update",
   "cloudSyncTextLocation": "Current cloud file",
-  "cloudSyncTextLocationHint": "Text edits update the TXT at the location below. Copies uploaded before the upgrade remain available but do not receive later edits.",
+  "cloudSyncTextLocationHint": "Manage updates, pauses and conflicts for participating books here.",
   "bookSourcesImportIntro": "Automatically detects sources. Review before importing.",
   "bookSourcesImportInputStep": "Choose source",
   "bookSourcesImportReviewStep": "Review & import",
@@ -6413,7 +6413,7 @@
   "bookSourceKeepLocal": "Keep my text",
   "bookSourceUseRemote": "Use source text",
   "bookSourceUpdateFailed": "Update did not finish. Your text was preserved. Please retry.",
-  "cloudSyncReadableStorage": "TXT changes sync as reusable content blocks. Unchanged books transfer no body data. Use Export to cloud for a complete file you can open outside this app.",
+  "cloudSyncReadableStorage": "Edited books upload as complete files. Unchanged books are not transferred again. Reading progress syncs separately.",
   "@bookSourceUpdateSummary": {
     "placeholders": {
       "added": {
@@ -6454,5 +6454,24 @@
   "cloudSyncExportBook": "Export complete file to cloud",
   "cloudSyncExportDone": "Complete file exported",
   "cloudSyncDiagnostics": "Copy sync diagnostics",
-  "cloudSyncProtocolUpgrade": "This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept."
+  "cloudSyncProtocolUpgrade": "This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept.",
+  "cloudSyncSettings": "Sync settings",
+  "cloudSyncSettingsHint": "Automatic sync, other data and connection",
+  "cloudSyncProgressOnlyHint": "Sync reading positions without uploading book files",
+  "cloudSyncProgressExplanation": "If both devices have the same book, you can sync reading progress alone. The new phone still needs a readable copy; progress records do not contain the book text.",
+  "cloudSyncFilesEntryHint": "Upload or download books; edits upload the whole file",
+  "cloudSyncOtherDataHint": "Library, sources, bookmarks, notes and reading settings",
+  "cloudSyncActivityHint": "Progress, file status and failure details",
+  "cloudSyncNeedsAttention": "A sync issue needs attention",
+  "cloudSyncFileStatus": "Updates and conflicts",
+  "cloudSyncTransferGuide": "Move to a new phone",
+  "cloudSyncTransferGuideHint": "Restore books and reading progress on a new phone",
+  "cloudSyncTransferIntro": "Uploading a book is optional for progress sync. You only need a cloud copy if the new phone does not already have the book and you want to download it from here.",
+  "cloudSyncTransferOldPhone": "1. Sync progress on the old phone",
+  "cloudSyncTransferOldPhoneBody": "Leave the reader to save your latest position, enable Reading progress, and tap Sync now. Use the same WebDAV connection and sync folder on both phones.",
+  "cloudSyncTransferHasBook": "2. The new phone already has the book",
+  "cloudSyncTransferHasBookBody": "Import the same local file, or open the same online book from the same source. Sync progress, then open the book to continue. Matching titles alone do not guarantee a match.",
+  "cloudSyncTransferNeedsBook": "3. The new phone needs the book file",
+  "cloudSyncTransferNeedsBookBody": "On the old phone, open Book files, allow uploads and select the book. After upload succeeds, sync the new phone and download it from Available to download. You can also transfer the same file yourself.",
+  "cloudSyncTransferEditedBook": "If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions."
 }

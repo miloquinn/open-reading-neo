@@ -11,7 +11,6 @@ import '../../../services/sync/webdav_sync_controller.dart';
 import '../../../utils/localization_extension.dart';
 import '../../../widgets/floating_subpage_scaffold.dart';
 import '../../../widgets/side_toast.dart';
-import 'book_file_sync_page.dart';
 
 class TxtSyncDetailsPage extends StatefulWidget {
   const TxtSyncDetailsPage({super.key});
@@ -150,7 +149,7 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
     final sync = context.watch<WebDavSyncController>();
     final l10n = context.l10n;
     return FloatingSubpageScaffold(
-      title: l10n.cloudSyncBooks,
+      title: l10n.cloudSyncFileStatus,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -162,29 +161,8 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
             bottom: 20,
           ),
           children: [
-            Text(l10n.cloudSyncBooksHint),
-            if (_states.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                l10n.cloudSyncTextLocationHint,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+            Text(l10n.cloudSyncReadableStorage),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.library_books_outlined),
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const BookFileSyncPage(),
-                        ),
-                      );
-                      if (mounted) await _load();
-                    },
-              label: Text(l10n.cloudSyncManageBooks),
-            ),
             if (_loading || _busy) const LinearProgressIndicator(),
             if (_failed)
               TextButton(onPressed: _load, child: Text(l10n.cloudSyncFailed)),
@@ -207,7 +185,6 @@ class _TxtSyncDetailsPageState extends State<TxtSyncDetailsPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(txtSyncStatusText(context, state.status)),
-                      Text(l10n.cloudSyncReadableStorage),
                       const SizedBox(height: 8),
                       if (state.remoteVersion != null)
                         TextButton.icon(

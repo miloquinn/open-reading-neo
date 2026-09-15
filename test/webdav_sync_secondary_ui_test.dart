@@ -83,42 +83,53 @@ void main() {
     await _writePreview(tester, previewKey, 'webdav-setup-light.png');
   });
 
-  testWidgets('WebDAV content separates data preferences and files', (
-    tester,
-  ) async {
-    final store = SecureSyncConfigStore(
-      secretStorage: _MemorySecrets(),
-      preferences: _MemoryPreferences(),
-    );
-    final controller = _ScopeController(store);
-    addTearDown(controller.dispose);
-    final previewKey = GlobalKey();
-    await _setPhoneSurface(tester);
-    await tester.pumpWidget(
-      _testApp(
-        controller,
-        RepaintBoundary(key: previewKey, child: const WebDavSyncContentPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Other sync content contains data and preferences without duplicate progress or file controls',
+    (tester) async {
+      final store = SecureSyncConfigStore(
+        secretStorage: _MemorySecrets(),
+        preferences: _MemoryPreferences(),
+      );
+      final controller = _ScopeController(store);
+      addTearDown(controller.dispose);
+      final previewKey = GlobalKey();
+      await _setPhoneSurface(tester);
+      await tester.pumpWidget(
+        _testApp(
+          controller,
+          RepaintBoundary(
+            key: previewKey,
+            child: const WebDavSyncContentPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('webdav-reading-data-section')), findsOne);
-    expect(
-      find.byKey(const ValueKey('webdav-reading-preferences-section')),
-      findsOne,
-    );
-    expect(find.byKey(const ValueKey('webdav-book-files-section')), findsOne);
-    expect(find.text('数据与同步'), findsOneWidget);
-    expect(find.text('阅读设置'), findsOneWidget);
-    expect(find.text('书籍文件'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('webdav-reading-data-section')),
+        findsOne,
+      );
+      expect(
+        find.byKey(const ValueKey('webdav-reading-preferences-section')),
+        findsOne,
+      );
+      expect(
+        find.byKey(const ValueKey('webdav-book-files-section')),
+        findsNothing,
+      );
+      expect(find.text('数据与同步'), findsOneWidget);
+      expect(find.text('阅读设置'), findsOneWidget);
+      expect(find.text('书籍文件'), findsNothing);
 
-    final progress = find.widgetWithText(SwitchListTile, '阅读进度');
-    await tester.tap(progress);
-    await tester.pumpAndSettle();
-    expect(controller.scope.progress, isFalse);
-    expect((await store.readScope()).progress, isFalse);
-    await _writePreview(tester, previewKey, 'webdav-content-light.png');
-  });
+      expect(find.widgetWithText(SwitchListTile, '阅读进度'), findsNothing);
+      final progress = find.widgetWithText(SwitchListTile, '书签');
+      await tester.tap(progress);
+      await tester.pumpAndSettle();
+      expect(controller.scope.bookmarks, isFalse);
+      expect((await store.readScope()).bookmarks, isFalse);
+      await _writePreview(tester, previewKey, 'webdav-content-light.png');
+    },
+  );
 
   testWidgets('secondary WebDAV pages support narrow dark large text', (
     tester,

@@ -525,7 +525,6 @@ class BookContentSyncService {
       format: binding.format,
       fileName: binding.originalFileName,
       parents: parents.map((r) => r.id).toList(),
-      base: parents.isEmpty ? null : parents.first,
       shouldContinue: _shouldContinue,
       metadata: {
         'source_state_sha256': source.hash,
@@ -865,7 +864,6 @@ class BookContentSyncService {
         format: binding.format,
         fileName: binding.originalFileName,
         parents: currentTips,
-        base: selected,
         metadata: {
           'source_state_sha256': selected.sourceHash,
           'source_assets': selected.sourceAssets,

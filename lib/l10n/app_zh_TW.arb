@@ -2865,7 +2865,7 @@
   "cloudSyncMoreContent": "更多同步內容",
   "cloudSyncBooks": "書籍與正文",
   "cloudSyncBooksHint": "參與同步的書籍、正文更新與檔案下載",
-  "cloudSyncActivity": "同步紀錄與需要處理",
+  "cloudSyncActivity": "同步詳情與問題",
   "cloudSyncStorage": "儲存連線",
   "cloudSyncNoActivity": "尚無同步紀錄",
   "cloudSyncProgress": "閱讀位置",
@@ -2892,7 +2892,7 @@
   "cloudSyncParticipate": "參與正文同步",
   "cloudSyncCloseReaderToUpdate": "請先關閉這本書的閱讀或編輯頁面，再套用正文更新",
   "cloudSyncTextLocation": "雲端目前檔案",
-  "cloudSyncTextLocationHint": "正文修改會更新下方位置的 TXT。升級前的上傳副本會保留，但不再跟隨正文修改。",
+  "cloudSyncTextLocationHint": "這裡管理已加入同步的書籍更新、暫停和衝突。",
   "bookSourcesImportIntro": "自動識別書源，預覽確認後匯入。",
   "bookSourcesImportInputStep": "選擇書源",
   "bookSourcesImportReviewStep": "預覽並匯入",
@@ -3101,7 +3101,7 @@
   "bookSourceKeepLocal": "保留我的正文",
   "bookSourceUseRemote": "採用書源正文",
   "bookSourceUpdateFailed": "更新未完成，現有正文已保留，請重試。",
-  "cloudSyncReadableStorage": "TXT 依內容區塊增量同步，未變更的書籍不傳輸正文。需要在其他軟體開啟時，可另外匯出完整檔案至雲端。",
+  "cloudSyncReadableStorage": "書籍修改後重新上傳整本；未修改的書籍不會重複傳輸。閱讀進度獨立同步。",
   "@bookSourceUpdateSummary": {
     "placeholders": {
       "added": {
@@ -3124,5 +3124,24 @@
   "cloudSyncExportBook": "匯出完整檔案至雲端",
   "cloudSyncExportDone": "完整檔案已匯出",
   "cloudSyncDiagnostics": "複製同步診斷",
-  "cloudSyncProtocolUpgrade": "此目錄使用舊版同步格式，請選擇新的空目錄。本機書籍與原有雲端檔案都會保留。"
+  "cloudSyncProtocolUpgrade": "此目錄使用舊版同步格式，請選擇新的空目錄。本機書籍與原有雲端檔案都會保留。",
+  "cloudSyncSettings": "同步設定",
+  "cloudSyncSettingsHint": "自動同步、其他資料與連線",
+  "cloudSyncProgressOnlyHint": "只同步閱讀位置，不上傳書籍檔案",
+  "cloudSyncProgressExplanation": "兩台裝置有同一本書時，可以只同步閱讀進度。新手機仍需有可開啟的書籍，進度記錄本身不包含正文。",
+  "cloudSyncFilesEntryHint": "按需上傳或下載；編輯後重新上傳整本",
+  "cloudSyncOtherDataHint": "書架、書源、書籤、筆記與閱讀設定",
+  "cloudSyncActivityHint": "檢視進度、檔案狀態和失敗原因",
+  "cloudSyncNeedsAttention": "有同步問題需要處理",
+  "cloudSyncFileStatus": "更新與衝突",
+  "cloudSyncTransferGuide": "換機指南",
+  "cloudSyncTransferGuideHint": "新手機如何恢復書籍與閱讀進度",
+  "cloudSyncTransferIntro": "同步進度不要求上傳書籍。是否需要上傳，取決於新手機有沒有這本書。",
+  "cloudSyncTransferOldPhone": "1. 先在舊手機同步進度",
+  "cloudSyncTransferOldPhoneBody": "退出閱讀器以儲存最新位置，開啟「閱讀進度」，然後點選「立即同步」。兩台手機使用相同的 WebDAV 連線和同步目錄。",
+  "cloudSyncTransferHasBook": "2. 新手機已經有這本書",
+  "cloudSyncTransferHasBookBody": "匯入同一份本機檔案，或開啟同一書源的同一本線上書，然後同步進度並開啟書籍接續。不需要再上傳正文；僅書名相同不能保證配對。",
+  "cloudSyncTransferNeedsBook": "3. 新手機還沒有書籍檔案",
+  "cloudSyncTransferNeedsBookBody": "舊手機進入「書籍檔案」，允許上傳並選取這本書。上傳成功後，新手機同步，再到「可下載」中下載。也可以自行傳入同一份檔案，再同步進度。",
+  "cloudSyncTransferEditedBook": "如果舊手機編輯過正文，建議透過「書籍檔案」上傳並在新手機下載該版本，以保留書籍關聯。不同內容版本的閱讀位置可能無法準確恢復。"
 }

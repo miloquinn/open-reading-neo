@@ -5693,7 +5693,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get cloudSyncBooksHint => '同期する本、本文の更新とダウンロード';
 
   @override
-  String get cloudSyncActivity => '同期履歴と対応が必要な項目';
+  String get cloudSyncActivity => '同期の詳細と問題';
 
   @override
   String get cloudSyncStorage => 'ストレージ接続';
@@ -5774,8 +5774,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get cloudSyncTextLocation => 'クラウド上の現在のファイル';
 
   @override
-  String get cloudSyncTextLocationHint =>
-      '本文の編集は以下の場所のTXTに反映されます。アップグレード前のコピーは保持されますが、その後の編集は反映されません。';
+  String get cloudSyncTextLocationHint => '同期に参加する本の更新・一時停止・競合を管理します。';
 
   @override
   String get bookSourcesImportIntro => 'ソースを自動認識します。確認してからインポートしてください。';
@@ -6413,7 +6412,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cloudSyncReadableStorage =>
-      'TXT は変更されたブロックを同期し、未変更の本文は転送しません。他のアプリで開く場合は、完全なファイルをクラウドに書き出せます。';
+      '編集した本はファイル全体をアップロードします。未変更の本は再送しません。読書位置は別に同期されます。';
 
   @override
   String get bookSourceBindSource => '配信元を関連付ける';
@@ -6455,4 +6454,67 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get cloudSyncProtocolUpgrade =>
       'このフォルダは古い同期形式です。新しい空のフォルダを選んでください。端末の書籍と既存のクラウドファイルは保持されます。';
+
+  @override
+  String get cloudSyncSettings => '同期設定';
+
+  @override
+  String get cloudSyncSettingsHint => '自動同期・その他のデータ・接続';
+
+  @override
+  String get cloudSyncProgressOnlyHint => '本のファイルをアップロードせず、読書位置を同期';
+
+  @override
+  String get cloudSyncProgressExplanation =>
+      '両方の端末に同じ本があれば、読書位置だけを同期できます。進捗データに本文は含まれないため、新しい端末にも読める本が必要です。';
+
+  @override
+  String get cloudSyncFilesEntryHint => '必要な本を送受信。編集後はファイル全体をアップロード';
+
+  @override
+  String get cloudSyncOtherDataHint => '本棚・配信元・しおり・メモ・読書設定';
+
+  @override
+  String get cloudSyncActivityHint => '進捗・ファイルの状態・エラーの詳細';
+
+  @override
+  String get cloudSyncNeedsAttention => '同期の問題を確認してください';
+
+  @override
+  String get cloudSyncFileStatus => '更新と競合';
+
+  @override
+  String get cloudSyncTransferGuide => '機種変更ガイド';
+
+  @override
+  String get cloudSyncTransferGuideHint => '新しい端末に本と読書位置を復元する方法';
+
+  @override
+  String get cloudSyncTransferIntro =>
+      '読書位置の同期に本のアップロードは必須ではありません。新しい端末に本がなく、ここからダウンロードしたい場合にアップロードします。';
+
+  @override
+  String get cloudSyncTransferOldPhone => '1. 古い端末で読書位置を同期';
+
+  @override
+  String get cloudSyncTransferOldPhoneBody =>
+      'リーダーを閉じて最新の位置を保存し、「読書位置」を有効にして「今すぐ同期」を押します。両方の端末で同じ WebDAV 接続と同期フォルダを使用してください。';
+
+  @override
+  String get cloudSyncTransferHasBook => '2. 新しい端末に本がある場合';
+
+  @override
+  String get cloudSyncTransferHasBookBody =>
+      '同じローカルファイルを取り込むか、同じ配信元の同じオンライン本を開きます。同期してから本を開くと続きへ進めます。タイトルが同じだけでは一致するとは限りません。';
+
+  @override
+  String get cloudSyncTransferNeedsBook => '3. 新しい端末に本がない場合';
+
+  @override
+  String get cloudSyncTransferNeedsBookBody =>
+      '古い端末の「本のファイル」でアップロードを許可し、本を選びます。完了後、新しい端末で同期し、ダウンロード一覧から取得します。同じファイルを自分で転送しても構いません。';
+
+  @override
+  String get cloudSyncTransferEditedBook =>
+      '古い端末で本文を編集した場合は、その版を「本のファイル」からアップロードし、新しい端末でダウンロードすると本の関連付けを保てます。本文の版が異なると読書位置を正確に復元できない場合があります。';
 }

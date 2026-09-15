@@ -15,6 +15,8 @@ import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
 
 import 'webdav_sync_translator.dart';
+import 'txt_sync_details_page.dart';
+import 'webdav_sync_widgets.dart';
 
 class BookFileSyncPage extends StatefulWidget {
   const BookFileSyncPage({super.key});
@@ -297,12 +299,29 @@ class _BookFileSyncPageState extends State<BookFileSyncPage>
           icon: Icons.select_all_rounded,
         ),
       ],
-      tools: TabBar(
-        controller: _tabController,
-        tabs: [
-          Tab(text: l10n.webDavFilesPendingUpload),
-          Tab(text: l10n.webDavFilesAvailableDownload),
-          Tab(text: l10n.webDavFilesSynced),
+      tools: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.sync_problem_outlined, size: 18),
+              label: Text(l10n.cloudSyncFileStatus),
+              onPressed: _transferring
+                  ? null
+                  : () async {
+                      await openSyncPage(context, const TxtSyncDetailsPage());
+                      if (mounted) await _load();
+                    },
+            ),
+          ),
+          TabBar(
+            controller: _tabController,
+            tabs: [
+              Tab(text: l10n.webDavFilesPendingUpload),
+              Tab(text: l10n.webDavFilesAvailableDownload),
+              Tab(text: l10n.webDavFilesSynced),
+            ],
+          ),
         ],
       ),
       body: _loading

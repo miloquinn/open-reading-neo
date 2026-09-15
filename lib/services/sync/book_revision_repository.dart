@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as path;
@@ -8,7 +7,7 @@ import 'package:path/path.dart' as path;
 import 'storage/immutable_object_store.dart';
 import 'storage/sync_storage.dart';
 
-/// A revision is the single commit point for both whole files and chunked TXT.
+/// A revision commits one complete book file, regardless of its format.
 /// Parents express causality; wall clock time never silently wins a conflict.
 class BookRevision {
   const BookRevision(this.id, this.data);
@@ -31,17 +30,8 @@ class BookRevisionRepository {
   BookRevisionRepository(this.objects);
   final ImmutableObjectStore objects;
   SyncStorage get storage => objects.storage;
-  static const minChunkBytes = 32 * 1024;
-  static const maxChunkBytes = 256 * 1024;
-  static const averageChunkBytes = 64 * 1024;
+  // Readers retain support for previously committed multi-object revisions.
   static const maxChunks = 100000;
-  static final _gear = List<int>.generate(256, (index) {
-    var value = index + 1;
-    for (var round = 0; round < 5; round++) {
-      value = (value * 1664525 + 1013904223) & 0xffffffff;
-    }
-    return value;
-  });
 
   static String folder(String bookUid) =>
       sha256.convert(utf8.encode(bookUid)).toString();
@@ -157,81 +147,41 @@ class BookRevisionRepository {
     required String fileName,
     required List<String> parents,
     required Map<String, dynamic> metadata,
-    BookRevision? base,
     bool Function()? shouldContinue,
   }) async {
-    final chunks = <Map<String, dynamic>>[];
-    final known = {
-      for (final chunk in base?.chunks ?? <Map<String, dynamic>>[])
-        chunk['sha256'] as String,
-    };
-    final temporary = await Directory.systemTemp.createTemp('sync-chunk-');
-    try {
-      Future<void> publishChunk(List<int> bytes) async {
-        if (shouldContinue?.call() == false) {
-          throw _invalid('Content transfer was paused.');
-        }
-        final digest = ImmutableObjectStore.hashBytes(bytes);
-        chunks.add({'sha256': digest, 'size': bytes.length});
-        if (chunks.length > maxChunks) {
-          throw _invalid('The book exceeds the revision chunk limit.');
-        }
-        if (known.contains(digest)) return;
-        final chunk = File(path.join(temporary.path, digest));
-        await chunk.writeAsBytes(bytes, flush: true);
-        await objects.putFile(chunkPath(bookUid, digest), chunk, digest);
-        known.add(digest);
-        await chunk.delete();
-      }
-
-      if (format.toLowerCase() == 'txt') {
-        final buffer = Uint8List(maxChunkBytes);
-        var count = 0, fingerprint = 0;
-        await for (final bytes in file.openRead()) {
-          for (final byte in bytes) {
-            buffer[count++] = byte;
-            fingerprint = ((fingerprint << 1) + _gear[byte]) & 0xffffffff;
-            if (count == maxChunkBytes ||
-                (count >= minChunkBytes &&
-                    (fingerprint & (averageChunkBytes - 1)) == 0)) {
-              await publishChunk(Uint8List.sublistView(buffer, 0, count));
-              count = 0;
-              fingerprint = 0;
-            }
-          }
-        }
-        if (count > 0 || chunks.isEmpty) {
-          await publishChunk(Uint8List.sublistView(buffer, 0, count));
-        }
-      } else {
-        chunks.add({'sha256': hash, 'size': await file.length()});
-        if (!known.contains(hash)) {
-          await objects.putFile(chunkPath(bookUid, hash), file, hash);
-        }
-      }
-      if (await ImmutableObjectStore.hashFile(file) != hash) {
-        throw _invalid('The local revision changed during upload.');
-      }
-      final orderedParents = parents.toSet().toList()..sort();
-      final data = <String, dynamic>{
-        'protocol': 'open-reading-book',
-        'schema_version': 2,
-        'book_uid': bookUid,
-        'parents': orderedParents,
-        'sha256': hash,
-        'size': await file.length(),
-        'format': format,
-        'original_file_name': fileName,
-        'chunks': chunks,
-        ...metadata,
-      };
-      final text = jsonEncode(data);
-      final id = ImmutableObjectStore.hashBytes(utf8.encode(text));
-      await objects.putText(revisionPath(bookUid, id), text);
-      return BookRevision(id, data);
-    } finally {
-      await temporary.delete(recursive: true);
+    if (shouldContinue?.call() == false) {
+      throw _invalid('Content transfer was paused.');
     }
+    final size = await file.length();
+    // A changed book is uploaded as one complete file. Identical content at
+    // this immutable address can still be reused when retrying a failed commit.
+    await objects.putFile(chunkPath(bookUid, hash), file, hash);
+    if (shouldContinue?.call() == false) {
+      throw _invalid('Content transfer was paused.');
+    }
+    if (await ImmutableObjectStore.hashFile(file) != hash ||
+        await file.length() != size) {
+      throw _invalid('The local revision changed during upload.');
+    }
+    final orderedParents = parents.toSet().toList()..sort();
+    final data = <String, dynamic>{
+      ...metadata,
+      'protocol': 'open-reading-book',
+      'schema_version': 2,
+      'book_uid': bookUid,
+      'parents': orderedParents,
+      'sha256': hash,
+      'size': size,
+      'format': format,
+      'original_file_name': fileName,
+      'chunks': [
+        {'sha256': hash, 'size': size},
+      ],
+    };
+    final text = jsonEncode(data);
+    final id = ImmutableObjectStore.hashBytes(utf8.encode(text));
+    await objects.putText(revisionPath(bookUid, id), text);
+    return BookRevision(id, data);
   }
 
   Future<void> materialize(BookRevision revision, File destination) async {

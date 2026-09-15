@@ -10343,7 +10343,7 @@ abstract class AppLocalizations {
   /// No description provided for @cloudSyncActivity.
   ///
   /// In en, this message translates to:
-  /// **'Sync activity and attention needed'**
+  /// **'Sync details and issues'**
   String get cloudSyncActivity;
 
   /// No description provided for @cloudSyncStorage.
@@ -10505,7 +10505,7 @@ abstract class AppLocalizations {
   /// No description provided for @cloudSyncTextLocationHint.
   ///
   /// In en, this message translates to:
-  /// **'Text edits update the TXT at the location below. Copies uploaded before the upgrade remain available but do not receive later edits.'**
+  /// **'Manage updates, pauses and conflicts for participating books here.'**
   String get cloudSyncTextLocationHint;
 
   /// No description provided for @bookSourcesImportIntro.
@@ -11633,7 +11633,7 @@ abstract class AppLocalizations {
   /// No description provided for @cloudSyncReadableStorage.
   ///
   /// In en, this message translates to:
-  /// **'TXT changes sync as reusable content blocks. Unchanged books transfer no body data. Use Export to cloud for a complete file you can open outside this app.'**
+  /// **'Edited books upload as complete files. Unchanged books are not transferred again. Reading progress syncs separately.'**
   String get cloudSyncReadableStorage;
 
   /// No description provided for @bookSourceBindSource.
@@ -11713,6 +11713,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This folder belongs to an older sync format. Choose a new empty folder. Your local books and existing cloud files will be kept.'**
   String get cloudSyncProtocolUpgrade;
+
+  /// No description provided for @cloudSyncSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync settings'**
+  String get cloudSyncSettings;
+
+  /// No description provided for @cloudSyncSettingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic sync, other data and connection'**
+  String get cloudSyncSettingsHint;
+
+  /// No description provided for @cloudSyncProgressOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync reading positions without uploading book files'**
+  String get cloudSyncProgressOnlyHint;
+
+  /// No description provided for @cloudSyncProgressExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'If both devices have the same book, you can sync reading progress alone. The new phone still needs a readable copy; progress records do not contain the book text.'**
+  String get cloudSyncProgressExplanation;
+
+  /// No description provided for @cloudSyncFilesEntryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload or download books; edits upload the whole file'**
+  String get cloudSyncFilesEntryHint;
+
+  /// No description provided for @cloudSyncOtherDataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Library, sources, bookmarks, notes and reading settings'**
+  String get cloudSyncOtherDataHint;
+
+  /// No description provided for @cloudSyncActivityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress, file status and failure details'**
+  String get cloudSyncActivityHint;
+
+  /// No description provided for @cloudSyncNeedsAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'A sync issue needs attention'**
+  String get cloudSyncNeedsAttention;
+
+  /// No description provided for @cloudSyncFileStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates and conflicts'**
+  String get cloudSyncFileStatus;
+
+  /// No description provided for @cloudSyncTransferGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to a new phone'**
+  String get cloudSyncTransferGuide;
+
+  /// No description provided for @cloudSyncTransferGuideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore books and reading progress on a new phone'**
+  String get cloudSyncTransferGuideHint;
+
+  /// No description provided for @cloudSyncTransferIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading a book is optional for progress sync. You only need a cloud copy if the new phone does not already have the book and you want to download it from here.'**
+  String get cloudSyncTransferIntro;
+
+  /// No description provided for @cloudSyncTransferOldPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Sync progress on the old phone'**
+  String get cloudSyncTransferOldPhone;
+
+  /// No description provided for @cloudSyncTransferOldPhoneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the reader to save your latest position, enable Reading progress, and tap Sync now. Use the same WebDAV connection and sync folder on both phones.'**
+  String get cloudSyncTransferOldPhoneBody;
+
+  /// No description provided for @cloudSyncTransferHasBook.
+  ///
+  /// In en, this message translates to:
+  /// **'2. The new phone already has the book'**
+  String get cloudSyncTransferHasBook;
+
+  /// No description provided for @cloudSyncTransferHasBookBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Import the same local file, or open the same online book from the same source. Sync progress, then open the book to continue. Matching titles alone do not guarantee a match.'**
+  String get cloudSyncTransferHasBookBody;
+
+  /// No description provided for @cloudSyncTransferNeedsBook.
+  ///
+  /// In en, this message translates to:
+  /// **'3. The new phone needs the book file'**
+  String get cloudSyncTransferNeedsBook;
+
+  /// No description provided for @cloudSyncTransferNeedsBookBody.
+  ///
+  /// In en, this message translates to:
+  /// **'On the old phone, open Book files, allow uploads and select the book. After upload succeeds, sync the new phone and download it from Available to download. You can also transfer the same file yourself.'**
+  String get cloudSyncTransferNeedsBookBody;
+
+  /// No description provided for @cloudSyncTransferEditedBook.
+  ///
+  /// In en, this message translates to:
+  /// **'If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions.'**
+  String get cloudSyncTransferEditedBook;
 }
 
 class _AppLocalizationsDelegate

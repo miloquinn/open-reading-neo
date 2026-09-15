@@ -13,6 +13,10 @@ import 'package:xxread/services/sync/reading_progress_sync_service.dart';
 import 'package:xxread/services/sync/sync_change_store.dart';
 import 'package:xxread/services/sync/sync_clock.dart';
 import 'package:xxread/services/sync/sync_protocol.dart';
+import 'package:xxread/services/sync/sync_engine.dart';
+import 'package:xxread/services/sync/sync_models.dart';
+import 'package:xxread/services/sync/storage/memory_sync_storage.dart';
+import 'package:xxread/services/sync/storage/sync_storage.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -99,6 +103,84 @@ void main() {
     expect(uid, startsWith('sha256:'));
     expect(uid, await initialBookUidForMap({...row, 'filePath': file.path}));
   });
+
+  test(
+    'new phone with an identical local file receives progress without any book upload',
+    () async {
+      final row = await insertTxt();
+      final uid = await stableBookUidForMap(database, row);
+      final remoteDb = await databaseFactoryFfi.openDatabase(
+        '${tempDirectory.path}/new-phone.db',
+      );
+      try {
+        await _createBooksTable(remoteDb);
+        await WebDavSyncSchemaMigration.migrate(remoteDb);
+        final copied = await File(
+          row['filePath'] as String,
+        ).copy('${tempDirectory.path}/new-phone.txt');
+        final imported = Map<String, Object?>.from(row)..remove('id');
+        imported['filePath'] = copied.path;
+        final id = await remoteDb.insert('books', imported);
+        final newRow = (await remoteDb.query(
+          'books',
+          where: 'id = ?',
+          whereArgs: [id],
+        )).single;
+        expect(await stableBookUidForMap(remoteDb, newRow), uid);
+        final remoteStore = SyncChangeStore(database: () async => remoteDb);
+        final storage = MemorySyncStorage();
+        const scope = WebDavSyncScope(bookFiles: false);
+        final oldEngine = SyncEngine(
+          storage: storage,
+          scope: scope,
+          changeStore: store,
+          installationId: 'old-phone',
+          adapters: MetadataSyncAdapters(
+            store: store,
+            registeredAdapters: [adapterFor(database, store)],
+          ),
+        );
+        await oldEngine.run();
+        final event = _operation(
+          uid,
+          page: 8,
+          device: 'old-phone',
+          vector: {'old-phone': 1},
+        );
+        await store.recordLocal(
+          dataset: 'progress',
+          recordId: uid,
+          entityKey: uid,
+          payload: event.payload,
+          deleted: false,
+          clock: HybridLogicalClock(deviceId: 'old-phone'),
+        );
+        expect((await oldEngine.run()).uploaded, 1);
+        final result = await SyncEngine(
+          storage: storage,
+          scope: scope,
+          changeStore: remoteStore,
+          installationId: 'new-phone',
+          adapters: MetadataSyncAdapters(
+            store: remoteStore,
+            registeredAdapters: [adapterFor(remoteDb, remoteStore)],
+          ),
+        ).run();
+        expect(result.downloaded, 1);
+        final candidates = await remoteStore.statesWithPrefix(
+          'progress_candidate:$uid:',
+        );
+        expect(candidates, hasLength(1));
+        expect(candidates.values.single, contains('remote-event'));
+        expect(candidates.values.single, contains('0.8'));
+        expect((await storage.list(SyncPath('books'))).objects, isEmpty);
+        expect((await storage.list(SyncPath('books'))).prefixes, isEmpty);
+        expect(await remoteDb.query('sync_book_files'), isEmpty);
+      } finally {
+        await remoteDb.close();
+      }
+    },
+  );
 
   test(
     'remote progress is staged and never overwrites the business row',

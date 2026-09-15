@@ -5609,7 +5609,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cloudSyncBooksHint => '参与同步的书籍、正文更新与文件下载';
 
   @override
-  String get cloudSyncActivity => '同步记录与需要处理';
+  String get cloudSyncActivity => '同步详情与问题';
 
   @override
   String get cloudSyncStorage => '存储连接';
@@ -5690,8 +5690,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cloudSyncTextLocation => '云端当前文件';
 
   @override
-  String get cloudSyncTextLocationHint =>
-      '正文修改会更新下方位置的 TXT。升级前的上传副本会保留，但不再跟随正文修改。';
+  String get cloudSyncTextLocationHint => '这里管理已加入同步的书籍更新、暂停和冲突。';
 
   @override
   String get bookSourcesImportIntro => '自动识别书源，预览确认后导入。';
@@ -6308,8 +6307,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourceUpdateFailed => '更新未完成，现有正文已保留，请重试。';
 
   @override
-  String get cloudSyncReadableStorage =>
-      'TXT 按内容块增量同步，未变化的书籍不传输正文。需要在其他软件打开时，可单独导出完整文件到云端。';
+  String get cloudSyncReadableStorage => '书籍修改后重新上传整本；未修改的书籍不会重复传输。阅读进度单独同步。';
 
   @override
   String get bookSourceBindSource => '关联书源';
@@ -6350,6 +6348,68 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get cloudSyncProtocolUpgrade =>
       '此目录使用旧版同步格式，请选择一个新的空目录。本地书籍和原有云端文件都会保留。';
+
+  @override
+  String get cloudSyncSettings => '同步设置';
+
+  @override
+  String get cloudSyncSettingsHint => '自动同步、其他数据与连接';
+
+  @override
+  String get cloudSyncProgressOnlyHint => '只同步阅读位置，不上传书籍文件';
+
+  @override
+  String get cloudSyncProgressExplanation =>
+      '两台设备有同一本书时，可以只同步阅读进度。新手机仍需有可打开的书籍，进度记录本身不包含正文。';
+
+  @override
+  String get cloudSyncFilesEntryHint => '按需上传或下载；编辑后重新上传整本';
+
+  @override
+  String get cloudSyncOtherDataHint => '书架、书源、书签、笔记与阅读设置';
+
+  @override
+  String get cloudSyncActivityHint => '查看进度、文件状态和失败原因';
+
+  @override
+  String get cloudSyncNeedsAttention => '有同步问题需要处理';
+
+  @override
+  String get cloudSyncFileStatus => '更新与冲突';
+
+  @override
+  String get cloudSyncTransferGuide => '换机指南';
+
+  @override
+  String get cloudSyncTransferGuideHint => '新手机怎样恢复书籍与阅读进度';
+
+  @override
+  String get cloudSyncTransferIntro => '同步进度不要求上传书籍。是否需要上传，取决于新手机有没有这本书。';
+
+  @override
+  String get cloudSyncTransferOldPhone => '1. 先在旧手机同步进度';
+
+  @override
+  String get cloudSyncTransferOldPhoneBody =>
+      '退出阅读器以保存最新位置，开启「阅读进度」，然后点击「立即同步」。两台手机使用相同的 WebDAV 连接和同步目录。';
+
+  @override
+  String get cloudSyncTransferHasBook => '2. 新手机已经有这本书';
+
+  @override
+  String get cloudSyncTransferHasBookBody =>
+      '导入同一份本地文件，或打开同一书源的同一本在线书，然后同步进度并打开书籍接续。不需要再上传正文；仅书名相同不能保证匹配。';
+
+  @override
+  String get cloudSyncTransferNeedsBook => '3. 新手机还没有书籍文件';
+
+  @override
+  String get cloudSyncTransferNeedsBookBody =>
+      '旧手机进入「书籍文件」，允许上传并选择这本书。上传成功后，新手机同步，再到「可下载」中下载。也可以自行传入同一份文件，再同步进度。';
+
+  @override
+  String get cloudSyncTransferEditedBook =>
+      '如果旧手机编辑过正文，建议通过「书籍文件」上传并在新手机下载该版本，以保留书籍关联。不同内容版本的阅读位置可能无法准确恢复。';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -11837,7 +11897,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get cloudSyncBooksHint => '參與同步的書籍、正文更新與檔案下載';
 
   @override
-  String get cloudSyncActivity => '同步紀錄與需要處理';
+  String get cloudSyncActivity => '同步詳情與問題';
 
   @override
   String get cloudSyncStorage => '儲存連線';
@@ -11918,8 +11978,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get cloudSyncTextLocation => '雲端目前檔案';
 
   @override
-  String get cloudSyncTextLocationHint =>
-      '正文修改會更新下方位置的 TXT。升級前的上傳副本會保留，但不再跟隨正文修改。';
+  String get cloudSyncTextLocationHint => '這裡管理已加入同步的書籍更新、暫停和衝突。';
 
   @override
   String get bookSourcesImportIntro => '自動識別書源，預覽確認後匯入。';
@@ -12537,8 +12596,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourceUpdateFailed => '更新未完成，現有正文已保留，請重試。';
 
   @override
-  String get cloudSyncReadableStorage =>
-      'TXT 依內容區塊增量同步，未變更的書籍不傳輸正文。需要在其他軟體開啟時，可另外匯出完整檔案至雲端。';
+  String get cloudSyncReadableStorage => '書籍修改後重新上傳整本；未修改的書籍不會重複傳輸。閱讀進度獨立同步。';
 
   @override
   String get bookSourceBindSource => '關聯書源';
@@ -12579,4 +12637,66 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get cloudSyncProtocolUpgrade =>
       '此目錄使用舊版同步格式，請選擇新的空目錄。本機書籍與原有雲端檔案都會保留。';
+
+  @override
+  String get cloudSyncSettings => '同步設定';
+
+  @override
+  String get cloudSyncSettingsHint => '自動同步、其他資料與連線';
+
+  @override
+  String get cloudSyncProgressOnlyHint => '只同步閱讀位置，不上傳書籍檔案';
+
+  @override
+  String get cloudSyncProgressExplanation =>
+      '兩台裝置有同一本書時，可以只同步閱讀進度。新手機仍需有可開啟的書籍，進度記錄本身不包含正文。';
+
+  @override
+  String get cloudSyncFilesEntryHint => '按需上傳或下載；編輯後重新上傳整本';
+
+  @override
+  String get cloudSyncOtherDataHint => '書架、書源、書籤、筆記與閱讀設定';
+
+  @override
+  String get cloudSyncActivityHint => '檢視進度、檔案狀態和失敗原因';
+
+  @override
+  String get cloudSyncNeedsAttention => '有同步問題需要處理';
+
+  @override
+  String get cloudSyncFileStatus => '更新與衝突';
+
+  @override
+  String get cloudSyncTransferGuide => '換機指南';
+
+  @override
+  String get cloudSyncTransferGuideHint => '新手機如何恢復書籍與閱讀進度';
+
+  @override
+  String get cloudSyncTransferIntro => '同步進度不要求上傳書籍。是否需要上傳，取決於新手機有沒有這本書。';
+
+  @override
+  String get cloudSyncTransferOldPhone => '1. 先在舊手機同步進度';
+
+  @override
+  String get cloudSyncTransferOldPhoneBody =>
+      '退出閱讀器以儲存最新位置，開啟「閱讀進度」，然後點選「立即同步」。兩台手機使用相同的 WebDAV 連線和同步目錄。';
+
+  @override
+  String get cloudSyncTransferHasBook => '2. 新手機已經有這本書';
+
+  @override
+  String get cloudSyncTransferHasBookBody =>
+      '匯入同一份本機檔案，或開啟同一書源的同一本線上書，然後同步進度並開啟書籍接續。不需要再上傳正文；僅書名相同不能保證配對。';
+
+  @override
+  String get cloudSyncTransferNeedsBook => '3. 新手機還沒有書籍檔案';
+
+  @override
+  String get cloudSyncTransferNeedsBookBody =>
+      '舊手機進入「書籍檔案」，允許上傳並選取這本書。上傳成功後，新手機同步，再到「可下載」中下載。也可以自行傳入同一份檔案，再同步進度。';
+
+  @override
+  String get cloudSyncTransferEditedBook =>
+      '如果舊手機編輯過正文，建議透過「書籍檔案」上傳並在新手機下載該版本，以保留書籍關聯。不同內容版本的閱讀位置可能無法準確恢復。';
 }

@@ -2865,7 +2865,7 @@
   "cloudSyncMoreContent": "その他の同期内容",
   "cloudSyncBooks": "本と本文",
   "cloudSyncBooksHint": "同期する本、本文の更新とダウンロード",
-  "cloudSyncActivity": "同期履歴と対応が必要な項目",
+  "cloudSyncActivity": "同期の詳細と問題",
   "cloudSyncStorage": "ストレージ接続",
   "cloudSyncNoActivity": "同期履歴はまだありません",
   "cloudSyncProgress": "読書位置",
@@ -2892,7 +2892,7 @@
   "cloudSyncParticipate": "この本の本文を同期",
   "cloudSyncCloseReaderToUpdate": "本文の更新を適用する前に、この本の読書・編集画面を閉じてください",
   "cloudSyncTextLocation": "クラウド上の現在のファイル",
-  "cloudSyncTextLocationHint": "本文の編集は以下の場所のTXTに反映されます。アップグレード前のコピーは保持されますが、その後の編集は反映されません。",
+  "cloudSyncTextLocationHint": "同期に参加する本の更新・一時停止・競合を管理します。",
   "bookSourcesImportIntro": "ソースを自動認識します。確認してからインポートしてください。",
   "bookSourcesImportInputStep": "書源を選択",
   "bookSourcesImportReviewStep": "確認して追加",
@@ -3101,7 +3101,7 @@
   "bookSourceKeepLocal": "自分の本文を保持",
   "bookSourceUseRemote": "配信元の本文を使用",
   "bookSourceUpdateFailed": "更新できませんでした。現在の本文は保持されています。再試行してください。",
-  "cloudSyncReadableStorage": "TXT は変更されたブロックを同期し、未変更の本文は転送しません。他のアプリで開く場合は、完全なファイルをクラウドに書き出せます。",
+  "cloudSyncReadableStorage": "編集した本はファイル全体をアップロードします。未変更の本は再送しません。読書位置は別に同期されます。",
   "@bookSourceUpdateSummary": {
     "placeholders": {
       "added": {
@@ -3124,5 +3124,24 @@
   "cloudSyncExportBook": "完全なファイルをクラウドに書き出す",
   "cloudSyncExportDone": "完全なファイルを書き出しました",
   "cloudSyncDiagnostics": "同期の診断情報をコピー",
-  "cloudSyncProtocolUpgrade": "このフォルダは古い同期形式です。新しい空のフォルダを選んでください。端末の書籍と既存のクラウドファイルは保持されます。"
+  "cloudSyncProtocolUpgrade": "このフォルダは古い同期形式です。新しい空のフォルダを選んでください。端末の書籍と既存のクラウドファイルは保持されます。",
+  "cloudSyncSettings": "同期設定",
+  "cloudSyncSettingsHint": "自動同期・その他のデータ・接続",
+  "cloudSyncProgressOnlyHint": "本のファイルをアップロードせず、読書位置を同期",
+  "cloudSyncProgressExplanation": "両方の端末に同じ本があれば、読書位置だけを同期できます。進捗データに本文は含まれないため、新しい端末にも読める本が必要です。",
+  "cloudSyncFilesEntryHint": "必要な本を送受信。編集後はファイル全体をアップロード",
+  "cloudSyncOtherDataHint": "本棚・配信元・しおり・メモ・読書設定",
+  "cloudSyncActivityHint": "進捗・ファイルの状態・エラーの詳細",
+  "cloudSyncNeedsAttention": "同期の問題を確認してください",
+  "cloudSyncFileStatus": "更新と競合",
+  "cloudSyncTransferGuide": "機種変更ガイド",
+  "cloudSyncTransferGuideHint": "新しい端末に本と読書位置を復元する方法",
+  "cloudSyncTransferIntro": "読書位置の同期に本のアップロードは必須ではありません。新しい端末に本がなく、ここからダウンロードしたい場合にアップロードします。",
+  "cloudSyncTransferOldPhone": "1. 古い端末で読書位置を同期",
+  "cloudSyncTransferOldPhoneBody": "リーダーを閉じて最新の位置を保存し、「読書位置」を有効にして「今すぐ同期」を押します。両方の端末で同じ WebDAV 接続と同期フォルダを使用してください。",
+  "cloudSyncTransferHasBook": "2. 新しい端末に本がある場合",
+  "cloudSyncTransferHasBookBody": "同じローカルファイルを取り込むか、同じ配信元の同じオンライン本を開きます。同期してから本を開くと続きへ進めます。タイトルが同じだけでは一致するとは限りません。",
+  "cloudSyncTransferNeedsBook": "3. 新しい端末に本がない場合",
+  "cloudSyncTransferNeedsBookBody": "古い端末の「本のファイル」でアップロードを許可し、本を選びます。完了後、新しい端末で同期し、ダウンロード一覧から取得します。同じファイルを自分で転送しても構いません。",
+  "cloudSyncTransferEditedBook": "古い端末で本文を編集した場合は、その版を「本のファイル」からアップロードし、新しい端末でダウンロードすると本の関連付けを保てます。本文の版が異なると読書位置を正確に復元できない場合があります。"
 }

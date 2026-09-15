@@ -10,6 +10,7 @@ class SourceScriptState {
   Map<String, String> values = {};
   Map<String, String> loginInfo = {};
   Map<String, String> loginHeaders = {};
+  String? rawLoginHeader;
   Map<String, Object?> javaState = {};
   final Map<String, SourceScriptCacheEntry> cache = {};
   final Map<String, Object?> memoryCache = {};

@@ -327,6 +327,95 @@ void main() {
     expect(prefs.getString(MemberAccountSummaryCache.storageKey), isNull);
   });
 
+  test('membership cache round-trips an account-bound entitlement', () async {
+    SharedPreferences.setMockInitialValues({});
+    const cache = MemberMembershipCache();
+    final expiresAt = DateTime.utc(2027, 1, 2, 3, 4, 5);
+    final membership = MemberMembership(
+      userId: 'user-1',
+      premium: true,
+      purchaseAllowed: true,
+      features: const {'private_network_sources': true},
+      entitlements: [
+        MemberEntitlement(
+          featureKey: 'premium',
+          source: 'promotion',
+          status: 'active',
+          grantedAt: DateTime.utc(2026, 1, 1),
+          expiresAt: expiresAt,
+        ),
+      ],
+    );
+
+    await cache.save('user-1', membership);
+    final restored = await cache.load();
+
+    expect(restored?.userId, 'user-1');
+    expect(restored?.membership.hasActivePremium, isTrue);
+    expect(restored?.membership.premiumExpiresAt, expiresAt);
+    expect(restored?.membership.features['private_network_sources'], isTrue);
+  });
+
+  test(
+    'cold start exposes cached membership while server refresh is pending',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      const cache = MemberMembershipCache();
+      const accountId = '6e29be31-ffeb-4699-bf69-8b37afe15504';
+      await cache.save(
+        accountId,
+        const MemberMembership(
+          userId: accountId,
+          premium: true,
+          features: {},
+          entitlements: [],
+        ),
+      );
+      final membershipResponse = Completer<ResponseBody>();
+      final controller = MemberAccountController(
+        membershipCache: cache,
+        api: _client(
+          _AsyncRouteAdapter((options) async {
+            return switch (options.uri.path) {
+              '/api/v1/auth/config' => _json({'providers': {}}),
+              '/api/v1/membership/config' => _json({
+                'product': 'premium_lifetime',
+                'features': [],
+              }),
+              '/api/v1/auth/me' => _json({'user': _user()}),
+              '/api/v1/membership' => membershipResponse.future,
+              '/api/v1/membership/referral' => _json({
+                'invite_code': 'TEST',
+                'invite_url': 'https://example.test/invite',
+              }),
+              _ => throw StateError('Unexpected route ${options.uri.path}'),
+            };
+          }),
+          _MemoryTokenStore(accessToken: 'access', refreshToken: 'refresh'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final initialization = controller.initialize();
+      for (
+        var attempt = 0;
+        attempt < 20 && !controller.hasPremiumAccess;
+        attempt++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.hasPremiumAccess, isTrue);
+
+      membershipResponse.complete(
+        _json({'premium': false, 'features': {}, 'entitlements': []}),
+      );
+      await initialization;
+      expect(controller.hasPremiumAccess, isFalse);
+      expect((await cache.load())?.membership.premium, isFalse);
+    },
+  );
+
   test(
     'password login stores the rotated session without exposing secrets',
     () async {
@@ -559,6 +648,49 @@ void main() {
         'https://open.xxread.top/support',
       );
       expect(controller.error, isNull);
+    },
+  );
+
+  test(
+    'trial expiry revokes access and notifies without another network request',
+    () async {
+      final storage = _MemoryTokenStore();
+      final expiresAt = DateTime.now().add(const Duration(seconds: 1));
+      final adapter = _RouteAdapter(
+        (options) => switch (options.uri.path) {
+          '/api/v1/auth/password/login' => _json(
+            _session(access: 'trial', refresh: 'trial-refresh'),
+          ),
+          '/api/v1/membership' => _json({
+            'premium': true,
+            'features': <String, bool>{},
+            'entitlements': [
+              {
+                'feature_key': 'premium',
+                'source': 'promotion',
+                'status': 'active',
+                'granted_at': DateTime.now().toIso8601String(),
+                'expires_at': expiresAt.toIso8601String(),
+              },
+            ],
+          }),
+          _ => throw StateError('Unexpected route ${options.uri.path}'),
+        },
+      );
+      final controller = MemberAccountController(
+        api: _client(adapter, storage),
+      );
+      addTearDown(controller.dispose);
+      await controller.loginPassword('reader@example.com', 'secret');
+      expect(controller.hasPremiumAccess, isTrue);
+      final expired = Completer<void>();
+      controller.addListener(() {
+        if (!controller.hasPremiumAccess && !expired.isCompleted) {
+          expired.complete();
+        }
+      });
+      await expired.future.timeout(const Duration(seconds: 3));
+      expect(controller.hasPremiumAccess, isFalse);
     },
   );
 

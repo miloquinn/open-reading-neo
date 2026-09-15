@@ -149,7 +149,7 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     }
     result = result.trim();
     if (resolveUrl && result.isNotEmpty) {
-      return _resolveRuleRequestUrl(
+      return resolveSourceRuleRequestUrl(
         document.baseUri,
         result,
         'reading source rule produced a non-HTTP URL.',
@@ -223,7 +223,7 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
     }
     result = result.trim();
     if (resolveUrl && result.isNotEmpty) {
-      return _resolveRuleRequestUrl(
+      return resolveSourceRuleRequestUrl(
         document.baseUri,
         result,
         'Source rule produced a non-HTTP URL.',
@@ -429,16 +429,4 @@ class SourceRuleEngine implements SourceRuleSelectorPort {
       _ => [value],
     };
   }
-}
-
-String _resolveRuleRequestUrl(Uri baseUri, String value, String errorMessage) {
-  final urlText = value.split(RegExp(r',\s*\{')).first.trim();
-  final directUri = Uri.tryParse(urlText);
-  if (directUri?.scheme == 'data') return value;
-  final resolved = resolveSourceRequestUrl(baseUri, value);
-  final uri = Uri.tryParse(resolved.split(RegExp(r',\s*\{')).first);
-  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-    throw BookSourceProtocolException(errorMessage);
-  }
-  return resolved;
 }

@@ -419,7 +419,7 @@ class SourceHttpTransport
           };
           if (!redirectStatuses.contains(status)) {
             throw BookSourceProtocolException(
-              'Reading source returned HTTP $status.',
+              'Reading source returned HTTP $status (${current.host}${current.path}).',
             );
           }
           if (redirects == maxRedirects) {
@@ -556,11 +556,7 @@ class SourceHttpTransport
             );
             continue;
           }
-          throw BookSourceProtocolException(
-            error.response?.statusCode == null
-                ? 'Could not connect to this reading source.'
-                : 'Reading source returned HTTP ${error.response!.statusCode}.',
-          );
+          throw _requestFailure(current, error.response);
         }
       }
     } finally {
@@ -570,4 +566,36 @@ class SourceHttpTransport
       'reading source source request failed.',
     );
   }
+}
+
+BookSourceProtocolException _requestFailure(
+  Uri uri,
+  Response<dynamic>? response,
+) {
+  if (response?.statusCode == null) {
+    return const BookSourceProtocolException(
+      'Could not connect to this reading source.',
+    );
+  }
+  String? detail;
+  try {
+    final data = response!.data;
+    // Only expose a bounded JSON error message, never headers, query tokens,
+    // or an entire HTML response (which may contain account information).
+    final decoded = data is List<int> && data.length <= 65536
+        ? jsonDecode(utf8.decode(data, allowMalformed: true))
+        : null;
+    if (decoded is Map) {
+      final message = decoded['message'] ?? decoded['msg'] ?? decoded['error'];
+      if (message is String && message.trim().isNotEmpty) {
+        detail = message.trim();
+        if (detail.length > 300) detail = '${detail.substring(0, 300)}…';
+      }
+    }
+  } on FormatException {
+    // Non-JSON failures still retain status and the endpoint without its query.
+  }
+  return BookSourceProtocolException(
+    'Reading source returned HTTP ${response!.statusCode} (${uri.host}${uri.path}).${detail == null ? '' : ' $detail'}',
+  );
 }

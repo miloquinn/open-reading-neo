@@ -8,7 +8,8 @@ const String privateBookSourceNetworkPreferenceKey =
 
 /// Shared runtime gate for consumers outside the widget/provider tree.
 /// AppSettingsNotifier keeps this in sync with verified account membership.
-/// Never persist the entitlement or restore it from the account UI cache.
+/// Persistence is owned by the account controller and restored only after the
+/// cached membership is matched to the authenticated account.
 class AdvancedFeatureAccess {
   static final ValueNotifier<bool> _premiumUnlocked = ValueNotifier(false);
 

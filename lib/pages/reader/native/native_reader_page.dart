@@ -1,3 +1,5 @@
+import '../book_settings_page.dart';
+import '../../../widgets/generated_book_cover.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;

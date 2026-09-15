@@ -21,6 +21,41 @@ void main() {
     });
 
     test(
+      'HTTP errors expose JSON reason without request query credentials',
+      () async {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server!.listen((request) async {
+          request.response.statusCode = 400;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({'message': 'Membership required'}),
+          );
+          await request.response.close();
+        });
+        final transport = SourceHttpTransport(
+          networkPolicy: const BookSourceNetworkPolicy(
+            allowPrivateNetwork: true,
+          ),
+        );
+        addTearDown(transport.close);
+        final url = 'http://127.0.0.1:${server!.port}/books?token=private-test';
+        await expectLater(
+          transport.send(
+            SourceRequestTemplate.parse(url, baseUri: Uri.parse(url)),
+          ),
+          throwsA(
+            predicate(
+              (error) =>
+                  '$error'.contains('Membership required') &&
+                  '$error'.contains('/books') &&
+                  !'$error'.contains('private-test'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'sends structured source JSON as UTF-8 bytes with its media type',
       () async {
         server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

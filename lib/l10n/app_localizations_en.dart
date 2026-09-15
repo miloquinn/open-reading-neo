@@ -705,6 +705,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceLoginTitle => 'Source sign-in';
 
   @override
+  String get sourceLoginInfo => 'Sign-in details';
+
+  @override
+  String get sourceLoginActions => 'Source actions';
+
+  @override
+  String get sourceLoginExtraSettings => 'Additional settings';
+
+  @override
   String get sourceLoginSecureStorageNotice =>
       'Sign-in details stay in this device\'s secure system storage.';
 
@@ -6052,6 +6061,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not read sources. Check the address or file and try again.';
 
   @override
+  String get bookSourcesImportWebPage =>
+      'This URL returned a website or sign-in page. Copy the website’s source download or subscription JSON link and import that instead. You can sign in after importing the source.';
+
+  @override
   String get bookSourcesImportSaveFailed =>
       'Could not save sources. Your preview is kept; please try again.';
 
@@ -6843,4 +6856,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String readerChapterProgressRemaining(int count) {
     return '$count chapters ahead';
   }
+
+  @override
+  String premiumTrialExpiresAt(String date) {
+    return 'Premium trial expires on $date.';
+  }
+
+  @override
+  String get premiumTrialTitle => 'Premium trial';
 }

@@ -37,6 +37,14 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
 
   @override
   Future<Object?> evaluateAsync(String script, SourceScriptContext context) {
+    // A network/interaction handler can evaluate a header or response script
+    // before its parent can resume. Queueing that child behind its parent
+    // deadlocks both. Attempts themselves are synchronous, so children in the
+    // active operation can safely run while the parent awaits its handler.
+    final scope = Zone.current[this];
+    if (scope is _SourceEvaluationScope && scope.active) {
+      return _evaluateAsyncLocked(script, context);
+    }
     final previous = _evaluationTail;
     final operation = () async {
       try {
@@ -44,7 +52,15 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
       } on Object {
         // A failed script must not poison the queue for later sources.
       }
-      return _evaluateAsyncLocked(script, context);
+      final scope = _SourceEvaluationScope();
+      try {
+        return await runZoned(
+          () => _evaluateAsyncLocked(script, context),
+          zoneValues: {this: scope},
+        );
+      } finally {
+        scope.active = false;
+      }
     }();
     _evaluationTail = operation.then<void>((_) {}, onError: (_, _) {});
     return operation;
@@ -56,6 +72,7 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
   ) async {
     final networkResponses = <String, SourceScriptNetworkResult>{};
     final interactionResponses = <String, SourceScriptInteractionResult>{};
+    final replayValues = <String, Object?>{};
     var networkCount = 0;
     var interactionCount = 0;
     for (var replayCount = 0; replayCount < 24; replayCount++) {
@@ -65,6 +82,7 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
           context,
           networkResponses,
           interactionResponses,
+          replayValues,
         );
       } on _SourceNetworkNeeded catch (pending) {
         if (++networkCount > 12) {
@@ -78,9 +96,20 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
             'This source script requested network access outside a source operation.',
           );
         }
-        networkResponses[pending.request.signature] = await handler(
-          pending.request,
-        );
+        try {
+          networkResponses[pending.request.signature] = await handler(
+            pending.request,
+          );
+        } on BookSourceProtocolException catch (error) {
+          // Replay failures at the original JS call site so the source's own
+          // try/catch can handle optional endpoints. Cancellation is not caught.
+          networkResponses[pending.request.signature] =
+              SourceScriptNetworkResult(
+                body: '',
+                finalUrl: pending.request.url,
+                failureMessage: error.message,
+              );
+        }
       } on _SourceInteractionNeeded catch (pending) {
         if (++interactionCount > 4) {
           throw const BookSourceProtocolException(
@@ -115,12 +144,14 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     SourceScriptContext context,
     Map<String, SourceScriptNetworkResult> networkResponses, [
     Map<String, SourceScriptInteractionResult> interactionResponses = const {},
+    Map<String, Object?>? replayValues,
   ]) {
     if (_disposed) throw StateError('The source script evaluator is disposed.');
     final state = _host.beginInvocation(
       context,
       networkResponses,
       interactionResponses,
+      replayValues ?? <String, Object?>{},
     );
     try {
       final payload = SourceScriptBootstrap.payload(script, context, state);
@@ -155,6 +186,11 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
         throw const FormatException('Script result envelope is not an object.');
       }
       state.variable = '${envelope['sourceVariable'] ?? ''}';
+      if (envelope['messages'] case final List messages) {
+        for (final message in messages.whereType<String>()) {
+          context.messageWriter?.call(message);
+        }
+      }
       if (envelope['sourceValues'] case final Map sourceValues) {
         state.values = sourceValues.map(
           (key, value) => MapEntry('$key', '${value ?? ''}'),
@@ -174,10 +210,12 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
         final normalized = loginHeaders.map(
           (key, value) => MapEntry('$key', '${value ?? ''}'),
         );
+        final raw = envelope['rawLoginHeader'] as String? ?? '';
         if (context.loginHeaderWriter != null) {
-          context.loginHeaderWriter!(normalized);
+          context.loginHeaderWriter!(normalized, rawLoginHeader: raw);
         } else {
           state.loginHeaders = normalized;
+          state.rawLoginHeader = raw;
         }
       }
       if (envelope['browserLocalStorage'] case final Map origins) {
@@ -233,6 +271,10 @@ class QuickJsSourceScriptEvaluator implements SourceScriptEvaluator {
     _disposed = true;
     _runtime.dispose();
   }
+}
+
+class _SourceEvaluationScope {
+  bool active = true;
 }
 
 class _SourceNetworkNeeded implements Exception {

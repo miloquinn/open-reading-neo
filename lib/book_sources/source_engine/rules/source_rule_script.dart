@@ -204,7 +204,7 @@ class SourceRuleScript {
     }
     value = value.trim();
     if (resolveUrl && value.isNotEmpty) {
-      return _resolveUrl(
+      return resolveSourceRuleRequestUrl(
         document.baseUri,
         value,
         'reading source script produced a non-HTTP URL.',
@@ -253,7 +253,7 @@ class SourceRuleScript {
     }
     value = value.trim();
     if (resolveUrl && value.isNotEmpty) {
-      return _resolveUrl(
+      return resolveSourceRuleRequestUrl(
         document.baseUri,
         value,
         'Source script produced a non-HTTP URL.',
@@ -369,23 +369,13 @@ class SourceRuleScript {
       cookieRemover: context.cookieRemover,
       loginInfo: context.loginInfo,
       loginHeaders: context.loginHeaders,
+      rawLoginHeader: context.rawLoginHeader,
       browserLocalStorage: context.browserLocalStorage,
       localStorageWriter: context.localStorageWriter,
       loginInfoWriter: context.loginInfoWriter,
       loginHeaderWriter: context.loginHeaderWriter,
+      messageWriter: context.messageWriter,
       interactionHandler: context.interactionHandler,
     );
   }
-}
-
-String _resolveUrl(Uri baseUri, String value, String errorMessage) {
-  final urlText = value.split(RegExp(r',\s*\{')).first.trim();
-  final directUri = Uri.tryParse(urlText);
-  if (directUri?.scheme == 'data') return value;
-  final resolved = resolveSourceRequestUrl(baseUri, value);
-  final uri = Uri.tryParse(resolved.split(RegExp(r',\s*\{')).first);
-  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-    throw BookSourceProtocolException(errorMessage);
-  }
-  return resolved;
 }

@@ -6,6 +6,27 @@ import 'package:xxread/book_sources/source_engine/source_cookie_jar.dart';
 
 void main() {
   group('SourceCookieJar', () {
+    test('script updates and expiring preferences preserve login cookies', () {
+      final jar = SourceCookieJar();
+      final uri = Uri.parse('https://books.test');
+      jar.setScriptCookies('source', uri, 'qttoken=secret; deviceId=device');
+      jar.setScriptCookies('source', uri, 'theme=dark; Path=/');
+      expect(
+        jar.scriptCookieHeader('source', uri),
+        'qttoken=secret; deviceId=device; theme=dark',
+      );
+      jar.setScriptCookies('source', uri, 'theme=; Max-Age=0; Path=/');
+      expect(
+        jar.scriptCookieHeader('source', uri),
+        'qttoken=secret; deviceId=device',
+      );
+      expect(jar.scriptCookieHeader('other', uri), isEmpty);
+      jar.setScriptCookies('source', uri, 'replacement=new');
+      expect(jar.scriptCookieHeader('source', uri), 'replacement=new');
+      jar.removeScriptCookies('source', uri);
+      expect(jar.scriptCookieHeader('source', uri), isEmpty);
+    });
+
     test('matches domain, secure, and longest paths', () {
       final jar = SourceCookieJar();
       final headers = Headers.fromMap({

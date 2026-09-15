@@ -18,9 +18,16 @@ class SourceScriptBootstrap {
     final loginInfo = context.loginInfo.isEmpty
         ? state.loginInfo
         : context.loginInfo;
-    final loginHeaders = context.loginHeaders.isEmpty
-        ? state.loginHeaders
-        : context.loginHeaders;
+    final ownsSession = context.loginHeaderWriter != null;
+    final loginHeaders = ownsSession || context.loginHeaders.isNotEmpty
+        ? context.loginHeaders
+        : state.loginHeaders;
+    final rawLoginHeader =
+        context.rawLoginHeader ??
+        (!ownsSession && context.loginHeaders.isEmpty
+            ? state.rawLoginHeader
+            : null) ??
+        (loginHeaders.isEmpty ? '' : jsonEncode(loginHeaders));
     return <String, Object?>{
       'script': script,
       'sourceId': context.source.stableId,
@@ -45,8 +52,9 @@ class SourceScriptBootstrap {
       'sourceValues': state.values,
       'loginInfo': loginInfo,
       'loginHeaders': loginHeaders,
+      'rawLoginHeader': rawLoginHeader,
       'browserLocalStorage': context.browserLocalStorage,
-      'storageOrigin': (context.baseUrl ?? context.source.baseUri).origin,
+      'storageOrigin': _storageOrigin(context),
       'sharedScript': context.source.jsLib,
       'state': state.javaState,
       'result': context.result is SourceScriptNetworkResult
@@ -63,6 +71,18 @@ class SourceScriptBootstrap {
       'book': context.book,
       'chapter': context.chapter,
     };
+  }
+
+  static String _storageOrigin(SourceScriptContext context) {
+    final base = context.baseUrl;
+    // Inline data: book/chapter payloads inherit the source's storage scope.
+    // They have no HTTP origin of their own.
+    if (base != null &&
+        (base.scheme == 'http' || base.scheme == 'https') &&
+        base.host.isNotEmpty) {
+      return base.origin;
+    }
+    return context.source.baseUri.origin;
   }
 
   static String build(Map<String, Object?> payload) {
@@ -87,6 +107,8 @@ class SourceScriptBootstrap {
   const __ruleValues = Object.assign({}, __payload.variables || {});
   let __loginInfo = Object.assign({}, __payload.loginInfo || {});
   let __loginHeaders = Object.assign({}, __payload.loginHeaders || {});
+  let __rawLoginHeader = __payload.rawLoginHeader || '';
+  const __messages = [];
   const __browserLocalStorage = Object.assign(Object.create(null), __payload.browserLocalStorage || {});
   const __storageOrigin = __payload.storageOrigin;
   const __clearedStorageOrigins = new Set();
@@ -141,20 +163,17 @@ class SourceScriptBootstrap {
     },
     get: (name) => __sourceValues[String(name)] || '',
     getHeaderMap: () => __javaMap(__payload.sourceHeader || {}),
-    getLoginHeader: () => Object.keys(__loginHeaders).length
-      ? JSON.stringify(__loginHeaders)
-      : '',
+    getLoginHeader: () => __rawLoginHeader,
     getLoginHeaderMap: () => __javaMap(__loginHeaders),
     putLoginHeader: (value) => {
-      if (typeof value === 'string') {
-        try { __loginHeaders = Object.assign({}, JSON.parse(value) || {}); }
-        catch (_) { __loginHeaders = {}; }
-      } else {
-        __loginHeaders = Object.assign({}, value || {});
-      }
+      __rawLoginHeader = typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
+      let parsed;
+      try { parsed = JSON.parse(__rawLoginHeader); } catch (_) {}
+      __loginHeaders = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? Object.assign({}, parsed) : {};
       return value;
     },
-    removeLoginHeader: () => { __loginHeaders = {}; return null; },
+    removeLoginHeader: () => { __loginHeaders = {}; __rawLoginHeader = ''; return null; },
     getLocalStorage: (origin) => __javaMap(__storage(origin)),
     getLoginInfo: () => JSON.stringify(__loginInfo),
     getLoginInfoMap: () => __javaMap(__loginInfo),
@@ -403,8 +422,8 @@ class SourceScriptBootstrap {
   };
   globalThis.java = {
     log: (value) => value,
-    toast: () => null,
-    longToast: () => null,
+    toast: (value) => { __messages.push(String(value)); return null; },
+    longToast: (value) => { __messages.push(String(value)); return null; },
     put: (name, value) => {
       const key = String(name);
       if (__payload.hasChapter) globalThis.chapter.putVariable(key, value);
@@ -658,6 +677,9 @@ class SourceScriptBootstrap {
       throw new Error('__OPEN_READING_NETWORK__' +
         encodeURIComponent(JSON.stringify(request)));
     }
+    if (reply.value && reply.value.failureMessage != null) {
+      throw new Error(reply.value.failureMessage);
+    }
     return reply.value || { body: '', finalUrl: String(url) };
   }
   if (__payload.result && __payload.result.__networkResponse === true) {
@@ -673,7 +695,22 @@ class SourceScriptBootstrap {
     (__payload.sharedScript || '') +
     '\\n' + ${jsonEncode(sharedFunctionExports)} +
     '\\nreturn eval(' + JSON.stringify(__payload.script) + ');\\n})';
+  const __nativeDate = globalThis.Date;
+  const __nativeMath = Math;
+  const __nativeRandom = Object.getOwnPropertyDescriptor(Math, 'random');
   try {
+  // Replayed synchronous scripts must reuse values already observed before
+  // awaiting I/O. New calls after the await still observe fresh time/randomness.
+  function __ReplayDate(...args) {
+    if (!new.target) return new __nativeDate(__host('replayNow', [])).toString();
+    return Reflect.construct(__nativeDate,
+      args.length ? args : [__host('replayNow', [])], new.target);
+  }
+  Object.setPrototypeOf(__ReplayDate, __nativeDate);
+  __ReplayDate.prototype = __nativeDate.prototype;
+  __ReplayDate.now = () => __host('replayNow', []);
+  globalThis.Date = __ReplayDate;
+  Math.random = () => __host('replayRandom', []);
   const __run = (0, eval)(__program);
   let __value = __run((name, value) => {
     __globals[name] = value;
@@ -687,11 +724,14 @@ class SourceScriptBootstrap {
     sourceValues: __sourceValues,
     loginInfo: __loginInfo,
     loginHeaders: __loginHeaders,
+    rawLoginHeader: __rawLoginHeader,
+    messages: __messages,
     browserLocalStorage: __browserLocalStorage,
     clearedStorageOrigins: Array.from(__clearedStorageOrigins),
     state: __state
   });
   } finally {
+    __defineGlobal(__nativeMath, 'random', __nativeRandom);
     for (const [name, descriptor] of __importedGlobals) {
       if (descriptor) __defineGlobal(__globals, name, descriptor);
       else delete __globals[name];

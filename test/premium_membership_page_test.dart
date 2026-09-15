@@ -39,6 +39,35 @@ void main() {
     await icons.load();
   });
 
+  testWidgets('active trial shows expiration and can redeem another code', (
+    tester,
+  ) async {
+    _usePlatform(TargetPlatform.android);
+    final store = _FakeAppleStore();
+    final account = _TestAccount(
+      store: store,
+      premium: true,
+      source: 'promotion',
+      expiresAt: DateTime.now().add(const Duration(days: 7)),
+    );
+    addTearDown(account.dispose);
+    addTearDown(store.close);
+    await _pumpPage(tester, account: account);
+    await tester.pumpAndSettle();
+    expect(find.text('高级版体验'), findsOneWidget);
+    expect(find.textContaining('高级版体验有效至'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('account-redemption-code')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('account-redeem-premium')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    _resetPlatform();
+  });
+
   for (final source in ['admin', 'card', 'apple']) {
     testWidgets('existing $source member sees channel and retains restore', (
       tester,
@@ -549,10 +578,12 @@ class _TestAccount extends MemberAccountController {
     required ApplePurchaseStore store,
     this.premium = false,
     this.source,
+    this.expiresAt,
   }) : super(appleStore: store);
 
   final bool premium;
   final String? source;
+  final DateTime? expiresAt;
 
   @override
   MemberMembership get membership => MemberMembership(
@@ -565,6 +596,7 @@ class _TestAccount extends MemberAccountController {
           source: source!,
           status: 'active',
           grantedAt: _createdAt,
+          expiresAt: expiresAt,
         ),
     ],
   );

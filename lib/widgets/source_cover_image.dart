@@ -83,6 +83,26 @@ class _SourceCoverImageState extends State<SourceCoverImage> {
           cacheWidth: widget.cacheWidth,
           cacheHeight: widget.cacheHeight,
           gaplessPlayback: true,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded) return child;
+            // Bytes arriving is not the same as a decoded frame arriving.
+            // Keep the placeholder underneath until the image can paint, then
+            // fade the image in once without fading the placeholder out first.
+            return Stack(
+              fit: StackFit.passthrough,
+              children: [
+                Positioned.fill(child: widget.fallback),
+                AnimatedOpacity(
+                  opacity: frame == null ? 0 : 1,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  child: child,
+                ),
+              ],
+            );
+          },
           errorBuilder: (_, _, _) {
             _retryAfterDecodeFailure();
             return widget.fallback;

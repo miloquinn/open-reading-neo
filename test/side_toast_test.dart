@@ -102,4 +102,54 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
   });
+
+  testWidgets('side toast can be swiped away', (tester) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (buildContext) {
+            context = buildContext;
+            return const Scaffold();
+          },
+        ),
+      ),
+    );
+
+    showSideToast(context, 'Swipe me', duration: const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.drag(find.text('Swipe me'), const Offset(500, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Swipe me'), findsNothing);
+  });
+
+  testWidgets('side toast action runs and dismisses the toast', (tester) async {
+    late BuildContext context;
+    var actionRuns = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (buildContext) {
+            context = buildContext;
+            return const Scaffold();
+          },
+        ),
+      ),
+    );
+
+    showSideToast(
+      context,
+      'Changed',
+      actionLabel: 'Undo',
+      onAction: () => actionRuns += 1,
+      duration: const Duration(seconds: 5),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+
+    expect(actionRuns, 1);
+    expect(find.text('Changed'), findsNothing);
+  });
 }

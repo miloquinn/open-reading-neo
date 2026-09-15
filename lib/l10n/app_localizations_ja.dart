@@ -678,6 +678,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sourceLoginTitle => 'ソースにログイン';
 
   @override
+  String get sourceLoginInfo => 'ログイン情報';
+
+  @override
+  String get sourceLoginActions => 'ソースの操作';
+
+  @override
+  String get sourceLoginExtraSettings => '追加設定';
+
+  @override
   String get sourceLoginSecureStorageNotice =>
       'ログイン情報はこの端末の安全なシステムストレージにのみ保存されます。';
 
@@ -5820,6 +5829,10 @@ class AppLocalizationsJa extends AppLocalizations {
       '書源を読み込めませんでした。アドレスやファイルを確認して再試行してください。';
 
   @override
+  String get bookSourcesImportWebPage =>
+      'このURLはウェブページまたはログインページです。サイトの書源ダウンロードまたは購読用JSONリンクをコピーしてインポートしてください。ログインはインポート後に行えます。';
+
+  @override
   String get bookSourcesImportSaveFailed =>
       '書源を保存できませんでした。プレビューは保持されています。再試行してください。';
 
@@ -6564,4 +6577,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String readerChapterProgressRemaining(int count) {
     return '残り$count章';
   }
+
+  @override
+  String premiumTrialExpiresAt(String date) {
+    return 'プレミアム体験の有効期限：$date。';
+  }
+
+  @override
+  String get premiumTrialTitle => 'プレミアム体験';
 }

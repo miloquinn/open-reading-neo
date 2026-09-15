@@ -456,6 +456,9 @@
   "bookSourcesRightsReportOpenFailed": "権利報告フォームを開けませんでした",
   "bookSourcesClose": "閉じる",
   "sourceLoginTitle": "ソースにログイン",
+  "sourceLoginInfo": "ログイン情報",
+  "sourceLoginActions": "ソースの操作",
+  "sourceLoginExtraSettings": "追加設定",
   "sourceLoginSecureStorageNotice": "ログイン情報はこの端末の安全なシステムストレージにのみ保存されます。",
   "sourceLoginNoForm": "このソースには利用可能なログイン方法がありません。",
   "sourceLoginBrowserTitle": "元のウェブサイトでログイン",
@@ -2907,6 +2910,7 @@
   "bookSourcesImportEmpty": "選択された書源がありません。ファイルや重複の選択を確認してください。",
   "bookSourcesImportRetry": "再試行",
   "bookSourcesImportFailed": "書源を読み込めませんでした。アドレスやファイルを確認して再試行してください。",
+  "bookSourcesImportWebPage": "このURLはウェブページまたはログインページです。サイトの書源ダウンロードまたは購読用JSONリンクをコピーしてインポートしてください。ログインはインポート後に行えます。",
   "bookSourcesImportSaveFailed": "書源を保存できませんでした。プレビューは保持されています。再試行してください。",
   "bookSourcesImportErrorDetails": "エラーの詳細",
   "bookSourcesImportFileUnreadable": "選択したファイルを読み込めませんでした。再度選択してください。",
@@ -3163,5 +3167,8 @@
   "readerChapterProgressTitle": "章の進捗",
   "readerChapterProgressHidden": "表示しない",
   "readerChapterProgressFraction": "{chapter}/{total}章",
-  "readerChapterProgressRemaining": "残り{count}章"
+  "readerChapterProgressRemaining": "残り{count}章",
+  "premiumTrialExpiresAt": "プレミアム体験の有効期限：{date}。",
+  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
+  "premiumTrialTitle": "プレミアム体験"
 }

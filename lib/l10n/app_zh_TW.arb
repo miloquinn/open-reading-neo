@@ -456,6 +456,9 @@
   "bookSourcesRightsReportOpenFailed": "無法開啟權利申訴表單",
   "bookSourcesClose": "關閉",
   "sourceLoginTitle": "書源登入",
+  "sourceLoginInfo": "登入資訊",
+  "sourceLoginActions": "書源操作",
+  "sourceLoginExtraSettings": "附加設定",
   "sourceLoginSecureStorageNotice": "登入資訊只會保存在目前裝置的系統安全儲存空間。",
   "sourceLoginNoForm": "此書源沒有提供可用的登入方式。",
   "sourceLoginBrowserTitle": "在原網站登入",
@@ -2907,6 +2910,7 @@
   "bookSourcesImportEmpty": "沒有可匯入的書源，請檢查檔案或重複書源的選擇。",
   "bookSourcesImportRetry": "重試",
   "bookSourcesImportFailed": "未能讀取書源，請檢查地址或檔案後重試。",
+  "bookSourcesImportWebPage": "這個地址回傳的是網頁或登入頁。請在網站中複製「書源下載」或「訂閱」的 JSON 連結，再匯入；匯入後可在書源中登入。",
   "bookSourcesImportSaveFailed": "未能儲存書源，已保留預覽，請重試。",
   "bookSourcesImportErrorDetails": "錯誤詳情",
   "bookSourcesImportFileUnreadable": "無法讀取所選檔案，請重新選擇。",
@@ -3163,5 +3167,8 @@
   "readerChapterProgressTitle": "章節進度",
   "readerChapterProgressHidden": "不顯示",
   "readerChapterProgressFraction": "{chapter}/{total}章",
-  "readerChapterProgressRemaining": "後續{count}章"
+  "readerChapterProgressRemaining": "後續{count}章",
+  "premiumTrialExpiresAt": "進階版體驗有效至 {date}。",
+  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
+  "premiumTrialTitle": "進階版體驗"
 }

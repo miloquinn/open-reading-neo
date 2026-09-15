@@ -197,7 +197,10 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                       ],
                     ]),
                     const SizedBox(height: 20),
-                    if (!premium || _usesAppleBilling || status != null)
+                    if (!premium ||
+                        _usesAppleBilling ||
+                        status != null ||
+                        account.membership?.premiumExpiresAt != null)
                       _section(
                         premium
                             ? l10n.premiumAccountBindingTitle
@@ -206,7 +209,9 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                           if (!account.isAuthenticated)
                             Text(l10n.premiumSignInRequired)
                           else if (_usesAppleBilling) ...[
-                            if (!premium) ...[
+                            if (!premium ||
+                                account.membership?.premiumExpiresAt !=
+                                    null) ...[
                               if (purchase.product case final product?) ...[
                                 Text(
                                   product.price,
@@ -281,7 +286,9 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
-                            if (!premium) ...[
+                            if (!premium ||
+                                account.membership?.premiumExpiresAt !=
+                                    null) ...[
                               const SizedBox(height: 16),
                               Text(
                                 l10n.premiumBillingBody,
@@ -292,7 +299,8 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                                 ),
                               ),
                             ],
-                          ] else if (!premium) ...[
+                          ] else if (!premium ||
+                              account.membership?.premiumExpiresAt != null) ...[
                             TextField(
                               key: const ValueKey('account-redemption-code'),
                               controller: _redemptionCode,
@@ -401,6 +409,14 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
     MemberAccountController account,
   ) {
     final l10n = context.l10n;
+    final expiresAt = account.membership?.premiumExpiresAt;
+    if (expiresAt != null) {
+      final local = expiresAt.toLocal();
+      return l10n.premiumTrialExpiresAt(
+        '${MaterialLocalizations.of(context).formatMediumDate(local)} '
+        '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(local))}',
+      );
+    }
     final sources = account.membership?.activePremiumSources ?? <String>{};
     if (sources.any(
       {'admin', 'manual', 'promotion', 'referral_card'}.contains,
@@ -443,7 +459,11 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n.premiumLifetimeTitle,
+                      premium &&
+                              widget.account.membership?.premiumExpiresAt !=
+                                  null
+                          ? l10n.premiumTrialTitle
+                          : l10n.premiumLifetimeTitle,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: premiumIvory,
                         fontWeight: FontWeight.w700,
@@ -452,7 +472,11 @@ class _PremiumMembershipPageState extends State<PremiumMembershipPage>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      l10n.premiumLifetimeCaption,
+                      premium &&
+                              widget.account.membership?.premiumExpiresAt !=
+                                  null
+                          ? _membershipSourceMessage(context, widget.account)
+                          : l10n.premiumLifetimeCaption,
                       style: TextStyle(
                         color: premiumIvory.withValues(alpha: 0.76),
                         fontSize: 13,

@@ -12,6 +12,7 @@ import '../utils/localization_extension.dart';
 import '../utils/reader_themes.dart';
 import 'generated_book_cover.dart';
 import 'app_menu.dart';
+import 'side_toast.dart';
 
 /// Reader entry point: presentation is shared by local and source books.
 Future<void> showReaderAloud({
@@ -872,17 +873,15 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
                       );
                     } catch (_) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              _copy(
-                                context,
-                                '未能保存听书模式，请重试',
-                                'Could not save listening mode. Please retry.',
-                                '表示モードを保存できませんでした',
-                              ),
-                            ),
+                        showSideToast(
+                          context,
+                          _copy(
+                            context,
+                            '未能保存听书模式，请重试',
+                            'Could not save listening mode. Please retry.',
+                            '表示モードを保存できませんでした',
                           ),
+                          kind: SideToastKind.error,
                         );
                       }
                     }
@@ -1116,17 +1115,15 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
               if (resume) await widget.controller.resume();
             } catch (_) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      _copy(
-                        context,
-                        '切换语音失败，请重试',
-                        'Could not switch voices. Please retry.',
-                        '音声を切り替えられませんでした',
-                      ),
-                    ),
+                showSideToast(
+                  context,
+                  _copy(
+                    context,
+                    '切换语音失败，请重试',
+                    'Could not switch voices. Please retry.',
+                    '音声を切り替えられませんでした',
                   ),
+                  kind: SideToastKind.error,
                 );
               }
             }

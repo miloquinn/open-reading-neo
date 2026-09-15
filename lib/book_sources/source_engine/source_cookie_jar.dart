@@ -68,14 +68,22 @@ class SourceCookieJar {
       header(jarKey, uri) ?? '';
 
   void setScriptCookies(String jarKey, Uri uri, String cookieHeader) {
-    final jar = _jars.putIfAbsent(jarKey, () => {});
-    jar.removeWhere(
-      (_, cookie) => _cookieDomainMatches(
-        uri.host,
-        cookie.domain,
-        hostOnly: cookie.hostOnly,
-      ),
-    );
+    // Attribute-bearing values update a single cookie. Plain Cookie headers
+    // retain Legado setCookie's replacement semantics.
+    if (RegExp(
+      r';\s*(?:path|domain|expires|max-age|samesite)\s*=|;\s*(?:secure|httponly)(?:;|$)',
+      caseSensitive: false,
+    ).hasMatch(cookieHeader)) {
+      store(
+        jarKey,
+        uri,
+        Headers.fromMap({
+          HttpHeaders.setCookieHeader: [cookieHeader],
+        }),
+      );
+      return;
+    }
+    removeScriptCookies(jarKey, uri);
     storeBrowserCookies(jarKey, uri, cookieHeader);
   }
 

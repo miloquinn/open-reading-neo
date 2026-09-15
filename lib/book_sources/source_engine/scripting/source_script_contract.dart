@@ -20,10 +20,12 @@ class SourceScriptContext {
     this.cookieRemover,
     this.loginInfo = const {},
     this.loginHeaders = const {},
+    this.rawLoginHeader,
     this.browserLocalStorage = const {},
     this.localStorageWriter,
     this.loginInfoWriter,
     this.loginHeaderWriter,
+    this.messageWriter,
     this.interactionHandler,
   });
 
@@ -44,6 +46,8 @@ class SourceScriptContext {
   final void Function(Uri uri)? cookieRemover;
   final Map<String, String> loginInfo;
   final Map<String, String> loginHeaders;
+  final String? rawLoginHeader;
+  final void Function(String message)? messageWriter;
   final Map<String, Map<String, String>> browserLocalStorage;
   final void Function(
     Map<String, Map<String, String>> value,
@@ -51,13 +55,15 @@ class SourceScriptContext {
   )?
   localStorageWriter;
   final void Function(Map<String, String> value)? loginInfoWriter;
-  final void Function(Map<String, String> value)? loginHeaderWriter;
+  final void Function(Map<String, String> value, {String? rawLoginHeader})?
+  loginHeaderWriter;
   final Future<SourceScriptInteractionResult> Function(
     SourceScriptInteractionRequest request,
   )?
   interactionHandler;
 
   SourceScriptContext copyWith({
+    void Function(String message)? messageWriter,
     Object? result,
     Uri? baseUrl,
     Map<String, String>? variables,
@@ -67,6 +73,7 @@ class SourceScriptContext {
     void Function(Map<String, Object?> value)? chapterWriter,
   }) => SourceScriptContext(
     source: source,
+    messageWriter: messageWriter ?? this.messageWriter,
     result: result ?? this.result,
     baseUrl: baseUrl ?? this.baseUrl,
     variables: variables ?? this.variables,
@@ -80,6 +87,7 @@ class SourceScriptContext {
     cookieRemover: cookieRemover,
     loginInfo: loginInfo,
     loginHeaders: loginHeaders,
+    rawLoginHeader: rawLoginHeader,
     browserLocalStorage: browserLocalStorage,
     localStorageWriter: localStorageWriter,
     loginInfoWriter: loginInfoWriter,
@@ -168,6 +176,7 @@ class SourceScriptNetworkResult {
     this.statusCode = 200,
     this.headers = const {},
     this.cookies = const {},
+    this.failureMessage,
   });
 
   final String body;
@@ -175,6 +184,7 @@ class SourceScriptNetworkResult {
   final int statusCode;
   final Map<String, String> headers;
   final Map<String, String> cookies;
+  final String? failureMessage;
 
   Map<String, Object?> toJson() => {
     'body': body,
@@ -182,6 +192,7 @@ class SourceScriptNetworkResult {
     'statusCode': statusCode,
     'headers': headers,
     'cookies': cookies,
+    if (failureMessage != null) 'failureMessage': failureMessage,
   };
 }
 

@@ -15,12 +15,14 @@ import 'account_summary_cache.dart';
 import 'account_token_store.dart';
 import 'apple_purchase_service.dart';
 import 'avatar_image_processor.dart';
+import 'membership_cache.dart';
 
 class MemberAccountController extends ChangeNotifier {
   MemberAccountController({
     MemberAccountApiClient? api,
     AccountAvatarCache? avatarCache,
     MemberAccountSummaryCache? summaryCache,
+    MemberMembershipCache? membershipCache,
     PendingDeviceAuthorizationStore? pendingAuthorizationStore,
     AccountAuthCallbackBridge? authCallbackBridge,
     ApplePurchaseStore? appleStore,
@@ -28,6 +30,7 @@ class MemberAccountController extends ChangeNotifier {
   }) : _api = api ?? MemberAccountApiClient(),
        _avatarCache = avatarCache ?? AccountAvatarCache.instance,
        _summaryCache = summaryCache ?? const MemberAccountSummaryCache(),
+       _membershipCache = membershipCache ?? const MemberMembershipCache(),
        _pendingAuthorizationStore =
            pendingAuthorizationStore ?? SecurePendingDeviceAuthorizationStore(),
        _authCallbackBridge = authCallbackBridge ?? AccountAuthCallbackBridge() {
@@ -50,6 +53,7 @@ class MemberAccountController extends ChangeNotifier {
         _checkMembershipOwner(membership, accountId);
         _resetMembershipSync();
         _membership = membership;
+        await _persistMembership();
         _updateSummaryFromAccount();
         unawaited(_persistSummary());
         notifyListeners();
@@ -63,6 +67,7 @@ class MemberAccountController extends ChangeNotifier {
   final MemberAccountApiClient _api;
   final AccountAvatarCache _avatarCache;
   final MemberAccountSummaryCache _summaryCache;
+  final MemberMembershipCache _membershipCache;
   final PendingDeviceAuthorizationStore _pendingAuthorizationStore;
   final AccountAuthCallbackBridge _authCallbackBridge;
   late final ApplePremiumPurchaseService _applePurchase;
@@ -145,7 +150,22 @@ class MemberAccountController extends ChangeNotifier {
   MemberSession? _pendingSession;
   MemberAuthConfig? _authConfig;
   MemberMembershipConfig? _membershipConfig;
-  MemberMembership? _membership;
+  MemberMembership? _membershipValue;
+  CachedMemberMembership? _cachedMembership;
+  bool _membershipCacheLoaded = false;
+  Timer? _membershipExpiryTimer;
+  MemberMembership? get _membership => _membershipValue;
+  set _membership(MemberMembership? value) {
+    _membershipExpiryTimer?.cancel();
+    _membershipValue = value;
+    final expiresAt = value?.premiumExpiresAt;
+    if (expiresAt != null && expiresAt.isAfter(DateTime.now())) {
+      _membershipExpiryTimer = Timer(expiresAt.difference(DateTime.now()), () {
+        if (!_disposed) notifyListeners();
+      });
+    }
+  }
+
   MemberAccountSummary? _summary;
   MemberReferral? _referral;
   MemberMfaStatus? _mfaStatus;
@@ -169,10 +189,12 @@ class MemberAccountController extends ChangeNotifier {
   MemberMembershipConfig? get membershipConfig => _membershipConfig;
   MemberMembership? get membership => _membership;
 
-  /// Premium access is only valid for the currently authenticated account and
-  /// the server-fetched membership value. Cached summaries are presentation
-  /// data and must never grant access.
-  bool get hasPremiumAccess => _user != null && _membership?.premium == true;
+  /// Premium access is valid only for the currently authenticated account.
+  /// A previously server-verified, account-bound snapshot may be used while a
+  /// fresh server reconciliation is in flight; the summary cache alone never
+  /// grants access.
+  bool get hasPremiumAccess =>
+      _user != null && _membership?.hasActivePremium == true;
   MemberAccountSummary? get summary => _summary;
   MemberReferral? get referral => _referral;
   MemberMfaStatus? get mfaStatus => _mfaStatus;
@@ -192,7 +214,13 @@ class MemberAccountController extends ChangeNotifier {
       await _run(() async {
         await _restorePendingDeviceAuthorization();
         unawaited(_initializeAuthCallbackBridge());
-        _summary = await _summaryCache.load();
+        final cachedValues = await Future.wait<Object?>([
+          _summaryCache.load(),
+          _membershipCache.load(),
+        ]);
+        _summary = cachedValues[0] as MemberAccountSummary?;
+        _cachedMembership = cachedValues[1] as CachedMemberMembership?;
+        _membershipCacheLoaded = true;
         if (_summary != null) notifyListeners();
         MemberAccountException? deferred;
         try {
@@ -211,6 +239,7 @@ class MemberAccountController extends ChangeNotifier {
           _acceptSession(session);
           if (session.mfaRequired) {
             await _clearSummary();
+            await _clearMembershipCache();
           } else {
             await _loadAccountValues();
             await _persistSummary();
@@ -223,6 +252,7 @@ class MemberAccountController extends ChangeNotifier {
             _membership = null;
             _mfaStatus = null;
             await _clearSummary();
+            await _clearMembershipCache();
           } else if (_isRetryableMembershipError(error)) {
             deferred ??= error;
           } else {
@@ -520,6 +550,7 @@ class MemberAccountController extends ChangeNotifier {
       _acceptSession(session);
       if (session.mfaRequired) {
         await _clearSummary();
+        await _clearMembershipCache();
       } else {
         await _loadAccountValues();
         await _persistSummary();
@@ -632,7 +663,10 @@ class MemberAccountController extends ChangeNotifier {
     if (_user?.id != accountId || _membership == null) {
       throw const MemberAccountException('账号已切换，请重新验证会员权益');
     }
-    if (hasPremiumAccess || _membership!.purchaseAllowed == false) return;
+    if ((hasPremiumAccess && _membership!.premiumExpiresAt == null) ||
+        _membership!.purchaseAllowed == false) {
+      return;
+    }
     await _applePurchase.purchase();
   }
 
@@ -649,6 +683,7 @@ class MemberAccountController extends ChangeNotifier {
     _checkMembershipOwner(membership, accountId);
     _resetMembershipSync();
     _membership = membership;
+    await _persistMembership();
     _updateSummaryFromAccount();
     await _persistSummary();
     await _loadReferralValue();
@@ -685,6 +720,7 @@ class MemberAccountController extends ChangeNotifier {
     _mfaStatus = null;
     notifyListeners();
     await _clearSummary();
+    await _clearMembershipCache();
     try {
       await _api.clearLocalSession();
     } catch (_) {
@@ -705,11 +741,13 @@ class MemberAccountController extends ChangeNotifier {
       _mfaStatus = null;
       notifyListeners();
       await _clearSummary();
+      await _clearMembershipCache();
     }
   });
 
   @override
   void dispose() {
+    _membershipExpiryTimer?.cancel();
     _disposed = true;
     _resetMembershipSync();
     _applePurchase.dispose();
@@ -725,6 +763,7 @@ class MemberAccountController extends ChangeNotifier {
           await _persistSummary();
         } else {
           await _clearSummary();
+          await _clearMembershipCache();
         }
       });
 
@@ -752,6 +791,7 @@ class MemberAccountController extends ChangeNotifier {
     }
     _pendingSession = null;
     _user = session.user;
+    _restoreCachedMembership(session.user.id);
     _updateSummaryFromAccount();
     if (accountChanged) notifyListeners();
   }
@@ -788,6 +828,52 @@ class MemberAccountController extends ChangeNotifier {
     }
   }
 
+  void _restoreCachedMembership(String accountId) {
+    final cached = _cachedMembership;
+    if (_membership != null || cached?.userId != accountId) return;
+    final owner = cached!.membership.userId;
+    if (owner != null && owner != accountId) return;
+    _membership = cached.membership;
+  }
+
+  Future<void> _ensureMembershipCacheLoaded() async {
+    if (_membershipCacheLoaded) return;
+    _cachedMembership = await _membershipCache.load();
+    _membershipCacheLoaded = true;
+    final accountId = _user?.id;
+    if (accountId != null) {
+      _restoreCachedMembership(accountId);
+      _updateSummaryFromAccount();
+      notifyListeners();
+    }
+  }
+
+  Future<void> _persistMembership() async {
+    final accountId = _user?.id;
+    final membership = _membership;
+    if (accountId == null || membership == null) return;
+    _cachedMembership = CachedMemberMembership(
+      userId: accountId,
+      membership: membership,
+    );
+    _membershipCacheLoaded = true;
+    try {
+      await _membershipCache.save(accountId, membership);
+    } catch (_) {
+      // A verified in-memory membership remains usable if persistence fails.
+    }
+  }
+
+  Future<void> _clearMembershipCache() async {
+    _cachedMembership = null;
+    _membershipCacheLoaded = true;
+    try {
+      await _membershipCache.clear();
+    } catch (_) {
+      // Cleared authentication state cannot be authorized by a stale cache.
+    }
+  }
+
   Uri? _avatarUri(String? value) {
     if (value == null || value.isEmpty) return null;
     return Uri.tryParse(value);
@@ -818,6 +904,7 @@ class MemberAccountController extends ChangeNotifier {
       _checkMembershipOwner(membership, accountId);
       _membership = membership;
       _membershipSyncFailed = false;
+      await _persistMembership();
     } catch (error) {
       if (_disposed ||
           _user?.id != accountId ||
@@ -830,6 +917,7 @@ class MemberAccountController extends ChangeNotifier {
         _scheduleMembershipRetry(accountId);
       } else {
         _membership = null;
+        await _clearMembershipCache();
       }
       _updateSummaryFromAccount();
       notifyListeners();
@@ -844,6 +932,7 @@ class MemberAccountController extends ChangeNotifier {
   }
 
   Future<void> _loadAccountValues() async {
+    await _ensureMembershipCacheLoaded();
     try {
       await _loadMembershipValue();
     } on MemberAccountException {

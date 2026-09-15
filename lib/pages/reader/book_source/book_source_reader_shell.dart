@@ -446,9 +446,7 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                           ? null
                           : () => unawaited(_showAskAiPanel()),
                       askAiTooltip: context.l10n.readerAskAi,
-                      onChangeSource: () => unawaited(_changeBookSource()),
-                      changeSourceTooltip:
-                          context.l10n.bookSourceChangeSourceTitle,
+                      onBookSettings: () => unawaited(_showBookSettings()),
                       onSettings: _showReadingSettings,
                       backTooltip: MaterialLocalizations.of(
                         context,

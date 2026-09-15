@@ -97,11 +97,10 @@ class SourceRequestTemplate {
     }
     final methodText = '${options['method'] ?? 'GET'}'.trim().toUpperCase();
     if (methodText == 'GET') urlText = _encodeQuery(urlText, charset);
-    final uri = baseUri.resolve(urlText);
     final syntheticBody = _dataUriSyntheticBody(urlText, options);
     if (syntheticBody != null) {
       return SourceRequestTemplate(
-        url: uri,
+        url: Uri(scheme: 'data', path: urlText.substring(5)),
         method: SourceRequestMethod.get,
         headers: const {},
         charset: 'utf-8',
@@ -109,6 +108,7 @@ class SourceRequestTemplate {
         syntheticBody: syntheticBody,
       );
     }
+    final uri = baseUri.resolve(urlText);
     if (!uri.hasAuthority || (uri.scheme != 'http' && uri.scheme != 'https')) {
       throw const BookSourceProtocolException(
         'reading source request targets must use HTTP or HTTPS.',
@@ -238,9 +238,28 @@ String resolveSourceRequestUrl(Uri baseUri, String value) {
   final optionsStart = _requestOptionsStart(value);
   final urlText = (optionsStart < 0 ? value : value.substring(0, optionsStart))
       .trim();
-  final resolved = baseUri.resolve(urlText).toString();
+  final resolved = urlText.startsWith('data:')
+      ? urlText
+      : baseUri.resolve(urlText).toString();
   if (optionsStart < 0) return resolved;
   return '$resolved${value.substring(optionsStart)}';
+}
+
+/// Shared URL contract for selector and script rules. Opaque data labels are
+/// local payload identifiers, not MIME types accepted by Uri.parse.
+String resolveSourceRuleRequestUrl(
+  Uri baseUri,
+  String value,
+  String errorMessage,
+) {
+  final urlText = value.split(RegExp(r',\s*\{')).first.trim();
+  if (urlText.startsWith('data:')) return value;
+  final resolved = resolveSourceRequestUrl(baseUri, value);
+  final uri = Uri.tryParse(resolved.split(RegExp(r',\s*\{')).first);
+  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    throw BookSourceProtocolException(errorMessage);
+  }
+  return resolved;
 }
 
 // Decode options before interpolation: URL escaping is appropriate for query

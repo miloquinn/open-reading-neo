@@ -1,5 +1,25 @@
 # 书源网页登录与设备会话
 
+## 通用登录与在线导入
+
+登录逻辑来自导入的书源配置。`loginUi` 的 JSON（也支持返回 JSON 的脚本）生成表单，`loginUrl` 中的 JavaScript 和按钮 `action` 决定如何请求接口、保存 Cookie 或登录头。HTTP(S) `loginUrl` 则打开内置网页登录。应用不需要为每个站点编写登录接口。
+
+对照本地 Legado-E：`SourceLoginActivity` 按是否存在 `loginUi` 选择表单或 WebView；`SourceLoginDialog` 执行书源脚本；`WebViewLoginFragment` 将网页 Cookie 同步至 CookieStore。WebView 开启 DOM Storage，但这条链路没有将 Local Storage 自动转换为 HTTP 请求头。本站已有的按 origin 保存、恢复 Local Storage 能力继续保留。
+
+URL 导入需要书源 JSON、订阅文档或 ORSP 服务地址。原网站的 `/login` 页面是 HTML，并不包含搜索、目录和正文规则，不能代替书源文件；遇到这类地址，导入页会明确提示复制网站的书源下载或订阅链接。
+
+2026-09-15 通用兼容修复：
+
+- 关闭 `enabledCookieJar` 仅禁用自动 HTTP Cookie 管理，不再禁用脚本显式读写；脚本保存的 Cookie 仍通过安全存储恢复。
+- `cookie.setCookie` 保留整组替换语义；带 Path/Max-Age 等属性的单条 Cookie 可以更新、过期，不会误删其他登录 Cookie。
+- 登录页恢复已保存的字段；执行设置按钮保留已有登录头。
+- `data:` 书籍与章节上下文使用书源的 Local Storage origin；小说中的评论图片不会单凭 `<img>` 字符串被判成漫画。
+- 网络等待后重跑脚本时，已经读取过的时间、随机数和 UUID 按调用顺序复用；新的调用仍取新值。这样带时间戳的原书源请求能命中该次执行的响应，不会重复请求至次数超限。网络次数限制保留。
+
+手动在线验收工具为 `tool/verify_source_login.dart`。通过环境变量传入 `SOURCE_URL`（或本地 `SOURCE_FILE`）、`SOURCE_LOGIN_VALUES`、`SOURCE_LOGIN_ACTION`、`SOURCE_LOGIN_ORIGIN`、`SOURCE_QUERY`，可选 `SOURCE_EXPECT_TEXT` 校验正文片段。工具调用实际导入器与书源运行时，检查 Cookie 会话、搜索、详情、目录及前三章；不把账号、密码和会话写进仓库。此测试在普通 CI 之外手动运行。
+
+本次实测使用站点提供的原版大灰狼书源，经过在线导入、账号登录、搜索（9 条结果）、详情、目录（103 章）及前三章正文，并校验第一回的正文片段。14 个独立 Flutter 测试文件通过，改动文件静态检查通过。本次没有进行手机实机登录或重新构建安装包。
+
 书源的 `loginUrl` 可以填写原网站的 HTTP(S) 地址或相对地址。用户在书源登录页打开内置浏览器，登录原站后点击“完成”，应用才保存会话；取消保留此前的会话。网页的账号密码由原网站处理，应用不会额外提取密码输入框。
 
 ```json
@@ -52,7 +72,19 @@ source.getLocalStorage("https://accounts.example").get("access_token")
 
 ## 验证
 
+通用登录兼容约定（2026-09-15）：
+
+- 同一脚本操作内的请求头/响应脚本不排在等待它的父脚本之后；独立操作仍串行。回归覆盖嵌套完成、失败后恢复及其他书源的隔离。
+- 脚本网络请求的协议错误在原始 JavaScript 调用点重放，让书源自己的 `try/catch` 能处理可选接口失败；取消操作不重放、不吞掉，必需接口的未捕获错误仍向用户报告。
+- 根规则脚本接收原始 HTTP 文本（包括 JSON），而 JSONPath 与选中条目的脚本仍接收结构化数据；避免书源的 `JSON.parse(result)` 收到对象。
+- 带 `type` 的本地 `data:` 请求支持书源自定义载荷标签，不要求标签是标准 MIME 类型；保持原始地址并返回十六进制正文，不能因 URI 解析失败静默丢弃书籍。
+- `putLoginHeader` 支持原始字符串与 JSON 对象，原始值在安全存储中单独保存；只有解析出的对象才作为自动 HTTP 请求头。原始 Token 的编码和用途由书源脚本决定。
+- 登录脚本的 `toast/longToast` 最终消息返回登录页完整展示；脚本反馈不再被无条件“会话已更新”覆盖。没有反馈时的会话保存提示不代表第三方认证结果。
+- 封面占位图保留到解码首帧，再执行一次淡入；同步命中的解码缓存不重复淡入，并尊重减少动画设置。
+
 相关回归文件：`source_browser_storage_test.dart`、`source_browser_session_runtime_test.dart`、`source_login_page_test.dart`。同时运行原有 Cookie、HTTP、脚本、交互协调及登录缓存失效回归；拥有全局状态的 Flutter 文件分别启动测试进程。
+
+2026-09-16 Android 真机验证：覆盖安装保留数据后，原始书山规则使用已保存的登录会话加载个性推荐、书籍详情，并打开《北境猎王》第 1 章正文分页。大灰狼此前也已验证到正文。本轮没有书源名或域名特判；这不代表所有聚合平台、账号专属分类均已实测。封面首帧过渡已通过组件回归，尚未完成真机逐帧动画检查。
 
 2026-09-12 验证：11 个独立 Flutter 测试文件共 123 项通过；本次涉及的 Dart 文件静态分析通过；包含 Flutter 编译的 Android `:app:assembleDebug` 通过。Cookie 回归也验证了不同路径的同名 Cookie 不会在生成请求头时被合并丢失。
 

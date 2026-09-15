@@ -18,12 +18,14 @@ abstract interface class SourceRuntimeSessionPort {
     ReadingSourceConfig source, {
     Map<String, String> loginInfo,
     Map<String, String> loginHeaders,
+    String? rawLoginHeader,
   });
   void updateInfo(ReadingSourceConfig source, Map<String, String> loginInfo);
   void updateHeaders(
     ReadingSourceConfig source,
-    Map<String, String> loginHeaders,
-  );
+    Map<String, String> loginHeaders, {
+    String? rawLoginHeader,
+  });
   Future<void> flush(ReadingSourceConfig source);
   Future<void> clear(ReadingSourceConfig source);
   String cookieHeader(ReadingSourceConfig source, Uri uri);
@@ -120,11 +122,13 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
     ReadingSourceConfig source, {
     Map<String, String> loginInfo = const {},
     Map<String, String> loginHeaders = const {},
+    String? rawLoginHeader,
   }) async {
     final previous = current(source);
     final session = SourceLoginSession(
       loginInfo: Map.unmodifiable(loginInfo),
       loginHeaders: Map.unmodifiable(loginHeaders),
+      rawLoginHeader: rawLoginHeader,
       browserSession: previous.browserSession,
     );
     _sessions[source.stableId] = session;
@@ -141,6 +145,7 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
     _sessions[source.stableId] = SourceLoginSession(
       loginInfo: Map.unmodifiable(loginInfo),
       loginHeaders: previous.loginHeaders,
+      rawLoginHeader: previous.rawLoginHeader,
       browserSession: previous.browserSession,
     );
     _dirty.add(source.stableId);
@@ -149,13 +154,18 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
   @override
   void updateHeaders(
     ReadingSourceConfig source,
-    Map<String, String> loginHeaders,
-  ) {
+    Map<String, String> loginHeaders, {
+    String? rawLoginHeader,
+  }) {
     final previous = current(source);
-    if (_sameStringMap(previous.loginHeaders, loginHeaders)) return;
+    if (_sameStringMap(previous.loginHeaders, loginHeaders) &&
+        previous.rawLoginHeader == rawLoginHeader) {
+      return;
+    }
     _sessions[source.stableId] = SourceLoginSession(
       loginInfo: previous.loginInfo,
       loginHeaders: Map.unmodifiable(loginHeaders),
+      rawLoginHeader: rawLoginHeader,
       browserSession: previous.browserSession,
     );
     final cookie = loginHeaders.entries
@@ -176,6 +186,7 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
       _sessions[source.stableId] = SourceLoginSession(
         loginInfo: previous.loginInfo,
         loginHeaders: previous.loginHeaders,
+        rawLoginHeader: previous.rawLoginHeader,
         browserSession: browser,
       );
       _dirty.add(source.stableId);
@@ -206,30 +217,19 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
 
   @override
   String cookieHeader(ReadingSourceConfig source, Uri uri) {
-    final cookieTransport = _cookieTransport;
-    if ((!source.enabledCookieJar && !current(source).browserSession.active) ||
-        cookieTransport == null) {
-      return '';
-    }
-    return cookieTransport.scriptCookieHeader(source.stableId, uri);
+    // enabledCookieJar controls automatic HTTP cookies, not explicit script
+    // access. Many form-login sources manage their own Cookie request header.
+    return _cookieTransport?.scriptCookieHeader(source.stableId, uri) ?? '';
   }
 
   @override
   void setCookies(ReadingSourceConfig source, Uri uri, String cookie) {
-    final cookieTransport = _cookieTransport;
-    if ((source.enabledCookieJar || current(source).browserSession.active) &&
-        cookieTransport != null) {
-      cookieTransport.setScriptCookies(source.stableId, uri, cookie);
-    }
+    _cookieTransport?.setScriptCookies(source.stableId, uri, cookie);
   }
 
   @override
   void removeCookies(ReadingSourceConfig source, Uri uri) {
-    final cookieTransport = _cookieTransport;
-    if ((source.enabledCookieJar || current(source).browserSession.active) &&
-        cookieTransport != null) {
-      cookieTransport.removeScriptCookies(source.stableId, uri);
-    }
+    _cookieTransport?.removeScriptCookies(source.stableId, uri);
   }
 
   @override
@@ -246,6 +246,7 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
     final next = SourceLoginSession(
       loginInfo: previous.loginInfo,
       loginHeaders: previous.loginHeaders,
+      rawLoginHeader: previous.rawLoginHeader,
       browserSession: session,
     );
     // Publish only after secure storage succeeds: a cancelled or failed login
@@ -302,6 +303,7 @@ class SourceRuntimeSessionManager implements SourceRuntimeSessionPort {
     _sessions[source.stableId] = SourceLoginSession(
       loginInfo: previous.loginInfo,
       loginHeaders: previous.loginHeaders,
+      rawLoginHeader: previous.rawLoginHeader,
       browserSession: browser,
     );
     _browserTransport?.restoreBrowserSession(source.stableId, browser);
@@ -423,9 +425,10 @@ class SourceRuntimeLogin {
     final source = sourceFromRegistered(registered);
     await _sessions.ensure(source);
     final raw = source.raw['loginUi'];
+    if (raw is List) return _restoreLoginFields(source, raw);
     if (raw is! String || raw.trim().isEmpty) return const [];
     final body = sourceScriptBody(raw);
-    if (body == null) return parseSourceLoginFields(raw);
+    if (body == null) return _restoreLoginFields(source, raw);
     final loginSource = '${source.raw['loginUrl'] ?? ''}';
     final loginScript = sourceScriptBody(loginSource) ?? loginSource;
     final value = await _scripts().evaluateAsync(
@@ -435,10 +438,32 @@ class SourceRuntimeLogin {
         result: _sessions.current(source).loginInfo,
       ),
     );
-    return parseSourceLoginFields(value);
+    return _restoreLoginFields(source, value);
   }
 
-  Future<void> login(
+  List<SourceLoginField> _restoreLoginFields(
+    ReadingSourceConfig source,
+    Object? value,
+  ) {
+    final saved = _sessions.current(source).loginInfo;
+    return [
+      for (final field in parseSourceLoginFields(value))
+        SourceLoginField(
+          name: field.name,
+          type: field.type,
+          viewName: field.viewName,
+          defaultValue: field.isButton
+              ? field.defaultValue
+              : (field.chars.isEmpty || field.chars.contains(saved[field.name]))
+              ? saved[field.name] ?? field.defaultValue
+              : field.defaultValue,
+          chars: field.chars,
+          action: field.action,
+        ),
+    ];
+  }
+
+  Future<String?> login(
     RegisteredBookSource registered,
     Map<String, String> values, {
     String? action,
@@ -448,7 +473,7 @@ class SourceRuntimeLogin {
     final website = sourceBrowserLoginUri(source.raw);
     if (website != null) {
       await browserLogin(source, website);
-      return;
+      return null;
     }
     final fields = await loadLoginFields(registered);
     final loginInfo = <String, String>{
@@ -458,7 +483,12 @@ class SourceRuntimeLogin {
           field.name: values[field.name] ?? field.defaultValue ?? '',
       ...values,
     };
-    await _sessions.save(source, loginInfo: loginInfo);
+    await _sessions.save(
+      source,
+      loginInfo: loginInfo,
+      loginHeaders: _sessions.current(source).loginHeaders,
+      rawLoginHeader: _sessions.current(source).rawLoginHeader,
+    );
     final loginSource = '${source.raw['loginUrl'] ?? ''}';
     final loginScript = sourceScriptBody(loginSource) ?? loginSource;
     if (loginScript.trim().isEmpty) {
@@ -473,13 +503,19 @@ class SourceRuntimeLogin {
               uri.host.isNotEmpty =>
         'java.startBrowserAwait(${jsonEncode(uri.toString())});',
       _ when trimmedAction.isNotEmpty => trimmedAction,
-      _ => "if (typeof login === 'function') login();",
+      _ =>
+        "if (typeof login === 'function') login(); "
+            "else throw new Error('This source does not define a login function.');",
     };
+    final messages = <String>[];
     await _scripts().evaluateAsync(
       '$loginScript\n$actionScript',
-      _contexts.scriptContext(source, result: loginInfo),
+      _contexts
+          .scriptContext(source, result: loginInfo)
+          .copyWith(messageWriter: messages.add),
     );
     await _sessions.flush(source);
+    return messages.where((message) => message.trim().isNotEmpty).lastOrNull;
   }
 }
 

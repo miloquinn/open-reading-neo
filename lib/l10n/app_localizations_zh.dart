@@ -667,6 +667,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sourceLoginTitle => '书源登录';
 
   @override
+  String get sourceLoginInfo => '登录信息';
+
+  @override
+  String get sourceLoginActions => '书源操作';
+
+  @override
+  String get sourceLoginExtraSettings => '附加设置';
+
+  @override
   String get sourceLoginSecureStorageNotice => '登录信息仅保存在当前设备的系统安全存储中。';
 
   @override
@@ -5735,6 +5744,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesImportFailed => '未能读取书源，请检查地址或文件后重试。';
 
   @override
+  String get bookSourcesImportWebPage =>
+      '这个地址返回的是网页或登录页。请在网站中复制“书源下载”或“订阅”的 JSON 链接，再导入；导入后可在书源中登录。';
+
+  @override
   String get bookSourcesImportSaveFailed => '未能保存书源，已保留预览，请重试。';
 
   @override
@@ -6457,6 +6470,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String readerChapterProgressRemaining(int count) {
     return '后续$count章';
   }
+
+  @override
+  String premiumTrialExpiresAt(String date) {
+    return '高级版体验有效至 $date。';
+  }
+
+  @override
+  String get premiumTrialTitle => '高级版体验';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -7120,6 +7141,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get sourceLoginTitle => '書源登入';
+
+  @override
+  String get sourceLoginInfo => '登入資訊';
+
+  @override
+  String get sourceLoginActions => '書源操作';
+
+  @override
+  String get sourceLoginExtraSettings => '附加設定';
 
   @override
   String get sourceLoginSecureStorageNotice => '登入資訊只會保存在目前裝置的系統安全儲存空間。';
@@ -12070,6 +12100,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get bookSourcesImportFailed => '未能讀取書源，請檢查地址或檔案後重試。';
 
   @override
+  String get bookSourcesImportWebPage =>
+      '這個地址回傳的是網頁或登入頁。請在網站中複製「書源下載」或「訂閱」的 JSON 連結，再匯入；匯入後可在書源中登入。';
+
+  @override
   String get bookSourcesImportSaveFailed => '未能儲存書源，已保留預覽，請重試。';
 
   @override
@@ -12793,4 +12827,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String readerChapterProgressRemaining(int count) {
     return '後續$count章';
   }
+
+  @override
+  String premiumTrialExpiresAt(String date) {
+    return '進階版體驗有效至 $date。';
+  }
+
+  @override
+  String get premiumTrialTitle => '進階版體驗';
 }

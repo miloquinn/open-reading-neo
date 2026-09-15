@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/txt_edit_service.dart';
+import 'package:xxread/widgets/side_toast.dart';
 
 import 'txt_editor_copy.dart';
 
@@ -170,9 +171,7 @@ class _TxtChapterEditorPageState extends State<TxtChapterEditorPage> {
           : error.code == 'section_too_large'
           ? copy.sectionTooLarge
           : copy.saveFailed;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      showSideToast(context, message, kind: SideToastKind.error);
       setState(() => _busy = false);
     }
   }
@@ -246,9 +245,7 @@ class _TxtChapterEditorPageState extends State<TxtChapterEditorPage> {
       }
     } on TxtEditFailure {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(copy.saveFailed)));
+      showSideToast(context, copy.saveFailed, kind: SideToastKind.error);
       setState(() => _busy = false);
     }
   }

@@ -480,12 +480,8 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                 _showAskAiPanel(chapter, bookmarkPage),
                               ),
                               askAiTooltip: context.l10n.readerAskAi,
-                              onEditChapter: _canEditCurrentTxt
-                                  ? () => unawaited(_editCurrentTxtChapter())
-                                  : null,
-                              editChapterTooltip: TxtEditorCopy.of(
-                                context,
-                              ).editChapter,
+                              onBookSettings: () =>
+                                  unawaited(_showBookSettings()),
                               onSettings: _showReadingSettings,
                               backTooltip: MaterialLocalizations.of(
                                 context,

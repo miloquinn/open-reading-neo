@@ -106,12 +106,13 @@ class _LoginRuntime extends SourceRuntime {
   int contentLoads = 0;
 
   @override
-  Future<void> login(
+  Future<String?> login(
     RegisteredBookSource registered,
     Map<String, String> values, {
     String? action,
   }) async {
     if (loginFails) throw StateError('source login rejected');
+    return null;
   }
 
   @override

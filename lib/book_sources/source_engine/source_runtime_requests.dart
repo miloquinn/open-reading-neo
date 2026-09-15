@@ -258,6 +258,7 @@ class SourceRuntimeRequests
       },
       loginInfo: loginSession.loginInfo,
       loginHeaders: loginSession.loginHeaders,
+      rawLoginHeader: loginSession.rawLoginHeader,
       browserLocalStorage: loginSession.browserSession.localStorage,
       localStorageWriter: (value, clearedOrigins) {
         checkGeneration();
@@ -272,9 +273,9 @@ class SourceRuntimeRequests
         checkGeneration();
         _sessions.updateInfo(source, value);
       },
-      loginHeaderWriter: (value) {
+      loginHeaderWriter: (value, {rawLoginHeader}) {
         checkGeneration();
-        _sessions.updateHeaders(source, value);
+        _sessions.updateHeaders(source, value, rawLoginHeader: rawLoginHeader);
       },
       interactionHandler: (request) =>
           _handleScriptInteraction(source, request, cancellation: cancellation),

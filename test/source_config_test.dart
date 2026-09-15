@@ -242,6 +242,18 @@ void main() {
     );
   });
 
+  test('novel scripts containing comment images remain text sources', () {
+    final source = ReadingSourceConfig.fromJson(
+      _source(
+        contentRule:
+            '<js>content = data.content + \'<img src="/comment.svg">\'; '
+            'JSON.stringify({content: content});</js>\$.content',
+      ),
+    );
+    expect(source.isImageSource, isFalse);
+    expect(source.effectiveBookType, 8);
+  });
+
   test('metadata comments do not get interpreted as executable rules', () {
     final source = ReadingSourceConfig.fromJson({
       ..._source(),

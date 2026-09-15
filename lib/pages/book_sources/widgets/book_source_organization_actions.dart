@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_registry.dart';
 import '../../../widgets/app_menu.dart';
+import '../../../widgets/side_toast.dart';
 import 'book_source_organization_copy.dart';
 import 'book_source_organization_sheets.dart';
 
@@ -67,46 +68,40 @@ class _BookSourceOrganizationActionsState
         _favorite = previous;
         _savingFavorite = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(BookSourceOrganizationCopy.of(context).saveFailed),
-        ),
+      showSideToast(
+        context,
+        BookSourceOrganizationCopy.of(context).saveFailed,
+        kind: SideToastKind.error,
       );
     }
   }
 
   void _showFavoriteNotice(bool value) {
     final copy = BookSourceOrganizationCopy.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final registry = widget.registry;
     final sourceId = widget.source.id;
     final onChanged = widget.onChanged;
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(value ? copy.favorited : copy.unfavorited),
-        action: SnackBarAction(
-          label: copy.undo,
-          onPressed: () async {
-            try {
-              await registry.setFavorite(sourceId, !value);
-              if (mounted) {
-                setState(() {
-                  _favorite = !value;
-                  _savingFavorite = false;
-                });
-              }
-              onChanged?.call();
-            } catch (_) {
-              if (mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(copy.saveFailed)));
-              }
-            }
-          },
-        ),
-      ),
+    showSideToast(
+      context,
+      value ? copy.favorited : copy.unfavorited,
+      kind: SideToastKind.success,
+      actionLabel: copy.undo,
+      onAction: () async {
+        try {
+          await registry.setFavorite(sourceId, !value);
+          if (mounted) {
+            setState(() {
+              _favorite = !value;
+              _savingFavorite = false;
+            });
+          }
+          onChanged?.call();
+        } catch (_) {
+          if (mounted) {
+            showSideToast(context, copy.saveFailed, kind: SideToastKind.error);
+          }
+        }
+      },
     );
   }
 

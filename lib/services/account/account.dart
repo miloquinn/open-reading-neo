@@ -7,3 +7,4 @@ export 'account_token_store.dart';
 export 'apple_purchase_service.dart';
 export 'avatar_image_processor.dart';
 export 'member_account_controller.dart';
+export 'membership_cache.dart';

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -8,6 +9,14 @@ import '../protocol/book_source_protocol.dart';
 import 'book_source_client.dart';
 
 enum BookSourceImportKind { orsp, additional }
+
+class BookSourceImportWebPageException extends FormatException {
+  const BookSourceImportWebPageException()
+    : super(
+        'This URL returned a web page, not a book source configuration. '
+        'Copy the source JSON download or subscription link from the website.',
+      );
+}
 
 class BookSourceImportAnalysis {
   const BookSourceImportAnalysis._({
@@ -236,6 +245,15 @@ BookSourceImportAnalysis _analyzeBookSourceBytes(
   try {
     decoded = decodeSourceImportBytes(bytes);
   } on FormatException catch (error) {
+    final prefix = utf8
+        .decode(bytes.take(2048).toList(), allowMalformed: true)
+        .replaceFirst('\uFEFF', '');
+    if (RegExp(
+      r'^\s*(?:<!--[\s\S]*?-->\s*)*<(?:!doctype\s+html|html|head|body|form)\b',
+      caseSensitive: false,
+    ).hasMatch(prefix)) {
+      throw const BookSourceImportWebPageException();
+    }
     throw FormatException('Source JSON is invalid: ${error.message}');
   }
 

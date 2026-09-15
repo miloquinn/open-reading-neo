@@ -24,6 +24,7 @@ class SourceRuleDocument {
       try {
         return SourceRuleDocument._(
           value: jsonDecode(body),
+          rawText: body,
           baseUri: baseUri,
           scriptContext: scriptContext,
           ruleState: ruleState,
@@ -66,8 +67,8 @@ class SourceRuleDocument {
   final String? rawText;
 
   /// What a top-level `<js>` rule (no preceding selector) should see as
-  /// `result`: the raw fetched text when [value] is a parsed HTML document,
-  /// or [value] itself for JSON documents and script-produced sub-documents.
+  /// `result`: raw fetched text for both HTML and JSON responses, or [value]
+  /// itself for selector- and script-produced sub-documents.
   Object? get scriptResultValue => rawText ?? value;
 
   SourceRuleDocument withScriptEntities({

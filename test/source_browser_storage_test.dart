@@ -181,6 +181,13 @@ void main() {
     expect(written?['https://books.test']?['token'], 'refreshed');
     expect(written?['https://books.test']?['__proto__'], 'literal');
     expect(written?['https://login.test']?['token'], 'account');
+    expect(
+      evaluator.evaluate(
+        "localStorage.getItem('token')",
+        context.copyWith(baseUrl: Uri.parse('data:;base64,e30=')),
+      ),
+      'reader',
+    );
     evaluator.evaluate('localStorage.clear()', context);
     expect(written?['https://books.test'], isEmpty);
     expect(written?['https://login.test']?['token'], 'account');

@@ -8,6 +8,7 @@ import '../../book_sources/source_engine/source_debug.dart';
 import '../../book_sources/source_engine/source_debug_session.dart';
 import '../../utils/localization_extension.dart';
 import '../../widgets/floating_subpage_scaffold.dart';
+import '../../widgets/side_toast.dart';
 
 class SourceDebugPage extends StatefulWidget {
   const SourceDebugPage({super.key, required this.source});
@@ -71,9 +72,11 @@ class _SourceDebugPageState extends State<SourceDebugPage> {
   Future<void> _copy(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    ScaffoldMessenger.of(
+    showSideToast(
       context,
-    ).showSnackBar(SnackBar(content: Text(context.l10n.sourceDebugCopied)));
+      context.l10n.sourceDebugCopied,
+      kind: SideToastKind.success,
+    );
   }
 
   void _showDetail(SourceDebugEvent event) {

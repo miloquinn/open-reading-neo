@@ -468,6 +468,9 @@
   "bookSourcesRightsReportOpenFailed": "无法打开权利投诉表单",
   "bookSourcesClose": "关闭",
   "sourceLoginTitle": "书源登录",
+  "sourceLoginInfo": "登录信息",
+  "sourceLoginActions": "书源操作",
+  "sourceLoginExtraSettings": "附加设置",
   "sourceLoginSecureStorageNotice": "登录信息仅保存在当前设备的系统安全存储中。",
   "sourceLoginNoForm": "该书源没有提供可用的登录方式。",
   "sourceLoginBrowserTitle": "在原网站登录",
@@ -3234,6 +3237,7 @@
   "bookSourcesImportEmpty": "没有可导入的书源，请检查文件或重复书源的选择。",
   "bookSourcesImportRetry": "重试",
   "bookSourcesImportFailed": "未能读取书源，请检查地址或文件后重试。",
+  "bookSourcesImportWebPage": "这个地址返回的是网页或登录页。请在网站中复制“书源下载”或“订阅”的 JSON 链接，再导入；导入后可在书源中登录。",
   "bookSourcesImportSaveFailed": "未能保存书源，已保留预览，请重试。",
   "bookSourcesImportErrorDetails": "错误详情",
   "bookSourcesImportFileUnreadable": "无法读取所选文件，请重新选择。",
@@ -3490,5 +3494,8 @@
   "readerChapterProgressTitle": "章节进度",
   "readerChapterProgressHidden": "不显示",
   "readerChapterProgressFraction": "{chapter}/{total}章",
-  "readerChapterProgressRemaining": "后续{count}章"
+  "readerChapterProgressRemaining": "后续{count}章",
+  "premiumTrialExpiresAt": "高级版体验有效至 {date}。",
+  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
+  "premiumTrialTitle": "高级版体验"
 }

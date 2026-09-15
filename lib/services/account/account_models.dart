@@ -405,7 +405,7 @@ class MemberEntitlement {
 
 class MemberMembership {
   const MemberMembership({
-    required this.premium,
+    required bool premium,
     required this.features,
     required this.entitlements,
     this.redeemed,
@@ -413,7 +413,8 @@ class MemberMembership {
     this.purchaseStatus = 'active',
     this.userId,
     this.purchaseAllowed,
-  });
+    // Preserve the public premium argument while checking expiry in the getter.
+  }) : _premium = premium; // ignore: prefer_initializing_formals
 
   factory MemberMembership.fromJson(Map<String, dynamic> json) =>
       MemberMembership(
@@ -435,6 +436,21 @@ class MemberMembership {
         redeemed: json['redeemed'] as bool?,
       );
 
+  bool get hasActivePremium =>
+      _premium && (entitlements.isEmpty || activePremiumSources.isNotEmpty);
+
+  DateTime? get premiumExpiresAt {
+    final active = entitlements.where(
+      (entry) => entry.featureKey == 'premium' && entry.status == 'active',
+    );
+    if (active.isEmpty || active.any((entry) => entry.expiresAt == null)) {
+      return null;
+    }
+    return active
+        .map((entry) => entry.expiresAt!)
+        .reduce((latest, value) => value.isAfter(latest) ? value : latest);
+  }
+
   Set<String> get activePremiumSources => entitlements
       .where(
         (entry) =>
@@ -448,7 +464,8 @@ class MemberMembership {
 
   final String? userId;
   final bool? purchaseAllowed;
-  final bool premium;
+  final bool _premium;
+  bool get premium => hasActivePremium;
   final bool testPurchase;
   final String purchaseStatus;
   final Map<String, bool> features;

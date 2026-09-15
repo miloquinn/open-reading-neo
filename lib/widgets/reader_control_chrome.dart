@@ -8,7 +8,6 @@ import '../core/reader/reader_auto_page_turn_controller.dart';
 import '../utils/glass_config.dart';
 import '../utils/localization_extension.dart';
 import '../utils/reader_themes.dart';
-import 'app_menu.dart';
 import 'reader_top_information_bar.dart';
 
 typedef ReaderStatusBuilder =
@@ -38,10 +37,7 @@ class ReaderChromeOverlay extends StatelessWidget {
     this.readAloudActive = false,
     this.onAskAi,
     this.askAiTooltip,
-    this.onChangeSource,
-    this.changeSourceTooltip,
-    this.onEditChapter,
-    this.editChapterTooltip,
+    this.onBookSettings,
     this.bookmarkBusy = false,
     this.topKey,
     this.bottomKey,
@@ -72,10 +68,7 @@ class ReaderChromeOverlay extends StatelessWidget {
   final VoidCallback? onReadAloud;
   final VoidCallback? onAskAi;
   final String? askAiTooltip;
-  final VoidCallback? onChangeSource;
-  final String? changeSourceTooltip;
-  final VoidCallback? onEditChapter;
-  final String? editChapterTooltip;
+  final VoidCallback? onBookSettings;
   final String backTooltip;
   final String bookmarkTooltip;
   final String tableOfContentsTooltip;
@@ -222,48 +215,17 @@ class ReaderChromeOverlay extends StatelessWidget {
                                 ? Icons.bookmark_rounded
                                 : Icons.bookmark_border_rounded,
                           ),
-                          if (onChangeSource != null || onEditChapter != null)
-                            AppPopupMenuButton<String>(
+                          if (onBookSettings != null)
+                            IconButton(
                               key: const ValueKey('reader-more-menu'),
                               tooltip: MaterialLocalizations.of(
                                 context,
                               ).moreButtonTooltip,
-                              color: palette.background,
                               icon: Icon(
                                 Icons.more_horiz_rounded,
                                 color: palette.text,
                               ),
-                              onSelected: (value) {
-                                if (value == 'change-source') {
-                                  onChangeSource?.call();
-                                } else if (value == 'edit-chapter') {
-                                  onEditChapter?.call();
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                if (onEditChapter != null)
-                                  PopupMenuItem(
-                                    value: 'edit-chapter',
-                                    child: ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      leading: const Icon(
-                                        Icons.edit_note_rounded,
-                                      ),
-                                      title: Text(editChapterTooltip ?? ''),
-                                    ),
-                                  ),
-                                if (onChangeSource != null)
-                                  PopupMenuItem(
-                                    value: 'change-source',
-                                    child: ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      leading: const Icon(
-                                        Icons.swap_horiz_rounded,
-                                      ),
-                                      title: Text(changeSourceTooltip ?? ''),
-                                    ),
-                                  ),
-                              ],
+                              onPressed: onBookSettings,
                             ),
                         ],
                       ),

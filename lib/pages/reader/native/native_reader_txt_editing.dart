@@ -106,9 +106,11 @@ extension _NativeReaderTxtEditing on _NativeReaderPageState {
     await Future.wait<void>([_loadBookmarks(), _loadAnnotations()]);
     _setReaderState(() {});
     if (mounted) {
-      ScaffoldMessenger.of(
+      showSideToast(
         context,
-      ).showSnackBar(SnackBar(content: Text(TxtEditorCopy.of(context).saved)));
+        TxtEditorCopy.of(context).saved,
+        kind: SideToastKind.success,
+      );
     }
   }
 }

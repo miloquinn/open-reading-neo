@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../book_sources/models/registered_book_source.dart';
 import '../../../book_sources/services/book_source_registry.dart';
+import '../../../widgets/side_toast.dart';
 import 'book_source_organization_copy.dart';
 
 Future<bool> showBookSourceGroupEditor(
@@ -215,10 +216,10 @@ class _BookSourceGroupEditorState extends State<_BookSourceGroupEditor> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(BookSourceOrganizationCopy.of(context).saveFailed),
-        ),
+      showSideToast(
+        context,
+        BookSourceOrganizationCopy.of(context).saveFailed,
+        kind: SideToastKind.error,
       );
     }
   }
@@ -423,10 +424,10 @@ class _BookSourceGroupManagerState extends State<_BookSourceGroupManager> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(BookSourceOrganizationCopy.of(context).saveFailed),
-        ),
+      showSideToast(
+        context,
+        BookSourceOrganizationCopy.of(context).saveFailed,
+        kind: SideToastKind.error,
       );
     }
   }
@@ -448,10 +449,10 @@ class _BookSourceGroupManagerState extends State<_BookSourceGroupManager> {
         _groups = previous;
         _busy = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(BookSourceOrganizationCopy.of(context).saveFailed),
-        ),
+      showSideToast(
+        context,
+        BookSourceOrganizationCopy.of(context).saveFailed,
+        kind: SideToastKind.error,
       );
     }
   }

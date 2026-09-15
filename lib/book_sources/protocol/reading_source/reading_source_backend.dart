@@ -13,7 +13,7 @@ import '../book_source_protocol.dart';
 
 abstract interface class ReadingSourceBackendPort {
   Future<List<SourceLoginField>> loadLoginFields(RegisteredBookSource source);
-  Future<void> loginSource(
+  Future<String?> loginSource(
     RegisteredBookSource source,
     Map<String, String> values, {
     String? action,
@@ -93,14 +93,14 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
   }
 
   @override
-  Future<void> loginSource(
+  Future<String?> loginSource(
     RegisteredBookSource source,
     Map<String, String> values, {
     String? action,
   }) async {
     await _ensureEnabled();
     try {
-      await _runtime().login(source, values, action: action);
+      return await _runtime().login(source, values, action: action);
     } finally {
       // The runtime saves login data before executing the source script, so a
       // thrown script can still leave a different session or cookie state.

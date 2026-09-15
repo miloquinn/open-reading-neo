@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:xxread/book_sources/source_engine/rules/source_rule_engine.dart';
 import 'package:xxread/book_sources/source_engine/source_cookie_utils.dart';
@@ -23,15 +24,21 @@ class SourceScriptHostApi {
   SourceScriptContext? _activeContext;
   Map<String, SourceScriptNetworkResult> _networkResponses = const {};
   Map<String, SourceScriptInteractionResult> _interactionResponses = const {};
+  Map<String, Object?> _replayValues = {};
+  final Map<String, int> _replayIndices = {};
+  final Random _random = Random.secure();
 
   SourceScriptState beginInvocation(
     SourceScriptContext context,
     Map<String, SourceScriptNetworkResult> networkResponses,
     Map<String, SourceScriptInteractionResult> interactionResponses,
+    Map<String, Object?> replayValues,
   ) {
     _activeContext = context;
     _networkResponses = networkResponses;
     _interactionResponses = interactionResponses;
+    _replayValues = replayValues;
+    _replayIndices.clear();
     return stateFor(context.source.stableId);
   }
 
@@ -39,6 +46,8 @@ class SourceScriptHostApi {
     _activeContext = null;
     _networkResponses = const {};
     _interactionResponses = const {};
+    _replayValues = {};
+    _replayIndices.clear();
   }
 
   SourceScriptState stateFor(String sourceId) =>
@@ -61,11 +70,11 @@ class SourceScriptHostApi {
       'hmacBase64' ||
       'hmacHex' ||
       'symmetricCrypto' ||
-      'randomUUID' ||
       'androidId' ||
       'digestHex' ||
       'digestBytes' ||
       'hmacBytes' => _crypto.handle(operation, arguments),
+      'randomUUID' || 'replayNow' || 'replayRandom' => _replayValue(operation),
       'toNumChapter' ||
       'utf8Bytes' ||
       'htmlFormat' ||
@@ -90,6 +99,22 @@ class SourceScriptHostApi {
       'interaction' => _interactionResult(arguments),
       _ => null,
     };
+  }
+
+  Object? _replayValue(String operation) {
+    final index = _replayIndices.update(
+      operation,
+      (value) => value + 1,
+      ifAbsent: () => 0,
+    );
+    return _replayValues.putIfAbsent(
+      '$operation:$index',
+      () => switch (operation) {
+        'replayNow' => DateTime.now().millisecondsSinceEpoch,
+        'replayRandom' => _random.nextDouble(),
+        _ => _crypto.handle(operation, const []),
+      },
+    );
   }
 
   String _cookieGet(List arguments) {

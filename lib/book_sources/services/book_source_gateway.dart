@@ -16,7 +16,7 @@ class DiscoveredBookSource {
 abstract interface class BookSourceGateway {
   Future<List<SourceLoginField>> loadLoginFields(RegisteredBookSource source);
 
-  Future<void> loginSource(
+  Future<String?> loginSource(
     RegisteredBookSource source,
     Map<String, String> values, {
     String? action,

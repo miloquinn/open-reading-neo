@@ -468,6 +468,9 @@
   "bookSourcesRightsReportOpenFailed": "Could not open the rights-report form",
   "bookSourcesClose": "Close",
   "sourceLoginTitle": "Source sign-in",
+  "sourceLoginInfo": "Sign-in details",
+  "sourceLoginActions": "Source actions",
+  "sourceLoginExtraSettings": "Additional settings",
   "sourceLoginSecureStorageNotice": "Sign-in details stay in this device's secure system storage.",
   "sourceLoginNoForm": "This source does not provide an available sign-in method.",
   "sourceLoginBrowserTitle": "Sign in on the original website",
@@ -5900,6 +5903,7 @@
   "bookSourcesImportEmpty": "No sources selected. Check the file or duplicate selection.",
   "bookSourcesImportRetry": "Try again",
   "bookSourcesImportFailed": "Could not read sources. Check the address or file and try again.",
+  "bookSourcesImportWebPage": "This URL returned a website or sign-in page. Copy the website’s source download or subscription JSON link and import that instead. You can sign in after importing the source.",
   "bookSourcesImportSaveFailed": "Could not save sources. Your preview is kept; please try again.",
   "bookSourcesImportErrorDetails": "Error details",
   "bookSourcesImportFileUnreadable": "Could not read the selected file. Choose it again.",
@@ -6510,5 +6514,8 @@
         "type": "int"
       }
     }
-  }
+  },
+  "premiumTrialExpiresAt": "Premium trial expires on {date}.",
+  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
+  "premiumTrialTitle": "Premium trial"
 }

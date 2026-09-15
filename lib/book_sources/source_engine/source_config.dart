@@ -63,15 +63,16 @@ class ReadingSourceConfig {
     if (rule('ruleToc').isEmpty || contentRule.isEmpty) return false;
     final content = _string(contentRule['content']).toLowerCase();
     final label = '$name\n$group'.toLowerCase();
-    final emitsImages =
-        content.contains('<img') ||
+    // An embedded <img> can be an illustration or a comment card in a novel.
+    // Infer legacy manga only from image selection rules or an explicit label.
+    final selectsImages =
         content.contains('@img') ||
         content.contains('img@') ||
         content.contains('amp-img') ||
         content.contains('data-original') ||
         content.contains('data-src');
     final labeledAsManga = label.contains('漫画') || label.contains('comic');
-    return emitsImages || labeledAsManga;
+    return selectsImages || labeledAsManga;
   }
 
   int get effectiveBookType => switch (type) {

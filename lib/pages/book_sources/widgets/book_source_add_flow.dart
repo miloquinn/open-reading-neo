@@ -172,6 +172,8 @@ class _BookSourceAddFlowState extends State<BookSourceAddFlow> {
         errorText: state.error?.toString(),
         errorSummary: state.error is TimeoutException
             ? context.l10n.bookSourcesImportTimedOut
+            : state.error is BookSourceImportWebPageException
+            ? context.l10n.bookSourcesImportWebPage
             : state.error is String
             ? state.error as String
             : null,

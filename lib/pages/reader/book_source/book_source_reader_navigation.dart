@@ -1,6 +1,46 @@
 part of 'book_source_reader_page.dart';
 
 extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
+  Future<void> _showBookSettings() async {
+    _pauseAutoPageTurn();
+    _controlsTimer?.cancel();
+    final fallback = GeneratedBookCover(
+      title: widget.book.title,
+      author: widget.book.author,
+    );
+    final action = await Navigator.of(context).push<BookSettingsAction>(
+      MaterialPageRoute(
+        builder: (_) => BookSettingsPage(
+          title: widget.book.title,
+          author: widget.book.author,
+          format: 'online',
+          description: widget.book.description,
+          cover: widget.book.coverUrl == null
+              ? fallback
+              : SourceCoverImage(
+                  url: widget.book.coverUrl!,
+                  headers: widget.book.coverHeaders,
+                  fallback: fallback,
+                ),
+          canChangeSource: true,
+          source: widget.source,
+          client: _client,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _applyReaderSystemUi();
+    if (!mounted) return;
+    switch (action) {
+      case BookSettingsAction.changeSource:
+        await _changeBookSource();
+      case BookSettingsAction.readingSettings:
+        _showReadingSettings();
+      default:
+        break;
+    }
+  }
+
   void _restoreScrollProgress(double progress) {
     _restorePageProgress = progress.clamp(0, 1);
     _restorePagedPosition = true;

@@ -1,6 +1,43 @@
 part of 'native_reader_page.dart';
 
 extension _NativeReaderControls on _NativeReaderPageState {
+  Future<void> _showBookSettings() async {
+    _pauseAutoPageTurn();
+    final fallback = GeneratedBookCover(
+      title: _activeBook.title,
+      author: _activeBook.author,
+    );
+    final coverPath = _activeBook.coverImagePath;
+    final action = await Navigator.of(context).push<BookSettingsAction>(
+      MaterialPageRoute(
+        builder: (_) => BookSettingsPage(
+          title: _activeBook.title,
+          author: _activeBook.author,
+          format: _activeBook.format,
+          cover: coverPath == null || kIsWeb
+              ? fallback
+              : Image.file(
+                  File(coverPath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => fallback,
+                ),
+          canEditText: _canEditCurrentTxt,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _applyReaderSystemUi();
+    if (!mounted) return;
+    switch (action) {
+      case BookSettingsAction.editText:
+        await _editCurrentTxtChapter();
+      case BookSettingsAction.readingSettings:
+        await _showReadingSettings();
+      default:
+        break;
+    }
+  }
+
   void _markReaderAloudForManualPageTurn() {
     final controller = _readerAloudController;
     _restartReaderAloudAfterManualPageTurn =

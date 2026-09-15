@@ -17,6 +17,28 @@ Uint8List _bytes(Object value) =>
     Uint8List.fromList(utf8.encode(jsonEncode(value)));
 
 void main() {
+  test('HTML login pages have a distinct actionable import error', () async {
+    final analyzer = BookSourceImportAnalyzer();
+    addTearDown(analyzer.close);
+    final bytes = Uint8List.fromList(
+      utf8.encode('<!DOCTYPE html><html><form>Sign in</form></html>'),
+    );
+    await expectLater(
+      analyzer.analyzeBytesAsync(bytes),
+      throwsA(isA<BookSourceImportWebPageException>()),
+    );
+    expect(
+      () => analyzer.analyzeBytes(Uint8List.fromList(utf8.encode('{broken'))),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error is BookSourceImportWebPageException,
+          'HTML classification',
+          false,
+        ),
+      ),
+    );
+  });
+
   final manifest = {
     'protocol': 'open-reading-source',
     'protocolVersion': '1.5',

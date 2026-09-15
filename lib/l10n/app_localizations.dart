@@ -1272,6 +1272,24 @@ abstract class AppLocalizations {
   /// **'Source sign-in'**
   String get sourceLoginTitle;
 
+  /// No description provided for @sourceLoginInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in details'**
+  String get sourceLoginInfo;
+
+  /// No description provided for @sourceLoginActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Source actions'**
+  String get sourceLoginActions;
+
+  /// No description provided for @sourceLoginExtraSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional settings'**
+  String get sourceLoginExtraSettings;
+
   /// No description provided for @sourceLoginSecureStorageNotice.
   ///
   /// In en, this message translates to:
@@ -10592,6 +10610,12 @@ abstract class AppLocalizations {
   /// **'Could not read sources. Check the address or file and try again.'**
   String get bookSourcesImportFailed;
 
+  /// No description provided for @bookSourcesImportWebPage.
+  ///
+  /// In en, this message translates to:
+  /// **'This URL returned a website or sign-in page. Copy the website’s source download or subscription JSON link and import that instead. You can sign in after importing the source.'**
+  String get bookSourcesImportWebPage;
+
   /// No description provided for @bookSourcesImportSaveFailed.
   ///
   /// In en, this message translates to:
@@ -11905,6 +11929,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} chapters ahead'**
   String readerChapterProgressRemaining(int count);
+
+  /// No description provided for @premiumTrialExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium trial expires on {date}.'**
+  String premiumTrialExpiresAt(String date);
+
+  /// No description provided for @premiumTrialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium trial'**
+  String get premiumTrialTitle;
 }
 
 class _AppLocalizationsDelegate

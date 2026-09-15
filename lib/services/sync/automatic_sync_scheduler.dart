@@ -8,7 +8,29 @@ class AutomaticSyncScheduler {
     required this.enabled,
     this.coalesceDelay = const Duration(seconds: 5),
     this.pollInterval = const Duration(seconds: 45),
-  });
+    this.interval,
+    this.lastSuccess,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
+  final Duration? Function()? interval;
+  final DateTime? Function()? lastSuccess;
+
+  bool get isDue {
+    final delay = interval?.call();
+    final last = lastSuccess?.call();
+    final now = _now();
+    return delay == null ||
+        last == null ||
+        last.isAfter(now) ||
+        now.difference(last) >= delay;
+  }
+
+  Future<void> runIfDue() async {
+    if (_backingOff || !isDue) return;
+    await _attempt();
+  }
 
   final Future<void> Function() run;
   final bool Function() enabled;
@@ -43,7 +65,7 @@ class AutomaticSyncScheduler {
   }
 
   void request({bool immediate = false}) {
-    if (_disposed || !enabled()) return;
+    if (_disposed || !enabled() || !isDue) return;
     if (_backingOff) return;
     if (_running) {
       _dirtyDuringRun = true;
@@ -62,7 +84,7 @@ class AutomaticSyncScheduler {
   }
 
   Future<void> _attempt() async {
-    if (_disposed || _running || !enabled()) return;
+    if (_disposed || _running || !enabled() || !isDue) return;
     _running = true;
     var failed = false;
     try {

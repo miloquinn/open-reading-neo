@@ -4,6 +4,67 @@ import 'package:xxread/services/sync/sync_models.dart';
 
 void main() {
   test(
+    'frequency and automatic success survive restart and clearing resets them',
+    () async {
+      final prefs = _MemoryPreferences();
+      final secrets = _MemorySecrets();
+      final first = SecureSyncConfigStore(
+        preferences: prefs,
+        secretStorage: secrets,
+      );
+      const config = WebDavSyncConfiguration(
+        serverUrl: 'https://example.test',
+        username: 'reader',
+        frequency: WebDavSyncFrequency.daily,
+      );
+      final time = DateTime.utc(2026, 9, 15, 8);
+      await first.save(config, 'secret');
+      await first.saveAutomaticSuccess(time);
+      final second = SecureSyncConfigStore(
+        preferences: prefs,
+        secretStorage: secrets,
+      );
+      expect(
+        (await second.readConfiguration())!.frequency,
+        WebDavSyncFrequency.daily,
+      );
+      expect(await second.readAutomaticSuccess(), time);
+      await second.clear();
+      expect(await second.readAutomaticSuccess(), isNull);
+    },
+  );
+
+  test(
+    'old auto sync preference migrates without changing existing behavior',
+    () {
+      final json = {'server_url': 'https://example.test', 'username': 'reader'};
+      expect(
+        WebDavSyncConfiguration.fromJson(json).frequency,
+        WebDavSyncFrequency.onChange,
+      );
+      expect(
+        WebDavSyncConfiguration.fromJson({
+          ...json,
+          'auto_sync': false,
+        }).frequency,
+        WebDavSyncFrequency.off,
+      );
+      final daily = WebDavSyncConfiguration.fromJson({
+        ...json,
+        'sync_frequency': 'daily',
+      });
+      expect(
+        daily.copyWith(rootPath: 'another').frequency,
+        WebDavSyncFrequency.daily,
+      );
+      expect(
+        daily.copyWith(autoSync: false).frequency,
+        WebDavSyncFrequency.off,
+      );
+    },
+  );
+
+  test(
     'installation identity survives configuration clearing but not a new device vault',
     () async {
       final secrets = _MemorySecrets();

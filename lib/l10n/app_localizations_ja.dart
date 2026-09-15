@@ -6517,4 +6517,35 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get cloudSyncTransferEditedBook =>
       '古い端末で本文を編集した場合は、その版を「本のファイル」からアップロードし、新しい端末でダウンロードすると本の関連付けを保てます。本文の版が異なると読書位置を正確に復元できない場合があります。';
+
+  @override
+  String get cloudSyncFrequency => '自動同期の頻度';
+
+  @override
+  String get cloudSyncFrequencyOff => 'オフ（手動のみ）';
+
+  @override
+  String get cloudSyncFrequencyOnChange => '変更時に同期';
+
+  @override
+  String get cloudSyncFrequency15Minutes => '15分ごと';
+
+  @override
+  String get cloudSyncFrequencyHourly => '1時間ごと';
+
+  @override
+  String get cloudSyncFrequencyDaily => '1日1回';
+
+  @override
+  String get cloudSyncFrequencyHint =>
+      '前回の自動同期成功から間隔を計算します。アプリが動いていない場合は次回起動時に同期し、失敗時は再試行します。「今すぐ同期」はいつでも使えます。';
+
+  @override
+  String cloudSyncFrequencySummary(String frequency) {
+    return '自動同期：$frequency';
+  }
+
+  @override
+  String get cloudSyncAutoResumeScheduledHint =>
+      '設定した頻度で読書位置を取得し、本を開くと同期済みの位置から再開します。最新の位置が必要なときは先に「今すぐ同期」を押してください。';
 }

@@ -183,6 +183,20 @@ class SecureSyncConfigStore {
   Future<void> saveScope(WebDavSyncScope scope) =>
       _preferences.write(_scopeKey, jsonEncode(scope));
 
+  static const _automaticSuccessKey = 'webdav_last_automatic_success';
+
+  Future<DateTime?> readAutomaticSuccess() async {
+    final value = await _preferences.read(_automaticSuccessKey);
+    return value == null ? null : DateTime.tryParse(value)?.toUtc();
+  }
+
+  Future<void> saveAutomaticSuccess(DateTime? time) => time == null
+      ? _preferences.delete(_automaticSuccessKey)
+      : _preferences.write(
+          _automaticSuccessKey,
+          time.toUtc().toIso8601String(),
+        );
+
   Future<bool> readAutoResume() async =>
       await _preferences.read(_autoResumeKey) != 'false';
 
@@ -216,6 +230,7 @@ class SecureSyncConfigStore {
     await _preferences.delete(_scopeKey);
     await _preferences.delete(_newBookUploadPolicyKey);
     await _preferences.delete(_autoResumeKey);
+    await _preferences.delete(_automaticSuccessKey);
   }
 }
 

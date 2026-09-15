@@ -5,6 +5,7 @@ import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'webdav_sync_widgets.dart';
+import 'webdav_sync_frequency.dart';
 
 import 'webdav_setup_page.dart';
 import 'webdav_sync_content_page.dart';
@@ -25,18 +26,20 @@ class WebDavSyncSettingsPage extends StatelessWidget {
       body: SyncPageBody(
         children: [
           SyncSurface(
-            child: SwitchListTile.adaptive(
-              title: Text(l10n.webDavAutomaticSync),
-              subtitle: Text(
-                sync.autoSync ? l10n.cloudSyncAutoHint : l10n.cloudSyncPaused,
-              ),
-              value: sync.autoSync,
-              onChanged: sync.isConfigured
-                  ? (value) => performSyncAction(
-                      context,
-                      () => sync.setAutoSync(value),
-                    )
+            child: SyncNavigationTile(
+              icon: Icons.schedule_outlined,
+              title: l10n.cloudSyncFrequency,
+              detail: syncFrequencyLabel(context, sync.syncFrequency),
+              onTap: sync.isConfigured
+                  ? () => _pickFrequency(context, sync)
                   : null,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.cloudSyncFrequencyHint,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 24),
@@ -84,6 +87,57 @@ class WebDavSyncSettingsPage extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _pickFrequency(
+  BuildContext context,
+  WebDavSyncController sync,
+) async {
+  final selected = await showModalBottomSheet<WebDavSyncFrequency>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  context.l10n.cloudSyncFrequency,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              for (final frequency in const [
+                WebDavSyncFrequency.onChange,
+                WebDavSyncFrequency.every15Minutes,
+                WebDavSyncFrequency.hourly,
+                WebDavSyncFrequency.daily,
+                WebDavSyncFrequency.off,
+              ])
+                ListTile(
+                  title: Text(syncFrequencyLabel(context, frequency)),
+                  subtitle: frequency == WebDavSyncFrequency.onChange
+                      ? Text(context.l10n.cloudSyncAutoHint)
+                      : null,
+                  selected: sync.syncFrequency == frequency,
+                  trailing: sync.syncFrequency == frequency
+                      ? const Icon(Icons.check_rounded)
+                      : null,
+                  onTap: () => Navigator.pop(context, frequency),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  if (selected == null || !context.mounted) return;
+  await performSyncAction(context, () => sync.setSyncFrequency(selected));
 }
 
 class _ConnectionFooter extends StatelessWidget {

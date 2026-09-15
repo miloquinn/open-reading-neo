@@ -11827,6 +11827,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions.'**
   String get cloudSyncTransferEditedBook;
+
+  /// No description provided for @cloudSyncFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic sync frequency'**
+  String get cloudSyncFrequency;
+
+  /// No description provided for @cloudSyncFrequencyOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off (manual only)'**
+  String get cloudSyncFrequencyOff;
+
+  /// No description provided for @cloudSyncFrequencyOnChange.
+  ///
+  /// In en, this message translates to:
+  /// **'After changes'**
+  String get cloudSyncFrequencyOnChange;
+
+  /// No description provided for @cloudSyncFrequency15Minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 15 minutes'**
+  String get cloudSyncFrequency15Minutes;
+
+  /// No description provided for @cloudSyncFrequencyHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Every hour'**
+  String get cloudSyncFrequencyHourly;
+
+  /// No description provided for @cloudSyncFrequencyDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Once a day'**
+  String get cloudSyncFrequencyDaily;
+
+  /// No description provided for @cloudSyncFrequencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Intervals start after a successful automatic sync. If the app is not running, it catches up next time you open it. Failed attempts retry. Sync now always works immediately.'**
+  String get cloudSyncFrequencyHint;
+
+  /// No description provided for @cloudSyncFrequencySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic sync: {frequency}'**
+  String cloudSyncFrequencySummary(String frequency);
+
+  /// No description provided for @cloudSyncAutoResumeScheduledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress is fetched at your chosen frequency. Opening a book resumes from the last synced position. Tap Sync now first when you need the latest progress.'**
+  String get cloudSyncAutoResumeScheduledHint;
 }
 
 class _AppLocalizationsDelegate

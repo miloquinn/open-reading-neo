@@ -14,6 +14,7 @@ import 'webdav_sync_activity_page.dart';
 import 'webdav_transfer_guide_page.dart';
 import 'webdav_setup_page.dart';
 import 'webdav_sync_translator.dart';
+import 'webdav_sync_frequency.dart';
 
 class WebDavSyncPage extends StatelessWidget {
   const WebDavSyncPage({super.key});
@@ -161,6 +162,15 @@ class _SyncOverview extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         if (configured) ...[
+          Text(
+            l10n.cloudSyncFrequencySummary(
+              syncFrequencyLabel(context, sync.syncFrequency),
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
           Text(
             sync.pendingChanges > 0
                 ? l10n.webDavPendingChanges(sync.pendingChanges)

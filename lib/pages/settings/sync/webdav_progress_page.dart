@@ -41,7 +41,11 @@ class WebDavProgressPage extends StatelessWidget {
                 const SyncDivider(),
                 SwitchListTile.adaptive(
                   title: Text(l10n.cloudSyncAutoResume),
-                  subtitle: Text(l10n.cloudSyncAutoResumeHint),
+                  subtitle: Text(
+                    sync.syncFrequency.interval == null
+                        ? l10n.cloudSyncAutoResumeHint
+                        : l10n.cloudSyncAutoResumeScheduledHint,
+                  ),
                   value: sync.autoResume,
                   onChanged: sync.isConfigured && sync.scope.progress
                       ? (value) => performSyncAction(

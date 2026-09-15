@@ -105,14 +105,39 @@ class WebDavSyncConfigDraft {
   final String rootPath;
   final bool allowInsecurePrivateHttp;
 
-  WebDavSyncConfiguration withoutPassword({bool autoSync = true}) =>
-      WebDavSyncConfiguration(
-        serverUrl: serverUrl,
-        username: username,
-        rootPath: rootPath,
-        allowInsecurePrivateHttp: allowInsecurePrivateHttp,
-        autoSync: autoSync,
-      );
+  WebDavSyncConfiguration withoutPassword({
+    bool autoSync = true,
+    WebDavSyncFrequency? frequency,
+  }) => WebDavSyncConfiguration(
+    serverUrl: serverUrl,
+    username: username,
+    rootPath: rootPath,
+    allowInsecurePrivateHttp: allowInsecurePrivateHttp,
+    autoSync: autoSync,
+    frequency: frequency,
+  );
+}
+
+enum WebDavSyncFrequency {
+  off,
+  onChange,
+  every15Minutes,
+  hourly,
+  daily;
+
+  Duration? get interval => switch (this) {
+    every15Minutes => const Duration(minutes: 15),
+    hourly => const Duration(hours: 1),
+    daily => const Duration(days: 1),
+    _ => null,
+  };
+
+  static WebDavSyncFrequency fromJson(
+    Object? value, {
+    required bool legacyEnabled,
+  }) =>
+      values.where((item) => item.name == value).firstOrNull ??
+      (legacyEnabled ? onChange : off);
 }
 
 class WebDavSyncConfiguration {
@@ -121,14 +146,18 @@ class WebDavSyncConfiguration {
     required this.username,
     this.rootPath = 'OpenReading',
     this.allowInsecurePrivateHttp = false,
-    this.autoSync = true,
-  });
+    bool autoSync = true,
+    WebDavSyncFrequency? frequency,
+  }) : frequency =
+           frequency ??
+           (autoSync ? WebDavSyncFrequency.onChange : WebDavSyncFrequency.off);
 
   final String serverUrl;
   final String username;
   final String rootPath;
   final bool allowInsecurePrivateHttp;
-  final bool autoSync;
+  final WebDavSyncFrequency frequency;
+  bool get autoSync => frequency != WebDavSyncFrequency.off;
 
   Map<String, Object?> toJson() => {
     'server_url': serverUrl,
@@ -136,6 +165,7 @@ class WebDavSyncConfiguration {
     'root_path': rootPath,
     'allow_insecure_private_http': allowInsecurePrivateHttp,
     'auto_sync': autoSync,
+    'sync_frequency': frequency.name,
   };
 
   factory WebDavSyncConfiguration.fromJson(Map<String, dynamic> json) =>
@@ -145,7 +175,10 @@ class WebDavSyncConfiguration {
         rootPath: json['root_path'] as String? ?? 'OpenReading',
         allowInsecurePrivateHttp:
             json['allow_insecure_private_http'] as bool? ?? false,
-        autoSync: json['auto_sync'] as bool? ?? true,
+        frequency: WebDavSyncFrequency.fromJson(
+          json['sync_frequency'],
+          legacyEnabled: json['auto_sync'] as bool? ?? true,
+        ),
       );
 
   WebDavSyncConfiguration copyWith({
@@ -154,13 +187,20 @@ class WebDavSyncConfiguration {
     String? rootPath,
     bool? allowInsecurePrivateHttp,
     bool? autoSync,
+    WebDavSyncFrequency? frequency,
   }) => WebDavSyncConfiguration(
     serverUrl: serverUrl ?? this.serverUrl,
     username: username ?? this.username,
     rootPath: rootPath ?? this.rootPath,
     allowInsecurePrivateHttp:
         allowInsecurePrivateHttp ?? this.allowInsecurePrivateHttp,
-    autoSync: autoSync ?? this.autoSync,
+    frequency:
+        frequency ??
+        (autoSync == false
+            ? WebDavSyncFrequency.off
+            : autoSync == true && !this.autoSync
+            ? WebDavSyncFrequency.onChange
+            : this.frequency),
   );
 }
 

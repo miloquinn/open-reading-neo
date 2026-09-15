@@ -3470,5 +3470,22 @@
   "cloudSyncTransferHasBookBody": "导入同一份本地文件，或打开同一书源的同一本在线书，然后同步进度并打开书籍接续。不需要再上传正文；仅书名相同不能保证匹配。",
   "cloudSyncTransferNeedsBook": "3. 新手机还没有书籍文件",
   "cloudSyncTransferNeedsBookBody": "旧手机进入「书籍文件」，允许上传并选择这本书。上传成功后，新手机同步，再到「可下载」中下载。也可以自行传入同一份文件，再同步进度。",
-  "cloudSyncTransferEditedBook": "如果旧手机编辑过正文，建议通过「书籍文件」上传并在新手机下载该版本，以保留书籍关联。不同内容版本的阅读位置可能无法准确恢复。"
+  "cloudSyncTransferEditedBook": "如果旧手机编辑过正文，建议通过「书籍文件」上传并在新手机下载该版本，以保留书籍关联。不同内容版本的阅读位置可能无法准确恢复。",
+  "cloudSyncFrequency": "自动同步频率",
+  "cloudSyncFrequencyOff": "关闭（仅手动）",
+  "cloudSyncFrequencyOnChange": "及时同步",
+  "cloudSyncFrequency15Minutes": "每 15 分钟",
+  "cloudSyncFrequencyHourly": "每小时",
+  "cloudSyncFrequencyDaily": "每天一次",
+  "cloudSyncFrequencyHint": "从上次自动同步成功起计算间隔。应用未运行时，下次打开后补同步；失败会重试。「立即同步」不受频率限制。",
+  "cloudSyncFrequencySummary": "自动同步：{frequency}",
+  "cloudSyncAutoResumeScheduledHint": "按同步频率获取进度，打开书籍时接续已同步的位置。需要最新进度时，请先点「立即同步」。",
+  "@cloudSyncFrequencySummary": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  }
+
 }

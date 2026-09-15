@@ -133,7 +133,7 @@ void main() {
     expect(find.byType(SwitchListTile), findsNothing);
     await tester.tap(find.text('同步设置'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(SwitchListTile, '自动同步'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, '自动同步频率'), findsOneWidget);
     await tester.tap(find.text('更多同步内容'));
     await tester.pumpAndSettle();
     final summary = find.textContaining('笔记与高亮');
@@ -293,6 +293,52 @@ void main() {
     });
   }
 
+  testWidgets('one frequency picker saves daily and off with a home summary', (
+    tester,
+  ) async {
+    final store = SecureSyncConfigStore(
+      secretStorage: _MemorySecrets(),
+      preferences: _MemoryPreferences(),
+    );
+    final controller = _ScopeController(store);
+    addTearDown(controller.dispose);
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final previewKey = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: previewKey,
+        child: _testApp(controller, const WebDavSyncPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('同步设置'));
+    await tester.tap(find.text('同步设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自动同步频率'));
+    await tester.pumpAndSettle();
+    expect(find.text('每 15 分钟'), findsOneWidget);
+    expect(find.text('每小时'), findsOneWidget);
+    await _savePreview(tester, previewKey, 'sync-frequency-picker.png');
+    await tester.tap(find.text('每天一次'));
+    await tester.pumpAndSettle();
+    expect(
+      (await store.readConfiguration())!.frequency,
+      WebDavSyncFrequency.daily,
+    );
+    await tester.tap(find.byKey(const ValueKey('floating-subpage-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('自动同步：每天一次'), findsOneWidget);
+    await _savePreview(tester, previewKey, 'sync-frequency-home.png');
+    await tester.tap(find.text('同步设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自动同步频率'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('关闭（仅手动）'));
+    await tester.pumpAndSettle();
+    expect((await store.readConfiguration())!.autoSync, isFalse);
+  });
+
   testWidgets('未配置用户也能从首页阅读换机指南', (tester) async {
     final controller = WebDavSyncController();
     addTearDown(controller.dispose);
@@ -448,6 +494,7 @@ Widget _testApp(
   return ChangeNotifierProvider<WebDavSyncController>.value(
     value: controller,
     child: MaterialApp(
+      debugShowCheckedModeBanner: false,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           textScaler: TextScaler.linear(textScale),
@@ -507,6 +554,23 @@ class _MemorySecrets implements SyncSecretStorage {
 
 class _ScopeController extends WebDavSyncController {
   _ScopeController(this.store) : super(configStore: store);
+
+  WebDavSyncFrequency frequency = WebDavSyncFrequency.onChange;
+  @override
+  WebDavSyncFrequency get syncFrequency => frequency;
+  @override
+  Future<void> setSyncFrequency(WebDavSyncFrequency next) async {
+    await store.save(
+      WebDavSyncConfiguration(
+        serverUrl: 'https://example.test',
+        username: 'reader',
+        frequency: next,
+      ),
+      'secret',
+    );
+    frequency = next;
+    notifyListeners();
+  }
 
   final SecureSyncConfigStore store;
   WebDavSyncScope value = const WebDavSyncScope();

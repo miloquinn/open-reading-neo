@@ -6473,5 +6473,22 @@
   "cloudSyncTransferHasBookBody": "Import the same local file, or open the same online book from the same source. Sync progress, then open the book to continue. Matching titles alone do not guarantee a match.",
   "cloudSyncTransferNeedsBook": "3. The new phone needs the book file",
   "cloudSyncTransferNeedsBookBody": "On the old phone, open Book files, allow uploads and select the book. After upload succeeds, sync the new phone and download it from Available to download. You can also transfer the same file yourself.",
-  "cloudSyncTransferEditedBook": "If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions."
+  "cloudSyncTransferEditedBook": "If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions.",
+  "cloudSyncFrequency": "Automatic sync frequency",
+  "cloudSyncFrequencyOff": "Off (manual only)",
+  "cloudSyncFrequencyOnChange": "After changes",
+  "cloudSyncFrequency15Minutes": "Every 15 minutes",
+  "cloudSyncFrequencyHourly": "Every hour",
+  "cloudSyncFrequencyDaily": "Once a day",
+  "cloudSyncFrequencyHint": "Intervals start after a successful automatic sync. If the app is not running, it catches up next time you open it. Failed attempts retry. Sync now always works immediately.",
+  "cloudSyncFrequencySummary": "Automatic sync: {frequency}",
+  "cloudSyncAutoResumeScheduledHint": "Progress is fetched at your chosen frequency. Opening a book resumes from the last synced position. Tap Sync now first when you need the latest progress.",
+  "@cloudSyncFrequencySummary": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  }
+
 }

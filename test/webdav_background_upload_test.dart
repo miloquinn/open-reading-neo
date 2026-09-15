@@ -269,6 +269,14 @@ class _DiscoveryConfig extends SecureSyncConfigStore {
     ),
   });
 
+  DateTime? lastAutomatic;
+  @override
+  Future<DateTime?> readAutomaticSuccess() async => lastAutomatic;
+  @override
+  Future<void> saveAutomaticSuccess(DateTime? time) async {
+    lastAutomatic = time;
+  }
+
   WebDavSyncConfiguration? configuration;
   WebDavSyncScope scope;
 
@@ -298,7 +306,9 @@ class _DiscoveryConfig extends SecureSyncConfigStore {
 
 class _DiscoveryStore extends SyncChangeStore {
   @override
-  Future<void> resetRemoteMirrorForNewSpace({String? preserveFileSpace}) async {}
+  Future<void> resetRemoteMirrorForNewSpace({
+    String? preserveFileSpace,
+  }) async {}
 
   @override
   Future<int> pendingCount({Set<String>? datasets}) async => 0;

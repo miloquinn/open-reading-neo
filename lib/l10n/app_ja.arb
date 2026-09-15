@@ -3143,5 +3143,22 @@
   "cloudSyncTransferHasBookBody": "同じローカルファイルを取り込むか、同じ配信元の同じオンライン本を開きます。同期してから本を開くと続きへ進めます。タイトルが同じだけでは一致するとは限りません。",
   "cloudSyncTransferNeedsBook": "3. 新しい端末に本がない場合",
   "cloudSyncTransferNeedsBookBody": "古い端末の「本のファイル」でアップロードを許可し、本を選びます。完了後、新しい端末で同期し、ダウンロード一覧から取得します。同じファイルを自分で転送しても構いません。",
-  "cloudSyncTransferEditedBook": "古い端末で本文を編集した場合は、その版を「本のファイル」からアップロードし、新しい端末でダウンロードすると本の関連付けを保てます。本文の版が異なると読書位置を正確に復元できない場合があります。"
+  "cloudSyncTransferEditedBook": "古い端末で本文を編集した場合は、その版を「本のファイル」からアップロードし、新しい端末でダウンロードすると本の関連付けを保てます。本文の版が異なると読書位置を正確に復元できない場合があります。",
+  "cloudSyncFrequency": "自動同期の頻度",
+  "cloudSyncFrequencyOff": "オフ（手動のみ）",
+  "cloudSyncFrequencyOnChange": "変更時に同期",
+  "cloudSyncFrequency15Minutes": "15分ごと",
+  "cloudSyncFrequencyHourly": "1時間ごと",
+  "cloudSyncFrequencyDaily": "1日1回",
+  "cloudSyncFrequencyHint": "前回の自動同期成功から間隔を計算します。アプリが動いていない場合は次回起動時に同期し、失敗時は再試行します。「今すぐ同期」はいつでも使えます。",
+  "cloudSyncFrequencySummary": "自動同期：{frequency}",
+  "cloudSyncAutoResumeScheduledHint": "設定した頻度で読書位置を取得し、本を開くと同期済みの位置から再開します。最新の位置が必要なときは先に「今すぐ同期」を押してください。",
+  "@cloudSyncFrequencySummary": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  }
+
 }

@@ -36,8 +36,10 @@ class WebDavSyncController extends ChangeNotifier {
     BookFileSyncService? bookFileService,
     BookContentSyncService? contentSyncService,
     this.localBooksLoader,
+    DateTime Function()? now,
     this._replaceRuleService,
-  }) : _configStore = configStore ?? SecureSyncConfigStore(),
+  }) : _now = now ?? DateTime.now,
+       _configStore = configStore ?? SecureSyncConfigStore(),
        _changeStore = changeStore ?? SyncChangeStore(),
        _clientFactory = clientFactory ?? WebDavClient.standard {
     _engine = engine;
@@ -53,9 +55,14 @@ class WebDavSyncController extends ChangeNotifier {
     _scheduler = AutomaticSyncScheduler(
       run: _runAutomaticCycle,
       enabled: () => isConfigured && autoSync && !_disposed,
+      interval: () => syncFrequency.interval,
+      lastSuccess: () => _lastAutomaticSuccess,
+      now: _now,
     );
   }
 
+  final DateTime Function() _now;
+  DateTime? _lastAutomaticSuccess;
   final SecureSyncConfigStore _configStore;
   final SyncChangeStore _changeStore;
   final WebDavClientFactory _clientFactory;
@@ -155,7 +162,11 @@ class WebDavSyncController extends ChangeNotifier {
 
   Future<void> checkProgressBeforeOpen() async {
     if (!isConfigured || !autoSync || !scope.progress) return;
-    await _syncMetadataNow();
+    if (syncFrequency.interval != null) {
+      await _scheduler.runIfDue();
+    } else {
+      await _syncMetadataNow();
+    }
   }
 
   String get _remoteFileFingerprint =>
@@ -170,14 +181,21 @@ class WebDavSyncController extends ChangeNotifier {
           .join('\n');
 
   Future<void> _runAutomaticCycle() async {
+    final connection = '$serverUrl|$username|$rootPath';
     final previousFiles = _remoteFileFingerprint;
+    var newBookDescriptorsPending = false;
+    Object? metadataError;
+    StackTrace? metadataStack;
     try {
       await _syncMetadataNow();
-    } catch (error) {
+    } catch (error, stack) {
       if (_blocksAllSync(error)) rethrow;
+      metadataError = error;
+      metadataStack = stack;
     }
     if (autoSync && scope.bookFiles && _backgroundUploadQueue.isNotEmpty) {
-      unawaited(_drainBackgroundBookUploads());
+      await _drainBackgroundBookUploads();
+      newBookDescriptorsPending = true;
     }
     final fileWorkPending = _textStates.any(
       (state) =>
@@ -195,11 +213,29 @@ class WebDavSyncController extends ChangeNotifier {
             previousFiles != _remoteFileFingerprint ||
             auditDue)) {
       _lastContentCheck = DateTime.now();
-      unawaited(
-        synchronizeTextFiles(automatic: true).catchError((Object error) {
-          debugPrint('TXT synchronization will retry: ${error.runtimeType}');
-        }),
-      );
+      await synchronizeTextFiles(automatic: true);
+      if ((_fileResult?.uploaded ?? 0) > 0 ||
+          (_fileResult?.downloaded ?? 0) > 0) {
+        // Reconciliation already publishes all updated file descriptors.
+        newBookDescriptorsPending = false;
+      }
+    }
+    // Publish newly committed file descriptors in this scheduled cycle; a
+    // daily schedule must not leave another device waiting an extra day.
+    if (newBookDescriptorsPending && metadataError == null) {
+      await _syncMetadataNow();
+    }
+    if (metadataError != null) {
+      Error.throwWithStackTrace(metadataError, metadataStack!);
+    }
+    if (_backgroundUploadFailure != null) throw _backgroundUploadFailure!;
+    if (scope.bookFiles && _fileFailure != null) throw _fileFailure!;
+    if (!_disposed &&
+        isConfigured &&
+        connection == '$serverUrl|$username|$rootPath') {
+      final completed = _now().toUtc();
+      await _configStore.saveAutomaticSuccess(completed);
+      _lastAutomaticSuccess = completed;
     }
   }
 
@@ -323,6 +359,8 @@ class WebDavSyncController extends ChangeNotifier {
   WebDavSyncErrorCode? get lastError => lastFailure?.code;
   String? get lastErrorMessage => lastFailure?.message;
   bool get autoSync => _configuration?.autoSync ?? false;
+  WebDavSyncFrequency get syncFrequency =>
+      _configuration?.frequency ?? WebDavSyncFrequency.off;
   WebDavSyncScope get scope => _scope;
   String? get serverUrl => _configuration?.serverUrl;
   String? get username => _configuration?.username;
@@ -347,7 +385,13 @@ class WebDavSyncController extends ChangeNotifier {
       _backgroundUploadQueue.add(book);
       queued++;
     }
-    if (queued > 0) unawaited(_drainBackgroundBookUploads());
+    if (queued > 0) {
+      if (syncFrequency.interval == null) {
+        unawaited(_drainBackgroundBookUploads());
+      } else {
+        requestAutomaticSync();
+      }
+    }
     return queued;
   }
 
@@ -356,6 +400,7 @@ class WebDavSyncController extends ChangeNotifier {
     // or permission to make a network request.
     await _contentSync.recoverLocalState();
     _configuration = await _configStore.readConfiguration();
+    _lastAutomaticSuccess = await _configStore.readAutomaticSuccess();
     _scope = SyncDatasetCatalog.normalizeScope(await _configStore.readScope());
     _newBookUploadPolicy = await _configStore.readNewBookUploadPolicy();
     _autoResume = await _configStore.readAutoResume();
@@ -386,6 +431,7 @@ class WebDavSyncController extends ChangeNotifier {
     _restorePersistedFileFailure();
     _restoreSettledStatus(successStatus: WebDavSyncStatus.idle);
     _scheduler.start();
+    if (syncFrequency.interval != null) requestAutomaticSync(immediate: true);
     notifyListeners();
   }
 
@@ -400,6 +446,7 @@ class WebDavSyncController extends ChangeNotifier {
       final password = await _resolvePassword(draft.password);
       final configuration = draft.withoutPassword(
         autoSync: _configuration?.autoSync ?? true,
+        frequency: _configuration?.frequency,
       );
       validateWebDavConfiguration(configuration, password: password);
       final client = _clientFactory(
@@ -439,6 +486,7 @@ class WebDavSyncController extends ChangeNotifier {
     final password = await _resolvePassword(draft.password);
     final configuration = draft.withoutPassword(
       autoSync: _configuration?.autoSync ?? true,
+      frequency: _configuration?.frequency,
     );
     final old = _configuration;
     if (old == null ||
@@ -446,6 +494,8 @@ class WebDavSyncController extends ChangeNotifier {
         old.rootPath != configuration.rootPath ||
         old.username != configuration.username) {
       await _changeStore.resetRemoteMirrorForNewSpace();
+      await _configStore.saveAutomaticSuccess(null);
+      _lastAutomaticSuccess = null;
       _remoteBooks = const [];
       _lastResult = null;
       _lastSuccessfulSync = null;
@@ -481,7 +531,12 @@ class WebDavSyncController extends ChangeNotifier {
       metadataStack = stack;
       if (_blocksAllSync(error)) rethrow;
     }
-    if (scope.bookFiles) await synchronizeTextFiles();
+    if (scope.bookFiles) {
+      if (!_backgroundUploadRunning && _backgroundUploadQueue.isNotEmpty) {
+        await _drainBackgroundBookUploads();
+      }
+      await synchronizeTextFiles();
+    }
     if (metadataError != null) {
       Error.throwWithStackTrace(metadataError, metadataStack!);
     }
@@ -608,7 +663,15 @@ class WebDavSyncController extends ChangeNotifier {
     }
   }
 
-  Future<void> setAutoSync(bool enabled) async {
+  Future<void> setAutoSync(bool enabled) => setSyncFrequency(
+    enabled
+        ? (syncFrequency == WebDavSyncFrequency.off
+              ? WebDavSyncFrequency.onChange
+              : syncFrequency)
+        : WebDavSyncFrequency.off,
+  );
+
+  Future<void> setSyncFrequency(WebDavSyncFrequency frequency) async {
     final current = _configuration;
     if (current == null) return;
     final credentials = await _configStore.readCredentials();
@@ -618,14 +681,13 @@ class WebDavSyncController extends ChangeNotifier {
         'The secure WebDAV password is unavailable.',
       );
     }
-    final updated = current.copyWith(autoSync: enabled);
+    final updated = current.copyWith(frequency: frequency);
     await _configStore.save(updated, credentials.password);
     _configuration = updated;
-    if (enabled) {
+    _scheduler.cancelPending();
+    if (updated.autoSync) {
       await _discoverUnuploadedBooks();
       _scheduler.request(immediate: true);
-    } else {
-      _scheduler.cancelPending();
     }
     notifyListeners();
   }
@@ -667,6 +729,7 @@ class WebDavSyncController extends ChangeNotifier {
     _scheduler.cancelPending();
     await _configStore.clear();
     _configuration = null;
+    _lastAutomaticSuccess = null;
     _autoResume = true;
     _lastResult = null;
     _lastCheckedAt = null;
@@ -825,8 +888,13 @@ class WebDavSyncController extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  Future<void> _drainBackgroundBookUploads() async {
-    if (_backgroundUploadRunning) return;
+  Future<void>? _backgroundDrain;
+  Future<void> _drainBackgroundBookUploads() =>
+      _backgroundDrain ??= _performBackgroundBookUploads().whenComplete(
+        () => _backgroundDrain = null,
+      );
+
+  Future<void> _performBackgroundBookUploads() async {
     _backgroundUploadRunning = true;
     try {
       // Give every book already in this batch one attempt. Failed books move

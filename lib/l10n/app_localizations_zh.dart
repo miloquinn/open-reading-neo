@@ -6410,6 +6410,37 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get cloudSyncTransferEditedBook =>
       '如果旧手机编辑过正文，建议通过「书籍文件」上传并在新手机下载该版本，以保留书籍关联。不同内容版本的阅读位置可能无法准确恢复。';
+
+  @override
+  String get cloudSyncFrequency => '自动同步频率';
+
+  @override
+  String get cloudSyncFrequencyOff => '关闭（仅手动）';
+
+  @override
+  String get cloudSyncFrequencyOnChange => '及时同步';
+
+  @override
+  String get cloudSyncFrequency15Minutes => '每 15 分钟';
+
+  @override
+  String get cloudSyncFrequencyHourly => '每小时';
+
+  @override
+  String get cloudSyncFrequencyDaily => '每天一次';
+
+  @override
+  String get cloudSyncFrequencyHint =>
+      '从上次自动同步成功起计算间隔。应用未运行时，下次打开后补同步；失败会重试。「立即同步」不受频率限制。';
+
+  @override
+  String cloudSyncFrequencySummary(String frequency) {
+    return '自动同步：$frequency';
+  }
+
+  @override
+  String get cloudSyncAutoResumeScheduledHint =>
+      '按同步频率获取进度，打开书籍时接续已同步的位置。需要最新进度时，请先点「立即同步」。';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12699,4 +12730,35 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get cloudSyncTransferEditedBook =>
       '如果舊手機編輯過正文，建議透過「書籍檔案」上傳並在新手機下載該版本，以保留書籍關聯。不同內容版本的閱讀位置可能無法準確恢復。';
+
+  @override
+  String get cloudSyncFrequency => '自動同步頻率';
+
+  @override
+  String get cloudSyncFrequencyOff => '關閉（僅手動）';
+
+  @override
+  String get cloudSyncFrequencyOnChange => '即時同步';
+
+  @override
+  String get cloudSyncFrequency15Minutes => '每 15 分鐘';
+
+  @override
+  String get cloudSyncFrequencyHourly => '每小時';
+
+  @override
+  String get cloudSyncFrequencyDaily => '每天一次';
+
+  @override
+  String get cloudSyncFrequencyHint =>
+      '從上次自動同步成功起計算間隔。應用程式未執行時，下次開啟後補同步；失敗會重試。「立即同步」不受頻率限制。';
+
+  @override
+  String cloudSyncFrequencySummary(String frequency) {
+    return '自動同步：$frequency';
+  }
+
+  @override
+  String get cloudSyncAutoResumeScheduledHint =>
+      '按同步頻率取得進度，開啟書籍時接續已同步的位置。需要最新進度時，請先點選「立即同步」。';
 }

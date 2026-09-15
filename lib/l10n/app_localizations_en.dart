@@ -6796,4 +6796,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cloudSyncTransferEditedBook =>
       'If you edited the text on the old phone, upload that version through Book files and download it on the new phone to preserve its book identity. Reading positions may not map correctly across different text versions.';
+
+  @override
+  String get cloudSyncFrequency => 'Automatic sync frequency';
+
+  @override
+  String get cloudSyncFrequencyOff => 'Off (manual only)';
+
+  @override
+  String get cloudSyncFrequencyOnChange => 'After changes';
+
+  @override
+  String get cloudSyncFrequency15Minutes => 'Every 15 minutes';
+
+  @override
+  String get cloudSyncFrequencyHourly => 'Every hour';
+
+  @override
+  String get cloudSyncFrequencyDaily => 'Once a day';
+
+  @override
+  String get cloudSyncFrequencyHint =>
+      'Intervals start after a successful automatic sync. If the app is not running, it catches up next time you open it. Failed attempts retry. Sync now always works immediately.';
+
+  @override
+  String cloudSyncFrequencySummary(String frequency) {
+    return 'Automatic sync: $frequency';
+  }
+
+  @override
+  String get cloudSyncAutoResumeScheduledHint =>
+      'Progress is fetched at your chosen frequency. Opening a book resumes from the last synced position. Tap Sync now first when you need the latest progress.';
 }

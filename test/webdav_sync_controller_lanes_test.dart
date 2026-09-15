@@ -10,6 +10,140 @@ import 'package:xxread/services/sync/sync_models.dart';
 import 'package:xxread/services/sync/webdav_sync_controller.dart';
 
 void main() {
+  testWidgets(
+    'failed scheduled file work does not advance the daily completion time',
+    (tester) async {
+      var now = DateTime.utc(2026, 9, 15);
+      final config = _Config()
+        ..lastAutomatic = now
+        ..configuration = const WebDavSyncConfiguration(
+          serverUrl: 'https://example.test/dav',
+          username: 'reader',
+          frequency: WebDavSyncFrequency.daily,
+        );
+      final store = _Store();
+      final engine = _Engine(config, store);
+      final files = _Files()
+        ..transfer = Future.value(
+          const BookContentReconcileResult(
+            uploaded: 0,
+            downloaded: 0,
+            conflicts: 0,
+            failed: 1,
+          ),
+        );
+      final controller = WebDavSyncController(
+        configStore: config,
+        changeStore: store,
+        engine: engine,
+        contentSyncService: files,
+        localBooksLoader: () async => [],
+        now: () => now,
+      );
+      await controller.initialize();
+      now = now.add(const Duration(days: 1));
+      await controller.checkProgressBeforeOpen();
+      expect(engine.calls, 1);
+      expect(config.lastAutomatic, now.subtract(const Duration(days: 1)));
+      expect(controller.lastFailureIsFile, isTrue);
+      await controller.checkProgressBeforeOpen();
+      expect(engine.calls, 1);
+      controller.dispose();
+    },
+  );
+
+  testWidgets(
+    'scheduled completion waits for files and publishes their descriptors in the same cycle',
+    (tester) async {
+      var now = DateTime.utc(2026, 9, 15);
+      final config = _Config()
+        ..lastAutomatic = now
+        ..configuration = const WebDavSyncConfiguration(
+          serverUrl: 'https://example.test/dav',
+          username: 'reader',
+          frequency: WebDavSyncFrequency.daily,
+        );
+      final store = _Store();
+      final engine = _Engine(config, store);
+      final transfer = Completer<BookContentReconcileResult>();
+      final files = _Files()..transfer = transfer.future;
+      final controller = WebDavSyncController(
+        configStore: config,
+        changeStore: store,
+        engine: engine,
+        contentSyncService: files,
+        localBooksLoader: () async => [],
+        now: () => now,
+      );
+      await controller.initialize();
+      now = now.add(const Duration(days: 1));
+      final run = controller.checkProgressBeforeOpen();
+      await tester.pump();
+      expect(engine.calls, 1);
+      expect(config.lastAutomatic, now.subtract(const Duration(days: 1)));
+      transfer.complete(
+        const BookContentReconcileResult(
+          uploaded: 1,
+          downloaded: 0,
+          conflicts: 0,
+          failed: 0,
+        ),
+      );
+      await run;
+      expect(engine.calls, 2);
+      expect(config.lastAutomatic, now);
+      controller.dispose();
+    },
+  );
+
+  testWidgets(
+    'daily schedule gates automatic entry points while manual sync remains available',
+    (tester) async {
+      var now = DateTime.utc(2026, 9, 15, 10);
+      final config = _Config()
+        ..scope = const WebDavSyncScope(bookFiles: false)
+        ..configuration = const WebDavSyncConfiguration(
+          serverUrl: 'https://example.test/dav',
+          username: 'reader',
+          frequency: WebDavSyncFrequency.daily,
+        )
+        ..lastAutomatic = now;
+      final store = _Store();
+      final engine = _Engine(config, store);
+      final controller = WebDavSyncController(
+        configStore: config,
+        changeStore: store,
+        engine: engine,
+        contentSyncService: _Files(),
+        localBooksLoader: () async => [],
+        now: () => now,
+      );
+      await controller.initialize();
+      controller.requestAutomaticSync(immediate: true);
+      controller.setForeground(false);
+      controller.setForeground(true);
+      await controller.checkProgressBeforeOpen();
+      await tester.pump(const Duration(seconds: 45));
+      expect(engine.calls, 0);
+      await controller.syncNow();
+      expect(engine.calls, 1);
+      // Daily means elapsed time since automatic completion, not midnight.
+      now = now.add(const Duration(days: 1));
+      await controller.checkProgressBeforeOpen();
+      expect(engine.calls, 2);
+      expect(config.lastAutomatic, now);
+      await controller.checkProgressBeforeOpen();
+      expect(engine.calls, 2);
+      await controller.setSyncFrequency(WebDavSyncFrequency.off);
+      controller.requestAutomaticSync(immediate: true);
+      await tester.pump();
+      expect(engine.calls, 2);
+      await controller.syncNow();
+      expect(engine.calls, 3);
+      controller.dispose();
+    },
+  );
+
   testWidgets('opening checks progress while a TXT upload is still running', (
     tester,
   ) async {
@@ -439,13 +573,29 @@ const _success = BookContentReconcileResult(
 
 class _Config extends SecureSyncConfigStore {
   WebDavSyncScope scope = const WebDavSyncScope(bookFiles: true);
+  WebDavSyncConfiguration configuration = const WebDavSyncConfiguration(
+    serverUrl: 'https://example.test/dav',
+    username: 'reader',
+    autoSync: true,
+  );
+  DateTime? lastAutomatic;
   @override
-  Future<WebDavSyncConfiguration?> readConfiguration() async =>
-      const WebDavSyncConfiguration(
-        serverUrl: 'https://example.test/dav',
-        username: 'reader',
-        autoSync: true,
-      );
+  Future<DateTime?> readAutomaticSuccess() async => lastAutomatic;
+  @override
+  Future<void> saveAutomaticSuccess(DateTime? time) async {
+    lastAutomatic = time;
+  }
+
+  @override
+  Future<WebDavSyncConfiguration?> readConfiguration() async => configuration;
+  @override
+  Future<StoredSyncCredentials?> readCredentials() async =>
+      StoredSyncCredentials(configuration, 'secret');
+  @override
+  Future<void> save(WebDavSyncConfiguration next, String password) async {
+    configuration = next;
+  }
+
   @override
   Future<WebDavSyncScope> readScope() async => scope;
   @override

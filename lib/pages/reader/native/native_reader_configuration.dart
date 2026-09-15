@@ -42,6 +42,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
         _tabletTwoPageEnabled = settings.tabletTwoPageEnabled;
         _topBarStyle = topBarStyle;
         _chapterTitlePageEnabled = settings.chapterTitlePageEnabled;
+        _chapterProgressStyle = settings.chapterProgressStyle;
         _readerSettingsLoaded = true;
       });
       _autoPageTurnController.setVertical(
@@ -115,6 +116,7 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
     tapPageAnimationEnabled: _tapPageAnimationEnabled,
     tabletTwoPageEnabled: _tabletTwoPageEnabled,
     chapterTitlePageEnabled: _chapterTitlePageEnabled,
+    chapterProgressStyle: _chapterProgressStyle,
   );
 
   ReaderFontProfile get _readerFontProfile => resolveReaderFontProfile(
@@ -258,6 +260,10 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
         ? _leafStatusController.value.revision
         : 0,
     _annotationRevision,
+    _chapterProgressStyle,
+    _chapterProgressStyle == ReaderChapterProgressStyle.hidden
+        ? 0
+        : _visibleChapterCount,
   );
 
   double get _effectiveTopMargin => _readerSafeArea.contentTop;
@@ -348,6 +354,14 @@ extension _NativeReaderConfiguration on _NativeReaderPageState {
       '$_firstLineIndent:$_paragraphSpacing:'
       '${_readerFontProfile.cacheSignature}:'
       '$_chapterTitlePageEnabled';
+
+  Future<void> _setChapterProgressStyle(
+    ReaderChapterProgressStyle style,
+  ) async {
+    if (_chapterProgressStyle == style) return;
+    _setReaderState(() => _chapterProgressStyle = style);
+    await _readerSettingsStore.saveChapterProgressStyle(style);
+  }
 
   Future<void> _setTopBarStyle(ReaderTopBarStyle style) async {
     if (_topBarStyle == style) return;

@@ -432,6 +432,8 @@ void main() {
     (tester) async {
       SharedPreferences.setMockInitialValues({
         ReaderSettingsStore.pageModeKey: BookSourcePageMode.instantPage.name,
+        ReaderSettingsStore.chapterProgressStyleKey:
+            ReaderChapterProgressStyle.remaining.name,
       });
       const searchTarget = 'unique search target';
       final content = List.generate(
@@ -470,6 +472,7 @@ void main() {
       final initialPage = tester.widget<ReaderPaperPageLeaf>(
         find.byType(ReaderPaperPageLeaf),
       );
+      expect(initialPage.chapterProgressLabel, '0 chapters ahead');
       expect(initialPage.metadata.pageNumber, 1);
       expect(initialPage.metadata.pageCount, greaterThan(1));
       expect(

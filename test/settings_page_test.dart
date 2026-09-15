@@ -23,6 +23,14 @@ class _SettingsAloudService extends ChangeNotifier
   @override
   bool get hasCloudApiKey => false;
   @override
+  bool get supportsProfiles => false;
+  @override
+  String get activeProfileId => 'default';
+  @override
+  List<ReaderAloudCloudProfile> get cloudProfiles => const [];
+  @override
+  Future<void> stopPreview() async {}
+  @override
   Future<void> initialize() async {}
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

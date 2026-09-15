@@ -3486,6 +3486,9 @@
         "type": "String"
       }
     }
-  }
-
+  },
+  "readerChapterProgressTitle": "章节进度",
+  "readerChapterProgressHidden": "不显示",
+  "readerChapterProgressFraction": "{chapter}/{total}章",
+  "readerChapterProgressRemaining": "后续{count}章"
 }

@@ -97,6 +97,35 @@ void main() {
             .onPressed!();
         await tester.pumpAndSettle();
 
+        final chapterProgressTile = find.byKey(
+          const ValueKey('reader-chapter-progress-tile'),
+        );
+        await tester.ensureVisible(chapterProgressTile);
+        await tester.tap(chapterProgressTile);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('reader-chapter-progress-fraction')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          (await const ReaderSettingsStore().load()).chapterProgressStyle,
+          ReaderChapterProgressStyle.fraction,
+        );
+        final currentLeaf =
+            tester
+                    .widget<ReaderShaderPageCurl>(
+                      find.byType(ReaderShaderPageCurl).first,
+                    )
+                    .currentPage
+                    .child
+                as ReaderPaperPageLeaf;
+        expect(
+          currentLeaf.chapterProgressLabel,
+          matches(RegExp(r'^1/\d+ chapters$')),
+        );
+
+        await tester.ensureVisible(find.text('Layout'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Layout'));
         await tester.pumpAndSettle();
         final titleSwitchFinder = find.byKey(
@@ -165,6 +194,10 @@ void main() {
         await tester.pumpAndSettle();
 
         final prefs = await SharedPreferences.getInstance();
+        expect(
+          prefs.getString(ReaderSettingsStore.chapterProgressStyleKey),
+          ReaderChapterProgressStyle.fraction.name,
+        );
         expect(prefs.getBool(ReaderSettingsStore.chapterTitlePageKey), isTrue);
         expect(prefs.getInt(ReaderSettingsStore.firstLineIndentKey), 4);
         expect(prefs.getInt(ReaderSettingsStore.paragraphSpacingKey), 2);

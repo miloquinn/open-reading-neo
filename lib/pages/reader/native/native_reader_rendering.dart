@@ -315,6 +315,12 @@ extension _NativeReaderRendering on _NativeReaderPageState {
       palette: _readerTheme,
       safeArea: _readerSafeArea,
       metadata: metadata,
+      chapterProgressLabel: formatReaderChapterProgress(
+        context,
+        style: _chapterProgressStyle,
+        chapterIndex: chapterIndex,
+        chapterCount: _visibleChapterCount,
+      ),
       pageNumberPlacement: pageNumberPlacement,
       horizontalPadding: math.max(14, _horizontalMargin),
       pageNumberHorizontalPadding: math.max(24, _horizontalMargin),

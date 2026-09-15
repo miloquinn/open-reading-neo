@@ -6548,4 +6548,20 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get cloudSyncAutoResumeScheduledHint =>
       '設定した頻度で読書位置を取得し、本を開くと同期済みの位置から再開します。最新の位置が必要なときは先に「今すぐ同期」を押してください。';
+
+  @override
+  String get readerChapterProgressTitle => '章の進捗';
+
+  @override
+  String get readerChapterProgressHidden => '表示しない';
+
+  @override
+  String readerChapterProgressFraction(int chapter, int total) {
+    return '$chapter/$total章';
+  }
+
+  @override
+  String readerChapterProgressRemaining(int count) {
+    return '残り$count章';
+  }
 }

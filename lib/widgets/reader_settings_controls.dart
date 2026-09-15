@@ -12,6 +12,7 @@ import '../core/reader/reader_system_ui.dart';
 import '../utils/reader_themes.dart';
 import '../utils/localization_extension.dart';
 import 'reader_theme_background.dart';
+import 'reader_chapter_progress_setting_tile.dart';
 
 @immutable
 class ReaderFontChoice {
@@ -50,6 +51,8 @@ class ReaderSettingsSheet extends StatefulWidget {
     required this.pageModeSummary,
     required this.topBarStyleTitle,
     required this.topBarStyleSummary,
+    this.chapterProgressStyle = ReaderChapterProgressStyle.hidden,
+    this.onChapterProgressStyleChanged,
     required this.pullBookmarkTitle,
     required this.pullBookmarkHint,
     required this.tapPageAnimationTitle,
@@ -144,6 +147,8 @@ class ReaderSettingsSheet extends StatefulWidget {
   final String pageModeSummary;
   final String topBarStyleTitle;
   final String topBarStyleSummary;
+  final ReaderChapterProgressStyle chapterProgressStyle;
+  final ValueChanged<ReaderChapterProgressStyle>? onChapterProgressStyleChanged;
   final String pullBookmarkTitle;
   final String pullBookmarkHint;
   final String tapPageAnimationTitle;
@@ -232,6 +237,8 @@ class ReaderSettingsSheet extends StatefulWidget {
 
 class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
   late String _themeId = widget.themeId;
+  late ReaderChapterProgressStyle _chapterProgressStyle =
+      widget.chapterProgressStyle;
   late double _fontSize = widget.fontSize;
   late int _textBrightness = widget.textBrightness;
   late bool _dimTextInDarkMode = widget.dimTextInDarkMode;
@@ -599,6 +606,14 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
       trailing: const Icon(Icons.chevron_right),
       onTap: widget.onTopBarStyleTap,
     ),
+    if (widget.onChapterProgressStyleChanged != null)
+      ReaderChapterProgressSettingTile(
+        style: _chapterProgressStyle,
+        onChanged: (style) {
+          setState(() => _chapterProgressStyle = style);
+          widget.onChapterProgressStyleChanged!(style);
+        },
+      ),
   ];
 
   List<Widget> _pagingTabChildren() => [

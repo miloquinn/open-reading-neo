@@ -125,7 +125,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
     if (controller == null) return;
     final ttsService = context.read<TtsService>();
     final aloudService = context.read<ReaderAloudService>();
-    await showReaderAloudPlayer(
+    await showReaderAloud(
       context: context,
       controller: controller,
       ttsService: ttsService,
@@ -136,7 +136,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
     );
   }
 
-  /// Opens the audiobook player; the player starts playback when necessary.
+  /// Opens the preferred listening interface and starts playback if needed.
   Future<void> _handleReaderAloudButtonPressed() async {
     _pauseAutoPageTurn();
     await _showReaderAloudPlayer();
@@ -249,6 +249,9 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) => ReaderSettingsSheet(
+        chapterProgressStyle: _chapterProgressStyle,
+        onChapterProgressStyleChanged: (style) =>
+            unawaited(_setChapterProgressStyle(style)),
         title: context.l10n.readingSettings,
         tabThemeLabel: context.l10n.readerSettingsTabTheme,
         tabTextLabel: context.l10n.readerSettingsTabText,

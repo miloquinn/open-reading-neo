@@ -1,0 +1,310 @@
+diff --git a/ios/Runner/ReaderAloudMediaBridge.swift b/ios/Runner/ReaderAloudMediaBridge.swift
+index 70a85ec..0031268 100644
+--- a/ios/Runner/ReaderAloudMediaBridge.swift
++++ b/ios/Runner/ReaderAloudMediaBridge.swift
+@@ -161,15 +161,14 @@ final class ReaderAloudMediaBridge {
+   }
+ 
+   private func activateAudioSessionIfNeeded() throws {
++    // Keep Now Playing eligible (nonmixable), but let navigation apps duck us
++    // rather than interrupt a session marked as spokenAudio. Flutter players
++    // share this session, so repair its policy even when we already activated it.
++    if audioSession.category != .playback || audioSession.mode != .default ||
++        !audioSession.categoryOptions.isEmpty {
++      try audioSession.setCategory(.playback, mode: .default, options: [])
++    }
+     guard !audioSessionActive else { return }
+-    try audioSession.setCategory(
+-      .playback,
+-      // Keep audiobook speech mixable. Navigation apps that use ducking can
+-      // then speak over the reader without producing the interruption that
+-      // would pause and rebuild Flutter's queued TTS session.
+-      mode: .default,
+-      options: [.mixWithOthers]
+-    )
+     try audioSession.setActive(true)
+     audioSessionActive = true
+   }
+diff --git a/lib/services/reader_aloud_service.dart b/lib/services/reader_aloud_service.dart
+index 4499db8..64be637 100644
+--- a/lib/services/reader_aloud_service.dart
++++ b/lib/services/reader_aloud_service.dart
+@@ -441,14 +441,6 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
+     implements ReaderAloudBytesPlayer {
+   AudioplayersReaderAloudBytesPlayer({AudioPlayer? player})
+     : _player = player ?? AudioPlayer() {
+-    _audioContextReady = _player.setAudioContext(
+-      AudioContext(
+-        iOS: AudioContextIOS(
+-          category: AVAudioSessionCategory.playback,
+-          options: const <AVAudioSessionOptions>{},
+-        ),
+-      ),
+-    );
+     _subscriptions.addAll([
+       _player.onPositionChanged.listen((value) {
+         _position = value;
+@@ -469,7 +461,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
+   }
+ 
+   final AudioPlayer _player;
+-  late final Future<void> _audioContextReady;
++  int _playbackGeneration = 0;
+   final List<StreamSubscription<Object?>> _subscriptions = [];
+   Completer<void>? _activePlayback;
+   bool _isPlaying = false;
+@@ -494,9 +486,21 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
+     required double volume,
+   }) async {
+     if (_disposed) return;
+-    await _audioContextReady;
+-    if (_disposed) return;
+-    await stop();
++    final operation = ++_playbackGeneration;
++    await _stopPlayback();
++    if (_disposed || operation != _playbackGeneration) return;
++    // iOS audio contexts are process-global. Configure only when playback is
++    // requested, including after a preview or another player changed the
++    // session. Keep the same nonmixable policy as TtsService and the media bridge.
++    await _player.setAudioContext(
++      AudioContext(
++        iOS: AudioContextIOS(
++          category: AVAudioSessionCategory.playback,
++          options: const <AVAudioSessionOptions>{},
++        ),
++      ),
++    );
++    if (_disposed || operation != _playbackGeneration) return;
+     final completer = Completer<void>();
+     _activePlayback = completer;
+     _position = Duration.zero;
+@@ -523,6 +527,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
+ 
+   @override
+   Future<void> pause() async {
++    ++_playbackGeneration;
+     if (!_isPlaying || _disposed) return;
+     await _player.pause();
+     _isPlaying = false;
+@@ -537,6 +542,11 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
+ 
+   @override
+   Future<void> stop() async {
++    ++_playbackGeneration;
++    await _stopPlayback();
++  }
++
++  Future<void> _stopPlayback() async {
+     if (_disposed) return;
+     _completeActivePlayback();
+     await _player.stop();
+@@ -556,6 +566,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
+   void dispose() {
+     if (_disposed) return;
+     _disposed = true;
++    ++_playbackGeneration;
+     _completeActivePlayback();
+     for (final subscription in _subscriptions) {
+       unawaited(subscription.cancel());
+diff --git a/lib/services/tts_service.dart b/lib/services/tts_service.dart
+index 2781c56..13ec0cd 100644
+--- a/lib/services/tts_service.dart
++++ b/lib/services/tts_service.dart
+@@ -314,18 +314,13 @@ class TtsService extends ChangeNotifier
+     }
+ 
+     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+-      // Configure the category before activating the shared session. Mixing
+-      // keeps a navigation prompt from turning into a full interruption of an
+-      // audiobook session: Maps can duck this speech while its instruction is
+-      // audible instead of forcing the queued reader to stop and rebuild.
+-      // Actual system interruptions (calls, Siri, alarms) are still handled by
+-      // the media bridge. The shared session remains active between queued
+-      // utterances so iOS does not introduce a gap for every sentence.
++      // Match ReaderAloudMediaBridge and the cloud/preview bytes player:
++      // nonmixable playback keeps Now Playing eligible, while default mode
++      // avoids the spokenAudio interruption requested by navigation prompts.
++      // Keep the shared session active between queued utterances to avoid gaps.
+       await tts.setIosAudioCategory(
+         IosTextToSpeechAudioCategory.playback,
+-        const <IosTextToSpeechAudioCategoryOptions>[
+-          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+-        ],
++        const <IosTextToSpeechAudioCategoryOptions>[],
+         IosTextToSpeechAudioMode.defaultMode,
+       );
+       await tts.autoStopSharedSession(false);
+diff --git a/test/reader_aloud_bytes_player_test.dart b/test/reader_aloud_bytes_player_test.dart
+new file mode 100644
+index 0000000..de443a6
+--- /dev/null
++++ b/test/reader_aloud_bytes_player_test.dart
+@@ -0,0 +1,144 @@
++import 'dart:async';
++import 'dart:typed_data';
++
++import 'package:audioplayers/audioplayers.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:xxread/services/reader_aloud_service.dart';
++
++void main() {
++  test(
++    'creating a cloud or preview player does not change the shared session',
++    () {
++      final native = _Player();
++      final player = AudioplayersReaderAloudBytesPlayer(player: native);
++      addTearDown(player.dispose);
++      expect(native.contexts, isEmpty);
++    },
++  );
++
++  test('cloud playback restores nonmixable playback after a preview', () async {
++    final session = _Session();
++    final native = _Player(session: session);
++    final previewNative = _Player(session: session);
++    final player = AudioplayersReaderAloudBytesPlayer(player: native);
++    final preview = AudioplayersReaderAloudBytesPlayer(player: previewNative);
++    addTearDown(player.dispose);
++    addTearDown(preview.dispose);
++
++    await _play(player);
++    await _play(preview);
++    // Another plugin changed the process-global policy while our player was idle.
++    session.context = AudioContextIOS(
++      category: AVAudioSessionCategory.playback,
++      options: {AVAudioSessionOptions.mixWithOthers},
++    );
++    await _play(player);
++
++    expect(native.contexts, hasLength(2));
++    expect(previewNative.contexts, hasLength(1));
++    for (final context in [
++      ...native.playedContexts,
++      ...previewNative.playedContexts,
++    ]) {
++      expect(context.category, AVAudioSessionCategory.playback);
++      expect(context.options, isEmpty);
++    }
++    expect(native.volumes, [0.6, 0.6]);
++    expect(player.isPlaying, isFalse);
++  });
++
++  for (final action in ['stop', 'pause', 'dispose']) {
++    test('$action during session setup cancels late playback', () async {
++      final gate = Completer<void>();
++      final native = _Player(contextGate: gate);
++      final player = AudioplayersReaderAloudBytesPlayer(player: native);
++      if (action != 'dispose') addTearDown(player.dispose);
++      final playing = _play(player);
++      await native.contextStarted.future;
++      if (action == 'dispose') {
++        player.dispose();
++      } else if (action == 'pause') {
++        await player.pause();
++      } else {
++        await player.stop();
++      }
++      gate.complete();
++      await playing;
++      expect(native.playedContexts, isEmpty);
++      expect(player.isPlaying, isFalse);
++    });
++  }
++
++  test('session setup failure is reported and can be retried', () async {
++    final native = _Player()..failContext = true;
++    final player = AudioplayersReaderAloudBytesPlayer(player: native);
++    addTearDown(player.dispose);
++    await expectLater(_play(player), throwsStateError);
++    expect(native.playedContexts, isEmpty);
++    expect(player.isPlaying, isFalse);
++    native.failContext = false;
++    await _play(player);
++    expect(native.playedContexts, hasLength(1));
++  });
++}
++
++Future<void> _play(AudioplayersReaderAloudBytesPlayer player) => player.play(
++  Uint8List.fromList([1, 2, 3]),
++  mimeType: 'audio/mpeg',
++  volume: 0.6,
++);
++
++class _Session {
++  AudioContextIOS? context;
++}
++
++class _Player implements AudioPlayer {
++  _Player({_Session? session, this.contextGate})
++    : session = session ?? _Session();
++
++  final _Session session;
++  final Completer<void>? contextGate;
++  final contextStarted = Completer<void>();
++  final contexts = <AudioContext>[];
++  final playedContexts = <AudioContextIOS>[];
++  final volumes = <double?>[];
++  final _completed = StreamController<void>.broadcast();
++  bool failContext = false;
++
++  @override
++  Stream<Duration> get onPositionChanged => const Stream.empty();
++  @override
++  Stream<Duration> get onDurationChanged => const Stream.empty();
++  @override
++  Stream<void> get onPlayerComplete => _completed.stream;
++
++  @override
++  Future<void> setAudioContext(AudioContext context) async {
++    contexts.add(context);
++    if (!contextStarted.isCompleted) contextStarted.complete();
++    await contextGate?.future;
++    if (failContext) throw StateError('Session unavailable');
++    session.context = context.iOS;
++  }
++
++  @override
++  Future<void> play(
++    Source source, {
++    double? volume,
++    double? balance,
++    AudioContext? ctx,
++    Duration? position,
++    PlayerMode? mode,
++  }) async {
++    playedContexts.add(session.context!);
++    volumes.add(volume);
++    _completed.add(null);
++  }
++
++  @override
++  Future<void> stop() async {}
++  @override
++  Future<void> dispose() => _completed.close();
++  @override
++  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
++}
+diff --git a/test/tts_service_ios_test.dart b/test/tts_service_ios_test.dart
+index 8b9ec35..8fd7cb8 100644
+--- a/test/tts_service_ios_test.dart
++++ b/test/tts_service_ios_test.dart
+@@ -28,7 +28,7 @@ void main() {
+     debugDefaultTargetPlatformOverride = null;
+   });
+ 
+-  test('configures a mixable iOS playback session before activating it', () {
++  test('configures nonmixable default-mode iOS playback before activation', () {
+     expect(service.supportsQueuedText, isTrue);
+ 
+     final categoryIndex = tts.calls.indexOf('setIosAudioCategory');
+@@ -39,9 +39,7 @@ void main() {
+     expect(autoStopIndex, greaterThan(categoryIndex));
+     expect(sharedInstanceIndex, greaterThan(autoStopIndex));
+     expect(tts.iosCategory, IosTextToSpeechAudioCategory.playback);
+-    expect(tts.iosOptions, <IosTextToSpeechAudioCategoryOptions>[
+-      IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+-    ]);
++    expect(tts.iosOptions, isEmpty);
+     expect(tts.iosMode, IosTextToSpeechAudioMode.defaultMode);
+     expect(tts.calls.where((call) => call.startsWith('setQueueMode')), isEmpty);
+   });

@@ -3159,6 +3159,9 @@
         "type": "String"
       }
     }
-  }
-
+  },
+  "readerChapterProgressTitle": "章節進度",
+  "readerChapterProgressHidden": "不顯示",
+  "readerChapterProgressFraction": "{chapter}/{total}章",
+  "readerChapterProgressRemaining": "後續{count}章"
 }

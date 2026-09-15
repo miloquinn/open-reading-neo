@@ -6827,4 +6827,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cloudSyncAutoResumeScheduledHint =>
       'Progress is fetched at your chosen frequency. Opening a book resumes from the last synced position. Tap Sync now first when you need the latest progress.';
+
+  @override
+  String get readerChapterProgressTitle => 'Chapter progress';
+
+  @override
+  String get readerChapterProgressHidden => 'Hidden';
+
+  @override
+  String readerChapterProgressFraction(int chapter, int total) {
+    return '$chapter/$total chapters';
+  }
+
+  @override
+  String readerChapterProgressRemaining(int count) {
+    return '$count chapters ahead';
+  }
 }

@@ -1,3 +1,7 @@
+import com.android.build.api.dsl.LibraryExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
+
 allprojects {
     repositories {
         google()
@@ -27,6 +31,32 @@ subprojects {
             targetCompatibility = JavaVersion.VERSION_17
         }
     }
+
+    pluginManager.withPlugin("org.jetbrains.kotlin.android") {
+        extensions.configure<KotlinAndroidProjectExtension> {
+            compilerOptions {
+                jvmTarget = JvmTarget.JVM_17
+            }
+        }
+    }
+
+    if (project.name == "file_picker") {
+        pluginManager.withPlugin("com.android.library") {
+            pluginManager.apply("org.jetbrains.kotlin.android")
+        }
+    }
+
+    if (project.name == "flutter_js") {
+        pluginManager.withPlugin("com.android.library") {
+            extensions.configure<LibraryExtension> {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_1_8
+                    targetCompatibility = JavaVersion.VERSION_1_8
+                }
+            }
+        }
+    }
+
 }
 
 tasks.register<Delete>("clean") {

@@ -28,7 +28,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  test('configures the iOS spoken-audio session before activating it', () {
+  test('configures nonmixable default-mode iOS playback before activation', () {
     expect(service.supportsQueuedText, isTrue);
 
     final categoryIndex = tts.calls.indexOf('setIosAudioCategory');
@@ -40,7 +40,7 @@ void main() {
     expect(sharedInstanceIndex, greaterThan(autoStopIndex));
     expect(tts.iosCategory, IosTextToSpeechAudioCategory.playback);
     expect(tts.iosOptions, isEmpty);
-    expect(tts.iosMode, IosTextToSpeechAudioMode.spokenAudio);
+    expect(tts.iosMode, IosTextToSpeechAudioMode.defaultMode);
     expect(tts.calls.where((call) => call.startsWith('setQueueMode')), isEmpty);
   });
 

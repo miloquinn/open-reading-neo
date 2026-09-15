@@ -2,13 +2,68 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/core/reader/reader_aloud_controller.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/settings/cloud_tts_settings_page.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'add, preview and select a named voice without overwriting the old voice',
+    (tester) async {
+      final secrets = _Secrets();
+      final store = PreferencesReaderAloudCloudSettingsStore(
+        secretStorage: secrets,
+      );
+      await store.writeApiKey('legacy-key');
+      final client = _FakeCloudClient();
+      final fixture = await _openSettings(
+        tester,
+        persistentStore: store,
+        cloudClient: client,
+      );
+      addTearDown(fixture.dispose);
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-profiles')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('cloud-tts-add')));
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-add')));
+      await tester.pumpAndSettle();
+      await _scrollTo(tester, const ValueKey('cloud-tts-name'));
+      await tester.enterText(
+        find.byKey(const ValueKey('cloud-tts-name')),
+        'Bedtime voice',
+      );
+      await _scrollTo(tester, const ValueKey('cloud-tts-key'));
+      await tester.enterText(
+        find.byKey(const ValueKey('cloud-tts-key')),
+        'new-key',
+      );
+      await _scrollTo(tester, const ValueKey('cloud-tts-voice'));
+      await tester.enterText(
+        find.byKey(const ValueKey('cloud-tts-voice')),
+        'nova',
+      );
+      await _scrollTo(tester, const ValueKey('cloud-tts-preview'));
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-preview')));
+      await tester.pumpAndSettle();
+      expect(client.lastVoice, 'nova');
+      expect(client.lastKey, 'new-key');
+      expect(fixture.service.cloudProfiles, hasLength(1));
+      expect(await store.readApiKey(), 'legacy-key');
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-save')));
+      await tester.pumpAndSettle();
+      expect(fixture.service.cloudProfiles, hasLength(2));
+      expect(fixture.service.cloudSettings.voice, 'nova');
+      expect(fixture.service.engineType, ReaderAloudEngineType.cloud);
+      expect(await store.readApiKey(), 'new-key');
+      expect(await store.readProfileKey('default'), 'legacy-key');
+      expect(find.text('Open cloud settings'), findsOneWidget);
+    },
+  );
 
   testWidgets('blank API key keeps the saved key when settings are saved', (
     tester,
@@ -190,14 +245,17 @@ Future<_SettingsFixture> _openSettings(
   WidgetTester tester, {
   _MemorySettingsStore? store,
   double textScale = 1,
+  ReaderAloudCloudSettingsStore? persistentStore,
+  _FakeCloudClient? cloudClient,
 }) async {
   final actualStore = store ?? _MemorySettingsStore();
   final system = _FakeAdjustableEngine();
   final service = ReaderAloudService(
     systemEngine: system,
-    settingsStore: actualStore,
-    cloudClient: _FakeCloudClient(),
+    settingsStore: persistentStore ?? actualStore,
+    cloudClient: cloudClient ?? _FakeCloudClient(),
     bytesPlayer: _FakeBytesPlayer(),
+    previewPlayerFactory: _FakeBytesPlayer.new,
   );
 
   await tester.pumpWidget(
@@ -308,13 +366,19 @@ class _FakeAdjustableEngine extends ChangeNotifier
 }
 
 class _FakeCloudClient implements ReaderAloudCloudClient {
+  String? lastKey;
+  String? lastVoice;
   @override
   Future<Uint8List> synthesize({
     required ReaderAloudCloudSettings settings,
     required String apiKey,
     required String text,
     required double speed,
-  }) async => Uint8List(0);
+  }) async {
+    lastKey = apiKey;
+    lastVoice = settings.voice;
+    return Uint8List.fromList([1]);
+  }
 }
 
 class _FakeBytesPlayer extends ChangeNotifier
@@ -346,4 +410,19 @@ class _FakeBytesPlayer extends ChangeNotifier
 
   @override
   Future<void> stop() async {}
+}
+
+class _Secrets implements ReaderAloudSecretStorage {
+  final values = <String, String>{};
+  @override
+  Future<String?> read(String key) async => values[key];
+  @override
+  Future<void> write(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
+  }
 }

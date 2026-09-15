@@ -1,3 +1,6 @@
+import com.android.build.api.dsl.ApplicationExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -38,7 +41,7 @@ gradle.taskGraph.whenReady {
     }
 }
 
-android {
+extensions.configure<ApplicationExtension> {
     namespace = "com.niki.xxread"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
@@ -49,8 +52,9 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+    buildFeatures {
+        buildConfig = true
+        resValues = true
     }
 
     defaultConfig {
@@ -95,6 +99,12 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
     }
 }
 

@@ -277,6 +277,12 @@ extension _BookSourceReaderPaginationRendering on _BookSourceReaderPageState {
       palette: _readerTheme,
       safeArea: _readerSafeArea,
       metadata: metadata,
+      chapterProgressLabel: formatReaderChapterProgress(
+        context,
+        style: _chapterProgressStyle,
+        chapterIndex: resolvedIndex,
+        chapterCount: _chapters.length,
+      ),
       pageNumberPlacement: pageNumberPlacement,
       horizontalPadding: math.max(14, _horizontalMargin),
       pageNumberHorizontalPadding: math.max(24, _horizontalMargin),

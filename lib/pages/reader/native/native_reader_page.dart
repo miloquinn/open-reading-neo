@@ -83,6 +83,7 @@ import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/utils/system_ui_helper.dart';
+import 'package:xxread/widgets/reader_progress_footer.dart';
 import 'package:xxread/widgets/reader_ai_panel.dart';
 import 'package:xxread/widgets/reader_annotated_text_page.dart';
 import 'package:xxread/widgets/reader_aloud_panel.dart';
@@ -384,6 +385,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _openingContentReadyScheduled = false;
   Timer? _openingLoaderTimer;
   ReaderTopBarStyle _topBarStyle = ReaderTopBarStyle.reader;
+  ReaderChapterProgressStyle _chapterProgressStyle =
+      ReaderChapterProgressStyle.hidden;
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;

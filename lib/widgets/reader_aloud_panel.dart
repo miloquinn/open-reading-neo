@@ -13,6 +13,55 @@ import '../utils/reader_themes.dart';
 import 'generated_book_cover.dart';
 import 'app_menu.dart';
 
+/// Reader entry point: presentation is shared by local and source books.
+Future<void> showReaderAloud({
+  required BuildContext context,
+  required ReaderAloudController controller,
+  required TtsService ttsService,
+  required ReaderAloudService aloudService,
+  required ReaderThemePalette palette,
+  required ThemeData themeData,
+  String author = '',
+}) async {
+  await aloudService.initialize();
+  if (!context.mounted) return;
+  if (aloudService.presentation == ReaderAloudPresentation.controls) {
+    final openPlayer = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: palette.controlBar,
+      constraints: BoxConstraints(
+        maxWidth: 560,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) => Theme(
+        data: themeData,
+        child: ReaderAloudPlayerPage(
+          controller: controller,
+          ttsService: ttsService,
+          aloudService: aloudService,
+          palette: palette,
+          author: author,
+          compactControls: true,
+        ),
+      ),
+    );
+    if (openPlayer != true || !context.mounted) return;
+  }
+  await showReaderAloudPlayer(
+    context: context,
+    controller: controller,
+    ttsService: ttsService,
+    aloudService: aloudService,
+    palette: palette,
+    themeData: themeData,
+    author: author,
+  );
+}
+
 Future<void> showReaderAloudPlayer({
   required BuildContext context,
   required ReaderAloudController controller,
@@ -96,6 +145,7 @@ class ReaderAloudPlayerPage extends StatefulWidget {
     required this.aloudService,
     required this.palette,
     this.author = '',
+    this.compactControls = false,
   });
 
   final ReaderAloudController controller;
@@ -103,6 +153,7 @@ class ReaderAloudPlayerPage extends StatefulWidget {
   final ReaderAloudService aloudService;
   final ReaderThemePalette palette;
   final String author;
+  final bool compactControls;
 
   @override
   State<ReaderAloudPlayerPage> createState() => _ReaderAloudPlayerPageState();
@@ -123,6 +174,70 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.compactControls) {
+      return SafeArea(
+        top: false,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([
+            widget.controller,
+            widget.ttsService,
+            widget.aloudService,
+          ]),
+          builder: (context, _) => SingleChildScrollView(
+            key: const ValueKey('reader-aloud-controls-menu'),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.controller.source.bookTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('reader-aloud-open-full-player'),
+                      tooltip: _copy('打开完整播放器', 'Open full player', 'プレーヤーを開く'),
+                      onPressed: () => Navigator.of(context).pop(true),
+                      icon: const Icon(Icons.open_in_full_rounded),
+                    ),
+                    IconButton(
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).closeButtonTooltip,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                Text(
+                  widget.controller.currentChapter?.title ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                _playbackControls(compact: true),
+                TextButton.icon(
+                  key: const ValueKey('reader-aloud-stop'),
+                  onPressed: () async {
+                    await widget.controller.stop();
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.stop_rounded),
+                  label: Text(_copy('结束听书', 'Stop listening', '読み上げを終了')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: widget.palette.background,
       body: SafeArea(
@@ -482,13 +597,17 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
           key: const ValueKey('reader-aloud-engine'),
           onPressed: _showSettings,
           icon: Icon(
-            widget.aloudService.usesCloud
+            widget.compactControls
+                ? Icons.settings_outlined
+                : widget.aloudService.usesCloud
                 ? Icons.cloud_outlined
                 : Icons.record_voice_over_outlined,
             size: 20,
           ),
           label: Text(
-            widget.aloudService.usesCloud
+            widget.compactControls
+                ? _copy('听书设置', 'Listening settings', '読み上げ設定')
+                : widget.aloudService.usesCloud
                 ? _copy('云端朗读引擎', 'Cloud voice', 'クラウド音声')
                 : _copy('系统朗读引擎', 'System voice', 'システム音声'),
             maxLines: 1,
@@ -722,6 +841,54 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                SwitchListTile.adaptive(
+                  key: const ValueKey('reader-aloud-presentation'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    _copy(context, '使用独立听书页面', 'Use full player', '専用プレーヤーを使用'),
+                  ),
+                  subtitle: Text(
+                    aloud.presentation == ReaderAloudPresentation.player
+                        ? _copy(
+                            context,
+                            '点击听书时进入完整播放器',
+                            'Open the full player when listening',
+                            '読み上げ時にプレーヤーを開く',
+                          )
+                        : _copy(
+                            context,
+                            '点击听书时展开阅读页控制菜单',
+                            'Show controls over the reading page',
+                            '読書画面に操作メニューを表示',
+                          ),
+                  ),
+                  value: aloud.presentation == ReaderAloudPresentation.player,
+                  onChanged: (value) async {
+                    try {
+                      await aloud.setPresentation(
+                        value
+                            ? ReaderAloudPresentation.player
+                            : ReaderAloudPresentation.controls,
+                      );
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _copy(
+                                context,
+                                '未能保存听书模式，请重试',
+                                'Could not save listening mode. Please retry.',
+                                '表示モードを保存できませんでした',
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
                 _engineSelector(context, controller, aloud),
                 const SizedBox(height: 20),
                 if (aloud.usesCloud)
@@ -749,6 +916,27 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
                     delay: Duration.zero,
                   ),
                 ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final rate in [0.5, 0.75, 1.0])
+                      ChoiceChip(
+                        key: ValueKey('reader-aloud-speed-$rate'),
+                        label: Text('${rate * 2}×'),
+                        selected: (speechRate - rate).abs() < 0.001,
+                        onSelected: (_) {
+                          setState(() => _pendingSpeechRate = rate);
+                          _scheduleSpeechRateCommit(
+                            rate,
+                            controller,
+                            tts,
+                            delay: Duration.zero,
+                          );
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 if (!aloud.usesCloud)
                   _slider(
                     context,
@@ -877,35 +1065,106 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
   Widget _cloudConfigurationCard(
     BuildContext context,
     ReaderAloudService aloud,
-  ) => Material(
-    color: widget.palette.surface.withValues(alpha: 0.72),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      leading: Icon(
-        aloud.hasCloudApiKey ? Icons.cloud_done_outlined : Icons.key_outlined,
-        color: aloud.hasCloudApiKey
-            ? widget.palette.accent
-            : widget.palette.secondaryText,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (aloud.cloudProfiles.length > 1)
+        AppPopupMenuButton<String>(
+          key: ValueKey(
+            'reader-aloud-cloud-profile:${aloud.activeProfileId}:${aloud.cloudProfiles.length}',
+          ),
+          initialValue: aloud.activeProfileId,
+          anchorRadius: 12,
+          tooltip: _copy(context, '当前语音', 'Current voice', '現在の音声'),
+          color: widget.palette.controlBar,
+          itemBuilder: (context) => [
+            for (final profile in aloud.cloudProfiles)
+              PopupMenuItem(value: profile.id, child: Text(profile.name)),
+          ],
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: _copy(context, '当前语音', 'Current voice', '現在の音声'),
+              filled: true,
+              fillColor: widget.palette.controlFill.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    aloud.cloudProfiles
+                        .firstWhere((p) => p.id == aloud.activeProfileId)
+                        .name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Icon(Icons.unfold_more_rounded, size: 20),
+              ],
+            ),
+          ),
+          onSelected: (id) async {
+            if (id == aloud.activeProfileId) return;
+            final resume =
+                widget.controller.state == ReaderAloudPlaybackState.playing;
+            try {
+              await widget.controller.pause();
+              await aloud.selectCloudProfile(id);
+              if (resume) await widget.controller.resume();
+            } catch (_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _copy(
+                        context,
+                        '切换语音失败，请重试',
+                        'Could not switch voices. Please retry.',
+                        '音声を切り替えられませんでした',
+                      ),
+                    ),
+                  ),
+                );
+              }
+            }
+          },
+        ),
+      Material(
+        color: widget.palette.surface.withValues(alpha: 0.72),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Icon(
+            aloud.hasCloudApiKey
+                ? Icons.cloud_done_outlined
+                : Icons.key_outlined,
+            color: aloud.hasCloudApiKey
+                ? widget.palette.accent
+                : widget.palette.secondaryText,
+          ),
+          title: Text(
+            '${aloud.cloudSettings.model} · ${aloud.cloudSettings.voice}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            aloud.hasCloudApiKey
+                ? _copy(
+                    context,
+                    '管理音色与连接',
+                    'Voice and connection settings',
+                    '音声と接続の設定',
+                  )
+                : _copy(context, '配置云端朗读', 'Set up cloud voice', 'クラウド音声を設定'),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => unawaited(_showCloudSettings(context, aloud)),
+        ),
       ),
-      title: Text(
-        '${aloud.cloudSettings.model} · ${aloud.cloudSettings.voice}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        aloud.hasCloudApiKey
-            ? _copy(
-                context,
-                '管理音色与连接',
-                'Voice and connection settings',
-                '音声と接続の設定',
-              )
-            : _copy(context, '配置云端朗读', 'Set up cloud voice', 'クラウド音声を設定'),
-      ),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => unawaited(_showCloudSettings(context, aloud)),
-    ),
+    ],
   );
 
   Future<void> _showCloudSettings(
@@ -913,7 +1172,12 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
     ReaderAloudService aloud,
   ) async {
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => CloudTtsSettingsPage(service: aloud)),
+      MaterialPageRoute(
+        builder: (_) => CloudTtsSettingsPage(
+          service: aloud,
+          pauseBook: widget.controller.pause,
+        ),
+      ),
     );
     if (saved == true && mounted) {
       await widget.controller.refreshPlayback();

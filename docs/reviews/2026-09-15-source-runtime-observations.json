@@ -1,0 +1,49 @@
+{
+  "kind": "offline_observations_not_compatibility_pass_rate",
+  "platform": "macos",
+  "observations": {
+    "same_url_twice": {
+      "networkCalls": 1,
+      "result": [
+        "1",
+        "1"
+      ]
+    },
+    "nonce_before_network": {
+      "networkCalls": 12,
+      "error": "Source script exceeded the network request limit."
+    },
+    "cache_side_effect_before_network": 2,
+    "shared_library_state": [
+      1,
+      1
+    ],
+    "login_api_shapes": [
+      "undefined",
+      "undefined",
+      "undefined",
+      "undefined",
+      "undefined",
+      "undefined",
+      "undefined",
+      null
+    ],
+    "header_write_then_request": {
+      "requestHadAuthorization": false,
+      "savedHeaderAfterScript": true
+    },
+    "button_action_preserves_existing_header": {
+      "headerStillPresent": false
+    },
+    "missing_login_function": "completed_without_error",
+    "source_value_survives_runtime_recreation": "",
+    "unsupported_api_static_classification": "supported",
+    "nested_request_with_scripted_header": {
+      "error": "TimeoutException after 0:00:02.000000: Future not completed",
+      "networkCalls": 0
+    },
+    "login_check_after_transport_failure": {
+      "checkRan": false
+    }
+  }
+}

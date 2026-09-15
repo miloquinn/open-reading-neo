@@ -79,6 +79,7 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
         _tabletTwoPageEnabled = settings.tabletTwoPageEnabled;
         _scrollByChapter = scrollByChapter;
         _chapterTitlePageEnabled = settings.chapterTitlePageEnabled;
+        _chapterProgressStyle = settings.chapterProgressStyle;
         _loadingCatalog = false;
       });
       unawaited(_syncVolumeKeyPaging());

@@ -217,7 +217,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
     if (controller == null) return;
     final ttsService = context.read<TtsService>();
     final aloudService = context.read<ReaderAloudService>();
-    await showReaderAloudPlayer(
+    await showReaderAloud(
       context: context,
       controller: controller,
       ttsService: ttsService,
@@ -228,7 +228,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
     );
   }
 
-  /// Opens the audiobook player; the player starts playback when necessary.
+  /// Opens the preferred listening interface and starts playback if needed.
   Future<void> _handleReaderAloudButtonPressed() async {
     _pauseAutoPageTurn();
     await _showReaderAloudPlayer();
@@ -320,6 +320,9 @@ extension _NativeReaderControls on _NativeReaderPageState {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) => ReaderSettingsSheet(
+        chapterProgressStyle: _chapterProgressStyle,
+        onChapterProgressStyleChanged: (style) =>
+            unawaited(_setChapterProgressStyle(style)),
         autoPageTurnController: _autoPageTurnController,
         autoPageTurnIsVertical: _pageMode == NativePageMode.verticalScroll,
         onAutoPageTurnSettings: () => unawaited(_showAutoPageTurnSettings()),

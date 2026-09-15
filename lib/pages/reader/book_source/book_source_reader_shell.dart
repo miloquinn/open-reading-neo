@@ -268,14 +268,28 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
   ) {
     return ValueListenableBuilder<double>(
       valueListenable: _scrollProgress,
-      builder: (context, _, _) => Text(
-        _chapters.isEmpty ? widget.book.title : _readerStatus(),
-        key: key,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: style,
-      ),
+      builder: (context, _, _) => _pageMode == BookSourcePageMode.verticalScroll
+          ? ReaderProgressFooter(
+              key: key,
+              chapterLabel: formatReaderChapterProgress(
+                context,
+                style: _chapterProgressStyle,
+                chapterIndex: _chapterIndex,
+                chapterCount: _chapters.length,
+              ),
+              pageLabel: _verticalPageCount == 0
+                  ? ''
+                  : '${_verticalPageIndex + 1} / $_verticalPageCount',
+              style: style,
+            )
+          : Text(
+              _chapters.isEmpty ? widget.book.title : _readerStatus(),
+              key: key,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
     );
   }
 

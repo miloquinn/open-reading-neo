@@ -11881,6 +11881,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Progress is fetched at your chosen frequency. Opening a book resumes from the last synced position. Tap Sync now first when you need the latest progress.'**
   String get cloudSyncAutoResumeScheduledHint;
+
+  /// No description provided for @readerChapterProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter progress'**
+  String get readerChapterProgressTitle;
+
+  /// No description provided for @readerChapterProgressHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get readerChapterProgressHidden;
+
+  /// No description provided for @readerChapterProgressFraction.
+  ///
+  /// In en, this message translates to:
+  /// **'{chapter}/{total} chapters'**
+  String readerChapterProgressFraction(int chapter, int total);
+
+  /// No description provided for @readerChapterProgressRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chapters ahead'**
+  String readerChapterProgressRemaining(int count);
 }
 
 class _AppLocalizationsDelegate

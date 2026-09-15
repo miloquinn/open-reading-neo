@@ -64,6 +64,7 @@ import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/utils/system_ui_helper.dart';
+import 'package:xxread/widgets/reader_progress_footer.dart';
 import 'package:xxread/widgets/reader_ai_panel.dart';
 import 'package:xxread/widgets/reader_annotated_text_page.dart';
 import 'package:xxread/widgets/reader_aloud_panel.dart';
@@ -295,6 +296,8 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   bool _openingContentReadyScheduled = false;
   Timer? _openingLoaderTimer;
   ReaderTopBarStyle _topBarStyle = ReaderTopBarStyle.reader;
+  ReaderChapterProgressStyle _chapterProgressStyle =
+      ReaderChapterProgressStyle.hidden;
   ReaderAloudController? _readerAloudController;
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
@@ -339,6 +342,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
     tapPageAnimationEnabled: _tapPageAnimationEnabled,
     tabletTwoPageEnabled: _tabletTwoPageEnabled,
     chapterTitlePageEnabled: _chapterTitlePageEnabled,
+    chapterProgressStyle: _chapterProgressStyle,
   );
 
   ReaderSafeAreaMetrics get _readerSafeArea => ReaderSafeAreaMetrics(
@@ -373,6 +377,10 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
         ? _leafStatusController.value.revision
         : 0,
     _annotationRevision,
+    _chapterProgressStyle,
+    _chapterProgressStyle == ReaderChapterProgressStyle.hidden
+        ? 0
+        : _chapters.length,
   );
 
   bool _shouldUseTwoPageLayout(Size size) =>

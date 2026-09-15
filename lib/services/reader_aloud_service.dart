@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/reader/reader_aloud_controller.dart';
 
+part 'reader_aloud_profiles.dart';
+
 enum ReaderAloudEngineType { system, cloud }
 
 @immutable
@@ -154,7 +156,7 @@ abstract interface class ReaderAloudCloudSettingsStore {
 }
 
 class PreferencesReaderAloudCloudSettingsStore
-    implements ReaderAloudCloudSettingsStore {
+    implements ReaderAloudCloudSettingsStore, ReaderAloudProfileStore {
   factory PreferencesReaderAloudCloudSettingsStore({
     SharedPreferences? preferences,
     ReaderAloudSecretStorage secretStorage =
@@ -165,6 +167,9 @@ class PreferencesReaderAloudCloudSettingsStore
     this._preferences,
     this._secretStorage,
   );
+
+  static const _profilesKey = 'reader_aloud_cloud_profiles_v1';
+  static const legacyProfileId = 'default';
 
   static const _engineKey = 'reader_aloud_engine';
   static const _baseUrlKey = 'reader_aloud_cloud_base_url';
@@ -180,8 +185,74 @@ class PreferencesReaderAloudCloudSettingsStore
   Future<SharedPreferences> get _prefs async =>
       _preferences ?? SharedPreferences.getInstance();
 
+  Future<Map<String, dynamic>?> _catalog() async {
+    final raw = (await _prefs).getString(_profilesKey);
+    return raw == null ? null : jsonDecode(raw) as Map<String, dynamic>;
+  }
+
   @override
-  Future<void> clearApiKey() => _secretStorage.delete(_apiKeyKey);
+  Future<String> loadActiveProfileId() async =>
+      (await _catalog())?['active'] as String? ?? legacyProfileId;
+
+  @override
+  Future<List<ReaderAloudCloudProfile>> loadProfiles() async {
+    final catalog = await _catalog();
+    if (catalog == null) {
+      return [
+        ReaderAloudCloudProfile(
+          id: legacyProfileId,
+          name: 'Cloud TTS',
+          settings: await loadSettings(),
+        ),
+      ];
+    }
+    return (catalog['profiles'] as List)
+        .map(
+          (value) =>
+              ReaderAloudCloudProfile.fromJson(value as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  @override
+  Future<void> saveProfiles(
+    List<ReaderAloudCloudProfile> profiles,
+    String activeId,
+  ) async {
+    if (!profiles.any((profile) => profile.id == activeId)) {
+      throw StateError('Missing active voice');
+    }
+    final saved = await (await _prefs).setString(
+      _profilesKey,
+      jsonEncode({
+        'active': activeId,
+        'profiles': profiles.map((profile) => profile.toJson()).toList(),
+      }),
+    );
+    if (!saved) throw StateError('Could not save voices');
+  }
+
+  String _profileKey(String id) =>
+      id == legacyProfileId ? _apiKeyKey : '${_apiKeyKey}_$id';
+
+  @override
+  Future<String?> readProfileKey(String id) async {
+    final key = (await _secretStorage.read(_profileKey(id)))?.trim();
+    return key == null || key.isEmpty ? null : key;
+  }
+
+  @override
+  Future<void> writeProfileKey(String id, String? key) async {
+    if (key == null || key.trim().isEmpty) {
+      await _secretStorage.delete(_profileKey(id));
+    } else {
+      await _secretStorage.write(_profileKey(id), key.trim());
+    }
+  }
+
+  @override
+  Future<void> clearApiKey() async =>
+      writeProfileKey(await loadActiveProfileId(), null);
 
   @override
   Future<ReaderAloudEngineType> loadEngineType() async {
@@ -193,6 +264,11 @@ class PreferencesReaderAloudCloudSettingsStore
 
   @override
   Future<ReaderAloudCloudSettings> loadSettings() async {
+    final catalog = await _catalog();
+    if (catalog != null) {
+      final profiles = await loadProfiles();
+      return profiles.firstWhere((p) => p.id == catalog['active']).settings;
+    }
     final prefs = await _prefs;
     return ReaderAloudCloudSettings(
       baseUrl: prefs.getString(_baseUrlKey) ?? 'https://api.openai.com/v1',
@@ -205,9 +281,7 @@ class PreferencesReaderAloudCloudSettingsStore
 
   @override
   Future<String?> readApiKey() async {
-    final value = await _secretStorage.read(_apiKeyKey);
-    final normalized = value?.trim();
-    return normalized == null || normalized.isEmpty ? null : normalized;
+    return readProfileKey(await loadActiveProfileId());
   }
 
   @override
@@ -219,6 +293,22 @@ class PreferencesReaderAloudCloudSettingsStore
   Future<void> saveSettings(ReaderAloudCloudSettings settings) async {
     final normalized = settings.normalized();
     validateReaderAloudCloudSettings(normalized);
+    if (await _catalog() != null) {
+      final activeId = await loadActiveProfileId();
+      final profiles = await loadProfiles();
+      await saveProfiles([
+        for (final profile in profiles)
+          if (profile.id == activeId)
+            ReaderAloudCloudProfile(
+              id: profile.id,
+              name: profile.name,
+              settings: normalized,
+            )
+          else
+            profile,
+      ], activeId);
+      return;
+    }
     final prefs = await _prefs;
     await prefs.setString(_baseUrlKey, normalized.baseUrl);
     await prefs.setString(_modelKey, normalized.model);
@@ -234,7 +324,7 @@ class PreferencesReaderAloudCloudSettingsStore
       await clearApiKey();
       return;
     }
-    await _secretStorage.write(_apiKeyKey, normalized);
+    await writeProfileKey(await loadActiveProfileId(), normalized);
   }
 }
 
@@ -441,14 +531,6 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
     implements ReaderAloudBytesPlayer {
   AudioplayersReaderAloudBytesPlayer({AudioPlayer? player})
     : _player = player ?? AudioPlayer() {
-    _audioContextReady = _player.setAudioContext(
-      AudioContext(
-        iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-          options: const <AVAudioSessionOptions>{},
-        ),
-      ),
-    );
     _subscriptions.addAll([
       _player.onPositionChanged.listen((value) {
         _position = value;
@@ -469,7 +551,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
   }
 
   final AudioPlayer _player;
-  late final Future<void> _audioContextReady;
+  int _playbackGeneration = 0;
   final List<StreamSubscription<Object?>> _subscriptions = [];
   Completer<void>? _activePlayback;
   bool _isPlaying = false;
@@ -494,9 +576,21 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
     required double volume,
   }) async {
     if (_disposed) return;
-    await _audioContextReady;
-    if (_disposed) return;
-    await stop();
+    final operation = ++_playbackGeneration;
+    await _stopPlayback();
+    if (_disposed || operation != _playbackGeneration) return;
+    // iOS audio contexts are process-global. Configure only when playback is
+    // requested, including after a preview or another player changed the
+    // session. Keep the same nonmixable policy as TtsService and the media bridge.
+    await _player.setAudioContext(
+      AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const <AVAudioSessionOptions>{},
+        ),
+      ),
+    );
+    if (_disposed || operation != _playbackGeneration) return;
     final completer = Completer<void>();
     _activePlayback = completer;
     _position = Duration.zero;
@@ -523,6 +617,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
 
   @override
   Future<void> pause() async {
+    ++_playbackGeneration;
     if (!_isPlaying || _disposed) return;
     await _player.pause();
     _isPlaying = false;
@@ -537,6 +632,11 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
 
   @override
   Future<void> stop() async {
+    ++_playbackGeneration;
+    await _stopPlayback();
+  }
+
+  Future<void> _stopPlayback() async {
     if (_disposed) return;
     _completeActivePlayback();
     await _player.stop();
@@ -556,6 +656,7 @@ class AudioplayersReaderAloudBytesPlayer extends ChangeNotifier
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    ++_playbackGeneration;
     _completeActivePlayback();
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
@@ -576,11 +677,14 @@ class ReaderAloudService extends ChangeNotifier
     ReaderAloudCloudClient? cloudClient,
     ReaderAloudBytesPlayer? bytesPlayer,
     ReaderAloudCloudAudioCache? cache,
+    ReaderAloudBytesPlayer Function()? previewPlayerFactory,
   }) : _settingsStore =
            settingsStore ?? PreferencesReaderAloudCloudSettingsStore(),
        _cloudClient = cloudClient ?? OpenAiCompatibleReaderAloudCloudClient(),
        _bytesPlayer = bytesPlayer ?? AudioplayersReaderAloudBytesPlayer(),
-       _cache = cache ?? ReaderAloudCloudAudioCache() {
+       _cache = cache ?? ReaderAloudCloudAudioCache(),
+       _previewPlayerFactory =
+           previewPlayerFactory ?? AudioplayersReaderAloudBytesPlayer.new {
     systemEngine.addListener(_relayEngineChange);
     _bytesPlayer.addListener(_relayEngineChange);
     unawaited(initialize());
@@ -591,6 +695,159 @@ class ReaderAloudService extends ChangeNotifier
   final ReaderAloudCloudClient _cloudClient;
   final ReaderAloudBytesPlayer _bytesPlayer;
   final ReaderAloudCloudAudioCache _cache;
+
+  final ReaderAloudBytesPlayer Function() _previewPlayerFactory;
+  ReaderAloudBytesPlayer? _previewPlayer;
+  int _previewGeneration = 0;
+  List<ReaderAloudCloudProfile> _profiles = [];
+  String _activeProfileId =
+      PreferencesReaderAloudCloudSettingsStore.legacyProfileId;
+  ReaderAloudPresentation _presentation = ReaderAloudPresentation.player;
+
+  bool get supportsProfiles => _settingsStore is ReaderAloudProfileStore;
+  List<ReaderAloudCloudProfile> get cloudProfiles =>
+      List.unmodifiable(_profiles);
+  String get activeProfileId => _activeProfileId;
+  ReaderAloudPresentation get presentation => _presentation;
+
+  Future<void> setPresentation(ReaderAloudPresentation value) async {
+    await initialize();
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setString('reader_aloud_presentation', value.name)) {
+      throw StateError('Could not save listening mode');
+    }
+    _presentation = value;
+    _notifySafe();
+  }
+
+  Future<void> _reloadProfiles() async {
+    final store = _settingsStore;
+    if (store is ReaderAloudProfileStore) {
+      _profiles = await (store as ReaderAloudProfileStore).loadProfiles();
+      _activeProfileId = await (store as ReaderAloudProfileStore)
+          .loadActiveProfileId();
+    }
+  }
+
+  Future<bool> profileHasKey(String id) async {
+    final store = _settingsStore;
+    return store is ReaderAloudProfileStore
+        ? await (store as ReaderAloudProfileStore).readProfileKey(id) != null
+        : _hasCloudApiKey;
+  }
+
+  Future<void> saveCloudProfile(
+    ReaderAloudCloudProfile profile, {
+    String? apiKey,
+    bool clearKey = false,
+  }) async {
+    await initialize();
+    final store = _settingsStore as ReaderAloudProfileStore;
+    validateReaderAloudCloudSettings(profile.settings);
+    final replacesKey = apiKey != null && apiKey.trim().isNotEmpty;
+    final changesKey = replacesKey || clearKey;
+    final previousKey = changesKey
+        ? await store.readProfileKey(profile.id)
+        : null;
+    if (changesKey) {
+      await store.writeProfileKey(profile.id, replacesKey ? apiKey : null);
+    }
+    final profiles = [..._profiles];
+    final index = profiles.indexWhere((p) => p.id == profile.id);
+    if (index < 0) {
+      profiles.add(profile);
+    } else {
+      profiles[index] = profile;
+    }
+    try {
+      await store.saveProfiles(profiles, _activeProfileId);
+    } catch (_) {
+      // Do not leave the old endpoint paired with a replacement credential.
+      if (changesKey) await store.writeProfileKey(profile.id, previousKey);
+      rethrow;
+    }
+    await _reloadProfiles();
+    _cloudSettings = await _settingsStore.loadSettings();
+    _hasCloudApiKey = await _settingsStore.readApiKey() != null;
+    _notifySafe();
+  }
+
+  Future<void> selectCloudProfile(String id) async {
+    await initialize();
+    final store = _settingsStore as ReaderAloudProfileStore;
+    if (!_profiles.any((p) => p.id == id)) throw StateError('Unknown voice');
+    final hasKey = await store.readProfileKey(id) != null;
+    await stop();
+    await store.saveProfiles(_profiles, id);
+    _activeProfileId = id;
+    _cloudSettings = _profiles.firstWhere((p) => p.id == id).settings;
+    _hasCloudApiKey = hasKey;
+    _cloudError = null;
+    _notifySafe();
+  }
+
+  Future<void> deleteCloudProfile(String id) async {
+    await initialize();
+    if (_profiles.length <= 1) throw StateError('Keep at least one voice');
+    final store = _settingsStore as ReaderAloudProfileStore;
+    final remaining = _profiles.where((p) => p.id != id).toList();
+    final activeId = id == _activeProfileId
+        ? remaining.first.id
+        : _activeProfileId;
+    if (id == _activeProfileId) await stop();
+    await store.saveProfiles(remaining, activeId);
+    await _reloadProfiles();
+    _cloudSettings = await _settingsStore.loadSettings();
+    _hasCloudApiKey = await _settingsStore.readApiKey() != null;
+    _notifySafe();
+    await store.writeProfileKey(id, null);
+  }
+
+  /// Audition drafts without changing the selected voice or advancing the book.
+  /// Failure is surfaced directly, never disguised by system-voice fallback.
+  Future<void> previewCloudVoice({
+    required ReaderAloudCloudSettings settings,
+    required String text,
+    String? profileId,
+    String? apiKey,
+    bool useSavedKey = true,
+  }) async {
+    final generation = ++_previewGeneration;
+    await _previewPlayer?.stop();
+    await initialize();
+    var key = apiKey?.trim();
+    if ((key == null || key.isEmpty) && useSavedKey) {
+      final store = _settingsStore;
+      key = store is ReaderAloudProfileStore && profileId != null
+          ? await (store as ReaderAloudProfileStore).readProfileKey(profileId)
+          : await _settingsStore.readApiKey();
+    }
+    if (_disposed || generation != _previewGeneration) return;
+    if (key == null || key.isEmpty) {
+      throw const ReaderAloudCloudException(
+        'missing_api_key',
+        '请先填写此语音服务的 API Key',
+      );
+    }
+    final audio = await _cloudClient.synthesize(
+      settings: settings,
+      apiKey: key,
+      text: text,
+      speed: (systemEngine.speechRate * 2).clamp(0.25, 2.0),
+    );
+    if (_disposed || generation != _previewGeneration) return;
+    final player = _previewPlayer ??= _previewPlayerFactory();
+    await player.play(
+      audio,
+      mimeType: _mimeTypeFor(settings.responseFormat),
+      volume: systemEngine.speechVolume,
+    );
+  }
+
+  Future<void> stopPreview() async {
+    ++_previewGeneration;
+    await _previewPlayer?.stop();
+  }
 
   ReaderAloudEngineType _engineType = ReaderAloudEngineType.system;
   ReaderAloudEngineType _activeEngineType = ReaderAloudEngineType.system;
@@ -657,6 +914,16 @@ class ReaderAloudService extends ChangeNotifier
     try {
       _engineType = await _settingsStore.loadEngineType();
       _cloudSettings = await _settingsStore.loadSettings();
+      await _reloadProfiles();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _presentation =
+            prefs.getString('reader_aloud_presentation') == 'controls'
+            ? ReaderAloudPresentation.controls
+            : ReaderAloudPresentation.player;
+      } catch (_) {
+        /* Older stores may not provide presentation preferences. */
+      }
       try {
         _hasCloudApiKey = (await _settingsStore.readApiKey()) != null;
       } catch (_) {
@@ -691,6 +958,7 @@ class ReaderAloudService extends ChangeNotifier
     validateReaderAloudCloudSettings(normalized);
     await _settingsStore.saveSettings(normalized);
     _cloudSettings = normalized;
+    await _reloadProfiles();
     _cloudError = null;
     _notifySafe();
   }
@@ -719,27 +987,29 @@ class ReaderAloudService extends ChangeNotifier
       return;
     }
 
+    final settings = _cloudSettings;
     try {
       final apiKey = await _settingsStore.readApiKey();
+      if (!_isCurrentOperation(operation)) return;
       if (apiKey == null) {
         throw const ReaderAloudCloudException(
           'missing_api_key',
           '请先配置 TTS API Key',
         );
       }
-      validateReaderAloudCloudSettings(_cloudSettings);
+      validateReaderAloudCloudSettings(settings);
       _activeEngineType = ReaderAloudEngineType.cloud;
       _currentCloudText = text;
       _cloudError = null;
       final cloudSpeed = (systemEngine.speechRate * 2).clamp(0.25, 2.0);
       final cacheKey = _cache.keyFor(
-        settings: _cloudSettings,
+        settings: settings,
         text: text,
         speed: cloudSpeed,
       );
       var audio = _cache.read(cacheKey);
       audio ??= await _cloudClient.synthesize(
-        settings: _cloudSettings,
+        settings: settings,
         apiKey: apiKey,
         text: text,
         speed: cloudSpeed,
@@ -748,7 +1018,7 @@ class ReaderAloudService extends ChangeNotifier
       _cache.write(cacheKey, audio);
       await _bytesPlayer.play(
         audio,
-        mimeType: _mimeTypeFor(_cloudSettings.responseFormat),
+        mimeType: _mimeTypeFor(settings.responseFormat),
         volume: systemEngine.speechVolume,
       );
     } catch (error, stackTrace) {
@@ -757,7 +1027,7 @@ class ReaderAloudService extends ChangeNotifier
           ? error.message
           : 'TTS 云端播放失败';
       _notifySafe();
-      if (_cloudSettings.fallbackToSystem) {
+      if (settings.fallbackToSystem) {
         _activeEngineType = ReaderAloudEngineType.system;
         await systemEngine.speak(text);
         return;
@@ -833,6 +1103,8 @@ class ReaderAloudService extends ChangeNotifier
     systemEngine.removeListener(_relayEngineChange);
     _bytesPlayer.removeListener(_relayEngineChange);
     _bytesPlayer.dispose();
+    ++_previewGeneration;
+    _previewPlayer?.dispose();
     super.dispose();
   }
 }

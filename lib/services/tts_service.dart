@@ -314,14 +314,14 @@ class TtsService extends ChangeNotifier
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      // Configure the category before activating the shared session. Playback
-      // with spokenAudio is valid with no category options and keeps speech
-      // eligible for background playback. The session remains active between
-      // queued utterances so iOS does not introduce a gap for every sentence.
+      // Match ReaderAloudMediaBridge and the cloud/preview bytes player:
+      // nonmixable playback keeps Now Playing eligible, while default mode
+      // avoids the spokenAudio interruption requested by navigation prompts.
+      // Keep the shared session active between queued utterances to avoid gaps.
       await tts.setIosAudioCategory(
         IosTextToSpeechAudioCategory.playback,
         const <IosTextToSpeechAudioCategoryOptions>[],
-        IosTextToSpeechAudioMode.spokenAudio,
+        IosTextToSpeechAudioMode.defaultMode,
       );
       await tts.autoStopSharedSession(false);
       await tts.setSharedInstance(true);

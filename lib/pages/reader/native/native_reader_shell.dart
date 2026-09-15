@@ -343,14 +343,27 @@ extension _NativeReaderShell on _NativeReaderPageState {
   }) {
     return ValueListenableBuilder<double>(
       valueListenable: _verticalScrollProgress,
-      builder: (context, _, _) => Text(
-        _readerStatus(pages, chapterCount),
-        key: key,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: style,
-      ),
+      builder: (context, _, _) => _pageMode == NativePageMode.verticalScroll
+          ? ReaderProgressFooter(
+              key: key,
+              chapterLabel: formatReaderChapterProgress(
+                context,
+                style: _chapterProgressStyle,
+                chapterIndex: _chapterIndex,
+                chapterCount: chapterCount,
+              ),
+              pageLabel:
+                  '${_pageIndex + 1} / ${_visibleContinuousParts.isNotEmpty ? _visibleContinuousParts.length : pages.length}',
+              style: style,
+            )
+          : Text(
+              _readerStatus(pages, chapterCount),
+              key: key,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
     );
   }
 

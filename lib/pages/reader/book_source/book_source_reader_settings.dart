@@ -127,6 +127,14 @@ extension _BookSourceReaderSettings on _BookSourceReaderPageState {
     if (repaginate) _restoreScrollProgress(currentProgress);
   }
 
+  Future<void> _setChapterProgressStyle(
+    ReaderChapterProgressStyle style,
+  ) async {
+    if (_chapterProgressStyle == style) return;
+    _updateReaderState(() => _chapterProgressStyle = style);
+    await _readerSettingsStore.saveChapterProgressStyle(style);
+  }
+
   Future<void> _setTopBarStyle(ReaderTopBarStyle style) async {
     if (_topBarStyle == style) return;
     // 顶部预留高度随样式变化；完全沉浸在上下滚动时取消整个预留区域。

@@ -6489,6 +6489,26 @@
         "type": "String"
       }
     }
+  },
+  "readerChapterProgressTitle": "Chapter progress",
+  "readerChapterProgressHidden": "Hidden",
+  "readerChapterProgressFraction": "{chapter}/{total} chapters",
+  "readerChapterProgressRemaining": "{count} chapters ahead",
+  "@readerChapterProgressFraction": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@readerChapterProgressRemaining": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
-
 }

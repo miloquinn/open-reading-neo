@@ -8,6 +8,16 @@ import 'reader_tap_zones.dart';
 
 enum ReaderTextAlignment { natural, justified }
 
+enum ReaderChapterProgressStyle {
+  hidden,
+
+  /// One-based current chapter / total chapters in the catalog.
+  fraction,
+
+  /// Chapters after the current chapter, excluding the current chapter.
+  remaining,
+}
+
 /// Converts the reader's 0–100 brightness setting into an opaque gray.
 ///
 /// Dark reader themes use the natural scale: 0 is #000000 and 100 is
@@ -111,6 +121,7 @@ class ReaderSettings {
     this.tapPageAnimationEnabled = true,
     this.tabletTwoPageEnabled = defaultTabletTwoPageEnabled,
     this.chapterTitlePageEnabled = true,
+    this.chapterProgressStyle = ReaderChapterProgressStyle.hidden,
   });
 
   final double fontSize;
@@ -131,6 +142,7 @@ class ReaderSettings {
   final bool tapPageAnimationEnabled;
   final bool tabletTwoPageEnabled;
   final bool chapterTitlePageEnabled;
+  final ReaderChapterProgressStyle chapterProgressStyle;
 
   ReaderSettings copyWith({
     double? fontSize,
@@ -151,6 +163,7 @@ class ReaderSettings {
     bool? tapPageAnimationEnabled,
     bool? tabletTwoPageEnabled,
     bool? chapterTitlePageEnabled,
+    ReaderChapterProgressStyle? chapterProgressStyle,
   }) {
     return ReaderSettings(
       fontSize: (fontSize ?? this.fontSize).clamp(minFontSize, maxFontSize),
@@ -191,6 +204,7 @@ class ReaderSettings {
       tabletTwoPageEnabled: tabletTwoPageEnabled ?? this.tabletTwoPageEnabled,
       chapterTitlePageEnabled:
           chapterTitlePageEnabled ?? this.chapterTitlePageEnabled,
+      chapterProgressStyle: chapterProgressStyle ?? this.chapterProgressStyle,
     );
   }
 }
@@ -222,6 +236,7 @@ class ReaderSettingsStore {
   static const chapterTitlePageKey =
       'native_reader_txt_chapter_title_page_enabled';
   static const tapZonesKey = 'reader_tap_zones_v1';
+  static const chapterProgressStyleKey = 'reader_chapter_progress_style';
   static const legacyBookSourceLineHeightKey = 'book_source_reader_line_height';
 
   const ReaderSettingsStore();
@@ -229,6 +244,13 @@ class ReaderSettingsStore {
   Future<String> loadThemeId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(themeKey) ?? ReaderSettings.defaultThemeId;
+  }
+
+  Future<void> saveChapterProgressStyle(
+    ReaderChapterProgressStyle style,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(chapterProgressStyleKey, style.name);
   }
 
   Future<void> saveThemeId(String themeId) async {
@@ -273,6 +295,10 @@ class ReaderSettingsStore {
     }
 
     return ReaderSettings(
+      chapterProgressStyle: ReaderChapterProgressStyle.values.firstWhere(
+        (style) => style.name == prefs.getString(chapterProgressStyleKey),
+        orElse: () => ReaderChapterProgressStyle.hidden,
+      ),
       fontSize: (prefs.getDouble(fontSizeKey) ?? ReaderSettings.defaultFontSize)
           .clamp(ReaderSettings.minFontSize, ReaderSettings.maxFontSize),
       textBrightness: textBrightness.clamp(
@@ -357,6 +383,10 @@ class ReaderSettingsStore {
       prefs.setBool(tapPageAnimationKey, settings.tapPageAnimationEnabled),
       prefs.setBool(tabletTwoPageKey, settings.tabletTwoPageEnabled),
       prefs.setBool(chapterTitlePageKey, settings.chapterTitlePageEnabled),
+      prefs.setString(
+        chapterProgressStyleKey,
+        settings.chapterProgressStyle.name,
+      ),
     ]);
   }
 

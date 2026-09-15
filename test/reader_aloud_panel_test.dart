@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/core/reader/reader_aloud_controller.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
@@ -12,6 +13,92 @@ import 'package:xxread/utils/reader_themes.dart';
 import 'package:xxread/widgets/reader_aloud_panel.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets(
+    'controls mode stays on the reader, pauses and opens the full player',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'reader_aloud_presentation': 'controls',
+      });
+      final fixture = await _openPlayer(
+        tester,
+        size: const Size(390, 844),
+        holdSystemSpeech: true,
+      );
+      addTearDown(fixture.dispose);
+      expect(
+        find.byKey(const ValueKey('reader-aloud-controls-menu')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('reader-aloud-cover')), findsNothing);
+      expect(find.text('open responsive player'), findsOneWidget);
+      expect(fixture.controller.state, ReaderAloudPlaybackState.playing);
+      await tester.tap(find.byKey(const ValueKey('reader-aloud-play-pause')));
+      await tester.pumpAndSettle();
+      expect(fixture.controller.state, ReaderAloudPlaybackState.paused);
+      await tester.tap(
+        find.byKey(const ValueKey('reader-aloud-open-full-player')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('reader-aloud-controls-menu')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('reader-aloud-cover')), findsOneWidget);
+      expect(fixture.controller.state, ReaderAloudPlaybackState.paused);
+    },
+  );
+
+  testWidgets('mode switch and 2x shortcut persist from listening settings', (
+    tester,
+  ) async {
+    final fixture = await _openSettingsFromPlayer(
+      tester,
+      size: const Size(390, 844),
+    );
+    addTearDown(fixture.dispose);
+    await tester.tap(find.byKey(const ValueKey('reader-aloud-presentation')));
+    await tester.pumpAndSettle();
+    expect(fixture.aloud.presentation, ReaderAloudPresentation.controls);
+    expect(
+      (await SharedPreferences.getInstance()).getString(
+        'reader_aloud_presentation',
+      ),
+      'controls',
+    );
+    final speed = find.byKey(const ValueKey('reader-aloud-speed-1.0'));
+    await tester.ensureVisible(speed);
+    await tester.tap(speed);
+    await tester.pumpAndSettle();
+    expect(fixture.tts.speechRate, 1.0);
+    expect(find.text('2.00×'), findsOneWidget);
+  });
+
+  testWidgets('compact controls scroll without overflow on small landscape', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'reader_aloud_presentation': 'controls',
+    });
+    final fixture = await _openPlayer(
+      tester,
+      size: const Size(568, 320),
+      textScale: 1.4,
+    );
+    addTearDown(fixture.dispose);
+    final stop = find.byKey(const ValueKey('reader-aloud-stop'));
+    await tester.ensureVisible(stop);
+    await tester.pumpAndSettle();
+    expect(stop.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(stop);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('reader-aloud-controls-menu')),
+      findsNothing,
+    );
+  });
+
   final viewportScenarios = <_ViewportScenario>[
     const _ViewportScenario('compact phone', Size(320, 568), textScale: 1.4),
     const _ViewportScenario(
@@ -333,9 +420,13 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.tap(
-          find.descendant(of: sheet, matching: find.text(localeScenario.cloud)),
+        final cloudOption = find.descendant(
+          of: sheet,
+          matching: find.text(localeScenario.cloud),
         );
+        await tester.ensureVisible(cloudOption);
+        await tester.pumpAndSettle();
+        await tester.tap(cloudOption);
         await tester.pumpAndSettle();
 
         expect(fixture.aloud.engineType, ReaderAloudEngineType.cloud);
@@ -387,7 +478,7 @@ void main() {
         home: Builder(
           builder: (context) => Scaffold(
             body: FilledButton(
-              onPressed: () => showReaderAloudPlayer(
+              onPressed: () => showReaderAloud(
                 context: context,
                 controller: controller,
                 ttsService: tts,
@@ -798,7 +889,7 @@ Future<_PlayerFixture> _openPlayer(
       home: Builder(
         builder: (context) => Scaffold(
           body: FilledButton(
-            onPressed: () => showReaderAloudPlayer(
+            onPressed: () => showReaderAloud(
               context: context,
               controller: controller,
               ttsService: tts,

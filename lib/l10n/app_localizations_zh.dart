@@ -6441,6 +6441,22 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get cloudSyncAutoResumeScheduledHint =>
       '按同步频率获取进度，打开书籍时接续已同步的位置。需要最新进度时，请先点「立即同步」。';
+
+  @override
+  String get readerChapterProgressTitle => '章节进度';
+
+  @override
+  String get readerChapterProgressHidden => '不显示';
+
+  @override
+  String readerChapterProgressFraction(int chapter, int total) {
+    return '$chapter/$total章';
+  }
+
+  @override
+  String readerChapterProgressRemaining(int count) {
+    return '后续$count章';
+  }
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12761,4 +12777,20 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get cloudSyncAutoResumeScheduledHint =>
       '按同步頻率取得進度，開啟書籍時接續已同步的位置。需要最新進度時，請先點選「立即同步」。';
+
+  @override
+  String get readerChapterProgressTitle => '章節進度';
+
+  @override
+  String get readerChapterProgressHidden => '不顯示';
+
+  @override
+  String readerChapterProgressFraction(int chapter, int total) {
+    return '$chapter/$total章';
+  }
+
+  @override
+  String readerChapterProgressRemaining(int count) {
+    return '後續$count章';
+  }
 }

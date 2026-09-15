@@ -3159,6 +3159,9 @@
         "type": "String"
       }
     }
-  }
-
+  },
+  "readerChapterProgressTitle": "章の進捗",
+  "readerChapterProgressHidden": "表示しない",
+  "readerChapterProgressFraction": "{chapter}/{total}章",
+  "readerChapterProgressRemaining": "残り{count}章"
 }

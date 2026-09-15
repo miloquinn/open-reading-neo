@@ -101,7 +101,7 @@ final class ReaderAloudMediaBridge {
         result(
           FlutterError(
             code: "audio_session_failed",
-            message: "Unable to activate the iOS spoken-audio session: \(error.localizedDescription)",
+            message: "Unable to activate the iOS audiobook audio session: \(error.localizedDescription)",
             details: nil
           )
         )
@@ -161,12 +161,14 @@ final class ReaderAloudMediaBridge {
   }
 
   private func activateAudioSessionIfNeeded() throws {
+    // Keep Now Playing eligible (nonmixable), but let navigation apps duck us
+    // rather than interrupt a session marked as spokenAudio. Flutter players
+    // share this session, so repair its policy even when we already activated it.
+    if audioSession.category != .playback || audioSession.mode != .default ||
+        !audioSession.categoryOptions.isEmpty {
+      try audioSession.setCategory(.playback, mode: .default, options: [])
+    }
     guard !audioSessionActive else { return }
-    try audioSession.setCategory(
-      .playback,
-      mode: .spokenAudio,
-      options: []
-    )
     try audioSession.setActive(true)
     audioSessionActive = true
   }

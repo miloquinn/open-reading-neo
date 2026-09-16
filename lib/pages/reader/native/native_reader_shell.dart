@@ -486,7 +486,10 @@ extension _NativeReaderShell on _NativeReaderPageState {
     _openingContentReadyScheduled = true;
     _openingLoaderTimer?.cancel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) BookOpenTransition.markReaderContentReady(context);
+      if (mounted) {
+        BookOpenTransition.markReaderContentReady(context);
+        _syncCloudReading();
+      }
     });
   }
 }

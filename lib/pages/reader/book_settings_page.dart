@@ -1,4 +1,10 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../../models/book.dart';
+import '../library/source_book_status_card.dart';
 
 import '../../book_sources/models/registered_book_source.dart';
 import '../../book_sources/services/book_source_client.dart';
@@ -19,6 +25,8 @@ class BookSettingsPage extends StatefulWidget {
     required this.author,
     required this.cover,
     required this.format,
+    this.shelfBook,
+    this.onBookChanged,
     this.description = '',
     this.canEditText = false,
     this.canChangeSource = false,
@@ -27,6 +35,8 @@ class BookSettingsPage extends StatefulWidget {
     this.loginSessionStore,
   });
 
+  final ValueChanged<Book>? onBookChanged;
+  final Book? shelfBook;
   final String title;
   final String author;
   final Widget cover;
@@ -43,6 +53,19 @@ class BookSettingsPage extends StatefulWidget {
 }
 
 class _BookSettingsPageState extends State<BookSettingsPage> {
+  late Book? _book = widget.shelfBook;
+  RegisteredBookSource? get _source {
+    try {
+      return _book?.hasSourceBinding == true
+          ? RegisteredBookSource.fromJson(
+              jsonDecode(_book!.sourceJson!) as Map<String, dynamic>,
+            )
+          : widget.source;
+    } catch (_) {
+      return widget.source;
+    }
+  }
+
   bool _loggedIn = false;
   bool _loadingLogin = true;
 
@@ -60,7 +83,7 @@ class _BookSettingsPageState extends State<BookSettingsPage> {
   }
 
   Future<void> _refreshLogin() async {
-    final config = widget.source?.sourceConfig;
+    final config = _source?.sourceConfig;
     var loggedIn = false;
     try {
       if (config != null) {
@@ -87,7 +110,7 @@ class _BookSettingsPageState extends State<BookSettingsPage> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) =>
-            SourceLoginPage(source: widget.source!, client: widget.client),
+            SourceLoginPage(source: _source!, client: widget.client),
       ),
     );
     if (mounted) await _refreshLogin();
@@ -131,7 +154,13 @@ class _BookSettingsPageState extends State<BookSettingsPage> {
                       child: SizedBox(
                         width: 96,
                         height: 136,
-                        child: widget.cover,
+                        child: _book?.coverImagePath != null && !kIsWeb
+                            ? Image.file(
+                                File(_book!.coverImagePath!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => widget.cover,
+                              )
+                            : widget.cover,
                       ),
                     ),
                     const SizedBox(width: 20),
@@ -144,7 +173,7 @@ class _BookSettingsPageState extends State<BookSettingsPage> {
                           Text(widget.author, style: text.bodyLarge),
                           const SizedBox(height: 12),
                           Text(
-                            widget.source?.name ?? widget.format.toUpperCase(),
+                            _source?.name ?? widget.format.toUpperCase(),
                             style: text.bodyMedium,
                           ),
                         ],
@@ -160,6 +189,16 @@ class _BookSettingsPageState extends State<BookSettingsPage> {
                   ),
                 ],
                 const SizedBox(height: 28),
+                if (_book != null)
+                  SourceBookStatusCard(
+                    book: _book!,
+                    allowSourceBinding: !widget.canChangeSource,
+                    onBookChanged: (book) {
+                      setState(() => _book = book);
+                      widget.onBookChanged?.call(book);
+                      _refreshLogin();
+                    },
+                  ),
                 Card(
                   clipBehavior: Clip.antiAlias,
                   child: Column(
@@ -183,7 +222,7 @@ class _BookSettingsPageState extends State<BookSettingsPage> {
                           context.l10n.bookSourceChangeSourceTitle,
                           BookSettingsAction.changeSource,
                         ),
-                      if (widget.source != null)
+                      if (_source != null)
                         ListTile(
                           leading: const Icon(Icons.account_circle_outlined),
                           title: Text(

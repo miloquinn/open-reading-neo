@@ -12,7 +12,6 @@ import 'package:xxread/services/core/database_service.dart';
 import 'package:xxread/services/books/book_image_map_service.dart';
 import 'package:xxread/services/books/book_import_models.dart';
 import 'package:xxread/services/books/web_book_file_store.dart';
-import 'package:xxread/services/sync/reading_progress_sync_service.dart';
 import 'package:xxread/services/sync/book_sync_identity.dart';
 
 class BookDao implements BookImportStore {
@@ -169,7 +168,6 @@ class BookDao implements BookImportStore {
     int bookId,
     int currentPage, {
     double? readingProgress,
-    bool emitSyncEvent = true,
   }) async {
     try {
       final db = await _databaseProvider();
@@ -185,9 +183,6 @@ class BookDao implements BookImportStore {
       );
       if (result == 0) {
         throw Exception('书籍不存在');
-      }
-      if (emitSyncEvent) {
-        await ReadingProgressSyncService.instance.recordLocalPosition(bookId);
       }
     } catch (e) {
       throw Exception('更新阅读进度失败: $e');
@@ -233,6 +228,73 @@ class BookDao implements BookImportStore {
       limit: 1,
     );
     return maps.isEmpty ? null : await _fromStorage(maps.first);
+  }
+
+  /// Compare-and-set source metadata without overwriting reading progress.
+  Future<bool> updateSourceBookMetadata(Book expected, String metadata) async {
+    final db = await _databaseProvider();
+    return await db.update(
+          'books',
+          {'source_book_json': metadata},
+          where:
+              'id = ? AND source_id = ? AND source_book_id = ? AND source_book_json = ? AND storage_type = ? AND content_hash IS ? AND file_modified_time IS ?',
+          whereArgs: [
+            expected.id,
+            expected.sourceId,
+            expected.sourceBookId,
+            expected.sourceBookJson,
+            expected.storageType,
+            expected.contentHash,
+            expected.fileModifiedTime,
+          ],
+        ) ==
+        1;
+  }
+
+  /// Apply a binding without replaying the progress/cover snapshot taken
+  /// before the network request. Freeze the existing stable identity first.
+  Future<Book> updateSourceBinding(Book expected, Book replacement) async {
+    final db = await _databaseProvider();
+    final stored = await _toStorage(replacement);
+    return db.transaction((txn) async {
+      final rows = await txn.query(
+        'books',
+        where: 'id = ?',
+        whereArgs: [expected.id],
+        limit: 1,
+      );
+      if (rows.isEmpty) throw StateError('Book was removed while binding');
+      final current = await _fromStorage(rows.single);
+      if (current.sourceId != expected.sourceId ||
+          current.sourceBookId != expected.sourceBookId ||
+          current.storageType != expected.storageType ||
+          current.filePath != expected.filePath) {
+        throw StateError('Book binding changed during source selection');
+      }
+      await stableBookUidForMap(txn, current.toMap());
+      final values = <String, Object?>{
+        for (final key in [
+          'source_id',
+          'source_book_id',
+          'source_json',
+          'source_book_json',
+        ])
+          key: stored[key],
+        if (current.coverImagePath == expected.coverImagePath)
+          'cover_image_path': stored['cover_image_path'],
+        if (current.isOnline) ...{
+          for (final key in ['currentPage', 'totalPages', 'reading_progress'])
+            key: stored[key],
+        },
+      };
+      await txn.update(
+        'books',
+        values,
+        where: 'id = ?',
+        whereArgs: [expected.id],
+      );
+      return _fromStorage({...rows.single, ...values});
+    });
   }
 
   Future<void> updateBookTotalPages(int bookId, int totalPages) async {
@@ -503,7 +565,6 @@ class BookDao implements BookImportStore {
     String? layoutSignature,
     int currentPage, {
     double? readingProgress,
-    bool emitSyncEvent = true,
   }) async {
     try {
       final db = await _databaseProvider();
@@ -529,9 +590,6 @@ class BookDao implements BookImportStore {
       if (result == 0) {
         throw Exception('书籍不存在');
       }
-      if (emitSyncEvent) {
-        await ReadingProgressSyncService.instance.recordLocalPosition(bookId);
-      }
     } catch (e) {
       throw Exception('更新 CanonicalLocator 进度失败: $e');
     }
@@ -547,7 +605,6 @@ class BookDao implements BookImportStore {
     required double? readingProgress,
     required String? canonicalLocator,
     int? totalPages,
-    bool emitSyncEvent = true,
   }) async {
     final db = await _databaseProvider();
     final values = <String, Object?>{
@@ -565,9 +622,6 @@ class BookDao implements BookImportStore {
       whereArgs: [bookId],
     );
     if (result == 0) throw Exception('书籍不存在');
-    if (emitSyncEvent) {
-      await ReadingProgressSyncService.instance.recordLocalPosition(bookId);
-    }
   }
 
   /// Invalidates layout-dependent locators after a text revision could not be

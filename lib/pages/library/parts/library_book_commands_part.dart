@@ -24,13 +24,6 @@ extension _LibraryPageBookCommands on _LibraryPageState {
     showSideToast(context, context.l10n.downloadRunningInBackground);
   }
 
-  Future<void> _openSourceUpdates(Book book) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => SourceBookUpdatesPage(book: book)),
-    );
-    if (mounted) await _loadBooks();
-  }
-
   Future<void> _changeOnlineBookSource(Book book) async {
     final source = book.hasSourceBinding
         ? _sourceShelfService.sourceFrom(book)

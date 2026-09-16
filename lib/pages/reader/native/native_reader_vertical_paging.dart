@@ -29,7 +29,7 @@ extension _NativeReaderVerticalPaging on _NativeReaderPageState {
               if (!mounted || revision != _verticalScrollRevision) return;
               _captureVerticalPosition();
               _verticalPositionCapturePending = false;
-              if (_progressSyncEventPending) {
+              if (_positionChanged) {
                 unawaited(_persistCurrentReaderPosition(reason: 'scroll-end'));
               }
             });

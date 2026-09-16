@@ -59,6 +59,37 @@ void main() {
       (await database.query('books', where: 'id = ?', whereArgs: [id])).single;
 
   test(
+    'binding preserves progress and cover changes made during source lookup',
+    () async {
+      final id = await dao.insertBook(book());
+      final original = (await dao.getBookById(id))!;
+      await dao.updateBookProgress(id, 8, readingProgress: 0.8);
+      await dao.updateBookCoverPath(id, '$root/covers/custom_new.png');
+      final rebound = await dao.updateSourceBinding(
+        original,
+        original.copyWith(
+          sourceId: 'new-source',
+          sourceBookId: 'new-book',
+          sourceJson: '{}',
+          sourceBookJson: '{}',
+          coverImagePath: '$root/covers/source_new.png',
+        ),
+      );
+      expect(rebound.sourceId, 'new-source');
+      expect(rebound.currentPage, 8);
+      expect(rebound.progress, 0.8);
+      expect(rebound.coverImagePath, '$root/covers/custom_new.png');
+      expect(rebound.filePath, original.filePath);
+      expect(rebound.contentHash, original.contentHash);
+      await expectLater(
+        dao.updateSourceBinding(original, original),
+        throwsStateError,
+      );
+      expect((await dao.getBookById(id))!.sourceId, 'new-source');
+    },
+  );
+
+  test(
     'new records stay relative across repeated sandbox relocation',
     () async {
       final id = await dao.insertBook(book());

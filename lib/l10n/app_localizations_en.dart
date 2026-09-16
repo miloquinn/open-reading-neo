@@ -389,6 +389,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookSourcesDisableSelected => 'Disable selected';
 
   @override
+  String get bookSourcesExportSelected => 'Export selected';
+
+  @override
+  String bookSourcesExportSuccess(int count, String location) {
+    return 'Exported $count source(s) to $location';
+  }
+
+  @override
+  String get bookSourcesExportFailed => 'Could not export the selected sources';
+
+  @override
+  String get bookSourcesExportUnsupported =>
+      'Source export is not supported on this platform yet';
+
+  @override
+  String get bookSourcesExportReplaceTitle => 'Replace existing file?';
+
+  @override
+  String bookSourcesExportReplaceMessage(String path) {
+    return 'A file already exists at $path. Replace it?';
+  }
+
+  @override
+  String get bookSourcesExportReplaceAction => 'Replace';
+
+  @override
   String get bookSourcesDeleteSelected => 'Delete selected';
 
   @override
@@ -6864,4 +6890,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumTrialTitle => 'Premium trial';
+
+  @override
+  String get bookSourceCheckUpdates => 'Check for updates';
+
+  @override
+  String get bookSourceUpdates => 'Book updates';
+
+  @override
+  String get bookSourceNotChecked => 'Not checked yet';
+
+  @override
+  String get bookSourceUpToDate => 'Catalog is up to date';
+
+  @override
+  String get bookSourceUpdatesAvailable => 'New chapters available';
+
+  @override
+  String get bookSourceNeedsMapping => 'Confirm where to continue';
+
+  @override
+  String bookSourceLastChecked(String time) {
+    return 'Last checked: $time';
+  }
+
+  @override
+  String bookSourceLastUpdated(String time) {
+    return 'Last updated: $time';
+  }
+
+  @override
+  String get bookSourceUpdateTimeUnknown => 'Update time unavailable';
+
+  @override
+  String bookSourceLatestChapterLabel(String chapter) {
+    return 'Latest: $chapter';
+  }
+
+  @override
+  String get bookSourceUpdateHelp =>
+      'While the library is open, catalogs are checked every 30 minutes. Check manually at any time. Online books use the latest catalog; local TXT books download new chapters only when you choose to continue. After binding or changing a source, confirm the last chapter already in your local file. Updates do not replace your original text. The update time is supplied by the source, or records when a new chapter was first detected.';
+
+  @override
+  String get bookSourceBindHelp =>
+      'Find this book in your sources to add its cover and enable source switching and chapter updates. Your local text and reading position are preserved.';
+
+  @override
+  String get bookSourceContinueUpdate => 'Download new chapters';
 }

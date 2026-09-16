@@ -26,13 +26,13 @@ import 'package:xxread/pages/settings/font_selection_sheet.dart';
 import 'package:xxread/pages/settings/floating_navigation_settings_page.dart';
 import 'package:xxread/pages/settings/library_layout_settings_page.dart';
 import 'package:xxread/pages/settings/replace_rules_page.dart';
-import 'package:xxread/pages/settings/sync/webdav_sync_page.dart';
+import 'package:xxread/pages/settings/backup/webdav_backup_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/core/app_build_info.dart';
 import 'package:xxread/services/core/core_services.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
-import 'package:xxread/services/sync/sync_models.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
+import 'package:xxread/pages/settings/backup/backup_copy.dart';
+import 'package:xxread/services/backup/webdav_backup_controller.dart';
 import 'package:xxread/utils/app_themes.dart';
 import 'package:xxread/utils/app_themes_translator.dart';
 import 'package:xxread/utils/font_catalog_helper.dart';
@@ -375,7 +375,7 @@ class _SettingsPageState extends State<SettingsPage> {
     bool isDarkMode,
   ) {
     final l10n = context.l10n;
-    final webDavSync = Provider.of<WebDavSyncController>(context);
+    final webDavSync = Provider.of<WebDavBackupController>(context);
     final useRailNavigation =
         NavigationContext.of(context)?.useRailNavigation ?? false;
     final useTabletLayout = LayoutHelper.usesTabletLayout(context);
@@ -442,48 +442,15 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  String _webDavSyncSubtitle(WebDavSyncController sync) {
-    final l10n = context.l10n;
-    if (!sync.isConfigured) return l10n.webDavConfigureSubtitle;
-    if (sync.status == WebDavSyncStatus.syncing ||
-        sync.status == WebDavSyncStatus.testing) {
-      return l10n.webDavSyncing;
-    }
-    if (sync.status == WebDavSyncStatus.failed) {
-      return l10n.webDavSyncFailed;
-    }
-    if (sync.status == WebDavSyncStatus.partialFailure) {
-      return l10n.webDavPartialFailure;
-    }
-    if (sync.pendingChanges > 0) {
-      return l10n.webDavPendingChanges(sync.pendingChanges);
-    }
-    final lastSuccess = sync.lastSuccessfulSync;
-    if (lastSuccess == null) return l10n.webDavNeverSynced;
-    final local = lastSuccess.toLocal();
-    final material = MaterialLocalizations.of(context);
-    final date = material.formatShortDate(local);
-    final time = material.formatTimeOfDay(TimeOfDay.fromDateTime(local));
-    return l10n.webDavLastSync('$date $time');
-  }
+  String _webDavSyncSubtitle(WebDavBackupController backup) =>
+      BackupCopy.of(context).summary;
 
-  Widget _webDavSyncTrailing(WebDavSyncController sync) {
-    if (sync.status == WebDavSyncStatus.syncing ||
-        sync.status == WebDavSyncStatus.testing) {
-      return const SizedBox.square(
-        dimension: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
-    }
-    if (sync.status == WebDavSyncStatus.failed ||
-        sync.status == WebDavSyncStatus.partialFailure) {
-      return Icon(
-        Icons.error_outline_rounded,
-        color: Theme.of(context).colorScheme.error,
-      );
-    }
-    return const Icon(Icons.chevron_right_rounded);
-  }
+  Widget _webDavSyncTrailing(WebDavBackupController backup) => backup.busy
+      ? const SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+      : const Icon(Icons.chevron_right_rounded);
 
   void _openBookSourceManagement() {
     Navigator.of(context).push(

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 import 'package:xxread/book_sources/models/registered_book_source.dart';
+import 'package:xxread/book_sources/services/book_source_export_service.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_maintenance_coordinator.dart';
 import 'package:xxread/book_sources/source_engine/source_config.dart';
@@ -323,7 +324,10 @@ void main() {
   });
 
   testWidgets('selection mode exposes bulk source actions', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     unmountPage(tester);
+    final exporter = _RecordingBookSourceExporter();
     final source = RegisteredBookSource(
       id: 'org.example.bulk',
       name: 'Bulk Example',
@@ -340,10 +344,10 @@ void main() {
       'open_reading_book_sources_v1': jsonEncode([source.toJson()]),
     });
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: BookSourceManagementPage(),
+        home: BookSourceManagementPage(exporter: exporter),
       ),
     );
     await tester.pump();
@@ -356,8 +360,49 @@ void main() {
     expect(find.text('Select all'), findsOneWidget);
     expect(find.text('Enable selected'), findsOneWidget);
     expect(find.text('Disable selected'), findsOneWidget);
+    expect(find.text('Export selected'), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('bookSourceExportSelected')),
+          )
+          .onPressed,
+      isNull,
+    );
     expect(find.text('Delete selected'), findsOneWidget);
     expect(find.byType(Checkbox), findsOneWidget);
+
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('bookSourceExportSelected')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    final strip = find.byKey(const Key('bookSourceBulkActionStrip'));
+    expect(tester.getSize(strip).height, lessThan(70));
+    expect(
+      tester
+          .getTopLeft(
+            find
+                .descendant(of: strip, matching: find.byType(OutlinedButton))
+                .first,
+          )
+          .dy,
+      tester.getTopLeft(find.byKey(const Key('bookSourceExportSelected'))).dy,
+    );
+    await tester.drag(strip, const Offset(-700, 0));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('bookSourceExportSelected')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bookSourceExportSelected')));
+    await tester.pump();
+    expect(exporter.exported.map((source) => source.id), [source.id]);
   });
 
   testWidgets('keeps source text aligned when selection mode opens', (
@@ -723,5 +768,20 @@ class _EmittingMaintenance extends BookSourceMaintenanceCoordinator {
   void emit(BookSourceMaintenanceState state) {
     _current = state;
     notifyListeners();
+  }
+}
+
+class _RecordingBookSourceExporter extends BookSourceExportService {
+  List<RegisteredBookSource> exported = const [];
+
+  @override
+  Future<BookSourceExportResult> export(
+    Iterable<RegisteredBookSource> sources,
+  ) async {
+    exported = List.unmodifiable(sources);
+    return const BookSourceExportResult.success(
+      displayName: 'sources.json',
+      location: '/tmp/sources.json',
+    );
   }
 }

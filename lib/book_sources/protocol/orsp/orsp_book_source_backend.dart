@@ -290,15 +290,22 @@ class OrspBookSourceBackend implements OrspBookSourceBackendPort {
     RegisteredBookSource source,
     String bookId, {
     BookDownloadCancellation? cancellation,
-  }) => _fetchAllChapters(
-    OrspHttpPipeline.apiUri(
-      source.apiBaseUrl,
-      'v1/books/${Uri.encodeComponent(bookId)}/chapters',
+  }) => _chapterCache.getChapterCatalogOrLoad(
+    sourceId: source.id,
+    sourceRevision: source.apiBaseUrl.toString(),
+    bookId: bookId,
+    refreshAfter: Duration.zero,
+    staleWhileRevalidate: false,
+    loader: () => _fetchAllChapters(
+      OrspHttpPipeline.apiUri(
+        source.apiBaseUrl,
+        'v1/books/${Uri.encodeComponent(bookId)}/chapters',
+      ),
+      pageSize: _chapterPageSizeFor(source),
+      maxBytes: OrspHttpPipeline.maxDownloadResponseBytes,
+      receiveTimeout: OrspHttpPipeline.downloadReceiveTimeout,
+      cancellation: cancellation,
     ),
-    pageSize: _chapterPageSizeFor(source),
-    maxBytes: OrspHttpPipeline.maxDownloadResponseBytes,
-    receiveTimeout: OrspHttpPipeline.downloadReceiveTimeout,
-    cancellation: cancellation,
   );
 
   @override

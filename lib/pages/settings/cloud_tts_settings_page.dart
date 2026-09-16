@@ -17,21 +17,25 @@ String cloudTtsCopy(BuildContext context, String zh, String en, String ja) =>
     };
 
 /// Shared by app settings and the audiobook player's quick settings.
-class CloudTtsSettingsPage extends StatefulWidget {
-  const CloudTtsSettingsPage({
+class CloudTtsEditorPage extends StatefulWidget {
+  const CloudTtsEditorPage({
     super.key,
     required this.service,
     this.pauseBook,
+    this.profile,
+    this.preset,
   });
 
+  final ReaderAloudCloudProfile? profile;
+  final ReaderAloudProviderPreset? preset;
   final ReaderAloudService service;
   final Future<void> Function()? pauseBook;
 
   @override
-  State<CloudTtsSettingsPage> createState() => _CloudTtsSettingsPageState();
+  State<CloudTtsEditorPage> createState() => _CloudTtsEditorPageState();
 }
 
-class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
+class _CloudTtsEditorPageState extends State<CloudTtsEditorPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   String? _editingId;
@@ -42,6 +46,8 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
   final _model = TextEditingController();
   final _voice = TextEditingController();
   final _apiKey = TextEditingController();
+  ReaderAloudCloudProvider _provider = ReaderAloudCloudProvider.openai;
+  bool _advancedExpanded = false;
   bool _loaded = false;
   bool _saving = false;
   bool _obscureKey = true;
@@ -60,23 +66,41 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
   }
 
   Future<void> _load() async {
-    await widget.service.initialize();
-    if (!mounted) return;
-    _editingId = widget.service.activeProfileId;
-    _hasProfileKey = widget.service.hasCloudApiKey;
-    final profiles = widget.service.cloudProfiles;
-    _name.text =
-        profiles.where((p) => p.id == _editingId).firstOrNull?.name ??
-        'Cloud TTS';
-    final settings = widget.service.cloudSettings;
-    _baseUrl.text = settings.baseUrl;
-    _model.text = settings.model;
-    _voice.text = settings.voice;
-    setState(() {
-      _format = settings.responseFormat;
-      _fallback = settings.fallbackToSystem;
-      _loaded = true;
-    });
+    try {
+      await widget.service.initialize();
+      if (!mounted) return;
+      _editingId = widget.profile?.id;
+      _hasProfileKey = !widget.service.supportsProfiles
+          ? widget.service.hasCloudApiKey
+          : _editingId != null &&
+                await widget.service.profileHasKey(_editingId!);
+      if (!mounted) return;
+      final settings =
+          widget.profile?.settings ??
+          widget.preset?.settings ??
+          widget.service.cloudSettings;
+      _provider = settings.provider;
+      _advancedExpanded = widget.preset?.url == '';
+      _name.text = widget.profile?.name ?? widget.preset?.name ?? 'Cloud TTS';
+      _baseUrl.text = settings.baseUrl;
+      _model.text = settings.model;
+      _voice.text = settings.voice;
+      setState(() {
+        _format = settings.responseFormat;
+        _fallback = settings.fallbackToSystem;
+        _loaded = true;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = _copy(
+            '加载失败，请重试',
+            'Could not load. Retry.',
+            '読み込みに失敗しました',
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -117,6 +141,7 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
     });
     try {
       final settings = ReaderAloudCloudSettings(
+        provider: _provider,
         baseUrl: _baseUrl.text,
         model: _model.text,
         voice: _voice.text,
@@ -191,6 +216,7 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
       if (!mounted || generation != _previewGeneration) return;
       await widget.service.previewCloudVoice(
         settings: ReaderAloudCloudSettings(
+          provider: _provider,
           baseUrl: _baseUrl.text,
           model: _model.text,
           voice: _voice.text,
@@ -199,7 +225,9 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
         ).normalized(),
         profileId: _editingId,
         apiKey: _apiKey.text,
-        useSavedKey: !_clearKey && _editingId != null,
+        useSavedKey:
+            !_clearKey &&
+            (_editingId != null || !widget.service.supportsProfiles),
         text: _copy(
           '夜色渐深，窗外的风轻轻翻过书页。愿每一个故事，都能陪你走过一段美好的时光。',
           'The evening breeze gently turns the pages. Let each story accompany you on a wonderful journey.',
@@ -225,44 +253,16 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
     }
   }
 
-  Future<void> _editProfile(ReaderAloudCloudProfile? profile) async {
-    await _stopPreview();
-    final hasKey = profile == null
-        ? false
-        : await widget.service.profileHasKey(profile.id);
-    if (!mounted) return;
-    final settings = profile?.settings ?? const ReaderAloudCloudSettings();
-    setState(() {
-      _editingId = profile?.id;
-      _name.text = profile?.name ?? '';
-      _baseUrl.text = settings.baseUrl;
-      _model.text = settings.model;
-      _voice.text = settings.voice;
-      _apiKey.clear();
-      _clearKey = false;
-      _hasProfileKey = hasKey;
-      _format = settings.responseFormat;
-      _fallback = settings.fallbackToSystem;
-      _error = null;
-    });
-  }
-
-  Future<void> _deleteProfile(ReaderAloudCloudProfile profile) async {
+  Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          _copy(
-            '删除「${profile.name}」？',
-            'Delete “${profile.name}”?',
-            '「${profile.name}」を削除しますか？',
-          ),
-        ),
+        title: Text(_copy('删除此语音配置？', 'Delete this voice?', 'この音声を削除しますか？')),
         content: Text(
           _copy(
-            '将移除此配置和保存在本机的密钥。',
-            'Remove this configuration and its saved key from this device.',
-            '設定と端末に保存されたキーを削除します。',
+            '同时移除本机保存的密钥。',
+            'Also removes its saved key from this device.',
+            '保存したキーも削除されます。',
           ),
         ),
         actions: [
@@ -281,20 +281,16 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
     setState(() => _saving = true);
     try {
       await _stopPreview();
-      if (profile.id == widget.service.activeProfileId) await _pauseBook();
-      await widget.service.deleteCloudProfile(profile.id);
-      await _editProfile(
-        widget.service.cloudProfiles.firstWhere(
-          (p) => p.id == widget.service.activeProfileId,
-        ),
-      );
+      if (_editingId == widget.service.activeProfileId) await _pauseBook();
+      await widget.service.deleteCloudProfile(_editingId!);
+      if (mounted) Navigator.pop(context, true);
     } catch (_) {
       if (mounted) {
         setState(
           () => _error = _copy(
             '删除失败，请重试',
-            'Could not delete. Please retry.',
-            '削除できませんでした。再試行してください',
+            'Could not delete. Retry.',
+            '削除できませんでした',
           ),
         );
       }
@@ -302,55 +298,6 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
-  Widget _profilesSection() => ExpansionTile(
-    key: const ValueKey('cloud-tts-profiles'),
-    tilePadding: EdgeInsets.zero,
-    title: Text(
-      _copy(
-        '已保存的语音（${widget.service.cloudProfiles.length}）',
-        'Saved voices (${widget.service.cloudProfiles.length})',
-        '保存した音声（${widget.service.cloudProfiles.length}）',
-      ),
-    ),
-    subtitle: Text(
-      _copy(
-        '可添加不同服务商、模型和音色',
-        'Add services, models and voices',
-        'サービス・モデル・音声を追加',
-      ),
-    ),
-    children: [
-      for (final profile in widget.service.cloudProfiles)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          selected: profile.id == _editingId,
-          leading: Icon(
-            profile.id == widget.service.activeProfileId
-                ? Icons.check_circle_outline
-                : Icons.record_voice_over_outlined,
-          ),
-          title: Text(profile.name),
-          subtitle: Text(
-            '${profile.settings.model} · ${profile.settings.voice}',
-          ),
-          onTap: _saving ? null : () => _editProfile(profile),
-          trailing: widget.service.cloudProfiles.length > 1
-              ? IconButton(
-                  tooltip: _copy('删除配置', 'Delete voice', '設定を削除'),
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: _saving ? null : () => _deleteProfile(profile),
-                )
-              : null,
-        ),
-      TextButton.icon(
-        key: const ValueKey('cloud-tts-add'),
-        onPressed: _saving ? null : () => _editProfile(null),
-        icon: const Icon(Icons.add),
-        label: Text(_copy('添加语音配置', 'Add voice', '音声設定を追加')),
-      ),
-    ],
-  );
 
   InputDecoration _decoration(
     String label, {
@@ -377,305 +324,54 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
     );
   }
 
-  Widget _heading(String title, {String? subtitle}) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+  ReaderAloudProviderPreset get _preset =>
+      readerAloudProviderPresets.firstWhere((p) => p.provider == _provider);
+
+  Future<void> _choose(
+    TextEditingController controller,
+    Map<String, String> options,
+    String title,
+  ) async {
+    final value = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _TtsChoicePage(
+          title: title,
+          options: options,
+          selected: controller.text,
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ],
+      ),
+    );
+    if (value != null && mounted) {
+      await _stopPreview();
+      if (mounted) setState(() => controller.text = value);
+    }
+  }
+
+  Widget _field(
+    String key,
+    TextEditingController controller,
+    String label, {
+    bool url = false,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: TextFormField(
+      key: ValueKey(key),
+      controller: controller,
+      enabled: !_saving,
+      validator: url ? _validateUrl : _required,
+      autocorrect: false,
+      decoration: _decoration(label),
     ),
   );
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final hasKey = _hasProfileKey && !_clearKey;
     return PopScope(
       canPop: !_saving,
       child: FloatingSubpageScaffold(
-        title: _copy('云端 TTS', 'Cloud TTS', 'クラウド TTS'),
+        title: widget.preset?.name ?? _name.text,
         resizeToAvoidBottomInset: true,
-        body: !_loaded
-            ? const Center(child: CircularProgressIndicator())
-            : Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Form(
-                    key: _formKey,
-                    child: ListView(
-                      padding: floatingSubpagePadding(context),
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      children: [
-                        if (widget.service.supportsProfiles) ...[
-                          _profilesSection(),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            key: const ValueKey('cloud-tts-name'),
-                            controller: _name,
-                            enabled: !_saving && !_previewing,
-                            validator: _required,
-                            decoration: _decoration(
-                              _copy('配置名称', 'Voice name', '設定名'),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                        Text(
-                          _copy(
-                            '连接语音服务，让阅读有声。',
-                            'Connect a voice service for read aloud.',
-                            '音声サービスに接続して読み上げます。',
-                          ),
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _copy(
-                            '支持 OpenAI 兼容的语音服务。可保存多套配置，试听后选择喜欢的音色。',
-                            'Supports OpenAI-compatible speech services. Save multiple configurations and preview your favorite voices.',
-                            'OpenAI 互換の音声サービスに対応。複数の設定を保存し、好みの音声を試聴できます。',
-                          ),
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                height: 1.5,
-                              ),
-                        ),
-                        const SizedBox(height: 28),
-                        _heading(_copy('服务连接', 'Connection', '接続')),
-                        TextFormField(
-                          key: const ValueKey('cloud-tts-url'),
-                          controller: _baseUrl,
-                          enabled: !_saving,
-                          keyboardType: TextInputType.url,
-                          textInputAction: TextInputAction.next,
-                          autocorrect: false,
-                          validator: _validateUrl,
-                          decoration: _decoration(
-                            _copy('服务地址', 'Service URL', 'サービス URL'),
-                            hint: 'https://api.openai.com/v1',
-                            helper: _copy(
-                              '填写服务商提供的 API 地址，通常以 /v1 结尾。',
-                              'Use your provider’s API URL, usually ending in /v1.',
-                              '通常は /v1 で終わる API URL を入力します。',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextFormField(
-                          key: const ValueKey('cloud-tts-key'),
-                          controller: _apiKey,
-                          enabled: !_saving,
-                          obscureText: _obscureKey,
-                          enableSuggestions: false,
-                          autocorrect: false,
-                          textInputAction: TextInputAction.next,
-                          decoration: _decoration(
-                            'API Key',
-                            hint: hasKey ? '••••••••' : null,
-                            helper: hasKey
-                                ? _copy(
-                                    '密钥已保存，留空即可保留。',
-                                    'Key saved. Leave blank to keep it.',
-                                    '保存済み。空欄のままでキーを維持します。',
-                                  )
-                                : _clearKey
-                                ? _copy(
-                                    '保存时移除原密钥；填写新密钥可替换。',
-                                    'Saving removes the old key; enter a new key to replace it.',
-                                    '保存時に元のキーを削除します。新しいキーで置き換えられます。',
-                                  )
-                                : _copy(
-                                    '密钥保存在本机安全存储中。',
-                                    'Stored in this device’s secure storage.',
-                                    'キーは端末の安全なストレージに保存されます。',
-                                  ),
-                            suffix: IconButton(
-                              tooltip: _obscureKey
-                                  ? _copy('显示密钥', 'Show key', 'キーを表示')
-                                  : _copy('隐藏密钥', 'Hide key', 'キーを非表示'),
-                              onPressed: _saving
-                                  ? null
-                                  : () => setState(
-                                      () => _obscureKey = !_obscureKey,
-                                    ),
-                              icon: Icon(
-                                _obscureKey
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (widget.service.hasCloudApiKey)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: _saving
-                                  ? null
-                                  : () =>
-                                        setState(() => _clearKey = !_clearKey),
-                              child: Text(
-                                _clearKey
-                                    ? _copy(
-                                        '保留原密钥',
-                                        'Keep saved key',
-                                        '保存済みキーを維持',
-                                      )
-                                    : _copy(
-                                        '移除已保存的密钥',
-                                        'Remove saved key',
-                                        '保存済みキーを削除',
-                                      ),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 24),
-                        _heading(_copy('朗读声音', 'Reading voice', '読み上げ音声')),
-                        TextFormField(
-                          key: const ValueKey('cloud-tts-model'),
-                          controller: _model,
-                          enabled: !_saving,
-                          autocorrect: false,
-                          textInputAction: TextInputAction.next,
-                          validator: _required,
-                          decoration: _decoration(
-                            _copy('语音模型', 'Speech model', '音声モデル'),
-                            hint: 'gpt-4o-mini-tts',
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextFormField(
-                          key: const ValueKey('cloud-tts-voice'),
-                          controller: _voice,
-                          enabled: !_saving,
-                          autocorrect: false,
-                          validator: _required,
-                          decoration: _decoration(
-                            _copy('音色', 'Voice', '声'),
-                            hint: 'alloy',
-                            helper: _copy(
-                              '填写服务商支持的音色名称或 ID。',
-                              'Enter a voice name or ID supported by your provider.',
-                              'サービスが対応する声の名前または ID を入力します。',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        OutlinedButton.icon(
-                          key: const ValueKey('cloud-tts-preview'),
-                          onPressed: _saving
-                              ? null
-                              : (_previewing ? _stopPreview : _preview),
-                          icon: Icon(
-                            _previewing
-                                ? Icons.stop_rounded
-                                : Icons.play_arrow_rounded,
-                          ),
-                          label: Text(
-                            _previewing
-                                ? _copy('停止试听', 'Stop preview', '試聴を停止')
-                                : _copy('试听当前音色', 'Preview voice', '音声を試聴'),
-                          ),
-                        ),
-                        Text(
-                          _copy(
-                            '试听使用上方配置与当前语速，可能产生服务费用。听书会先暂停。',
-                            'Preview uses this configuration and current speed. Service charges may apply. Book playback pauses first.',
-                            '現在の設定と速度で試聴します。料金が発生する場合があります。読み上げは一時停止します。',
-                          ),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 16),
-                        ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          childrenPadding: const EdgeInsets.only(top: 12),
-                          shape: const Border(),
-                          collapsedShape: const Border(),
-                          title: Text(
-                            _copy('更多选项', 'More options', '詳細設定'),
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          subtitle: Text(
-                            _copy(
-                              '音频格式与失败处理',
-                              'Audio format and fallback',
-                              '音声形式とエラー時の動作',
-                            ),
-                          ),
-                          children: [
-                            DropdownButtonFormField<String>(
-                              initialValue: _format,
-                              isExpanded: true,
-                              decoration: _decoration(
-                                _copy('音频格式', 'Audio format', '音声形式'),
-                              ),
-                              items: [
-                                for (final format in [
-                                  'mp3',
-                                  'opus',
-                                  'aac',
-                                  'flac',
-                                  'wav',
-                                  'pcm',
-                                ])
-                                  DropdownMenuItem(
-                                    value: format,
-                                    child: Text(format.toUpperCase()),
-                                  ),
-                              ],
-                              onChanged: _saving
-                                  ? null
-                                  : (value) => setState(() => _format = value!),
-                            ),
-                            const SizedBox(height: 12),
-                            SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                _copy(
-                                  '自动切换系统语音',
-                                  'Use system voice on failure',
-                                  '失敗時にシステム音声を使用',
-                                ),
-                              ),
-                              subtitle: Text(
-                                _copy(
-                                  '云端服务不可用时，继续使用设备语音朗读。',
-                                  'Keep reading with the device voice when the cloud service is unavailable.',
-                                  'クラウドサービスが利用できない場合、端末の音声で読み上げを続けます。',
-                                ),
-                              ),
-                              value: _fallback,
-                              onChanged: _saving
-                                  ? null
-                                  : (value) =>
-                                        setState(() => _fallback = value),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
         bottomNavigationBar: !_loaded
             ? null
             : SafeArea(
@@ -683,21 +379,25 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    12,
+                    8,
                     16,
-                    16 + MediaQuery.viewInsetsOf(context).bottom,
+                    12 + MediaQuery.viewInsetsOf(context).bottom,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_error != null)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Semantics(
                             liveRegion: true,
                             child: Text(
                               _error!,
-                              style: TextStyle(color: scheme.error),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
                           ),
                         ),
@@ -707,16 +407,11 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
                           width: double.infinity,
                           child: FilledButton(
                             key: const ValueKey('cloud-tts-save'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                            ),
                             onPressed: _saving ? null : _save,
                             child: Text(
                               _saving
                                   ? _copy('正在保存…', 'Saving…', '保存中…')
-                                  : widget.service.supportsProfiles
-                                  ? _copy('保存并使用', 'Save and use', '保存して使用')
-                                  : _copy('保存配置', 'Save settings', '設定を保存'),
+                                  : _copy('保存并使用', 'Save and use', '保存して使用'),
                             ),
                           ),
                         ),
@@ -725,7 +420,511 @@ class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
                   ),
                 ),
               ),
+        body: !_loaded
+            ? Center(
+                child: _error == null
+                    ? const CircularProgressIndicator()
+                    : TextButton(onPressed: _load, child: Text(_error!)),
+              )
+            : Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Form(
+                    key: _formKey,
+                    child: SingleChildScrollView(
+                      padding: floatingSubpagePadding(context),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            _copy('选择喜欢的声音', 'Choose your voice', '音声を選択'),
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _copy(
+                              '填入服务商 API Key，即可试听。',
+                              'Enter your provider API key to preview.',
+                              'API キーを入力して試聴できます。',
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(_copy('语音模型', 'Speech model', '音声モデル')),
+                            subtitle: Text(
+                              _preset.models[_model.text] ?? _model.text,
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: _saving
+                                ? null
+                                : () => _choose(
+                                    _model,
+                                    _preset.models,
+                                    _copy('语音模型', 'Speech model', '音声モデル'),
+                                  ),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(_copy('音色', 'Voice', '声')),
+                            subtitle: Text(
+                              _preset.voices[_voice.text] ?? _voice.text,
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: _saving
+                                ? null
+                                : () => _choose(
+                                    _voice,
+                                    _preset.voices,
+                                    _copy('音色', 'Voice', '声'),
+                                  ),
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            key: const ValueKey('cloud-tts-key'),
+                            controller: _apiKey,
+                            enabled: !_saving,
+                            obscureText: _obscureKey,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            decoration: _decoration(
+                              'API Key',
+                              hint: hasKey ? '••••••••' : null,
+                              helper: hasKey
+                                  ? _copy(
+                                      '已保存，留空保留',
+                                      'Saved; leave blank to keep',
+                                      '保存済み・空欄で維持',
+                                    )
+                                  : _copy(
+                                      '密钥保存在本机安全存储中',
+                                      'Stored securely on this device',
+                                      '端末に安全に保存',
+                                    ),
+                              suffix: IconButton(
+                                onPressed: () =>
+                                    setState(() => _obscureKey = !_obscureKey),
+                                tooltip: _copy(
+                                  '显示或隐藏密钥',
+                                  'Toggle key visibility',
+                                  'キーの表示切替',
+                                ),
+                                icon: Icon(
+                                  _obscureKey
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          OutlinedButton.icon(
+                            key: const ValueKey('cloud-tts-preview'),
+                            onPressed: _saving
+                                ? null
+                                : (_previewing ? _stopPreview : _preview),
+                            icon: Icon(
+                              _previewing
+                                  ? Icons.stop_rounded
+                                  : Icons.play_arrow_rounded,
+                            ),
+                            label: Text(
+                              _previewing
+                                  ? _copy('停止试听', 'Stop preview', '試聴を停止')
+                                  : _copy('试听当前音色', 'Preview voice', '音声を試聴'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _copy(
+                              '试听会暂停听书，并使用当前语速。服务商可能计费。',
+                              'Preview pauses the book and uses the current speed. Provider charges may apply.',
+                              '試聴時は読書を一時停止します。料金が発生する場合があります。',
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                          if (_provider == ReaderAloudCloudProvider.mimo)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Text(
+                                _copy(
+                                  'MiMo 通过指令调整语速，实际倍速可能略有差异。',
+                                  'MiMo adjusts pace through instructions; actual speed may vary.',
+                                  'MiMo は指示で話速を調整するため、実際の速度は異なる場合があります。',
+                                ),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ExpansionTile(
+                            maintainState: true,
+                            tilePadding: EdgeInsets.zero,
+                            title: Text(
+                              _copy('高级自定义', 'Advanced customization', '詳細設定'),
+                            ),
+                            subtitle: Text(
+                              _copy(
+                                '名称、地址与自定义模型 / 音色',
+                                'Name, endpoint and custom model / voice',
+                                '名前・URL・カスタム音声',
+                              ),
+                            ),
+                            initiallyExpanded: _advancedExpanded,
+                            onExpansionChanged: (value) =>
+                                _advancedExpanded = value,
+                            children: [
+                              _field(
+                                'cloud-tts-name',
+                                _name,
+                                _copy('配置名称', 'Name', '設定名'),
+                              ),
+                              _field(
+                                'cloud-tts-url',
+                                _baseUrl,
+                                _copy('服务地址', 'Service URL', 'サービス URL'),
+                                url: true,
+                              ),
+                              _field(
+                                'cloud-tts-model',
+                                _model,
+                                _copy('自定义模型 ID', 'Custom model ID', 'モデル ID'),
+                              ),
+                              _field(
+                                'cloud-tts-voice',
+                                _voice,
+                                _copy('自定义音色 ID', 'Custom voice ID', '音声 ID'),
+                              ),
+                              DropdownButtonFormField<String>(
+                                initialValue: _format,
+                                isExpanded: true,
+                                decoration: _decoration(
+                                  _copy('音频格式', 'Audio format', '音声形式'),
+                                ),
+                                items:
+                                    {
+                                          _format,
+                                          ...readerAloudCloudFormats(_provider),
+                                        }
+                                        .map(
+                                          (f) => DropdownMenuItem(
+                                            value: f,
+                                            child: Text(f.toUpperCase()),
+                                          ),
+                                        )
+                                        .toList(),
+                                onChanged: _saving
+                                    ? null
+                                    : (v) => setState(() => _format = v!),
+                              ),
+                              const SizedBox(height: 12),
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  _copy(
+                                    '失败时使用系统语音',
+                                    'Use system voice on failure',
+                                    '失敗時にシステム音声',
+                                  ),
+                                ),
+                                value: _fallback,
+                                onChanged: _saving
+                                    ? null
+                                    : (v) => setState(() => _fallback = v),
+                              ),
+                              if (_editingId != null &&
+                                  widget.service.cloudProfiles.length > 1)
+                                TextButton(
+                                  onPressed: _saving ? null : _delete,
+                                  child: Text(
+                                    _copy('删除配置', 'Delete voice', '設定を削除'),
+                                  ),
+                                ),
+                              if (_hasProfileKey)
+                                TextButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => setState(
+                                          () => _clearKey = !_clearKey,
+                                        ),
+                                  child: Text(
+                                    _clearKey
+                                        ? _copy(
+                                            '保留原密钥',
+                                            'Keep saved key',
+                                            '保存キーを維持',
+                                          )
+                                        : _copy(
+                                            '移除已保存的密钥',
+                                            'Remove saved key',
+                                            '保存キーを削除',
+                                          ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
       ),
     );
   }
+}
+
+class _TtsChoicePage extends StatefulWidget {
+  const _TtsChoicePage({
+    required this.title,
+    required this.options,
+    required this.selected,
+  });
+  final String title;
+  final Map<String, String> options;
+  final String selected;
+  @override
+  State<_TtsChoicePage> createState() => _TtsChoicePageState();
+}
+
+class _TtsChoicePageState extends State<_TtsChoicePage> {
+  String _query = '';
+  @override
+  Widget build(BuildContext context) => FloatingSubpageScaffold(
+    title: widget.title,
+    body: ListView(
+      padding: floatingSubpagePadding(context),
+      children: [
+        TextField(
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: cloudTtsCopy(context, '搜索', 'Search', '検索'),
+          ),
+          onChanged: (v) => setState(() => _query = v.toLowerCase()),
+        ),
+        const SizedBox(height: 12),
+        for (final entry in widget.options.entries.where(
+          (e) => '${e.key} ${e.value}'.toLowerCase().contains(_query),
+        ))
+          ListTile(
+            title: Text(entry.value),
+            trailing: entry.key == widget.selected
+                ? const Icon(Icons.check)
+                : null,
+            onTap: () => Navigator.pop(context, entry.key),
+          ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            cloudTtsCopy(
+              context,
+              '其他模型与音色可在高级自定义中输入。',
+              'Enter other IDs under Advanced customization.',
+              'その他の ID は詳細設定で入力できます。',
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Saved configurations are separate from the editor, shared by settings and player.
+class CloudTtsSettingsPage extends StatefulWidget {
+  const CloudTtsSettingsPage({
+    super.key,
+    required this.service,
+    this.pauseBook,
+  });
+  final ReaderAloudService service;
+  final Future<void> Function()? pauseBook;
+  @override
+  State<CloudTtsSettingsPage> createState() => _CloudTtsSettingsPageState();
+}
+
+class _CloudTtsSettingsPageState extends State<CloudTtsSettingsPage> {
+  bool _loaded = false;
+  String? _error;
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      await widget.service.initialize();
+      if (mounted) {
+        setState(() {
+          _loaded = true;
+          _error = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = cloudTtsCopy(
+            context,
+            '加载失败，请重试',
+            'Could not load. Retry.',
+            '読み込みに失敗しました',
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _edit({
+    ReaderAloudCloudProfile? profile,
+    ReaderAloudProviderPreset? preset,
+  }) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CloudTtsEditorPage(
+          service: widget.service,
+          pauseBook: widget.pauseBook,
+          profile: profile,
+          preset: preset,
+        ),
+      ),
+    );
+    if (mounted) {
+      if (saved == true) {
+        Navigator.pop(context, true);
+      } else {
+        setState(() {});
+      }
+    }
+  }
+
+  Future<void> _add() async {
+    final preset = await Navigator.of(context).push<ReaderAloudProviderPreset>(
+      MaterialPageRoute(
+        builder: (context) => FloatingSubpageScaffold(
+          title: cloudTtsCopy(context, '添加语音', 'Add voice', '音声を追加'),
+          body: ListView(
+            padding: floatingSubpagePadding(context),
+            children: [
+              Text(
+                cloudTtsCopy(context, '选择语音服务', 'Choose a provider', 'サービスを選択'),
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 12),
+              for (final preset in readerAloudProviderPresets)
+                ListTile(
+                  leading: const Icon(Icons.record_voice_over_outlined),
+                  title: Text(preset.name),
+                  subtitle: Text(preset.models.values.join(' · ')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(context, preset),
+                ),
+              const Divider(),
+              ListTile(
+                title: Text(
+                  cloudTtsCopy(
+                    context,
+                    '自定义兼容服务',
+                    'Custom compatible service',
+                    'カスタム互換サービス',
+                  ),
+                ),
+                subtitle: const Text('OpenAI API'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pop(
+                  context,
+                  const ReaderAloudProviderPreset(
+                    'Cloud TTS',
+                    ReaderAloudCloudProvider.openai,
+                    '',
+                    {'': '自定义'},
+                    {'': '自定义'},
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (preset != null && mounted) await _edit(preset: preset);
+  }
+
+  @override
+  Widget build(BuildContext context) => FloatingSubpageScaffold(
+    title: cloudTtsCopy(context, '云端 TTS', 'Cloud TTS', 'クラウド TTS'),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: !_loaded
+            ? Center(
+                child: _error == null
+                    ? const CircularProgressIndicator()
+                    : TextButton(onPressed: _load, child: Text(_error!)),
+              )
+            : ListView(
+                padding: floatingSubpagePadding(context),
+                children: [
+                  Text(
+                    cloudTtsCopy(context, '我的语音', 'My voices', '保存した音声'),
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    cloudTtsCopy(
+                      context,
+                      '为不同的书，选一副喜欢的声音。',
+                      'Choose a voice for every story.',
+                      '物語に合う音声を選びましょう。',
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  for (final p in widget.service.cloudProfiles)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        p.id == widget.service.activeProfileId
+                            ? Icons.check_circle_outline
+                            : Icons.record_voice_over_outlined,
+                      ),
+                      title: Text(p.name),
+                      subtitle: Text(
+                        readerAloudProviderPresets
+                                .firstWhere(
+                                  (v) => v.provider == p.settings.provider,
+                                )
+                                .voices[p.settings.voice] ??
+                            p.settings.voice,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _edit(profile: p),
+                    ),
+                  if (!widget.service.supportsProfiles)
+                    ListTile(
+                      title: Text(
+                        cloudTtsCopy(
+                          context,
+                          '当前配置',
+                          'Current settings',
+                          '現在の設定',
+                        ),
+                      ),
+                      onTap: () => _edit(),
+                    ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    key: const ValueKey('cloud-tts-add'),
+                    onPressed: _add,
+                    icon: const Icon(Icons.add),
+                    label: Text(
+                      cloudTtsCopy(context, '添加语音配置', 'Add voice', '音声設定を追加'),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    ),
+  );
 }

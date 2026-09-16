@@ -28,12 +28,15 @@ class IoReadingDataExportBackend implements ReadingDataExportBackend {
   final ReadingDataOverwriteConfirmation _overwriteConfirmation;
   final TargetPlatform _platform;
 
-  static Future<String?> _pickSavePath(String name) => FilePicker.saveFile(
-    fileName: name,
-    type: FileType.custom,
-    allowedExtensions: const ['md'],
-    lockParentWindow: true,
-  );
+  static Future<String?> _pickSavePath(String name) {
+    final extension = path.extension(name).replaceFirst('.', '').toLowerCase();
+    return FilePicker.saveFile(
+      fileName: name,
+      type: extension.isEmpty ? FileType.any : FileType.custom,
+      allowedExtensions: extension.isEmpty ? null : [extension],
+      lockParentWindow: true,
+    );
+  }
 
   @override
   Future<ReadingDataExportBackendResult> export(
@@ -57,12 +60,12 @@ class IoReadingDataExportBackend implements ReadingDataExportBackend {
             ? await _bridge.exportBookToDownloads(
                 sourcePath: temporary.path,
                 displayName: request.suggestedName,
-                mimeType: 'text/plain',
+                mimeType: request.mimeType,
               )
             : await _bridge.exportDocument(
                 sourcePath: temporary.path,
                 displayName: request.suggestedName,
-                mimeType: 'text/plain',
+                mimeType: request.mimeType,
               );
         return _fromNative(row);
       } finally {

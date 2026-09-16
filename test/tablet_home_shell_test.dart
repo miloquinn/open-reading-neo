@@ -22,7 +22,7 @@ import 'package:xxread/services/library/download_task_controller.dart';
 import 'package:xxread/pages/settings/settings_page.dart';
 import 'package:xxread/services/ai/ai_chat_history_store.dart';
 import 'package:xxread/services/core/theme_notifier.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
+import 'package:xxread/services/backup/webdav_backup_controller.dart';
 import 'package:xxread/services/account/account.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
@@ -354,7 +354,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     final history = AiChatHistoryStore();
     final theme = ThemeNotifier();
-    final webDav = WebDavSyncController();
+    final webDav = WebDavBackupController();
     final account = MemberAccountController();
     addTearDown(theme.dispose);
     addTearDown(webDav.dispose);

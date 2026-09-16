@@ -39,7 +39,7 @@ class SourceBrowserSessionActivity : Activity() {
     private val owner: String by lazy { "open:$sourceId:${hashCode()}" }
     private val url: String by lazy { payload.optString("url") }
     private val headers: Map<String, String> by lazy { headersFromJson(payload.optJSONObject("headers")?.toString()) }
-    private val suppliedHtml: String? by lazy { payload.optString("html").takeIf { it.isNotEmpty() } }
+    private val suppliedHtml: String? by lazy { payload.sourceOptionalString("html")?.takeIf { it.isNotEmpty() } }
     private val tracker: SourceBrowserSessionTracker by lazy {
         SourceBrowserSessionTracker(SourceBrowserSession.fromJson(payload.optJSONObject("session")?.toString()))
     }
@@ -82,7 +82,7 @@ class SourceBrowserSessionActivity : Activity() {
             finish()
             return
         }
-        title = payload.optString("title").takeIf { it.isNotBlank() } ?: getString(R.string.source_browser_login_title)
+        title = payload.sourceOptionalString("title")?.takeIf { it.isNotBlank() } ?: getString(R.string.source_browser_login_title)
         buildUi()
         configureSourceBrowserWebView(webView, headers)
         webView.addJavascriptInterface(
@@ -156,7 +156,7 @@ class SourceBrowserSessionActivity : Activity() {
             setPadding(12, 8, 12, 8)
         }
         val cancel = Button(this).apply {
-            text = payload.optString("cancelLabel").takeIf { it.isNotBlank() }
+            text = payload.sourceOptionalString("cancelLabel")?.takeIf { it.isNotBlank() }
                 ?: getString(R.string.source_browser_cancel)
             isAllCaps = false
             setOnClickListener { cancelAndFinish() }
@@ -170,7 +170,7 @@ class SourceBrowserSessionActivity : Activity() {
             setPadding(12, 0, 12, 0)
         }
         doneButton = Button(this).apply {
-            text = payload.optString("doneLabel").takeIf { it.isNotBlank() }
+            text = payload.sourceOptionalString("doneLabel")?.takeIf { it.isNotBlank() }
                 ?: getString(R.string.source_browser_done)
             isAllCaps = false
             setOnClickListener { captureAndFinish() }

@@ -14,6 +14,34 @@ import 'package:xxread/widgets/reader_aloud_panel.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final presentation in ['player', 'controls']) {
+    testWidgets('$presentation ends paused listening and clears highlight', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'reader_aloud_presentation': presentation,
+      });
+      final fixture = await _openPlayer(
+        tester,
+        size: const Size(390, 844),
+        holdSystemSpeech: true,
+      );
+      addTearDown(fixture.dispose);
+      await tester.tap(find.byKey(const ValueKey('reader-aloud-play-pause')));
+      await tester.pumpAndSettle();
+      expect(fixture.controller.isActive, isTrue);
+      expect(fixture.controller.highlight, isNotNull);
+      fixture.controller.setSleepTimer(const Duration(minutes: 10));
+      await tester.tap(find.byKey(const ValueKey('reader-aloud-stop')));
+      await tester.pumpAndSettle();
+      expect(fixture.controller.state, ReaderAloudPlaybackState.stopped);
+      expect(fixture.controller.isActive, isFalse);
+      expect(fixture.controller.highlight, isNull);
+      expect(fixture.controller.sleepDuration, isNull);
+      expect(find.byKey(const ValueKey('reader-aloud-stop')), findsNothing);
+      expect(find.text('open responsive player'), findsOneWidget);
+    });
+  }
   testWidgets(
     'controls mode stays on the reader, pauses and opens the full player',
     (tester) async {
@@ -156,6 +184,7 @@ void main() {
           'reader-aloud-chapters',
           'reader-aloud-volume',
           'reader-aloud-engine',
+          'reader-aloud-stop',
         ]) {
           final control = find.byKey(ValueKey(key));
           expect(control.hitTestable(), findsOneWidget);
@@ -243,7 +272,7 @@ void main() {
 
       expect(find.text('云端 TTS'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('cloud-tts-save')).hitTestable(),
+        find.byKey(const ValueKey('cloud-tts-add')).hitTestable(),
         findsOneWidget,
       );
     },

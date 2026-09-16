@@ -406,7 +406,10 @@ extension _LibraryPageCollection on _LibraryPageState {
     );
   }
 
-  Widget _buildListCover(BuildContext context, Book book) {
+  Widget _buildListCover(BuildContext context, Book book) =>
+      BookUpdateIndicator(book: book, child: _buildListCoverArt(context, book));
+
+  Widget _buildListCoverArt(BuildContext context, Book book) {
     if (!kIsWeb &&
         book.coverImagePath != null &&
         book.coverImagePath!.isNotEmpty) {

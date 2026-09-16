@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../book_sources/models/registered_book_source.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
 import '../../book_sources/services/book_source_import_analyzer.dart';
+import '../../book_sources/services/book_source_export_service.dart';
 import '../../book_sources/services/book_source_registry.dart';
 import '../../book_sources/services/book_source_maintenance_coordinator.dart';
 import '../../book_sources/services/book_source_usage_service.dart';
@@ -43,11 +44,13 @@ class BookSourceManagementPage extends StatefulWidget {
     super.key,
     this.maintenance,
     this.registry,
+    this.exporter,
     this.readReferencedSourceIds = referencedBookSourceIds,
   });
 
   final BookSourceMaintenanceCoordinator? maintenance;
   final BookSourceRegistry? registry;
+  final BookSourceExportService? exporter;
   final Future<Set<String>> Function() readReferencedSourceIds;
 
   @override
@@ -66,6 +69,7 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
   int _handledMaintenanceRunId = 0;
   bool _maintenancePageOpen = false;
   bool _dedupeRunning = false;
+  bool _exporting = false;
   BookSourceMaintenanceStatus? _lastMaintenanceStatus;
 
   @override
@@ -305,6 +309,8 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
             onDisableSelected: () =>
                 unawaited(_controller.setSelectedSourcesEnabled(false)),
             onCheckSelected: () => unawaited(_checkSelectedSourcesHealth()),
+            onExportSelected: () => unawaited(_exportSelectedSources()),
+            exportInProgress: _exporting,
             onGroupSelected: () => unawaited(
               _editSourceGroups([
                 for (final source in state.sources)
@@ -470,6 +476,75 @@ class _BookSourceManagementPageState extends State<BookSourceManagementPage> {
         showSideToast(context, '$error', kind: SideToastKind.error);
       }
     }
+  }
+
+  Future<void> _exportSelectedSources() async {
+    if (_exporting) return;
+    final state = _controller.state;
+    final selected = [
+      for (final source in state.sources)
+        if (state.selectedSourceIds.contains(source.id)) source,
+    ];
+    if (selected.isEmpty) return;
+    setState(() => _exporting = true);
+    try {
+      final exporter =
+          widget.exporter ??
+          BookSourceExportService(
+            overwriteConfirmation: _confirmExportOverwrite,
+          );
+      final result = await exporter.export(selected);
+      if (!mounted) return;
+      switch (result.status) {
+        case BookSourceExportStatus.success:
+          showSideToast(
+            context,
+            context.l10n.bookSourcesExportSuccess(
+              selected.length,
+              result.location ?? result.displayName ?? '',
+            ),
+            kind: SideToastKind.success,
+          );
+        case BookSourceExportStatus.cancelled:
+          break;
+        case BookSourceExportStatus.unsupported:
+          showSideToast(
+            context,
+            context.l10n.bookSourcesExportUnsupported,
+            kind: SideToastKind.warning,
+          );
+        case BookSourceExportStatus.failure:
+          showSideToast(
+            context,
+            context.l10n.bookSourcesExportFailed,
+            kind: SideToastKind.error,
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<bool> _confirmExportOverwrite(String path) async {
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(context.l10n.bookSourcesExportReplaceTitle),
+            content: Text(context.l10n.bookSourcesExportReplaceMessage(path)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(context.l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(context.l10n.bookSourcesExportReplaceAction),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   Future<void> _checkSourceHealth(RegisteredBookSource source) async {

@@ -84,7 +84,8 @@ class _BookCoverItem extends StatelessWidget {
                             left: 6,
                             child: _BookSelectionIndicator(selected: selected),
                           ),
-                        if (book.isOnline)
+                        if (book.isOnline &&
+                            !BookUpdateIndicator.hasUpdate(book))
                           Positioned(
                             top: 6,
                             right: 6,
@@ -143,8 +144,16 @@ class _BookCoverItem extends StatelessWidget {
                         if (book.currentPage > 0)
                           Positioned(
                             top: 6,
-                            left: book.isOnline ? 6 : null,
-                            right: book.isOnline ? null : 6,
+                            left:
+                                book.isOnline ||
+                                    BookUpdateIndicator.hasUpdate(book)
+                                ? 6
+                                : null,
+                            right:
+                                book.isOnline ||
+                                    BookUpdateIndicator.hasUpdate(book)
+                                ? null
+                                : 6,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
@@ -271,7 +280,10 @@ class _BookSelectionIndicator extends StatelessWidget {
 
 /// 网格封面画面（真实封面或默认设计），不带圆角：
 /// 由格子里的 ClipRRect 或打开动画的飞行图层负责裁剪。
-Widget _gridCoverArt(BuildContext context, Book book) {
+Widget _gridCoverArt(BuildContext context, Book book) =>
+    BookUpdateIndicator(book: book, child: _gridCoverImage(context, book));
+
+Widget _gridCoverImage(BuildContext context, Book book) {
   final theme = Theme.of(context);
   final scheme = theme.colorScheme;
   final isMaterial3Style =

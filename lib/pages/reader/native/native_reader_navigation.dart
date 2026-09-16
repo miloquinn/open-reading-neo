@@ -115,7 +115,7 @@ extension _NativeReaderNavigation on _NativeReaderPageState {
     List<_NativeChapter> chapters,
   ) async {
     if (!isTxtBookmarkLocatorResolved(bookmark.anchorKey)) return;
-    if (!_suppressProgressSyncEvents) _markReadingPositionChanged();
+    _markReadingPositionChanged();
     final locatorRaw = bookmark.canonicalLocator;
     final locator = locatorRaw == null
         ? null

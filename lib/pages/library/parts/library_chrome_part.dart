@@ -155,7 +155,6 @@ extension _LibraryPageChrome on _LibraryPageState {
   Widget _buildTopBar() {
     final palette = PageStyleHelper.palette(context);
     final scheme = Theme.of(context).colorScheme;
-    final webDavSync = context.watch<WebDavSyncController?>();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
@@ -191,21 +190,6 @@ extension _LibraryPageChrome on _LibraryPageState {
               child: Text(context.l10n.librarySelectAll),
             )
           else ...[
-            if (webDavSync?.isConfigured ?? false) ...[
-              _buildTopBarIcon(
-                icon: Icons.cloud_sync_rounded,
-                active: webDavSync!.remoteBooks.any(
-                  (book) => book.fileAvailable,
-                ),
-                tooltip: context.l10n.webDavBookFilesTitle,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const BookFileSyncPage(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
             _buildTopBarIcon(
               icon: Icons.downloading_rounded,
               active:

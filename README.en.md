@@ -84,7 +84,7 @@ with room for deeper performance, typography, and interaction work.
 
 Local reading does not require an account or a developer-operated cloud
 service. Network features such as AI and book sources are explicitly enabled
-and configured by the user. Cloud sync and WebDAV are not currently built in.
+and configured by the user. WebDAV supports manual ZIP snapshot backups and restoration. See [WebDAV backups](docs/webdav-backup.md).
 
 ## Open book sources
 

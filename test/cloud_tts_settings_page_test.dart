@@ -27,10 +27,31 @@ void main() {
         cloudClient: client,
       );
       addTearDown(fixture.dispose);
-      await tester.tap(find.byKey(const ValueKey('cloud-tts-profiles')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const ValueKey('cloud-tts-add')));
+      expect(find.byKey(const ValueKey('cloud-tts-key')), findsNothing);
       await tester.tap(find.byKey(const ValueKey('cloud-tts-add')));
+      await tester.pumpAndSettle();
+      expect(find.text('豆包'), findsOneWidget);
+      expect(find.text('MiniMax'), findsOneWidget);
+      await tester.tap(find.text('OpenAI'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('cloud-tts-model')), findsNothing);
+      await tester.tap(find.text('Voice').first);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'nova');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nova'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Advanced customization'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await Scrollable.ensureVisible(
+        tester.element(find.text('Advanced customization')),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Advanced customization'));
       await tester.pumpAndSettle();
       await _scrollTo(tester, const ValueKey('cloud-tts-name'));
       await tester.enterText(
@@ -42,11 +63,7 @@ void main() {
         find.byKey(const ValueKey('cloud-tts-key')),
         'new-key',
       );
-      await _scrollTo(tester, const ValueKey('cloud-tts-voice'));
-      await tester.enterText(
-        find.byKey(const ValueKey('cloud-tts-voice')),
-        'nova',
-      );
+
       await _scrollTo(tester, const ValueKey('cloud-tts-preview'));
       await tester.tap(find.byKey(const ValueKey('cloud-tts-preview')));
       await tester.pumpAndSettle();
@@ -64,6 +81,41 @@ void main() {
       expect(find.text('Open cloud settings'), findsOneWidget);
     },
   );
+
+  for (final name in ['豆包', 'MiniMax', '小米 MiMo']) {
+    testWidgets('$name preset can save with only a key', (tester) async {
+      final store = PreferencesReaderAloudCloudSettingsStore(
+        secretStorage: _Secrets(),
+      );
+      final fixture = await _openSettings(tester, persistentStore: store);
+      addTearDown(fixture.dispose);
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-add')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('cloud-tts-url')), findsNothing);
+      expect(find.byKey(const ValueKey('cloud-tts-model')), findsNothing);
+      await tester.enterText(
+        find.byKey(const ValueKey('cloud-tts-key')),
+        'provider-key',
+      );
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-save')));
+      await tester.pumpAndSettle();
+      final preset = readerAloudProviderPresets.firstWhere(
+        (p) => p.name == name,
+      );
+      expect(fixture.service.cloudSettings.provider, preset.provider);
+      expect(fixture.service.cloudSettings.model, preset.settings.model);
+      expect(fixture.service.cloudSettings.voice, preset.settings.voice);
+      expect(
+        fixture.service.cloudSettings.responseFormat,
+        preset.settings.responseFormat,
+      );
+      expect(await store.readApiKey(), 'provider-key');
+      expect(fixture.service.cloudProfiles, hasLength(2));
+      expect(find.text('Open cloud settings'), findsOneWidget);
+    });
+  }
 
   testWidgets('blank API key keeps the saved key when settings are saved', (
     tester,
@@ -98,6 +150,7 @@ void main() {
 
     final remove = find.text('Remove saved key');
     await tester.ensureVisible(remove);
+    await tester.pumpAndSettle();
     await tester.tap(remove);
     await tester.pump();
 
@@ -122,6 +175,7 @@ void main() {
 
       final remove = find.text('Remove saved key');
       await tester.ensureVisible(remove);
+      await tester.pumpAndSettle();
       await tester.tap(remove);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('floating-subpage-back')));
@@ -157,8 +211,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Could not finish saving'), findsOneWidget);
-    expect(find.text('voice-model-next'), findsOneWidget);
-    expect(find.text('coral'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('cloud-tts-model')))
+          .controller!
+          .text,
+      'voice-model-next',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('cloud-tts-voice')))
+          .controller!
+          .text,
+      'coral',
+    );
     expect(
       find.byKey(const ValueKey('cloud-tts-save')).hitTestable(),
       findsOneWidget,
@@ -179,6 +245,7 @@ void main() {
     final fixture = await _openSettings(tester);
     addTearDown(fixture.dispose);
 
+    await _scrollTo(tester, const ValueKey('cloud-tts-url'));
     await tester.enterText(
       find.byKey(const ValueKey('cloud-tts-url')),
       'http://tts.example.com/v1',
@@ -216,10 +283,17 @@ void main() {
 }
 
 Future<void> _scrollTo(WidgetTester tester, Key key) async {
+  final state = tester.state<ScrollableState>(find.byType(Scrollable).first);
+  state.position.jumpTo(0);
+  await tester.pumpAndSettle();
   await tester.scrollUntilVisible(
     find.byKey(key),
     240,
     scrollable: find.byType(Scrollable).first,
+  );
+  await Scrollable.ensureVisible(
+    tester.element(find.byKey(key)),
+    alignment: 0.5,
   );
   await tester.pumpAndSettle();
 }
@@ -287,6 +361,22 @@ Future<_SettingsFixture> _openSettings(
   );
   await tester.tap(find.text('Open cloud settings'));
   await tester.pumpAndSettle();
+  if (persistentStore == null) {
+    await tester.tap(find.text('Current settings'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Advanced customization'),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await Scrollable.ensureVisible(
+      tester.element(find.text('Advanced customization')),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Advanced customization'));
+    await tester.pumpAndSettle();
+  }
   return _SettingsFixture(store: actualStore, service: service, system: system);
 }
 

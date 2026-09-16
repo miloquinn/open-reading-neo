@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:xxread/services/sync/sync_models.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
+import 'package:xxread/services/backup/webdav_backup_controller.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/utils/page_style_helper.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
@@ -23,16 +23,14 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
   final _rootController = TextEditingController(text: 'OpenReading');
 
   var _obscurePassword = true;
-  var _testing = false;
   var _saving = false;
-  var _connectionVerified = false;
   WebDavSyncErrorCode? _connectionError;
   WebDavSyncFailure? _connectionFailure;
 
   @override
   void initState() {
     super.initState();
-    final sync = context.read<WebDavSyncController>();
+    final sync = context.read<WebDavBackupController>();
     _serverController.text = sync.serverUrl ?? '';
     _usernameController.text = sync.username ?? '';
     _rootController.text = sync.rootPath ?? 'OpenReading';
@@ -54,40 +52,45 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
     rootPath: _rootController.text.trim(),
   );
 
-  Future<void> _testConnection() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _save() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
+    final draft = _draft;
+    final sync = context.read<WebDavBackupController>();
     setState(() {
-      _testing = true;
-      _connectionVerified = false;
+      _saving = true;
       _connectionError = null;
       _connectionFailure = null;
     });
-    final result = await context.read<WebDavSyncController>().testConnection(
-      _draft,
-    );
-    if (!mounted) return;
-    setState(() {
-      _testing = false;
-      _connectionVerified = result.success;
-      _connectionError = result.errorCode;
-      _connectionFailure = result.failure;
-    });
-  }
-
-  Future<void> _save() async {
-    if (!_connectionVerified || _saving) return;
-    setState(() => _saving = true);
-    final sync = context.read<WebDavSyncController>();
-    await sync.configure(_draft);
-    if (!mounted) return;
-    setState(() => _saving = false);
-    Navigator.of(context).pop();
-  }
-
-  void _invalidateTest([String? _]) {
-    if (_connectionVerified || _connectionError != null) {
+    try {
+      final result = await sync.testConnection(draft);
+      if (!mounted) return;
+      if (!result.success) {
+        setState(() {
+          _connectionError = result.errorCode ?? WebDavSyncErrorCode.unknown;
+          _connectionFailure = result.failure;
+        });
+        return;
+      }
+      await sync.configure(draft);
+      if (mounted) Navigator.of(context).pop();
+    } on WebDavSyncFailure catch (error) {
+      if (!mounted) return;
       setState(() {
-        _connectionVerified = false;
+        _connectionError = error.code;
+        _connectionFailure = error;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _connectionError = WebDavSyncErrorCode.unknown);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _clearError(String _) {
+    if (_connectionError != null) {
+      setState(() {
         _connectionError = null;
         _connectionFailure = null;
       });
@@ -98,8 +101,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = PageStyleHelper.palette(context);
-    final scheme = Theme.of(context).colorScheme;
-    final sync = context.watch<WebDavSyncController>();
+    final sync = context.watch<WebDavBackupController>();
     final hasStoredConfiguration = sync.isConfigured;
     return FloatingSubpageScaffold(
       title: l10n.webDavSetUp,
@@ -142,6 +144,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                       child: Column(
                         children: [
                           TextFormField(
+                            enabled: !_saving,
                             controller: _serverController,
                             keyboardType: TextInputType.url,
                             autofillHints: const [AutofillHints.url],
@@ -149,7 +152,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                               labelText: l10n.webDavServerUrl,
                               prefixIcon: const Icon(Icons.link_rounded),
                             ),
-                            onChanged: _invalidateTest,
+                            onChanged: _clearError,
                             validator: (value) {
                               final uri = Uri.tryParse(value?.trim() ?? '');
                               return uri != null && uri.host.isNotEmpty
@@ -159,6 +162,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
+                            enabled: !_saving,
                             controller: _usernameController,
                             autofillHints: const [AutofillHints.username],
                             decoration: InputDecoration(
@@ -167,7 +171,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                                 Icons.person_outline_rounded,
                               ),
                             ),
-                            onChanged: _invalidateTest,
+                            onChanged: _clearError,
                             validator: (value) =>
                                 (value?.trim().isNotEmpty ?? false)
                                 ? null
@@ -175,6 +179,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
+                            enabled: !_saving,
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             autofillHints: const [AutofillHints.password],
@@ -198,7 +203,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                                 ),
                               ),
                             ),
-                            onChanged: _invalidateTest,
+                            onChanged: _clearError,
                             validator: (value) =>
                                 (value?.isNotEmpty ?? false) ||
                                     hasStoredConfiguration
@@ -207,52 +212,19 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
+                            enabled: !_saving,
                             controller: _rootController,
                             decoration: InputDecoration(
                               labelText: l10n.webDavRootPath,
                               prefixIcon: const Icon(Icons.folder_outlined),
                             ),
-                            onChanged: _invalidateTest,
+                            onChanged: _clearError,
                             validator: (value) =>
                                 (value?.trim().isNotEmpty ?? false)
                                 ? null
                                 : l10n.webDavErrorUnknown,
                           ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              key: const ValueKey('webdav-test-action'),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                backgroundColor: _connectionVerified
-                                    ? scheme.secondaryContainer
-                                    : null,
-                                foregroundColor: _connectionVerified
-                                    ? scheme.onSecondaryContainer
-                                    : null,
-                              ),
-                              onPressed: _testing ? null : _testConnection,
-                              icon: _testing
-                                  ? const SizedBox.square(
-                                      dimension: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.wifi_tethering_rounded),
-                              label: Text(
-                                _testing
-                                    ? l10n.webDavTestingConnection
-                                    : l10n.webDavTestConnection,
-                              ),
-                            ),
-                          ),
-                          if (_connectionVerified ||
-                              _connectionError != null) ...[
+                          if (_connectionError != null) ...[
                             const SizedBox(height: 14),
                             Semantics(
                               liveRegion: true,
@@ -260,25 +232,19 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color:
-                                      (_connectionVerified
-                                              ? Colors.green
-                                              : Theme.of(
-                                                  context,
-                                                ).colorScheme.error)
-                                          .withValues(alpha: 0.1),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.error.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Icon(
-                                      _connectionVerified
-                                          ? Icons.check_circle_outline
-                                          : Icons.error_outline,
-                                      color: _connectionVerified
-                                          ? Colors.green
-                                          : Theme.of(context).colorScheme.error,
+                                      Icons.error_outline,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -287,12 +253,10 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            _connectionVerified
-                                                ? l10n.webDavConnectionSuccess
-                                                : webDavSyncErrorText(
-                                                    context,
-                                                    _connectionError,
-                                                  ),
+                                            webDavSyncErrorText(
+                                              context,
+                                              _connectionError,
+                                            ),
                                           ),
                                           if (_connectionFailure != null) ...[
                                             const SizedBox(height: 10),
@@ -322,9 +286,7 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: _connectionVerified && !_saving
-                            ? _save
-                            : null,
+                        onPressed: _saving ? null : _save,
                         icon: _saving
                             ? const SizedBox.square(
                                 dimension: 18,
@@ -333,7 +295,11 @@ class _WebDavSetupPageState extends State<WebDavSetupPage> {
                                 ),
                               )
                             : const Icon(Icons.save_outlined),
-                        label: Text(l10n.webDavSaveConfiguration),
+                        label: Text(
+                          _saving
+                              ? l10n.webDavTestingConnection
+                              : l10n.webDavSaveConfiguration,
+                        ),
                       ),
                     ),
                   ],

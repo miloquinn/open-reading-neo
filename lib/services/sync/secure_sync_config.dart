@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:uuid/uuid.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,51 +62,7 @@ class SecureSyncConfigStore {
     SyncSecretStorage? secretStorage,
     SyncPreferences? preferences,
   }) : _secretStorage = secretStorage ?? FlutterSyncSecretStorage(),
-       _identityStorage = secretStorage ?? _deviceOnlyStorage,
        _preferences = preferences ?? SharedSyncPreferences();
-
-  static final SyncSecretStorage _deviceOnlyStorage = FlutterSyncSecretStorage(
-    const FlutterSecureStorage(
-      iOptions: IOSOptions(
-        accessibility: KeychainAccessibility.first_unlock_this_device,
-      ),
-      mOptions: MacOsOptions(
-        accessibility: KeychainAccessibility.first_unlock_this_device,
-      ),
-    ),
-  );
-  final SyncSecretStorage _identityStorage;
-  static Future<String>? _defaultDeviceIdentity;
-  Future<String>? _injectedDeviceIdentity;
-
-  Future<String> deviceIdentity() {
-    if (identical(_identityStorage, _deviceOnlyStorage)) {
-      return _defaultDeviceIdentity ??= _readDeviceIdentity().onError((
-        error,
-        stack,
-      ) {
-        _defaultDeviceIdentity = null;
-        Error.throwWithStackTrace(error!, stack);
-      });
-    }
-    return _injectedDeviceIdentity ??= _readDeviceIdentity();
-  }
-
-  Future<String> _readDeviceIdentity() async {
-    const key = 'open_reading.sync.installation';
-    try {
-      final existing = await _identityStorage.read(key);
-      if (existing != null && existing.isNotEmpty) return existing;
-      final id = const Uuid().v4();
-      await _identityStorage.write(key, id);
-      return id;
-    } catch (_) {
-      throw const WebDavSyncFailure(
-        WebDavSyncErrorCode.secureStorage,
-        'The device sync identity could not be read from secure storage.',
-      );
-    }
-  }
 
   static const _configurationKey = 'webdav_sync_configuration_v1';
   static const _scopeKey = 'webdav_sync_scope_v1';
@@ -160,63 +115,6 @@ class SecureSyncConfigStore {
     await _preferences.write(_configurationKey, jsonEncode(configuration));
   }
 
-  Future<WebDavSyncScope> readScope() async {
-    final raw = await _preferences.read(_scopeKey);
-    if (raw == null) {
-      // A configured connection with no saved scope is a new connection (or a
-      // pre-scope install): preserve as much user data as possible by default.
-      // Once a scope is saved, its explicit false values remain authoritative.
-      if (await readConfiguration() != null) {
-        return const WebDavSyncScope(
-          notes: true,
-          replaceRules: true,
-          bookFiles: true,
-        );
-      }
-      return const WebDavSyncScope();
-    }
-    return WebDavSyncScope.fromJson(
-      (jsonDecode(raw) as Map).cast<String, dynamic>(),
-    );
-  }
-
-  Future<void> saveScope(WebDavSyncScope scope) =>
-      _preferences.write(_scopeKey, jsonEncode(scope));
-
-  static const _automaticSuccessKey = 'webdav_last_automatic_success';
-
-  Future<DateTime?> readAutomaticSuccess() async {
-    final value = await _preferences.read(_automaticSuccessKey);
-    return value == null ? null : DateTime.tryParse(value)?.toUtc();
-  }
-
-  Future<void> saveAutomaticSuccess(DateTime? time) => time == null
-      ? _preferences.delete(_automaticSuccessKey)
-      : _preferences.write(
-          _automaticSuccessKey,
-          time.toUtc().toIso8601String(),
-        );
-
-  Future<bool> readAutoResume() async =>
-      await _preferences.read(_autoResumeKey) != 'false';
-
-  Future<void> saveAutoResume(bool enabled) =>
-      _preferences.write(_autoResumeKey, enabled.toString());
-
-  Future<WebDavNewBookUploadPolicy> readNewBookUploadPolicy() async {
-    final saved = await _preferences.read(_newBookUploadPolicyKey);
-    if (saved != null) return WebDavNewBookUploadPolicy.fromStorage(saved);
-    // A fresh connection defaults to complete backup. Before configuration,
-    // keep the neutral prompt policy so setup screens do not imply that a
-    // connection already exists. Explicitly saved choices always win.
-    return await readConfiguration() == null
-        ? WebDavNewBookUploadPolicy.askEveryTime
-        : WebDavNewBookUploadPolicy.automatic;
-  }
-
-  Future<void> saveNewBookUploadPolicy(WebDavNewBookUploadPolicy policy) =>
-      _preferences.write(_newBookUploadPolicyKey, policy.storageValue);
-
   Future<void> clear() async {
     try {
       await _secretStorage.delete(_passwordKey);
@@ -230,7 +128,7 @@ class SecureSyncConfigStore {
     await _preferences.delete(_scopeKey);
     await _preferences.delete(_newBookUploadPolicyKey);
     await _preferences.delete(_autoResumeKey);
-    await _preferences.delete(_automaticSuccessKey);
+    await _preferences.delete('webdav_last_automatic_success');
   }
 }
 

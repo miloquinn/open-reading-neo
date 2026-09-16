@@ -1,3 +1,5 @@
+> 历史设计：WebDAV 已改为手动 ZIP 备份。当前行为见 [WebDAV 备份](webdav-backup.md)。以下同步方案不再适用于当前版本。
+
 > 同步架构已由 [统一书库、连载更新与云同步](webdav-readable-storage-plan.md) 取代。本文保留当时的设计和测试记录；旧版本目录、分块协议与相关文件名不代表当前实现。
 
 # WebDAV 错误诊断与版本选择评估

@@ -1,3 +1,5 @@
+> 历史设计：WebDAV 已改为手动 ZIP 备份。当前行为见 [WebDAV 备份](webdav-backup.md)。以下同步方案不再适用于当前版本。
+
 > 历史记录：云端协议以 [WebDAV 同步协议与维护约定](webdav-sync-design.md) 为准。本文仅保留本地编辑设计与当时测试证据；v2/v3 双模式、旧目录和旧基准不代表当前实现。
 
 # TXT 正文编辑与 WebDAV 双向同步设计

@@ -6,7 +6,10 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
     _openingContentReadyScheduled = true;
     _openingLoaderTimer?.cancel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) BookOpenTransition.markReaderContentReady(context);
+      if (mounted) {
+        BookOpenTransition.markReaderContentReady(context);
+        _syncCloudReading();
+      }
     });
   }
 
@@ -441,7 +444,13 @@ extension _BookSourceReaderShell on _BookSourceReaderPageState {
                           ? null
                           : () => unawaited(_handleReaderAloudButtonPressed()),
                       readAloudTooltip: context.l10n.ttsReading,
-                      readAloudActive: _readerAloudActive,
+                      readAloudActive: context.select<ReaderAloudSession?, bool>(
+                        (session) =>
+                            session?.sourceId ==
+                                'source:${widget.source.id}:${widget.book.id}' &&
+                            (session?.isActive ?? false),
+                      ),
+                      onLocateReadAloud: () => unawaited(_locateReaderAloud()),
                       onAskAi: _chapters.isEmpty
                           ? null
                           : () => unawaited(_showAskAiPanel()),

@@ -3,6 +3,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import '../../services/books/enhanced_txt_import_service.dart';
 
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
@@ -11,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 
 import '../../models/book.dart';
+import '../../services/books/book_cover_edit_service.dart';
 import '../../services/books/book_dao.dart';
 import '../../services/books/cover_generator_service.dart';
 import '../../services/books/txt_edit_service.dart';
@@ -18,6 +21,7 @@ import '../../services/books/txt_edit_reference_service.dart';
 import '../../services/books/txt_content_change_bus.dart';
 import '../../services/library/library_event_bus_service.dart';
 import '../models/registered_book_source.dart';
+import '../models/source_book_update_info.dart';
 import '../protocol/book_source_protocol.dart';
 import 'book_download_cancellation.dart';
 import 'book_source_client.dart';
@@ -235,7 +239,12 @@ class BookSourceShelfService {
         chapterIndex * unitsPerChapter +
         (chapterProgress.clamp(0, 1) * unitsPerChapter).round();
     final totalUnits = chapterCount * unitsPerChapter;
-    final updated = shelfBook.copyWith(
+    final coverPath =
+        book.coverUrl != null && !BookCoverEditService.hasCustomCover(shelfBook)
+        ? await _storedCoverPath(source, book)
+        : null;
+    var updated = shelfBook.copyWith(
+      coverImagePath: coverPath,
       currentPage: shelfBook.isOnline ? currentUnits : shelfBook.currentPage,
       totalPages: shelfBook.isOnline ? totalUnits : shelfBook.totalPages,
       readingProgress: shelfBook.isOnline
@@ -244,7 +253,15 @@ class BookSourceShelfService {
       sourceId: source.id,
       sourceBookId: book.id,
       sourceJson: jsonEncode(source.toJson()),
-      sourceBookJson: jsonEncode(book.toJson()),
+      sourceBookJson: jsonEncode({
+        ...book.toJson(),
+        if (!shelfBook.isOnline)
+          SourceBookUpdateInfo.storageKey: SourceBookUpdateInfo(
+            status: SourceBookCheckStatus.needsMapping,
+            latestChapter: book.latestChapter,
+            updatedAt: book.updatedAt,
+          ).toJson(),
+      }),
     );
     final oldState = shelfBook.isOnline
         ? null
@@ -263,7 +280,7 @@ class BookSourceShelfService {
       );
     }
     try {
-      await _bookDao.updateBook(updated);
+      updated = await _bookDao.updateSourceBinding(shelfBook, updated);
     } catch (_) {
       if (oldState != null) {
         await _sourceChapterStateStore.save(shelfBook, oldState);
@@ -610,7 +627,7 @@ class BookSourceShelfService {
     }
     if (actualHash != state.materializedContentHash) {
       final reconciled = _reconcileEditedContent(
-        await file.readAsString(),
+        await _readSourceUpdateText(shelfBook),
         state.chapters,
       );
       if (reconciled == null) {
@@ -1037,9 +1054,12 @@ class BookSourceShelfService {
     required int refreshedChapterCount,
     required bool invalidateAllReferences,
   }) async {
+    // Prefix boundaries describe the file on disk, not the next revision.
+    final previousState =
+        await _sourceChapterStateStore.load(shelfBook) ?? state;
     final content = await _materializeWithPreservedPrefix(
       shelfBook,
-      state,
+      previousState,
       chapters,
     );
     late Book updatedBook;
@@ -1060,11 +1080,41 @@ class BookSourceShelfService {
         try {
           updatedBook = await _revisionCommitter(shelfBook, revision);
         } catch (_) {
-          await _sourceChapterStateStore.save(shelfBook, state);
+          await _sourceChapterStateStore.save(shelfBook, previousState);
           rethrow;
         }
       },
     );
+    if (addedChapterCount > 0) {
+      final previousInfo = SourceBookUpdateInfo.fromBook(updatedBook);
+      final sourceDates =
+          chapters
+              .map((chapter) => DateTime.tryParse(chapter.sourceMarker ?? ''))
+              .nonNulls
+              .toList()
+            ..sort();
+      final checkedAt = DateTime.now().toUtc();
+      final info = SourceBookUpdateInfo(
+        status: SourceBookCheckStatus.current,
+        checkedAt: checkedAt,
+        updatedAt: sourceDates.isNotEmpty
+            ? sourceDates.last
+            : previousInfo.updatedAt ?? checkedAt,
+        chapterCount: committedState.catalogChapterIds.length,
+        latestChapterId: chapters.last.sourceChapterId,
+        latestChapter: chapters.last.title,
+      );
+      try {
+        final metadata = info.encodeInto(updatedBook);
+        if (await _bookDao.updateSourceBookMetadata(updatedBook, metadata)) {
+          updatedBook = updatedBook.copyWith(sourceBookJson: metadata);
+        }
+      } catch (error) {
+        // The text revision is already committed; a status write must not
+        // turn a successful download into a failed task. Recheck on refresh.
+        debugPrint('Persist source update status failed: $error');
+      }
+    }
     LibraryEventBus().notifyLibraryChanged();
     TxtContentChangeBus.instance.notify(
       TxtContentChanged(
@@ -1165,7 +1215,7 @@ class BookSourceShelfService {
     if (untrackedCount <= 0) {
       return SourceChapterStateStore.materialize(chapters);
     }
-    final current = await File(book.filePath).readAsString();
+    final current = await _readSourceUpdateText(book);
     String prefix;
     if (previous.chapters.isEmpty) {
       prefix = current;
@@ -1347,7 +1397,7 @@ class BookSourceShelfService {
           book.coverUrl!,
           headers: book.coverHeaders,
         );
-        return CoverGenerator.saveCover(
+        return await CoverGenerator.saveCover(
           bytes,
           '${source.id}_${book.id}',
           documentsDirectory: documents,
@@ -1359,7 +1409,7 @@ class BookSourceShelfService {
         title: book.title,
         author: book.author,
       );
-      return CoverGenerator.saveCover(
+      return await CoverGenerator.saveCover(
         bytes,
         '${source.id}_${book.id}.png',
         documentsDirectory: documents,
@@ -1369,4 +1419,31 @@ class BookSourceShelfService {
       return null;
     }
   }
+}
+
+Future<String> _readSourceUpdateText(Book book) async => compute(
+  _decodeSourceUpdateText,
+  (await File(book.filePath).readAsBytes(), book.textEncoding),
+);
+
+String _decodeSourceUpdateText((Uint8List, String?) input) {
+  // Prefer lossless UTF-8, including files converted during a prior append.
+  final encoding = EnhancedTxtImportService.normalizeEncoding(input.$2);
+  if (!encoding.startsWith('utf16')) {
+    try {
+      return utf8.decode(input.$1);
+    } on FormatException {
+      /* Legacy TXT. */
+    }
+  }
+  final result = EnhancedTxtImportService().decodeWithResult(
+    input.$1,
+    encodingOverride: input.$2,
+  );
+  if (result.content.contains('\uFFFD')) {
+    throw const FormatException(
+      'Local TXT encoding must be resolved before updating.',
+    );
+  }
+  return result.content;
 }

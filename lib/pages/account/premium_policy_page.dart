@@ -43,6 +43,15 @@ class PremiumPolicyPage extends StatelessWidget {
         : [
             (l10n.agreementV2Section6Title, l10n.agreementV2Section6Body),
             (l10n.premiumPrivacyAccountTitle, l10n.premiumPrivacyAccountBody),
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? (
+                    '账号阅读统计与排行榜',
+                    '登录后，阅读记录的唯一编号、账号归属、起止时间及阅读时长会同步到官方服务器，用于跨设备统计和去重；此功能不上传书籍正文、书名或书单。未登录的记录保存在本机，仅在你确认合并后归入所选账号，不能重复转给其他账号。公开排行榜默认关闭，开启后展示昵称、头像和有效阅读时长；关闭后不再公开排名，个人云端统计仍保留。注销账号会删除对应云端阅读记录。',
+                  )
+                : (
+                    'Account reading statistics and leaderboards',
+                    'While signed in, record IDs, account ownership, reading timestamps and durations sync to our server for cross-device statistics and deduplication. Book text, titles and book lists are not uploaded by this feature. Guest records stay on your device until you choose an account to import them into; imported records cannot be reassigned. Public rankings are off by default. Opting in shares your name, avatar and ranked reading time. Opting out hides your ranking while preserving private cloud statistics. Deleting your account deletes its cloud reading records.',
+                  ),
             (l10n.premiumPrivacyPurchaseTitle, l10n.premiumPrivacyPurchaseBody),
           ];
     return FloatingSubpageScaffold(

@@ -1,3 +1,5 @@
+> 历史设计：WebDAV 已改为手动 ZIP 备份。当前行为见 [WebDAV 备份](webdav-backup.md)。以下同步方案不再适用于当前版本。
+
 # WebDAV 同步 UI / UX 设计
 
 > 2026-09-05 补充：TXT编辑后自动双向更新、跨设备无感续读、以续读为核心的同步首页及冲突交互以新草案 `txt-editing-webdav-sync-design.md` 对照；下文为既有同步界面的设计记录，新交互尚未实施。

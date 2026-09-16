@@ -7,6 +7,7 @@ import 'package:passkeys/types.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../core/app_distribution.dart';
+import '../reading/reading_account_scope.dart';
 import 'account_auth_callback_bridge.dart';
 import 'account_api_client.dart';
 import 'account_avatar_cache.dart';
@@ -26,8 +27,10 @@ class MemberAccountController extends ChangeNotifier {
     PendingDeviceAuthorizationStore? pendingAuthorizationStore,
     AccountAuthCallbackBridge? authCallbackBridge,
     ApplePurchaseStore? appleStore,
+    ReadingAccountScope? readingScope,
     this.membershipRetryDelay = const Duration(seconds: 30),
   }) : _api = api ?? MemberAccountApiClient(),
+       _readingScope = readingScope ?? ReadingAccountScope.instance,
        _avatarCache = avatarCache ?? AccountAvatarCache.instance,
        _summaryCache = summaryCache ?? const MemberAccountSummaryCache(),
        _membershipCache = membershipCache ?? const MemberMembershipCache(),
@@ -65,6 +68,8 @@ class MemberAccountController extends ChangeNotifier {
   static const appleProductId = 'com.niki.xxread.premium.lifetime';
 
   final MemberAccountApiClient _api;
+  final ReadingAccountScope _readingScope;
+  MemberAccountApiClient get readingApi => _api;
   final AccountAvatarCache _avatarCache;
   final MemberAccountSummaryCache _summaryCache;
   final MemberMembershipCache _membershipCache;
@@ -712,6 +717,7 @@ class MemberAccountController extends ChangeNotifier {
       confirmation: confirmation,
       mfaCode: mfaCode,
     );
+    await _readingScope.setOwner(null);
     _resetMembershipSync();
     _user = null;
     _pendingSession = null;
@@ -730,6 +736,7 @@ class MemberAccountController extends ChangeNotifier {
   });
 
   Future<void> logout() => _run(() async {
+    await _readingScope.setOwner(null);
     try {
       await _api.logout();
     } finally {
@@ -783,6 +790,7 @@ class MemberAccountController extends ChangeNotifier {
   }
 
   void _acceptAuthenticatedSession(MemberSession session) {
+    unawaited(_readingScope.setOwner(session.user.id));
     final accountChanged = _user?.id != session.user.id;
     if (accountChanged) {
       _resetMembershipSync();

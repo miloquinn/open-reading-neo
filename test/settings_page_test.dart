@@ -13,7 +13,7 @@ import 'package:xxread/services/reader_aloud_service.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/account/account.dart';
 import 'package:xxread/services/core/core_services.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
+import 'package:xxread/services/backup/webdav_backup_controller.dart';
 
 class _SettingsAloudService extends ChangeNotifier
     implements ReaderAloudService {
@@ -68,7 +68,7 @@ Future<ValueNotifier<double>> _pumpSettingsPage(
 
   final theme = ThemeNotifier();
   final appSettings = AppSettingsNotifier();
-  final webDav = WebDavSyncController();
+  final webDav = WebDavBackupController();
   final account = MemberAccountController();
   addTearDown(theme.dispose);
   addTearDown(appSettings.dispose);
@@ -190,7 +190,7 @@ void main() {
       same(aloud),
     );
     expect(
-      find.byKey(const ValueKey('cloud-tts-save')).hitTestable(),
+      find.byKey(const ValueKey('cloud-tts-add')).hitTestable(),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

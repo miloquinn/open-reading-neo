@@ -8,9 +8,25 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
       title: widget.book.title,
       author: widget.book.author,
     );
+    // The library may have checked or downloaded this book while reading.
+    try {
+      _shelfBook = await _shelfService.findShelfBook(
+        sourceId: widget.source.id,
+        sourceBookId: widget.book.id,
+      );
+    } catch (_) {
+      /* Keep the last known association if storage is unavailable. */
+    }
+    if (!mounted) return;
+    var catalogChecked = false;
     final action = await Navigator.of(context).push<BookSettingsAction>(
       MaterialPageRoute(
         builder: (_) => BookSettingsPage(
+          shelfBook: _shelfBook,
+          onBookChanged: (book) {
+            _shelfBook = book;
+            catalogChecked = true;
+          },
           title: widget.book.title,
           author: widget.book.author,
           format: 'online',
@@ -31,6 +47,12 @@ extension _BookSourceReaderNavigation on _BookSourceReaderPageState {
     if (!mounted) return;
     await _applyReaderSystemUi();
     if (!mounted) return;
+    if (catalogChecked && action != BookSettingsAction.changeSource) {
+      await _saveProgress();
+      if (!mounted) return;
+      await _initialize();
+      if (!mounted) return;
+    }
     switch (action) {
       case BookSettingsAction.changeSource:
         await _changeBookSource();

@@ -461,5 +461,11 @@ class _MemoryBookDao extends BookDao {
   }
 
   @override
+  Future<Book> updateSourceBinding(Book expected, Book replacement) async {
+    stored = replacement;
+    return stored;
+  }
+
+  @override
   Future<void> updateBook(Book book) async => stored = book;
 }

@@ -9,6 +9,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.LinearLayout
 import android.widget.TextView
+import org.json.JSONObject
 
 /** Debug-only native fixture for the immediate cross-origin localStorage redirect case. */
 class SourceBrowserSessionFixtureActivity : Activity() {
@@ -28,6 +29,15 @@ class SourceBrowserSessionFixtureActivity : Activity() {
             addView(status, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
         setContentView(root)
+        val optionalPayload = JSONObject("""{"html":null,"webJs":null,"literal":"null","inline":"<p>fixture</p>"}""")
+        if (optionalPayload.sourceOptionalString("html") != null ||
+            optionalPayload.sourceOptionalString("webJs") != null ||
+            optionalPayload.sourceOptionalString("missing") != null ||
+            optionalPayload.sourceOptionalString("literal") != "null" ||
+            optionalPayload.sourceOptionalString("inline") != "<p>fixture</p>") {
+            finishFixture(false, "Optional browser payload fields lost their types")
+            return
+        }
         if (!SourceBrowserSessionRuntime.supportsIsolatedDataDirectory) {
             finishFixture(false, "Requires Android 9+")
             return

@@ -8,7 +8,6 @@ import '../../models/book.dart';
 import '../../services/books/book_dao.dart';
 import '../../services/library/download_task_controller.dart';
 import '../../services/sync/book_sync_identity.dart';
-import '../../services/sync/webdav_sync_controller.dart';
 import '../../utils/localization_extension.dart';
 import '../../widgets/floating_subpage_scaffold.dart';
 import 'download_tasks_page.dart';
@@ -96,11 +95,6 @@ class _SourceBookUpdatesPageState extends State<SourceBookUpdatesPage> {
 
   Future<String> _uid() async => widget.bookUid ?? await stableBookUid(_book);
 
-  void _requestSync() {
-    final sync = context.read<WebDavSyncController?>();
-    sync?.requestAutomaticSync(immediate: true);
-  }
-
   Future<void> _update(SourceUpdateMode mode) async {
     setState(() {
       _busy = true;
@@ -130,7 +124,6 @@ class _SourceBookUpdatesPageState extends State<SourceBookUpdatesPage> {
       if (_result != null) {
         _book = _result!.book;
         _message = sourceUpdateResultText(context, _result!, mode: mode);
-        _requestSync();
       } else if (task?.state == DownloadTaskState.failed) {
         _message = context.l10n.bookSourceUpdateFailed;
       } else {
@@ -208,7 +201,6 @@ class _SourceBookUpdatesPageState extends State<SourceBookUpdatesPage> {
         if (mounted) {
           _result = null;
           _message = context.l10n.bookSourceTrackingEstablished;
-          _requestSync();
         }
       }
     } catch (_) {
@@ -291,7 +283,6 @@ class _SourceBookUpdatesPageState extends State<SourceBookUpdatesPage> {
           resolution: choice,
         );
         _book = _result!.book;
-        if (mounted) _requestSync();
       }
     } catch (_) {
       if (mounted) _message = context.l10n.bookSourceUpdateFailed;
@@ -326,7 +317,7 @@ class _SourceBookUpdatesPageState extends State<SourceBookUpdatesPage> {
                 ? null
                 : () => _update(SourceUpdateMode.appendNewChapters),
             icon: const Icon(Icons.update_rounded),
-            label: Text(l10n.bookSourceCheckNewChapters),
+            label: Text(l10n.bookSourceContinueUpdate),
           ),
           OutlinedButton.icon(
             onPressed: _busy

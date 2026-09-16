@@ -17,7 +17,7 @@ import 'package:xxread/services/account/account.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/core/core_services.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
+import 'package:xxread/services/backup/webdav_backup_controller.dart';
 import 'package:xxread/utils/layout_helper.dart';
 
 class _FakeCacheManager extends AppCacheManager {
@@ -151,7 +151,7 @@ void main() {
       tester.view.physicalSize = size;
       final theme = ThemeNotifier();
       final appSettings = AppSettingsNotifier();
-      final webDav = WebDavSyncController();
+      final webDav = WebDavBackupController();
       final account = MemberAccountController();
       addTearDown(theme.dispose);
       addTearDown(appSettings.dispose);

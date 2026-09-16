@@ -33,6 +33,7 @@ class ReaderChromeOverlay extends StatelessWidget {
     required this.settingsTooltip,
     required this.bookmarked,
     this.onReadAloud,
+    this.onLocateReadAloud,
     this.readAloudTooltip,
     this.readAloudActive = false,
     this.onAskAi,
@@ -66,6 +67,7 @@ class ReaderChromeOverlay extends StatelessWidget {
   final VoidCallback? onSearch;
   final String? searchTooltip;
   final VoidCallback? onReadAloud;
+  final VoidCallback? onLocateReadAloud;
   final VoidCallback? onAskAi;
   final String? askAiTooltip;
   final VoidCallback? onBookSettings;
@@ -307,6 +309,59 @@ class ReaderChromeOverlay extends StatelessWidget {
             ),
           ),
         ),
+        if (onLocateReadAloud != null)
+          AnimatedPositioned(
+            key: const ValueKey('reader-aloud-locate-slide'),
+            duration: reducedMotion
+                ? Duration.zero
+                : Duration(
+                    milliseconds: visible && readAloudActive ? 300 : 420,
+                  ),
+            curve: Curves.easeOutCubic,
+            right: visible && readAloudActive
+                ? 8 + MediaQuery.paddingOf(context).right
+                : -72,
+            top: MediaQuery.sizeOf(context).height * 0.56 - 56,
+            child: IgnorePointer(
+              ignoring: !visible || !readAloudActive,
+              child: ExcludeSemantics(
+                excluding: !visible || !readAloudActive,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: palette.controlBar.withValues(alpha: 0.8),
+                    border: Border.all(
+                      color: palette.text.withValues(alpha: 0.1),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    key: const ValueKey('reader-aloud-locate'),
+                    tooltip: switch (Localizations.localeOf(
+                      context,
+                    ).languageCode) {
+                      'en' => 'Locate reading position',
+                      'ja' => '読み上げ位置に移動',
+                      _ => '定位朗读',
+                    },
+                    onPressed: onLocateReadAloud,
+                    color: palette.text,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
+                    icon: const Icon(Icons.my_location_rounded, size: 22),
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (autoPageTurnController != null)
           _ReaderAutoPageTurnControl(
             palette: palette,

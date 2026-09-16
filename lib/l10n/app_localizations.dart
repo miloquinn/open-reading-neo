@@ -753,6 +753,48 @@ abstract class AppLocalizations {
   /// **'Disable selected'**
   String get bookSourcesDisableSelected;
 
+  /// No description provided for @bookSourcesExportSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Export selected'**
+  String get bookSourcesExportSelected;
+
+  /// No description provided for @bookSourcesExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported {count} source(s) to {location}'**
+  String bookSourcesExportSuccess(int count, String location);
+
+  /// No description provided for @bookSourcesExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the selected sources'**
+  String get bookSourcesExportFailed;
+
+  /// No description provided for @bookSourcesExportUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Source export is not supported on this platform yet'**
+  String get bookSourcesExportUnsupported;
+
+  /// No description provided for @bookSourcesExportReplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace existing file?'**
+  String get bookSourcesExportReplaceTitle;
+
+  /// No description provided for @bookSourcesExportReplaceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'A file already exists at {path}. Replace it?'**
+  String bookSourcesExportReplaceMessage(String path);
+
+  /// No description provided for @bookSourcesExportReplaceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get bookSourcesExportReplaceAction;
+
   /// No description provided for @bookSourcesDeleteSelected.
   ///
   /// In en, this message translates to:
@@ -11941,6 +11983,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Premium trial'**
   String get premiumTrialTitle;
+
+  /// bookSourceCheckUpdates
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get bookSourceCheckUpdates;
+
+  /// bookSourceUpdates
+  ///
+  /// In en, this message translates to:
+  /// **'Book updates'**
+  String get bookSourceUpdates;
+
+  /// bookSourceNotChecked
+  ///
+  /// In en, this message translates to:
+  /// **'Not checked yet'**
+  String get bookSourceNotChecked;
+
+  /// bookSourceUpToDate
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog is up to date'**
+  String get bookSourceUpToDate;
+
+  /// bookSourceUpdatesAvailable
+  ///
+  /// In en, this message translates to:
+  /// **'New chapters available'**
+  String get bookSourceUpdatesAvailable;
+
+  /// bookSourceNeedsMapping
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm where to continue'**
+  String get bookSourceNeedsMapping;
+
+  /// bookSourceLastChecked
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked: {time}'**
+  String bookSourceLastChecked(String time);
+
+  /// bookSourceLastUpdated
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated: {time}'**
+  String bookSourceLastUpdated(String time);
+
+  /// bookSourceUpdateTimeUnknown
+  ///
+  /// In en, this message translates to:
+  /// **'Update time unavailable'**
+  String get bookSourceUpdateTimeUnknown;
+
+  /// bookSourceLatestChapterLabel
+  ///
+  /// In en, this message translates to:
+  /// **'Latest: {chapter}'**
+  String bookSourceLatestChapterLabel(String chapter);
+
+  /// bookSourceUpdateHelp
+  ///
+  /// In en, this message translates to:
+  /// **'While the library is open, catalogs are checked every 30 minutes. Check manually at any time. Online books use the latest catalog; local TXT books download new chapters only when you choose to continue. After binding or changing a source, confirm the last chapter already in your local file. Updates do not replace your original text. The update time is supplied by the source, or records when a new chapter was first detected.'**
+  String get bookSourceUpdateHelp;
+
+  /// bookSourceBindHelp
+  ///
+  /// In en, this message translates to:
+  /// **'Find this book in your sources to add its cover and enable source switching and chapter updates. Your local text and reading position are preserved.'**
+  String get bookSourceBindHelp;
+
+  /// bookSourceContinueUpdate
+  ///
+  /// In en, this message translates to:
+  /// **'Download new chapters'**
+  String get bookSourceContinueUpdate;
 }
 
 class _AppLocalizationsDelegate

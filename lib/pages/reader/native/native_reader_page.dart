@@ -69,12 +69,10 @@ import 'package:xxread/services/books/txt_edit_service.dart';
 import 'package:xxread/services/books/txt_edit_reference_service.dart';
 import 'package:xxread/services/library/library_event_bus_service.dart';
 import 'package:xxread/services/sync/book_sync_identity.dart';
-import 'package:xxread/services/sync/reading_progress_event.dart';
-import 'package:xxread/services/sync/reading_progress_sync_service.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
+import 'package:xxread/services/reading/reading_cloud_recorder.dart';
 import 'package:xxread/services/tts_service.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
 import 'package:xxread/services/reader_aloud_session.dart';
@@ -135,7 +133,6 @@ part 'native_reader_horizontal_window.dart';
 part 'native_reader_document_parsers.dart';
 part 'native_reader_continuous_layout.dart';
 part 'native_reader_txt_editing.dart';
-part 'native_reader_sync_continuation.dart';
 
 typedef NativePageMode = ReaderPageMode;
 
@@ -394,6 +391,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   ReaderAloudHighlight? _readerAloudHighlight;
   bool _restartReaderAloudAfterManualPageTurn = false;
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
+  final ReadingCloudRecorder _cloudRecorder = ReadingCloudRecorder();
   final BookmarkDao _bookmarkDao = BookmarkDao();
   final BookNoteDao _bookNoteDao = BookNoteDao();
   final TxtEditReferenceService _txtEditReferenceService =
@@ -422,12 +420,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   Size _readerViewportSize = Size.zero;
   int _contentEditRevision = 0;
   String? _currentContentSignature;
-  Timer? _syncContinuationTimer;
-  ReadingProgressRemoteCandidate? _remoteProgressCandidate;
-  String? _dismissedRemoteProgressEventId;
-  bool _showReturnToLocalPosition = false;
-  bool _progressSyncEventPending = false;
-  bool _suppressProgressSyncEvents = false;
+  bool _positionChanged = false;
   bool? _lastUsesTwoPageLayout;
   Animation<double>? _routeAnimation;
 
@@ -454,11 +447,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     _startReadingSession();
     _chapterIndex = widget.book.currentPage;
     _currentContentSignature = widget.book.contentHash;
-    _showReturnToLocalPosition =
-        widget.book.id != null &&
-        ReadingProgressSyncService.instance.wasContinuationApplied(
-          widget.book.id!,
-        );
     _resetHorizontalPagingWindow(_chapterIndex);
     final savedLocator = widget.book.toCanonicalLocator();
     _anchorOffset = savedLocator?.textAnchor?.startOffsetUtf16;
@@ -476,7 +464,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     unawaited(_loadPageMode());
     unawaited(_loadBookmarks());
     unawaited(_loadAnnotations());
-    _startSyncContinuationWatch();
   }
 
   @override
@@ -491,6 +478,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     }
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       unawaited(_flushReadingSession());
       unawaited(_persistCurrentReaderPosition(reason: 'lifecycle'));
@@ -509,6 +497,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _syncCloudReading();
     _bindRouteAnimation();
     _bindOpeningFlightSettled();
     _bindOpeningCoverHold();
@@ -718,7 +707,6 @@ class _NativeReaderPageState extends State<NativeReaderPage>
     WidgetsBinding.instance.removeObserver(this);
     _openingLoaderTimer?.cancel();
     _controlsTimer?.cancel();
-    _syncContinuationTimer?.cancel();
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
     _openingFlightSettled?.removeListener(_onOpeningFlightSettledChanged);
     _openingCoverHoldReached?.removeListener(_onOpeningCoverHoldChanged);
@@ -801,9 +789,7 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         ? null
         : ((chapterIndex + chapterProgress) / chapterCount).clamp(0.0, 1.0);
     final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
-    final emitSyncEvent =
-        _progressSyncEventPending && !_suppressProgressSyncEvents;
-    if (emitSyncEvent) _progressSyncEventPending = false;
+    _positionChanged = false;
     // The serialized write can run after this State has been disposed. Resolve
     // context-dependent font and locale data while the reader is still alive.
     final layoutSignature = _layoutSignature;
@@ -822,20 +808,17 @@ class _NativeReaderPageState extends State<NativeReaderPage>
         layoutSignature,
         chapterIndex,
         readingProgress: readingProgress,
-        emitSyncEvent: emitSyncEvent,
       ),
     );
   }
 
   Future<void> _queueBookProgress(int bookId, int chapterIndex) {
     return _queuePositionWrite(
-      () => BookDao().updateBookProgress(
-        bookId,
-        chapterIndex,
-        emitSyncEvent: false,
-      ),
+      () => BookDao().updateBookProgress(bookId, chapterIndex),
     );
   }
+
+  void _markReadingPositionChanged() => _positionChanged = true;
 
   Future<void> _queuePositionWrite(Future<void> Function() write) {
     return _positionSaveQueue.enqueue(write);

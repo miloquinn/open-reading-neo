@@ -13,6 +13,182 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test(
+    'cloud queue prepares one segment ahead without advancing playback',
+    () async {
+      final client = _QueuedCloudClient();
+      final player = _QueuedBytesPlayer();
+      final service = ReaderAloudService(
+        systemEngine: _FakeSystemEngine(),
+        settingsStore: _FakeSettingsStore()..type = ReaderAloudEngineType.cloud,
+        cloudClient: client,
+        bytesPlayer: player,
+      );
+      addTearDown(service.dispose);
+      await service.initialize();
+      expect(service.supportsQueuedText, isTrue);
+      final started = <int>[];
+      final playback = service.speakQueued([
+        'first',
+        'second',
+        'third',
+      ], onTextStarted: started.add);
+      await _flushQueue();
+      expect(client.texts, ['first']);
+      client.complete(0);
+      await _flushQueue();
+      expect(player.audio, [
+        [0],
+      ]);
+      expect(client.texts, ['first', 'second']);
+      client.complete(1);
+      await _flushQueue();
+      expect(started, [0]);
+      expect(player.audio, hasLength(1));
+      expect(client.texts, hasLength(2));
+      player.complete();
+      await _flushQueue();
+      expect(player.audio, [
+        [0],
+        [1],
+      ]);
+      expect(started, [0, 1]);
+      expect(client.texts, ['first', 'second', 'third']);
+      client.complete(2);
+      player.complete();
+      await _flushQueue();
+      expect(player.audio, [
+        [0],
+        [1],
+        [2],
+      ]);
+      player.complete();
+      await playback;
+      expect(started, [0, 1, 2]);
+    },
+  );
+
+  for (final action in ['pause', 'stop']) {
+    test(
+      '$action invalidates pending cloud prefetch and prevents stale playback',
+      () async {
+        final client = _QueuedCloudClient();
+        final player = _QueuedBytesPlayer();
+        final service = ReaderAloudService(
+          systemEngine: _FakeSystemEngine(),
+          settingsStore: _FakeSettingsStore()
+            ..type = ReaderAloudEngineType.cloud,
+          cloudClient: client,
+          bytesPlayer: player,
+        );
+        addTearDown(service.dispose);
+        final started = <int>[];
+        final playback = service.speakQueued([
+          'first',
+          'second',
+          'third',
+        ], onTextStarted: started.add);
+        await _flushQueue();
+        client.complete(0);
+        await _flushQueue();
+        expect(client.texts, ['first', 'second']);
+        if (action == 'pause') {
+          await service.pause();
+        } else {
+          await service.stop();
+        }
+        client.complete(1);
+        await playback;
+        await _flushQueue();
+        expect(started, [0]);
+        expect(player.audio, [
+          [0],
+        ]);
+        expect(client.texts, hasLength(2));
+      },
+    );
+  }
+
+  test(
+    'prefetch failure is deferred and falls back only when its segment starts',
+    () async {
+      final system = _FakeSystemEngine();
+      final client = _QueuedCloudClient();
+      final player = _QueuedBytesPlayer();
+      final service = ReaderAloudService(
+        systemEngine: system,
+        settingsStore: _FakeSettingsStore()..type = ReaderAloudEngineType.cloud,
+        cloudClient: client,
+        bytesPlayer: player,
+      );
+      addTearDown(service.dispose);
+      final started = <int>[];
+      final playback = service.speakQueued([
+        'first',
+        'second',
+      ], onTextStarted: started.add);
+      await _flushQueue();
+      client.complete(0);
+      await _flushQueue();
+      client.results[1].completeError(
+        const ReaderAloudCloudException('failed', 'failed'),
+      );
+      await _flushQueue();
+      expect(system.spoken, isEmpty);
+      expect(service.cloudError, isNull);
+      expect(started, [0]);
+      player.complete();
+      await playback;
+      expect(system.spoken, ['second']);
+      expect(player.audio, [
+        [0],
+      ]);
+      expect(started, [0, 1]);
+    },
+  );
+
+  test(
+    'new voice and speed queue does not reuse audio from cancelled prefetch',
+    () async {
+      final system = _FakeSystemEngine();
+      final client = _QueuedCloudClient();
+      final player = _QueuedBytesPlayer();
+      final service = ReaderAloudService(
+        systemEngine: system,
+        settingsStore: _FakeSettingsStore()..type = ReaderAloudEngineType.cloud,
+        cloudClient: client,
+        bytesPlayer: player,
+      );
+      addTearDown(service.dispose);
+      final old = service.speakQueued([
+        'first',
+        'second',
+      ], onTextStarted: (_) {});
+      await _flushQueue();
+      client.complete(0);
+      await _flushQueue();
+      await service.stop();
+      await service.updateCloudSettings(
+        const ReaderAloudCloudSettings(voice: 'nova'),
+      );
+      system.speechRateValue = 1;
+      final next = service.speakQueued(['second'], onTextStarted: (_) {});
+      await _flushQueue();
+      expect(client.texts, ['first', 'second', 'second']);
+      expect(client.voices, ['alloy', 'alloy', 'nova']);
+      expect(client.speeds, [1, 1, 2]);
+      client.complete(1);
+      client.complete(2);
+      await _flushQueue();
+      expect(player.audio, [
+        [0],
+        [2],
+      ]);
+      player.complete();
+      await Future.wait([old, next]);
+    },
+  );
+
+  test(
     'named voices migrate legacy settings and keep keys isolated after restart',
     () async {
       final secrets = _FakeSecretStorage();
@@ -566,4 +742,54 @@ class _FailingProfileStore extends _FakeSettingsStore
   Future<void> writeProfileKey(String id, String? key) async {
     apiKey = key;
   }
+}
+
+Future<void> _flushQueue() => Future<void>.delayed(Duration.zero);
+
+class _QueuedCloudClient implements ReaderAloudCloudClient {
+  final texts = <String>[];
+  final voices = <String>[];
+  final speeds = <double>[];
+  final results = <Completer<Uint8List>>[];
+  void complete(int index) =>
+      results[index].complete(Uint8List.fromList([index]));
+  @override
+  Future<Uint8List> synthesize({
+    required ReaderAloudCloudSettings settings,
+    required String apiKey,
+    required String text,
+    required double speed,
+  }) {
+    texts.add(text);
+    voices.add(settings.voice);
+    speeds.add(speed);
+    final result = Completer<Uint8List>();
+    results.add(result);
+    return result.future;
+  }
+}
+
+class _QueuedBytesPlayer extends _FakeBytesPlayer {
+  final audio = <List<int>>[];
+  Completer<void>? active;
+  void complete() {
+    final value = active;
+    if (value != null && !value.isCompleted) value.complete();
+  }
+
+  @override
+  Future<void> play(
+    Uint8List bytes, {
+    required String mimeType,
+    required double volume,
+  }) {
+    audio.add(bytes.toList());
+    active = Completer<void>();
+    return active!.future;
+  }
+
+  @override
+  Future<void> pause() async => complete();
+  @override
+  Future<void> stop() async => complete();
 }

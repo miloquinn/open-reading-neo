@@ -7,11 +7,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:xxread/models/book.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/storage/android_book_folder_registry.dart';
-import 'package:xxread/services/sync/sync.dart';
 import 'package:xxread/utils/localization_extension.dart';
 import 'package:xxread/widgets/floating_subpage_scaffold.dart';
 import 'package:xxread/widgets/side_toast.dart';
@@ -33,12 +30,10 @@ class _ImportBookPageState extends State<ImportBookPage> {
   late final ImportBookController _controller;
   late final AndroidBookFolderRegistry _androidFolderRegistry;
   bool _isDiscovering = false;
-  bool _isSyncingImportedBooks = false;
   bool? _iCloudAvailable;
   List<AndroidBookFolder> _androidFolders = const [];
-  final Set<int> _handledWebDavBookIds = <int>{};
 
-  bool get _isBusy => _controller.isRunning || _isSyncingImportedBooks;
+  bool get _isBusy => _controller.isRunning;
 
   @override
   void initState() {
@@ -106,142 +101,6 @@ class _ImportBookPageState extends State<ImportBookPage> {
 
   Future<void> _runImportOperation(Future<void> Function() operation) async {
     await operation();
-    if (!mounted) return;
-    final importedBooks = _controller.items
-        .where(
-          (item) =>
-              item.status == ImportQueueItemStatus.imported &&
-              item.result?.outcome == BookImportOutcome.imported,
-        )
-        .map((item) => item.result!.book)
-        .where((book) => book.id != null)
-        .where((book) => _handledWebDavBookIds.add(book.id!))
-        .toList(growable: false);
-    if (importedBooks.isEmpty) return;
-    await _handleImportedBooks(importedBooks);
-  }
-
-  Future<void> _handleImportedBooks(List<Book> books) async {
-    final sync = Provider.of<WebDavSyncController?>(context, listen: false);
-    if (sync == null || !sync.isConfigured || !sync.scope.bookFiles) return;
-    final eligible = <Book>[];
-    for (final book in books) {
-      if (book.isOnline || book.filePath.isEmpty) continue;
-      final file = File(book.filePath);
-      if (!await file.exists()) continue;
-      if (book.format.toLowerCase() == 'txt' ||
-          await file.length() <=
-              BookFileSyncService.maxRecoverableFileBytes) {
-        eligible.add(book);
-      }
-    }
-    if (!mounted || eligible.isEmpty) return;
-
-    if (sync.newBookUploadPolicy == WebDavNewBookUploadPolicy.automatic) {
-      sync.enqueueNewBookUploads(eligible);
-      return;
-    }
-
-    final selected = switch (sync.newBookUploadPolicy) {
-      WebDavNewBookUploadPolicy.manual => const <Book>[],
-      WebDavNewBookUploadPolicy.automatic => const <Book>[],
-      WebDavNewBookUploadPolicy.askEveryTime => await _askWhichBooksToUpload(
-        eligible,
-      ),
-    };
-    if (selected.isEmpty || !mounted) return;
-    await _uploadImportedBooks(sync, selected);
-  }
-
-  Future<List<Book>> _askWhichBooksToUpload(List<Book> books) async {
-    final selectedIds = books.map((book) => book.id!).toSet();
-    final result = await showDialog<List<Book>>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(context.l10n.webDavNewBooksPromptTitle(books.length)),
-          content: SizedBox(
-            width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.l10n.webDavNewBooksPromptBody),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: books.length,
-                    itemBuilder: (context, index) {
-                      final book = books[index];
-                      return CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: selectedIds.contains(book.id),
-                        title: Text(
-                          book.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(book.format.toUpperCase()),
-                        onChanged: (selected) => setDialogState(() {
-                          if (selected ?? false) {
-                            selectedIds.add(book.id!);
-                          } else {
-                            selectedIds.remove(book.id);
-                          }
-                        }),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(const []),
-              child: Text(context.l10n.webDavNewBooksSkip),
-            ),
-            FilledButton(
-              onPressed: selectedIds.isEmpty
-                  ? null
-                  : () => Navigator.of(dialogContext).pop(
-                      books
-                          .where((book) => selectedIds.contains(book.id))
-                          .toList(growable: false),
-                    ),
-              child: Text(context.l10n.webDavFilesUploadSelected),
-            ),
-          ],
-        ),
-      ),
-    );
-    return result ?? const [];
-  }
-
-  Future<void> _uploadImportedBooks(
-    WebDavSyncController sync,
-    List<Book> books,
-  ) async {
-    setState(() => _isSyncingImportedBooks = true);
-    showSideToast(context, context.l10n.webDavNewBooksUploading(books.length));
-    var succeeded = 0;
-    var failed = 0;
-    for (final book in books) {
-      try {
-        await sync.uploadBookFile(book);
-        succeeded++;
-      } catch (_) {
-        failed++;
-      }
-    }
-    if (!mounted) return;
-    setState(() => _isSyncingImportedBooks = false);
-    showSideToast(
-      context,
-      context.l10n.webDavNewBooksUploadResult(succeeded, failed),
-      kind: failed == 0 ? SideToastKind.success : SideToastKind.warning,
-    );
   }
 
   Future<void> _loadICloudAvailability() async {
@@ -592,9 +451,7 @@ class _ImportBookPageState extends State<ImportBookPage> {
     if (_controller.totalCount == 0) return null;
     final hasCompleted = _controller.completedCount > 0;
     final primaryLabel = _isBusy
-        ? (_isSyncingImportedBooks
-              ? context.l10n.webDavNewBooksUploading(_controller.succeededCount)
-              : context.l10n.importProcessing)
+        ? context.l10n.importProcessing
         : context.l10n.importAction(_controller.queuedCount);
     return ImportBottomBar(
       summary: hasCompleted

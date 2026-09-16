@@ -74,6 +74,8 @@ source.getLocalStorage("https://accounts.example").get("access_token")
 
 通用登录兼容约定（2026-09-15）：
 
+Android 浏览器跨进程参数中的可选 HTML、JavaScript 和界面文案按字符串类型读取，JSON `null` 保持为空；不能用 `JSONObject.optString` 将其转换成正文 `"null"`。可见浏览器与后台加载服务共用此约定。2026-09-16 原生真机夹具验证了空值、缺失字段、合法字面文本 `"null"`、内联 HTML 和跨域 Local Storage；浏览器交互、运行时交互端口及会话回归共 18 项通过。普通网页按钮逐项实测尚未完成。
+
 - 同一脚本操作内的请求头/响应脚本不排在等待它的父脚本之后；独立操作仍串行。回归覆盖嵌套完成、失败后恢复及其他书源的隔离。
 - 脚本网络请求的协议错误在原始 JavaScript 调用点重放，让书源自己的 `try/catch` 能处理可选接口失败；取消操作不重放、不吞掉，必需接口的未捕获错误仍向用户报告。
 - 根规则脚本接收原始 HTTP 文本（包括 JSON），而 JSONPath 与选中条目的脚本仍接收结构化数据；避免书源的 `JSON.parse(result)` 收到对象。

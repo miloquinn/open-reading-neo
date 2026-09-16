@@ -221,17 +221,15 @@ extension _LibraryPageBookDetails on _LibraryPageState {
                             unawaited(_changeOnlineBookSource(book));
                           },
                         ),
-                      if (!book.isOnline &&
-                          book.hasSourceBinding &&
-                          book.format.toLowerCase() == 'txt')
+                      if (book.hasSourceBinding)
                         _buildOptionItem(
                           context: context,
                           icon: Icons.update_rounded,
                           iconColor: localScheme.primary,
-                          title: context.l10n.bookSourceTrackUpdatesTitle,
+                          title: context.l10n.bookSourceCheckUpdates,
                           onTap: () {
                             Navigator.pop(context);
-                            unawaited(_openSourceUpdates(book));
+                            _showBookInfo(book);
                           },
                         ),
                       if (book.isOnline)
@@ -570,52 +568,60 @@ extension _LibraryPageBookDetails on _LibraryPageState {
             Text(context.l10n.libraryBookInfo),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow(context.l10n.libraryBookTitle, book.title),
-            const SizedBox(height: 12),
-            _buildInfoRow(context.l10n.author, book.author),
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              context.l10n.libraryFormat,
-              book.format.toUpperCase(),
-            ),
-            const SizedBox(height: 12),
-            if (book.isOnline) ...[
-              _buildInfoRow(
-                context.l10n.totalChapters,
-                context.l10n.libraryChaptersCount(
-                  (book.totalPages / BookSourceShelfService.unitsPerChapter)
-                      .round(),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (book.hasSourceBinding || book.format.toLowerCase() == 'txt')
+                  SourceBookStatusCard(book: book),
+                _buildInfoRow(context.l10n.libraryBookTitle, book.title),
+                const SizedBox(height: 12),
+                _buildInfoRow(context.l10n.author, book.author),
+                const SizedBox(height: 12),
+                _buildInfoRow(
+                  context.l10n.libraryFormat,
+                  book.format.toUpperCase(),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                context.l10n.currentChapter,
-                context.l10n.libraryChaptersCount(
-                  (book.currentPage / BookSourceShelfService.unitsPerChapter)
-                      .round(),
+                const SizedBox(height: 12),
+                if (book.isOnline) ...[
+                  _buildInfoRow(
+                    context.l10n.totalChapters,
+                    context.l10n.libraryChaptersCount(
+                      (book.totalPages / BookSourceShelfService.unitsPerChapter)
+                          .round(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    context.l10n.currentChapter,
+                    context.l10n.libraryChaptersCount(
+                      (book.currentPage /
+                              BookSourceShelfService.unitsPerChapter)
+                          .round(),
+                    ),
+                  ),
+                ] else ...[
+                  _buildInfoRow(
+                    context.l10n.totalPages,
+                    context.l10n.libraryPagesCount(book.totalPages),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    context.l10n.currentPage,
+                    context.l10n.libraryPagesCount(book.currentPage),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _buildInfoRow(
+                  context.l10n.readingProgress,
+                  '${(book.progress * 100).toStringAsFixed(1)}%',
                 ),
-              ),
-            ] else ...[
-              _buildInfoRow(
-                context.l10n.totalPages,
-                context.l10n.libraryPagesCount(book.totalPages),
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                context.l10n.currentPage,
-                context.l10n.libraryPagesCount(book.currentPage),
-              ),
-            ],
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              context.l10n.readingProgress,
-              '${(book.progress * 100).toStringAsFixed(1)}%',
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
           TextButton(

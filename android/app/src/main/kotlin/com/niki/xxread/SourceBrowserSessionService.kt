@@ -171,8 +171,8 @@ class SourceBrowserSessionService : Service() {
         private val url = payload.optString("url")
         private val method = payload.optString("method", "GET").uppercase()
         private val body = payload.optString("body", "")
-        private val webJs = payload.optString("webJs").takeIf { it.isNotBlank() }
-        private val html = payload.optString("html").takeIf { it.isNotEmpty() }
+        private val webJs = payload.sourceOptionalString("webJs")?.takeIf { it.isNotBlank() }
+        private val html = payload.sourceOptionalString("html")?.takeIf { it.isNotEmpty() }
         private val headers = headersFromJson(payload.optJSONObject("headers")?.toString())
         private val timeoutMs = payload.optLong("timeoutMs", 15_000L).coerceIn(2_000L, 60_000L)
         private val tracker = SourceBrowserSessionTracker(

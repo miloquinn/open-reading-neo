@@ -14,8 +14,11 @@ import 'package:xxread/pages/reader/book_reader_launcher.dart';
 import 'package:xxread/models/book.dart';
 import 'package:xxread/pages/reader/book_source/online_reader_factory.dart';
 import 'package:xxread/pages/reading_stats/detailed_stats_page.dart';
+import 'package:xxread/pages/reading_stats/leaderboard_page.dart';
+import 'package:xxread/services/account/member_account_controller.dart';
 import 'package:xxread/services/books/book_services.dart';
 import 'package:xxread/services/library/library_event_bus_service.dart';
+import 'package:xxread/services/reading/reading_cloud_controller.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
 import 'package:xxread/utils/book_open_transition.dart';
@@ -315,6 +318,10 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
     Navigator.of(context).pushWithSlideScale(const DetailedStatsPage());
   }
 
+  void _openLeaderboard() {
+    Navigator.of(context).pushWithSlideScale(const ReadingLeaderboardPage());
+  }
+
   Future<void> _openBook(Book book) async {
     final openingActivity = BookOpenTransition.beginActivity();
     final initialThemeFuture = ReaderThemes.loadSavedPalette();
@@ -323,13 +330,6 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
           ? book
           : await _bookDao.getBookById(book.id!);
       if (fullBook == null || !mounted) return;
-      if (fullBook.isOnline) {
-        fullBook = await BookReaderLauncher.refreshProgressBeforeOpen(
-          context,
-          fullBook,
-        );
-        if (!mounted) return;
-      }
       final initialTheme = await initialThemeFuture;
       if (!mounted) return;
 
@@ -474,6 +474,8 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
                                     readingRhythm,
                                   ],
                                 ),
+                              const SizedBox(height: 18),
+                              _buildLeaderboardCard(),
                               if (_recentBooks.length > 1) ...[
                                 const SizedBox(height: 28),
                                 _buildSectionHeading(
@@ -815,6 +817,139 @@ class _HomeMobileDashboardPageState extends State<HomeMobileDashboardPage>
         ),
       ),
     );
+  }
+
+  Widget _buildLeaderboardCard() {
+    final palette = _palette;
+    MemberAccountController? account;
+    ReadingCloudController? cloud;
+    try {
+      account = context.watch<MemberAccountController>();
+      cloud = context.watch<ReadingCloudController>();
+    } on ProviderNotFoundException {
+      // Isolated previews and widget tests may render the home page without
+      // account services. The entry remains useful and shows its signed-out
+      // state until those providers are available.
+    }
+
+    final signedIn =
+        account?.user?.id != null && account?.user?.id == cloud?.owner;
+    final summary = signedIn ? cloud?.summary : null;
+    final me = signedIn ? (cloud?.week?['me'] as Map?) : null;
+    final seconds = (summary?['week_seconds'] as num?)?.toInt() ?? 0;
+    final rank = (me?['rank'] as num?)?.toInt();
+    final isChinese = Localizations.localeOf(context).languageCode == 'zh';
+
+    final subtitle = !signedIn
+        ? (isChinese
+              ? '登录后同步阅读记录，参与周榜'
+              : 'Sign in to sync reading and join the weekly board')
+        : cloud?.busy == true && summary == null
+        ? (isChinese ? '正在同步本周阅读数据…' : 'Syncing this week…')
+        : rank != null
+        ? (isChinese
+              ? '本周 ${_compactDuration(seconds, chinese: true)} · 第 $rank 名'
+              : 'This week ${_compactDuration(seconds, chinese: false)} · Rank $rank')
+        : (isChinese
+              ? '本周 ${_compactDuration(seconds, chinese: true)} · 查看我的排名'
+              : 'This week ${_compactDuration(seconds, chinese: false)} · View my rank');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('home-reading-leaderboard-card'),
+        onTap: _openLeaderboard,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: _cardDecoration(color: palette.cardColor, radius: 22),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: palette.accentColor.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.emoji_events_outlined,
+                  size: 23,
+                  color: palette.accentColor,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isChinese ? '阅读排行榜' : 'Reading leaderboard',
+                      style: TextStyle(
+                        color: palette.primaryTextColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: palette.secondaryTextColor,
+                        fontSize: 13,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (rank != null) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.accentColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    '#$rank',
+                    style: TextStyle(
+                      color: palette.accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 13,
+                color: palette.secondaryTextColor,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _compactDuration(int seconds, {required bool chinese}) {
+    final minutes = seconds ~/ 60;
+    if (minutes < 60) {
+      return chinese ? '$minutes 分钟' : '${minutes}m';
+    }
+    final hours = minutes ~/ 60;
+    final remainder = minutes % 60;
+    if (remainder == 0) return chinese ? '$hours 小时' : '${hours}h';
+    return chinese ? '$hours 小时 $remainder 分' : '${hours}h ${remainder}m';
   }
 
   Widget _buildMetric({required String value, required String label}) {

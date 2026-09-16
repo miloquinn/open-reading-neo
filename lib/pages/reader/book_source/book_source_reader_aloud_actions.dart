@@ -42,6 +42,41 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
       _readerAloudActive = active;
       _readerAloudHighlight = highlight;
     });
+    _syncCloudReading();
+  }
+
+  Future<void> _locateReaderAloud() async {
+    final session = context.read<ReaderAloudSession?>();
+    if (session?.sourceId != 'source:${widget.source.id}:${widget.book.id}')
+      return;
+    final controller = session?.controller;
+    final highlight = controller?.highlight;
+    if (controller == null || highlight == null) return;
+    // A reopened reader must subscribe to the existing session, not acquire a
+    // new one or use reveal callbacks captured by a disposed reader route.
+    if (_readerAloudController != controller) {
+      _readerAloudController?.removeListener(_onReaderAloudChanged);
+      _readerAloudController = controller;
+      controller.addListener(_onReaderAloudChanged);
+    }
+    _onReaderAloudChanged();
+    try {
+      await _revealReaderAloudPosition(
+        ReaderAloudPosition(
+          chapterIndex: highlight.chapterIndex,
+          offset: highlight.startOffset,
+        ),
+      );
+    } catch (_) {
+      if (mounted)
+        showSideToast(context, switch (Localizations.localeOf(
+          context,
+        ).languageCode) {
+          'en' => 'Could not locate the reading position. Please retry.',
+          'ja' => '読み上げ位置に移動できませんでした。再試行してください。',
+          _ => '定位朗读失败，请重试',
+        }, kind: SideToastKind.error);
+    }
   }
 
   Future<void> _revealReaderAloudPosition(ReaderAloudPosition position) async {

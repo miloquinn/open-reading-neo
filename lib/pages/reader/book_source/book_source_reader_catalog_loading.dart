@@ -264,6 +264,13 @@ extension _BookSourceReaderCatalogLoading on _BookSourceReaderPageState {
     });
     final shelfBookId = _shelfBookId;
     if (shelfBookId == null) return;
+    if (shelfBook != null && _chapters.isNotEmpty) {
+      unawaited(
+        SourceBookUpdateService()
+            .markOnlineOpened(shelfBook, latestChapterId: _chapters.last.id)
+            .catchError((Object _) {}),
+      );
+    }
     unawaited(ReadingResumeService.markReading(shelfBookId));
     try {
       final results = await Future.wait<Object>([

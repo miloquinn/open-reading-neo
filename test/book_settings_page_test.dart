@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/reader/book_settings_page.dart';
+import 'package:xxread/models/book.dart';
 
 void main() {
   testWidgets('reader more button opens book settings directly', (
@@ -151,6 +152,40 @@ void main() {
     expect(selected, BookSettingsAction.editText);
     expect(find.text('打开'), findsOneWidget);
   });
+
+  testWidgets(
+    'downloaded book in online reader keeps one reader-owned source switch',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: BookSettingsPage(
+            title: 'Book',
+            author: 'Author',
+            format: 'online',
+            cover: const SizedBox(),
+            canChangeSource: true,
+            shelfBook: Book(
+              id: 7,
+              title: 'Book',
+              filePath: '/tmp/book.txt',
+              format: 'txt',
+              sourceId: 's',
+              sourceBookId: 'b',
+              sourceJson: '{}',
+              sourceBookJson: '{}',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('换源'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, '换源'), findsOneWidget);
+      expect(find.text('检查更新'), findsOneWidget);
+    },
+  );
 
   testWidgets('online books offer source switching', (tester) async {
     await tester.pumpWidget(app(online: true));

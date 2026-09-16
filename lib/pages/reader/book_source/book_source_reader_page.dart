@@ -23,6 +23,7 @@ import 'package:xxread/book_sources/caching/source_cover_cache.dart';
 import 'package:xxread/book_sources/services/book_source_reading_progress.dart';
 import 'package:xxread/book_sources/services/book_source_registry.dart';
 import 'package:xxread/book_sources/services/book_source_shelf_service.dart';
+import 'package:xxread/book_sources/services/source_book_update_service.dart';
 import 'package:xxread/book_sources/services/book_source_text_paginator.dart';
 import 'package:xxread/core/reader/canonical_locator.dart';
 import 'package:xxread/core/reader/platform_reader_aloud_media_session.dart';
@@ -57,6 +58,7 @@ import 'package:xxread/services/books/bookmark_dao.dart';
 import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/reading/reading_resume_service.dart';
 import 'package:xxread/services/reading/reading_stats_dao.dart';
+import 'package:xxread/services/reading/reading_cloud_recorder.dart';
 import 'package:xxread/services/tts_service.dart';
 import 'package:xxread/services/reader_aloud_service.dart';
 import 'package:xxread/services/reader_aloud_session.dart';
@@ -280,6 +282,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   Timer? _progressSaveTimer;
   Timer? _controlsTimer;
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
+  final ReadingCloudRecorder _cloudRecorder = ReadingCloudRecorder();
   final BookmarkDao _bookmarkDao = BookmarkDao();
   final BookNoteDao _bookNoteDao = BookNoteDao();
   final ReaderSettingsStore _readerSettingsStore = const ReaderSettingsStore();
@@ -458,6 +461,7 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _syncCloudReading();
     var nextReaderFont = FontCatalog.defaultReaderFont;
     var nextReaderFontReady = true;
     try {
@@ -526,9 +530,21 @@ class _BookSourceReaderPageState extends State<BookSourceReaderPage>
 
   void _startReadingSession() {
     _readingSessionStartedAt ??= DateTime.now();
+    _syncCloudReading();
+  }
+
+  void _syncCloudReading() {
+    if (_appLifecycleActive && _readingSessionStartedAt != null &&
+        _openingContentReadyScheduled && !_readerAloudActive &&
+        (ModalRoute.isCurrentOf(context) ?? true)) {
+      _cloudRecorder.start();
+    } else {
+      unawaited(_cloudRecorder.stop());
+    }
   }
 
   Future<void> _flushReadingSession() async {
+    unawaited(_cloudRecorder.stop());
     final startedAt = _readingSessionStartedAt;
     if (startedAt == null) return;
 

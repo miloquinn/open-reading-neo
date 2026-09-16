@@ -374,6 +374,32 @@ class AppLocalizationsJa extends AppLocalizations {
   String get bookSourcesDisableSelected => '選択項目を無効化';
 
   @override
+  String get bookSourcesExportSelected => '選択項目をエクスポート';
+
+  @override
+  String bookSourcesExportSuccess(int count, String location) {
+    return '$count 件のソースを $location にエクスポートしました';
+  }
+
+  @override
+  String get bookSourcesExportFailed => '選択したソースをエクスポートできませんでした';
+
+  @override
+  String get bookSourcesExportUnsupported =>
+      'このプラットフォームではソースのエクスポートにまだ対応していません';
+
+  @override
+  String get bookSourcesExportReplaceTitle => '既存のファイルを置き換えますか？';
+
+  @override
+  String bookSourcesExportReplaceMessage(String path) {
+    return '$path には既にファイルがあります。置き換えますか？';
+  }
+
+  @override
+  String get bookSourcesExportReplaceAction => '置き換える';
+
+  @override
   String get bookSourcesDeleteSelected => '選択項目を削除';
 
   @override
@@ -6585,4 +6611,51 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get premiumTrialTitle => 'プレミアム体験';
+
+  @override
+  String get bookSourceCheckUpdates => '更新を確認';
+
+  @override
+  String get bookSourceUpdates => '書籍の更新';
+
+  @override
+  String get bookSourceNotChecked => '未確認';
+
+  @override
+  String get bookSourceUpToDate => '目次は最新です';
+
+  @override
+  String get bookSourceUpdatesAvailable => '新しい章があります';
+
+  @override
+  String get bookSourceNeedsMapping => '追加する開始位置を確認';
+
+  @override
+  String bookSourceLastChecked(String time) {
+    return '最終確認：$time';
+  }
+
+  @override
+  String bookSourceLastUpdated(String time) {
+    return '最終更新：$time';
+  }
+
+  @override
+  String get bookSourceUpdateTimeUnknown => '更新日時は不明です';
+
+  @override
+  String bookSourceLatestChapterLabel(String chapter) {
+    return '最新の章：$chapter';
+  }
+
+  @override
+  String get bookSourceUpdateHelp =>
+      '書庫を開いている間、30 分ごとに目次を確認します。手動でも確認できます。オンライン書籍は最新の目次を使います。ローカル TXT は追加を選ぶと新しい章をダウンロードします。連携や書籍ソースの変更後は、ローカルにある最後の章を確認してください。元の本文は置き換えません。更新日時はソースの日時、または新しい章を最初に検出した日時です。';
+
+  @override
+  String get bookSourceBindHelp =>
+      '書籍ソースで検索して連携すると、表紙の追加、ソースの変更、章の追加ができます。ローカルの本文と読書位置は保持されます。';
+
+  @override
+  String get bookSourceContinueUpdate => '新しい章をダウンロード';
 }

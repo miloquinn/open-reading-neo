@@ -25,6 +25,8 @@ class BookSourceManagementList extends StatelessWidget {
     required this.onEnableSelected,
     required this.onDisableSelected,
     required this.onCheckSelected,
+    required this.onExportSelected,
+    required this.exportInProgress,
     required this.onGroupSelected,
     required this.onRemoveSelected,
     required this.onToggleSourceSelection,
@@ -47,6 +49,8 @@ class BookSourceManagementList extends StatelessWidget {
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
   final VoidCallback onCheckSelected;
+  final VoidCallback onExportSelected;
+  final bool exportInProgress;
   final VoidCallback onGroupSelected;
   final VoidCallback onRemoveSelected;
   final ValueChanged<RegisteredBookSource> onToggleSourceSelection;
@@ -115,6 +119,8 @@ class BookSourceManagementList extends StatelessWidget {
                 onEnableSelected: onEnableSelected,
                 onDisableSelected: onDisableSelected,
                 onCheckSelected: onCheckSelected,
+                onExportSelected: onExportSelected,
+                exportInProgress: exportInProgress,
                 onGroupSelected: onGroupSelected,
                 onRemoveSelected: onRemoveSelected,
               ),
@@ -241,6 +247,8 @@ class _HeaderAndFilters extends StatelessWidget {
     required this.onEnableSelected,
     required this.onDisableSelected,
     required this.onCheckSelected,
+    required this.onExportSelected,
+    required this.exportInProgress,
     required this.onGroupSelected,
     required this.onRemoveSelected,
   });
@@ -258,6 +266,8 @@ class _HeaderAndFilters extends StatelessWidget {
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
   final VoidCallback onCheckSelected;
+  final VoidCallback onExportSelected;
+  final bool exportInProgress;
   final VoidCallback onGroupSelected;
   final VoidCallback onRemoveSelected;
 
@@ -329,6 +339,8 @@ class _HeaderAndFilters extends StatelessWidget {
             onEnableSelected: onEnableSelected,
             onDisableSelected: onDisableSelected,
             onCheckSelected: onCheckSelected,
+            onExportSelected: onExportSelected,
+            exportInProgress: exportInProgress,
             onGroupSelected: onGroupSelected,
             onRemoveSelected: onRemoveSelected,
           ),
@@ -382,6 +394,8 @@ class _BulkActions extends StatelessWidget {
     required this.onEnableSelected,
     required this.onDisableSelected,
     required this.onCheckSelected,
+    required this.onExportSelected,
+    required this.exportInProgress,
     required this.onGroupSelected,
     required this.onRemoveSelected,
   });
@@ -392,6 +406,8 @@ class _BulkActions extends StatelessWidget {
   final VoidCallback onEnableSelected;
   final VoidCallback onDisableSelected;
   final VoidCallback onCheckSelected;
+  final VoidCallback onExportSelected;
+  final bool exportInProgress;
   final VoidCallback onGroupSelected;
   final VoidCallback onRemoveSelected;
 
@@ -399,9 +415,7 @@ class _BulkActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = state.selectedSourceIds.isNotEmpty;
     final progress = state.healthProgress;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return _BulkActionStrip(
       children: [
         OutlinedButton.icon(
           onPressed: onToggleSelectAll,
@@ -422,7 +436,7 @@ class _BulkActions extends StatelessWidget {
           icon: const Icon(Icons.create_new_folder_outlined),
           label: Text(BookSourceOrganizationCopy.of(context).editGroups),
         ),
-        FilledButton.tonalIcon(
+        OutlinedButton.icon(
           onPressed: selected ? onEnableSelected : null,
           icon: const Icon(Icons.toggle_on_outlined),
           label: Text(context.l10n.bookSourcesEnableSelected),
@@ -446,7 +460,21 @@ class _BulkActions extends StatelessWidget {
                 : '${progress.completed}/${progress.total}',
           ),
         ),
-        TextButton.icon(
+        OutlinedButton.icon(
+          key: const Key('bookSourceExportSelected'),
+          onPressed: selected && !exportInProgress ? onExportSelected : null,
+          icon: exportInProgress
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.file_download_outlined),
+          label: Text(context.l10n.bookSourcesExportSelected),
+        ),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
           onPressed: selected ? onRemoveSelected : null,
           icon: const Icon(Icons.delete_outline_rounded),
           label: Text(context.l10n.bookSourcesDeleteSelected),
@@ -454,4 +482,62 @@ class _BulkActions extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Keeps batch actions to one row, independent of screen width and text scale.
+class _BulkActionStrip extends StatefulWidget {
+  const _BulkActionStrip({required this.children});
+  final List<Widget> children;
+  @override
+  State<_BulkActionStrip> createState() => _BulkActionStripState();
+}
+
+class _BulkActionStripState extends State<_BulkActionStrip> {
+  final _controller = ScrollController();
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return OutlinedButtonTheme(
+      data: OutlinedButtonThemeData(
+        style:
+            theme.outlinedButtonTheme.style?.merge(_buttonStyle) ??
+            _buttonStyle,
+      ),
+      child: Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        thickness: 3,
+        radius: const Radius.circular(3),
+        child: SingleChildScrollView(
+          key: const Key('bookSourceBulkActionStrip'),
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              for (var i = 0; i < widget.children.length; i++) ...[
+                if (i != 0) const SizedBox(width: 8),
+                widget.children[i],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  ButtonStyle get _buttonStyle => OutlinedButton.styleFrom(
+    minimumSize: const Size(0, 40),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    iconSize: 18,
+    visualDensity: VisualDensity.standard,
+    tapTargetSize: MaterialTapTargetSize.padded,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
 }

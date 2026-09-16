@@ -1,3 +1,5 @@
+> 历史设计：WebDAV 已改为手动 ZIP 备份。当前行为见 [WebDAV 备份](webdav-backup.md)。以下同步方案不再适用于当前版本。
+
 # 云端目录设计入口
 
 2026-09-15：原 current/history 完整文件布局已移除，现行协议见 [WebDAV 同步协议与维护约定](webdav-sync-design.md)。

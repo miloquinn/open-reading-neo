@@ -16,6 +16,26 @@ void main() {
     BookSourceChapterCache.clearMemory();
   });
 
+  test('explicit catalog download bypasses fresh reader cache', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'source-catalog-check-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final runtime = _CachingRuntime();
+    final backend = ReadingSourceBackend(
+      () => runtime,
+      chapterCache: BookSourceChapterCache(cacheDirectory: directory),
+      additionalProtocolsEnabled: () async => true,
+    );
+    final source = _readingSource();
+    await backend.getChapters(source, 'book');
+    expect(runtime.catalogLoads, 1);
+    await backend.getChaptersForDownload(source, 'book');
+    expect(runtime.catalogLoads, 2);
+    await backend.getChapters(source, 'book');
+    expect(runtime.catalogLoads, 2);
+  });
+
   test(
     'reading source reuses catalog and chapter from disk after reopen',
     () async {
@@ -154,7 +174,8 @@ void main() {
     );
 
     expect(downloadedCatalog.single.id, 'chapter');
-    expect(runtime.catalogLoads, 1);
+    // Update/download catalogs must reach the source even while reader cache is fresh.
+    expect(runtime.catalogLoads, 2);
     expect(downloaded.content, 'cached body');
     expect(runtime.contentLoads, 1);
   });

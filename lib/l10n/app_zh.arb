@@ -240,6 +240,24 @@
   "bookSourcesClearSelection": "取消全选",
   "bookSourcesEnableSelected": "启用所选",
   "bookSourcesDisableSelected": "停用所选",
+  "bookSourcesExportSelected": "导出所选",
+  "bookSourcesExportSuccess": "已将 {count} 个书源导出到 {location}",
+  "@bookSourcesExportSuccess": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "location": { "type": "String" }
+    }
+  },
+  "bookSourcesExportFailed": "无法导出所选书源",
+  "bookSourcesExportUnsupported": "当前平台暂不支持导出书源",
+  "bookSourcesExportReplaceTitle": "替换已有文件？",
+  "bookSourcesExportReplaceMessage": "{path} 已存在文件，是否替换？",
+  "@bookSourcesExportReplaceMessage": {
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "bookSourcesExportReplaceAction": "替换",
   "bookSourcesDeleteSelected": "删除所选",
   "bookSourcesDeleteSelectedMessage": "确定删除选中的 {count} 个书源吗？本地书籍不会受到影响。",
   "@bookSourcesDeleteSelectedMessage": {
@@ -3496,6 +3514,25 @@
   "readerChapterProgressFraction": "{chapter}/{total}章",
   "readerChapterProgressRemaining": "后续{count}章",
   "premiumTrialExpiresAt": "高级版体验有效至 {date}。",
-  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
-  "premiumTrialTitle": "高级版体验"
+  "@premiumTrialExpiresAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "premiumTrialTitle": "高级版体验",
+  "bookSourceCheckUpdates": "检查更新",
+  "bookSourceUpdates": "书籍更新",
+  "bookSourceNotChecked": "尚未检查",
+  "bookSourceUpToDate": "目录已是最新",
+  "bookSourceUpdatesAvailable": "有新章节",
+  "bookSourceNeedsMapping": "待确认续更起点",
+  "bookSourceLastChecked": "上次检查于 {time}",
+  "bookSourceLastUpdated": "上次更新于 {time}",
+  "bookSourceUpdateTimeUnknown": "更新时刻暂无记录",
+  "bookSourceLatestChapterLabel": "最新章节：{chapter}",
+  "bookSourceUpdateHelp": "书库打开时，每 30 分钟检查一次目录，也可随时手动检查。在线书籍使用最新目录；本地 TXT 需点击续更后下载新章节。绑定或更换书源后，请先确认本地文件已有的最后一章，续更不会替换原文。更新时间优先采用书源提供的时间，否则记录首次发现新章节的时间。",
+  "bookSourceBindHelp": "在书源中搜索这本书，绑定后可补充封面、换源和续更。保留本地正文与阅读位置。",
+  "bookSourceContinueUpdate": "下载新章节"
 }

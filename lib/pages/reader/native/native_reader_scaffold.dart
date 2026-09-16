@@ -475,7 +475,15 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                     )
                                   : null,
                               readAloudTooltip: context.l10n.ttsReading,
-                              readAloudActive: _readerAloudActive,
+                              readAloudActive: context
+                                  .select<ReaderAloudSession?, bool>(
+                                    (session) =>
+                                        session?.sourceId ==
+                                            'local:${widget.book.id}' &&
+                                        (session?.isActive ?? false),
+                                  ),
+                              onLocateReadAloud: () =>
+                                  unawaited(_locateReaderAloud()),
                               onAskAi: () => unawaited(
                                 _showAskAiPanel(chapter, bookmarkPage),
                               ),
@@ -520,9 +528,6 @@ extension _NativeReaderScaffold on _NativeReaderPageState {
                                 ),
                               ),
                             ),
-                          if (_remoteProgressCandidate != null ||
-                              _showReturnToLocalPosition)
-                            _buildSyncContinuationBanner(),
                         ],
                       );
                     },

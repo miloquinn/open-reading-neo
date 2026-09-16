@@ -42,9 +42,23 @@ extension _NativeReaderSession on _NativeReaderPageState {
 
   void _startReadingSession() {
     _readingSessionStartedAt ??= DateTime.now();
+    _syncCloudReading();
+  }
+
+  void _syncCloudReading() {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (_readingSessionStartedAt != null && _openingContentReadyScheduled &&
+        (ModalRoute.isCurrentOf(context) ?? true) &&
+        !_readerAloudActive &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed)) {
+      _cloudRecorder.start();
+    } else {
+      unawaited(_cloudRecorder.stop());
+    }
   }
 
   Future<void> _flushReadingSession() async {
+    unawaited(_cloudRecorder.stop());
     final startedAt = _readingSessionStartedAt;
     if (startedAt == null) return;
 

@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xxread/core/reader/canonical_locator.dart';
 import 'package:xxread/core/reader/native_text_paginator.dart';
+import 'package:xxread/core/reader/reader_aloud_controller.dart';
 import 'package:xxread/core/reader/reader_annotation.dart';
 import 'package:xxread/core/reader/reader_text_pagination.dart';
 import 'package:xxread/l10n/app_localizations.dart';
@@ -13,6 +14,82 @@ import 'package:xxread/widgets/reader_chapter_title_page.dart';
 import 'package:xxread/widgets/reader_tap_observer.dart';
 
 void main() {
+  testWidgets('moving spoken highlight preserves every character position', (
+    tester,
+  ) async {
+    const source = '翻页后正文保持原来的字重。正在朗读的句子只改变背景色。Next sentence stays in place.';
+    const bodyStyle = TextStyle(
+      fontSize: 20,
+      height: 1.6,
+      fontWeight: FontWeight.w400,
+    );
+    Future<List<Rect>> render(ReaderAloudHighlight? highlight) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 240,
+              height: 500,
+              child: ReaderAnnotatedTextPage(
+                page: const ReaderTextPage(text: source),
+                sourceText: source,
+                chapterId: 'chapter-1',
+                chapterTitle: '第一章',
+                chapterIndex: 0,
+                pageIndex: 0,
+                bookId: 1,
+                format: BookFormat.txt,
+                renderer: ReaderRendererType.flutterNative,
+                palette: ReaderThemes.day,
+                bodyStyle: bodyStyle,
+                flowStyle: const NativeTextFlowStyle(
+                  textDirection: TextDirection.ltr,
+                  textScaler: TextScaler.noScaling,
+                  locale: Locale('zh'),
+                  strutStyle: null,
+                  textHeightBehavior: readerTextHeightBehavior,
+                ),
+                annotations: const [],
+                spokenHighlight: highlight,
+                onSaveTextAnnotation: (_, _) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.byType(ReaderAnnotatedTextPage),
+          matching: find.byType(RichText),
+        ),
+      );
+      return [
+        for (var i = 0; i < source.length; i++)
+          for (final box in paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: i, extentOffset: i + 1),
+          ))
+            box.toRect().shift(paragraph.localToGlobal(Offset.zero)),
+      ];
+    }
+
+    final original = await render(null);
+    expect(original, isNotEmpty);
+    for (final range in [(0, 14), (14, 31), (31, source.length)]) {
+      expect(
+        await render(
+          ReaderAloudHighlight(
+            chapterIndex: 0,
+            chapterId: 'chapter-1',
+            startOffset: range.$1,
+            endOffset: range.$2,
+          ),
+        ),
+        original,
+      );
+    }
+    expect(await render(null), original);
+  });
+
   testWidgets('inline chapter title is outside selectable body coordinates', (
     tester,
   ) async {

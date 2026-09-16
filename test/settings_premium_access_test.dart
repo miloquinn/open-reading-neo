@@ -12,7 +12,7 @@ import 'package:xxread/pages/settings/settings_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/account/account.dart';
 import 'package:xxread/services/core/core_services.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
+import 'package:xxread/services/backup/webdav_backup_controller.dart';
 
 import 'support/premium_account.dart';
 
@@ -85,7 +85,7 @@ void main() {
           return settings;
         }))!;
         final theme = ThemeNotifier();
-        final webDav = WebDavSyncController();
+        final webDav = WebDavBackupController();
         addTearDown(account.dispose);
         addTearDown(appSettings.dispose);
         addTearDown(theme.dispose);
@@ -134,7 +134,7 @@ void main() {
         }
 
         expectSection(false);
-        expect(find.text(l10n.cloudSyncTitle), findsOneWidget);
+        expect(find.text('WebDAV backups'), findsOneWidget);
         expect(find.text(l10n.bookSourceManagementTitle), findsOneWidget);
         account.setPremium(true);
         await tester.pump();

@@ -33,6 +33,8 @@ import 'services/books/book_services.dart';
 import 'services/books/book_format_support.dart';
 import 'services/ai/ai_chat_history_store.dart';
 import 'services/reading/reading_resume_service.dart';
+import 'services/reading/reading_account_scope.dart';
+import 'services/reading/reading_cloud_controller.dart';
 import 'services/reader/replace_rule_service.dart';
 import 'services/core/app_distribution.dart';
 import 'services/core/app_update_download_service.dart';
@@ -41,7 +43,7 @@ import 'services/core/app_settings_service.dart';
 import 'services/core/theme_notifier.dart';
 import 'services/core/display_refresh_rate_controller.dart';
 import 'services/library/download_task_controller.dart';
-import 'services/sync/webdav_sync_controller.dart';
+import 'services/backup/webdav_backup_controller.dart';
 import 'utils/app_themes.dart';
 import 'utils/book_open_transition.dart';
 import 'services/tts_service.dart';
@@ -66,6 +68,7 @@ void main(List<String> arguments) async {
   // Large imported source libraries used to live in one SharedPreferences
   // value. Move that blob before any global preference cache is warmed so a
   // multi-thousand-source library cannot make startup consume ~1 GB or ANR.
+  if (!kIsWeb) await WebDavBackupController.recoverPendingRestore();
   await BookSourceRegistry().prepareStorage();
   // Warm the reader palette while the app shell is starting so tapping a book
   // does not have to wait for SharedPreferences and custom-theme decoding.
@@ -102,6 +105,8 @@ void main(List<String> arguments) async {
     ),
   );
 
+  await ReadingAccountScope.instance.restore();
+
   runApp(
     RestartableApp(
       child: provider.MultiProvider(
@@ -112,6 +117,15 @@ void main(List<String> arguments) async {
           ),
           provider.ChangeNotifierProvider(
             create: (_) => MemberAccountController()..synchronize(),
+          ),
+          provider.ChangeNotifierProvider(
+            lazy: false,
+            create: (context) => ReadingCloudController(
+              account: provider.Provider.of<MemberAccountController>(
+                context,
+                listen: false,
+              ),
+            ),
           ),
           provider.ChangeNotifierProvider(
             lazy: false,
@@ -142,12 +156,7 @@ void main(List<String> arguments) async {
             create: (_) => DownloadTaskController(),
           ),
           provider.ChangeNotifierProvider(
-            create: (context) => WebDavSyncController(
-              replaceRuleService: provider.Provider.of<ReplaceRuleService>(
-                context,
-                listen: false,
-              ),
-            ),
+            create: (_) => WebDavBackupController(),
           ),
         ],
         child: XxReadApp(
@@ -211,7 +220,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
   final List<SourceInteractionTicket> _pendingSourceInteractions = [];
   bool _showingSourceInteraction = false;
   BackgroundDownloadTap? _pendingNotificationTap;
-  bool _webDavSyncInitialized = false;
   bool _resumeReadingHandled = false;
   late final IncomingBookService _incomingBookService;
 
@@ -378,17 +386,17 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
       unawaited(
+        provider.Provider.of<ReadingCloudController>(
+          context,
+          listen: false,
+        ).synchronize(),
+      );
+      unawaited(
         provider.Provider.of<MemberAccountController>(
           context,
           listen: false,
         ).synchronize(),
       );
-    }
-    if (_webDavSyncInitialized && mounted) {
-      provider.Provider.of<WebDavSyncController>(
-        context,
-        listen: false,
-      ).setForeground(state == AppLifecycleState.resumed);
     }
   }
 
@@ -407,20 +415,6 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
     final imageCache = PaintingBinding.instance.imageCache;
     imageCache.clear();
     imageCache.clearLiveImages();
-  }
-
-  Future<void> _runAutomaticWebDavSyncIfNeeded() async {
-    if (!_webDavSyncInitialized || !mounted) return;
-    final sync = provider.Provider.of<WebDavSyncController>(
-      context,
-      listen: false,
-    );
-    if (!sync.isConfigured || !sync.autoSync) return;
-    try {
-      await sync.syncNow();
-    } catch (error) {
-      debugPrint('WebDAV 自动同步失败（已保留本地变更）: $error');
-    }
   }
 
   Future<void> _bootstrapServices() async {
@@ -449,13 +443,11 @@ class _XxReadAppState extends State<XxReadApp> with WidgetsBindingObserver {
 
     if (!mounted) return;
     try {
-      final sync = provider.Provider.of<WebDavSyncController>(
+      final sync = provider.Provider.of<WebDavBackupController>(
         context,
         listen: false,
       );
       await sync.initialize();
-      _webDavSyncInitialized = true;
-      unawaited(_runAutomaticWebDavSyncIfNeeded());
     } catch (error) {
       // WebDAV 是可选能力，安全存储或远端初始化失败不能阻塞本地阅读。
       debugPrint('WebDAV 同步初始化失败（已忽略）: $error');

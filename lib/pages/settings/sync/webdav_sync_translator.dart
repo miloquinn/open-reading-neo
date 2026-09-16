@@ -131,25 +131,3 @@ String? _failureExplanation(BuildContext context, String message) {
   }
   return null;
 }
-
-String webDavSyncFailurePhaseText(
-  BuildContext context,
-  WebDavSyncPhase phase, {
-  bool bookFiles = false,
-}) {
-  if (bookFiles) {
-    return context.l10n.webDavErrorPhase(context.l10n.webDavScopeBookFiles);
-  }
-  return context.l10n.webDavErrorPhase(webDavSyncPhaseText(context, phase));
-}
-
-String webDavSyncPhaseText(BuildContext context, WebDavSyncPhase phase) =>
-    switch (phase) {
-      WebDavSyncPhase.connecting => context.l10n.webDavPhaseConnecting,
-      WebDavSyncPhase.scanningLocal => context.l10n.webDavPhaseScanningLocal,
-      WebDavSyncPhase.readingRemote => context.l10n.webDavPhaseReadingRemote,
-      WebDavSyncPhase.applyingRemote => context.l10n.webDavPhaseApplyingRemote,
-      WebDavSyncPhase.uploadingLocal => context.l10n.webDavPhaseUploadingLocal,
-      WebDavSyncPhase.finishing => context.l10n.webDavPhaseFinishing,
-      WebDavSyncPhase.none => context.l10n.webDavPhaseUnknown,
-    };

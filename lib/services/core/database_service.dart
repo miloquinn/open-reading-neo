@@ -10,6 +10,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'package:xxread/data/migration/reading_schema_migration.dart';
+import 'package:xxread/data/migration/reading_cloud_schema_migration.dart';
 import 'package:xxread/data/migration/book_import_schema_migration.dart';
 import 'package:xxread/data/migration/book_storage_path_migration.dart';
 import 'package:xxread/data/migration/book_note_lookup_index_migration.dart';
@@ -24,7 +25,7 @@ class DatabaseService {
 
   static Database? _database;
   static const String _dbName = 'xxread_v2.db';
-  static const int _dbVersion = BookStoragePathMigration.migrationVersion;
+  static const int _dbVersion = ReadingCloudSchemaMigration.migrationVersion;
   static Future<Database>? _openingDatabase;
 
   Future<Database> get database async {
@@ -377,6 +378,9 @@ class DatabaseService {
       final documents = await getApplicationDocumentsDirectory();
       await BookStoragePathMigration.migrate(db, documents.path);
     }
+    if (oldVersion < ReadingCloudSchemaMigration.migrationVersion) {
+      await ReadingCloudSchemaMigration.migrate(db);
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -480,6 +484,7 @@ class DatabaseService {
     await WebDavSyncSchemaMigration.migrate(db);
     await PaginationCacheSchemaMigration.migrate(db);
     await BookNoteLookupIndexMigration.migrate(db);
+    await ReadingCloudSchemaMigration.migrate(db);
   }
 
   /// 创建books表索引

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xxread/l10n/app_localizations.dart';
 import 'package:xxread/pages/account/account_page.dart';
 import 'package:xxread/services/account/account.dart';
+import 'package:xxread/services/reading/reading_account_scope.dart';
 
 Future<MemberAccountController> _openDeletionFlow(
   WidgetTester tester,
@@ -19,13 +20,19 @@ Future<MemberAccountController> _openDeletionFlow(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final readingScope = ReadingAccountScope();
+  addTearDown(readingScope.dispose);
   final controller = MemberAccountController(
+    readingScope: readingScope,
     api: MemberAccountApiClient(
       dio: Dio()..httpClientAdapter = adapter,
       tokenStore: tokenStore,
     ),
   );
-  await tester.runAsync(controller.initialize);
+  await tester.runAsync(() async {
+    await controller.initialize();
+    await readingScope.setOwner(readingScope.owner);
+  });
 
   await tester.pumpWidget(
     ChangeNotifierProvider.value(
@@ -62,6 +69,11 @@ Future<MemberAccountController> _openDeletionFlow(
 /// frames so each hop lands before settling.
 Future<void> _settleRequest(WidgetTester tester) async {
   for (var i = 0; i < 10; i++) {
+    // initialize() runs in the real zone; account reading ownership persists
+    // through the same serial preferences queue when logout/deletion follows.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 1)),
+    );
     await tester.pump(const Duration(milliseconds: 50));
   }
   await tester.pumpAndSettle();

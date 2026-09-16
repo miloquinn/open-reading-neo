@@ -11,12 +11,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/reader/reader_aloud_controller.dart';
 
 part 'reader_aloud_profiles.dart';
+part 'reader_aloud_providers.dart';
 
 enum ReaderAloudEngineType { system, cloud }
 
 @immutable
 class ReaderAloudCloudSettings {
   const ReaderAloudCloudSettings({
+    this.provider = ReaderAloudCloudProvider.openai,
     this.baseUrl = 'https://api.openai.com/v1',
     this.model = 'gpt-4o-mini-tts',
     this.voice = 'alloy',
@@ -24,6 +26,7 @@ class ReaderAloudCloudSettings {
     this.fallbackToSystem = true,
   });
 
+  final ReaderAloudCloudProvider provider;
   final String baseUrl;
   final String model;
   final String voice;
@@ -31,12 +34,14 @@ class ReaderAloudCloudSettings {
   final bool fallbackToSystem;
 
   ReaderAloudCloudSettings copyWith({
+    ReaderAloudCloudProvider? provider,
     String? baseUrl,
     String? model,
     String? voice,
     String? responseFormat,
     bool? fallbackToSystem,
   }) => ReaderAloudCloudSettings(
+    provider: provider ?? this.provider,
     baseUrl: baseUrl ?? this.baseUrl,
     model: model ?? this.model,
     voice: voice ?? this.voice,
@@ -172,6 +177,7 @@ class PreferencesReaderAloudCloudSettingsStore
   static const legacyProfileId = 'default';
 
   static const _engineKey = 'reader_aloud_engine';
+  static const _providerKey = 'reader_aloud_cloud_provider';
   static const _baseUrlKey = 'reader_aloud_cloud_base_url';
   static const _modelKey = 'reader_aloud_cloud_model';
   static const _voiceKey = 'reader_aloud_cloud_voice';
@@ -271,6 +277,11 @@ class PreferencesReaderAloudCloudSettingsStore
     }
     final prefs = await _prefs;
     return ReaderAloudCloudSettings(
+      provider:
+          ReaderAloudCloudProvider.values
+              .where((p) => p.name == prefs.getString(_providerKey))
+              .firstOrNull ??
+          ReaderAloudCloudProvider.openai,
       baseUrl: prefs.getString(_baseUrlKey) ?? 'https://api.openai.com/v1',
       model: prefs.getString(_modelKey) ?? 'gpt-4o-mini-tts',
       voice: prefs.getString(_voiceKey) ?? 'alloy',
@@ -310,6 +321,7 @@ class PreferencesReaderAloudCloudSettingsStore
       return;
     }
     final prefs = await _prefs;
+    await prefs.setString(_providerKey, normalized.provider.name);
     await prefs.setString(_baseUrlKey, normalized.baseUrl);
     await prefs.setString(_modelKey, normalized.model);
     await prefs.setString(_voiceKey, normalized.voice);
@@ -363,6 +375,17 @@ class OpenAiCompatibleReaderAloudCloudClient implements ReaderAloudCloudClient {
     required String text,
     required double speed,
   }) async {
+    if (settings.provider != ReaderAloudCloudProvider.openai) {
+      return synthesizeNativeCloud(
+        _dio,
+        settings.normalized(),
+        apiKey,
+        text,
+        speed,
+        maxResponseBytes,
+        maxInputCharacters,
+      );
+    }
     final normalizedSettings = settings.normalized();
     validateReaderAloudCloudSettings(normalizedSettings);
     final normalizedKey = apiKey.trim();
@@ -503,7 +526,7 @@ class ReaderAloudCloudAudioCache {
   }) => sha256
       .convert(
         utf8.encode(
-          '${settings.baseUrl}\n${settings.model}\n${settings.voice}\n'
+          '${settings.provider.name}\n${settings.baseUrl}\n${settings.model}\n${settings.voice}\n'
           '${settings.responseFormat}\n${speed.toStringAsFixed(3)}\n$text',
         ),
       )
@@ -873,9 +896,9 @@ class ReaderAloudService extends ChangeNotifier
       (systemEngine as ReaderAloudContinuousEngine).supportsContinuousText;
   @override
   bool get supportsQueuedText =>
-      _engineType == ReaderAloudEngineType.system &&
-      systemEngine is ReaderAloudQueuedEngine &&
-      (systemEngine as ReaderAloudQueuedEngine).supportsQueuedText;
+      _engineType == ReaderAloudEngineType.cloud ||
+      (systemEngine is ReaderAloudQueuedEngine &&
+          (systemEngine as ReaderAloudQueuedEngine).supportsQueuedText);
 
   @override
   int get currentPosition {
@@ -1042,6 +1065,10 @@ class ReaderAloudService extends ChangeNotifier
     required ValueChanged<int> onTextStarted,
   }) async {
     await initialize();
+    if (_engineType == ReaderAloudEngineType.cloud) {
+      await _speakCloudQueued(texts, onTextStarted: onTextStarted);
+      return;
+    }
     if (_engineType != ReaderAloudEngineType.system ||
         systemEngine is! ReaderAloudQueuedEngine ||
         !(systemEngine as ReaderAloudQueuedEngine).supportsQueuedText) {
@@ -1053,6 +1080,108 @@ class ReaderAloudService extends ChangeNotifier
       texts,
       onTextStarted: onTextStarted,
     );
+  }
+
+  /// One synthesis ahead, while the current audio plays. Preparation returns
+  /// errors as values: a speculative failure must not surface until its turn.
+  Future<void> _speakCloudQueued(
+    List<String> texts, {
+    required ValueChanged<int> onTextStarted,
+  }) async {
+    if (texts.isEmpty) return;
+    final operation = ++_operationGeneration;
+    final settings = _cloudSettings;
+    final speed = (systemEngine.speechRate * 2).clamp(0.25, 2.0);
+    // Capture credentials once for the queue, alongside its settings snapshot.
+    String? apiKey;
+    Object? keyError;
+    try {
+      apiKey = await _settingsStore.readApiKey();
+    } catch (error) {
+      keyError = error;
+    }
+    if (!_isCurrentOperation(operation)) return;
+
+    Future<({Uint8List? audio, Object? error, StackTrace? stack})> prepare(
+      int index,
+    ) async {
+      try {
+        if (!_isCurrentOperation(operation)) {
+          return (audio: null, error: null, stack: null);
+        }
+        if (keyError != null) throw keyError;
+        if (apiKey == null || apiKey.trim().isEmpty) {
+          throw const ReaderAloudCloudException(
+            'missing_api_key',
+            '请先配置 TTS API Key',
+          );
+        }
+        validateReaderAloudCloudSettings(settings);
+        final cacheKey = _cache.keyFor(
+          settings: settings,
+          text: texts[index],
+          speed: speed,
+        );
+        final audio =
+            _cache.read(cacheKey) ??
+            await _cloudClient.synthesize(
+              settings: settings,
+              apiKey: apiKey,
+              text: texts[index],
+              speed: speed,
+            );
+        if (_isCurrentOperation(operation)) _cache.write(cacheKey, audio);
+        return (audio: audio, error: null, stack: null);
+      } catch (error, stack) {
+        return (audio: null, error: error, stack: stack);
+      }
+    }
+
+    var pending = prepare(0);
+    for (var index = 0; index < texts.length; index++) {
+      final prepared = await pending;
+      if (!_isCurrentOperation(operation)) return;
+      _currentCloudText = texts[index];
+      _cloudError = null;
+      _activeEngineType = ReaderAloudEngineType.cloud;
+      // Report progress only when this segment is about to play, never when
+      // prefetch finishes. A callback may synchronously stop or seek the queue.
+      onTextStarted(index);
+      if (!_isCurrentOperation(operation)) return;
+      var nextPrepared = false;
+      try {
+        if (prepared.error != null) {
+          Error.throwWithStackTrace(prepared.error!, prepared.stack!);
+        }
+        final playback = _bytesPlayer.play(
+          prepared.audio!,
+          mimeType: _mimeTypeFor(settings.responseFormat),
+          volume: systemEngine.speechVolume,
+        );
+        if (index + 1 < texts.length && _isCurrentOperation(operation)) {
+          pending = prepare(index + 1);
+          nextPrepared = true;
+        }
+        await playback;
+      } catch (error, stack) {
+        if (!_isCurrentOperation(operation)) return;
+        _cloudError = error is ReaderAloudCloudException
+            ? error.message
+            : 'TTS 云端播放失败';
+        _notifySafe();
+        if (!settings.fallbackToSystem) Error.throwWithStackTrace(error, stack);
+        _activeEngineType = ReaderAloudEngineType.system;
+        await systemEngine.speak(texts[index]);
+        // Synthesis failures have not scheduled the next segment. A playback
+        // failure may have; reuse its future rather than sending it twice.
+        if (!nextPrepared &&
+            index + 1 < texts.length &&
+            _isCurrentOperation(operation)) {
+          pending = prepare(index + 1);
+        }
+      }
+      if (!_isCurrentOperation(operation)) return;
+    }
   }
 
   @override

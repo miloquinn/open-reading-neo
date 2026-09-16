@@ -228,6 +228,24 @@
   "bookSourcesClearSelection": "選択を解除",
   "bookSourcesEnableSelected": "選択項目を有効化",
   "bookSourcesDisableSelected": "選択項目を無効化",
+  "bookSourcesExportSelected": "選択項目をエクスポート",
+  "bookSourcesExportSuccess": "{count} 件のソースを {location} にエクスポートしました",
+  "@bookSourcesExportSuccess": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "location": { "type": "String" }
+    }
+  },
+  "bookSourcesExportFailed": "選択したソースをエクスポートできませんでした",
+  "bookSourcesExportUnsupported": "このプラットフォームではソースのエクスポートにまだ対応していません",
+  "bookSourcesExportReplaceTitle": "既存のファイルを置き換えますか？",
+  "bookSourcesExportReplaceMessage": "{path} には既にファイルがあります。置き換えますか？",
+  "@bookSourcesExportReplaceMessage": {
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "bookSourcesExportReplaceAction": "置き換える",
   "bookSourcesDeleteSelected": "選択項目を削除",
   "bookSourcesDeleteSelectedMessage": "選択した {count} 件のソースを削除しますか？ローカルの本には影響しません。",
   "@bookSourcesDeleteSelectedMessage": {
@@ -3169,6 +3187,25 @@
   "readerChapterProgressFraction": "{chapter}/{total}章",
   "readerChapterProgressRemaining": "残り{count}章",
   "premiumTrialExpiresAt": "プレミアム体験の有効期限：{date}。",
-  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
-  "premiumTrialTitle": "プレミアム体験"
+  "@premiumTrialExpiresAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "premiumTrialTitle": "プレミアム体験",
+  "bookSourceCheckUpdates": "更新を確認",
+  "bookSourceUpdates": "書籍の更新",
+  "bookSourceNotChecked": "未確認",
+  "bookSourceUpToDate": "目次は最新です",
+  "bookSourceUpdatesAvailable": "新しい章があります",
+  "bookSourceNeedsMapping": "追加する開始位置を確認",
+  "bookSourceLastChecked": "最終確認：{time}",
+  "bookSourceLastUpdated": "最終更新：{time}",
+  "bookSourceUpdateTimeUnknown": "更新日時は不明です",
+  "bookSourceLatestChapterLabel": "最新の章：{chapter}",
+  "bookSourceUpdateHelp": "書庫を開いている間、30 分ごとに目次を確認します。手動でも確認できます。オンライン書籍は最新の目次を使います。ローカル TXT は追加を選ぶと新しい章をダウンロードします。連携や書籍ソースの変更後は、ローカルにある最後の章を確認してください。元の本文は置き換えません。更新日時はソースの日時、または新しい章を最初に検出した日時です。",
+  "bookSourceBindHelp": "書籍ソースで検索して連携すると、表紙の追加、ソースの変更、章の追加ができます。ローカルの本文と読書位置は保持されます。",
+  "bookSourceContinueUpdate": "新しい章をダウンロード"
 }

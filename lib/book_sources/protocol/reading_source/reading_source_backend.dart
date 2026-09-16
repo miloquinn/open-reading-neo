@@ -203,6 +203,7 @@ class ReadingSourceBackend implements ReadingSourceBackendPort {
       sourceId: source.id,
       sourceRevision: await _cacheRevision(source, sourceVariables),
       bookId: bookId,
+      refreshAfter: Duration.zero,
       staleWhileRevalidate: false,
       loader: () => _runtime().getChapters(
         source,

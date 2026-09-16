@@ -17,106 +17,110 @@ void main() {
   testWidgets('boundary requires a chapter and preserves the selected ID', (
     tester,
   ) async {
-    final directory = await Directory.systemTemp.createTemp('source-boundary');
-    addTearDown(() => directory.delete(recursive: true));
-    final original = _shelfBook('${directory.path}/serial.txt');
-    final loaded = original.copyWith(title: 'Reloaded Serial Novel');
-    final service = _PageShelfService();
-    var loaderCalls = 0;
+    await tester.runAsync(() async {
+      final directory = Directory.systemTemp.createTempSync('source-boundary');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final original = _shelfBook('${directory.path}/serial.txt');
+      final loaded = original.copyWith(title: 'Reloaded Serial Novel');
+      final service = _PageShelfService();
+      var loaderCalls = 0;
 
-    await tester.pumpWidget(
-      _harness(
-        book: original,
-        service: service,
-        bookUid: 'stable-page-uid',
-        bookLoader: (id) async {
-          loaderCalls++;
-          expect(id, original.id);
-          return loaded;
-        },
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Reloaded Serial Novel'), findsOneWidget);
+      await tester.pumpWidget(
+        _harness(
+          book: original,
+          service: service,
+          bookUid: 'stable-page-uid',
+          bookLoader: (id) async {
+            loaderCalls++;
+            expect(id, original.id);
+            return loaded;
+          },
+        ),
+      );
+      await tester.pump();
+      await _pumpRealIo(tester);
+      expect(find.text('Reloaded Serial Novel'), findsOneWidget);
 
-    await tester.tap(find.text('确认已下载章节'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('确认已下载章节'));
+      await tester.pump();
+      await _pumpRealIo(tester);
 
-    final dialog = find.byType(AlertDialog);
-    final confirm = find.descendant(
-      of: dialog,
-      matching: find.widgetWithText(FilledButton, '确定'),
-    );
-    expect(confirm, findsOneWidget);
-    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+      final dialog = find.byType(AlertDialog);
+      final confirm = find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(FilledButton, '确认'),
+      );
+      expect(confirm, findsOneWidget);
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
 
-    await tester.tap(find.text('第二章'));
-    await tester.pump();
-    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
-    await tester.tap(confirm);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('第二章'));
+      await tester.pump();
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+      await tester.tap(confirm);
+      await tester.pump();
+      await _pumpRealIo(tester);
 
-    expect(service.baselineCalls, hasLength(1));
-    final call = service.baselineCalls.single;
-    expect(call.shelfBook, same(loaded));
-    expect(call.chapterIds, ['chapter-1', 'chapter-2', 'chapter-3']);
-    expect(call.lastDownloadedChapterId, 'chapter-2');
-    expect(call.mappingConfirmed, isTrue);
-    expect(call.bookUid, 'stable-page-uid');
-    expect(find.text('已确认追更起点，可以检查新章节了。'), findsOneWidget);
-    expect(loaderCalls, greaterThanOrEqualTo(2));
+      expect(service.baselineCalls, hasLength(1));
+      final call = service.baselineCalls.single;
+      expect(call.shelfBook, same(loaded));
+      expect(call.chapterIds, ['chapter-1', 'chapter-2', 'chapter-3']);
+      expect(call.lastDownloadedChapterId, 'chapter-2');
+      expect(call.mappingConfirmed, isTrue);
+      expect(call.bookUid, 'stable-page-uid');
+      expect(find.text('已确认追更起点，可以检查新章节了。'), findsOneWidget);
+      expect(loaderCalls, greaterThanOrEqualTo(2));
+    });
   });
 
   testWidgets('both source update actions reach their distinct queue modes', (
     tester,
   ) async {
-    final directory = await Directory.systemTemp.createTemp('source-actions');
-    addTearDown(() => directory.delete(recursive: true));
-    final book = _shelfBook('${directory.path}/serial.txt');
-    final service = _PageShelfService();
+    await tester.runAsync(() async {
+      final directory = Directory.systemTemp.createTempSync('source-actions');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final book = _shelfBook('${directory.path}/serial.txt');
+      final service = _PageShelfService();
 
-    await tester.pumpWidget(
-      _harness(
-        book: book,
-        service: service,
-        bookUid: 'stable-page-uid',
-        bookLoader: (_) async => book,
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpWidget(
+        _harness(
+          book: book,
+          service: service,
+          bookUid: 'stable-page-uid',
+          bookLoader: (_) async => book,
+        ),
+      );
+      await tester.pump();
+      await _pumpRealIo(tester);
 
-    await _runUpdateAction(tester, '检查新章节');
-    await _runUpdateAction(tester, '刷新已下载章节');
+      await _runUpdateAction(tester, '下载新章节');
+      await _runUpdateAction(tester, '刷新已下载章节');
 
-    expect(service.updateCalls, hasLength(2));
-    expect(service.updateCalls[0].shelfBook, same(book));
-    expect(service.updateCalls[0].mode, SourceUpdateMode.appendNewChapters);
-    expect(service.updateCalls[0].bookUid, 'stable-page-uid');
-    expect(
-      service.updateCalls[1].mode,
-      SourceUpdateMode.refreshDownloadedChapters,
-    );
+      expect(service.updateCalls, hasLength(2));
+      expect(service.updateCalls[0].shelfBook, same(book));
+      expect(service.updateCalls[0].mode, SourceUpdateMode.appendNewChapters);
+      expect(service.updateCalls[0].bookUid, 'stable-page-uid');
+      expect(
+        service.updateCalls[1].mode,
+        SourceUpdateMode.refreshDownloadedChapters,
+      );
+    });
   });
 }
 
 Future<void> _runUpdateAction(WidgetTester tester, String label) async {
   await tester.tap(find.text(label));
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 100));
+  await _pumpRealIo(tester);
   final dialog = find.byType(AlertDialog);
   expect(dialog, findsOneWidget);
   final close = find.descendant(
     of: dialog,
-    matching: find.widgetWithText(TextButton, '确定'),
+    matching: find.widgetWithText(TextButton, '确认'),
   );
   expect(close, findsOneWidget);
   await tester.tap(close);
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 100));
+  await _pumpRealIo(tester);
 }
 
 Widget _harness({
@@ -276,5 +280,14 @@ class _PageShelfService extends BookSourceShelfService {
       materializedContentHash: 'content-hash',
       revisionOrigin: SourceRevisionOrigin.sourceRefresh,
     );
+  }
+}
+
+// The page reads its sidecar on disk. Give real I/O and route transitions a
+// chance to finish without waiting for the busy indicator to stop animating.
+Future<void> _pumpRealIo(WidgetTester tester) async {
+  for (var i = 0; i < 20; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    await tester.pump(const Duration(milliseconds: 20));
   }
 }

@@ -17,6 +17,7 @@ class ReaderAloudCloudProfile {
   Map<String, Object> toJson() => {
     'id': id,
     'name': name,
+    'provider': settings.provider.name,
     'baseUrl': settings.baseUrl,
     'model': settings.model,
     'voice': settings.voice,
@@ -29,6 +30,11 @@ class ReaderAloudCloudProfile {
         id: json['id'] as String,
         name: json['name'] as String,
         settings: ReaderAloudCloudSettings(
+          provider:
+              ReaderAloudCloudProvider.values
+                  .where((p) => p.name == json['provider'])
+                  .firstOrNull ??
+              ReaderAloudCloudProvider.openai,
           baseUrl: json['baseUrl'] as String,
           model: json['model'] as String,
           voice: json['voice'] as String,

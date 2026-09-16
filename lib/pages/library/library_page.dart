@@ -12,7 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'source_book_updates_page.dart';
+import 'source_book_status_card.dart';
+import '../../widgets/book_update_indicator.dart';
+import '../../book_sources/services/source_book_update_service.dart';
 import '../../services/sync/book_sync_identity.dart';
 import '../../book_sources/protocol/book_source_protocol.dart';
 import 'package:xxread/book_sources/services/book_source_change_service.dart';
@@ -25,7 +27,6 @@ import 'package:xxread/pages/home/home_mobile_chrome.dart';
 import 'package:xxread/pages/home/home_shell_page.dart';
 import 'package:xxread/pages/book_sources/book_source_change_page.dart';
 import 'package:xxread/pages/reader/book_source/online_reader_factory.dart';
-import 'package:xxread/pages/settings/sync/book_file_sync_page.dart';
 import 'package:xxread/reader_core/ai/ai_service.dart';
 import 'package:xxread/services/ai/ai_preprocess_task_controller.dart';
 import 'package:xxread/services/books/book_services.dart';
@@ -34,7 +35,6 @@ import 'package:xxread/services/core/app_settings_service.dart';
 import 'package:xxread/services/library/library_services.dart';
 import 'package:xxread/services/library/download_task_controller.dart';
 import 'package:xxread/services/reader/replace_rule_service.dart';
-import 'package:xxread/services/sync/webdav_sync_controller.dart';
 import 'package:xxread/utils/book_open_transition.dart';
 import 'package:xxread/utils/glass_config.dart';
 import 'package:xxread/utils/layout_helper.dart';
@@ -135,7 +135,7 @@ class LibraryPage extends StatefulWidget {
   State<LibraryPage> createState() => _LibraryPageState();
 }
 
-class _LibraryPageState extends State<LibraryPage> {
+class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   List<Book> _books = [];
   int _booksRevision = 0;
   int _visibleBooksCacheRevision = -1;
@@ -153,6 +153,8 @@ class _LibraryPageState extends State<LibraryPage> {
   StreamSubscription<void>? _librarySubscription;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
+  Timer? _sourceUpdateTimer;
+  bool _checkingSourceUpdates = false;
   Timer? _searchDebounce;
   String _searchQuery = '';
   bool _searchBarVisible = false;
@@ -184,13 +186,6 @@ class _LibraryPageState extends State<LibraryPage> {
     try {
       var fullBook = await _bookDao.getBookById(book.id!);
       if (fullBook == null || !mounted) return;
-      if (fullBook.isOnline) {
-        fullBook = await BookReaderLauncher.refreshProgressBeforeOpen(
-          context,
-          fullBook,
-        );
-        if (!mounted) return;
-      }
       final initialTheme = await initialThemeFuture;
       if (!mounted) return;
       if (fullBook.isOnline) {
@@ -304,9 +299,14 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _bookDeletionService = BookDeletionService(bookDao: _bookDao);
     widget.controller?._state = this;
     _loadBooks();
+    _sourceUpdateTimer = Timer.periodic(
+      SourceBookUpdateService.automaticInterval,
+      (_) => unawaited(_checkSourceUpdates()),
+    );
     _librarySubscription = LibraryEventBus().stream.listen((_) {
       if (mounted) {
         _loadBooks();
@@ -322,12 +322,14 @@ class _LibraryPageState extends State<LibraryPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (widget.controller?._state == this) {
       widget.controller?._state = null;
     }
     final librarySubscription = _librarySubscription;
     _librarySubscription = null;
     _booksRevision++;
+    _sourceUpdateTimer?.cancel();
     _searchDebounce?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -498,6 +500,7 @@ class _LibraryPageState extends State<LibraryPage> {
           _isInitialLoading = false;
         });
         _syncSelection();
+        unawaited(_checkSourceUpdates());
       }
     } catch (error, stackTrace) {
       debugPrint('Failed to load library books: $error');
@@ -508,6 +511,35 @@ class _LibraryPageState extends State<LibraryPage> {
           _isInitialLoading = false;
         });
       }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_checkSourceUpdates());
+  }
+
+  Future<void> _checkSourceUpdates() async {
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.paused ||
+        _checkingSourceUpdates ||
+        widget.booksLoader != null ||
+        kIsWeb) {
+      return;
+    }
+    _checkingSourceUpdates = true;
+    try {
+      final service = SourceBookUpdateService();
+      for (final book in List<Book>.of(_books)) {
+        if (!mounted) break;
+        if (!book.hasSourceBinding) continue;
+        try {
+          await service.check(book, force: false);
+        } catch (_) {
+          /* Retry next cycle. */
+        }
+      }
+    } finally {
+      _checkingSourceUpdates = false;
     }
   }
 

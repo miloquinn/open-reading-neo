@@ -77,6 +77,28 @@ class MemberAccountApiClient {
     return MemberUser.fromJson(_map(json['user']), baseUri: baseUri);
   }
 
+  /// Every request includes the expected account. The server rejects stale
+  /// requests even if secure storage changed to a different account's token.
+  Future<Map<String, dynamic>> readingRequest(
+    String method,
+    String endpoint,
+    String owner, {
+    Map<String, Object?>? data,
+    String? period,
+  }) => _jsonRequest(
+    method,
+    Uri(
+      path: '/api/v1/reading/$endpoint',
+      queryParameters: method == 'GET'
+          ? {'user_id': owner, 'period': ?period}
+          : null,
+    ).toString(),
+    data: method == 'GET' ? null : {...?data, 'user_id': owner},
+    // Account lifecycle synchronization owns token refresh. A late background
+    // upload must not refresh and overwrite credentials after an account switch.
+    retryAuthentication: false,
+  );
+
   Future<MemberSession> restoreSession() async {
     final storedPending = await _tokenStore.readMfaPending();
     final json = await _jsonRequest(

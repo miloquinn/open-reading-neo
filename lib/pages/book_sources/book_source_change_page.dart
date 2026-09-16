@@ -291,7 +291,9 @@ class _BookSourceChangePageState extends State<BookSourceChangePage> {
   @override
   Widget build(BuildContext context) {
     return FloatingSubpageScaffold(
-      title: context.l10n.bookSourceChangeSourceTitle,
+      title: widget.currentSource == null
+          ? context.l10n.bookSourceBindSource
+          : context.l10n.bookSourceChangeSourceTitle,
       body: Padding(
         padding: EdgeInsets.only(
           top: FloatingSubpageScaffold.headerExtentOf(context),

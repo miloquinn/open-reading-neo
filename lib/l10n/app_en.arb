@@ -240,6 +240,24 @@
   "bookSourcesClearSelection": "Clear selection",
   "bookSourcesEnableSelected": "Enable selected",
   "bookSourcesDisableSelected": "Disable selected",
+  "bookSourcesExportSelected": "Export selected",
+  "bookSourcesExportSuccess": "Exported {count} source(s) to {location}",
+  "@bookSourcesExportSuccess": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "location": { "type": "String" }
+    }
+  },
+  "bookSourcesExportFailed": "Could not export the selected sources",
+  "bookSourcesExportUnsupported": "Source export is not supported on this platform yet",
+  "bookSourcesExportReplaceTitle": "Replace existing file?",
+  "bookSourcesExportReplaceMessage": "A file already exists at {path}. Replace it?",
+  "@bookSourcesExportReplaceMessage": {
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "bookSourcesExportReplaceAction": "Replace",
   "bookSourcesDeleteSelected": "Delete selected",
   "bookSourcesDeleteSelectedMessage": "Delete {count} selected sources? Local books are not affected.",
   "@bookSourcesDeleteSelectedMessage": {
@@ -6516,6 +6534,79 @@
     }
   },
   "premiumTrialExpiresAt": "Premium trial expires on {date}.",
-  "@premiumTrialExpiresAt": {"placeholders": {"date": {"type": "String"}}},
-  "premiumTrialTitle": "Premium trial"
+  "@premiumTrialExpiresAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "premiumTrialTitle": "Premium trial",
+  "bookSourceCheckUpdates": "Check for updates",
+  "@bookSourceCheckUpdates": {
+    "description": "bookSourceCheckUpdates"
+  },
+  "bookSourceUpdates": "Book updates",
+  "@bookSourceUpdates": {
+    "description": "bookSourceUpdates"
+  },
+  "bookSourceNotChecked": "Not checked yet",
+  "@bookSourceNotChecked": {
+    "description": "bookSourceNotChecked"
+  },
+  "bookSourceUpToDate": "Catalog is up to date",
+  "@bookSourceUpToDate": {
+    "description": "bookSourceUpToDate"
+  },
+  "bookSourceUpdatesAvailable": "New chapters available",
+  "@bookSourceUpdatesAvailable": {
+    "description": "bookSourceUpdatesAvailable"
+  },
+  "bookSourceNeedsMapping": "Confirm where to continue",
+  "@bookSourceNeedsMapping": {
+    "description": "bookSourceNeedsMapping"
+  },
+  "bookSourceLastChecked": "Last checked: {time}",
+  "@bookSourceLastChecked": {
+    "description": "bookSourceLastChecked",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "bookSourceLastUpdated": "Last updated: {time}",
+  "@bookSourceLastUpdated": {
+    "description": "bookSourceLastUpdated",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "bookSourceUpdateTimeUnknown": "Update time unavailable",
+  "@bookSourceUpdateTimeUnknown": {
+    "description": "bookSourceUpdateTimeUnknown"
+  },
+  "bookSourceLatestChapterLabel": "Latest: {chapter}",
+  "@bookSourceLatestChapterLabel": {
+    "description": "bookSourceLatestChapterLabel",
+    "placeholders": {
+      "chapter": {
+        "type": "String"
+      }
+    }
+  },
+  "bookSourceUpdateHelp": "While the library is open, catalogs are checked every 30 minutes. Check manually at any time. Online books use the latest catalog; local TXT books download new chapters only when you choose to continue. After binding or changing a source, confirm the last chapter already in your local file. Updates do not replace your original text. The update time is supplied by the source, or records when a new chapter was first detected.",
+  "@bookSourceUpdateHelp": {
+    "description": "bookSourceUpdateHelp"
+  },
+  "bookSourceBindHelp": "Find this book in your sources to add its cover and enable source switching and chapter updates. Your local text and reading position are preserved.",
+  "@bookSourceBindHelp": {
+    "description": "bookSourceBindHelp"
+  },
+  "bookSourceContinueUpdate": "Download new chapters",
+  "@bookSourceContinueUpdate": {
+    "description": "bookSourceContinueUpdate"
+  }
 }

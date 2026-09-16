@@ -195,21 +195,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('cloud-tts-profiles')));
-      await tester.pumpAndSettle();
       await capture('profiles');
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('cloud-tts-preview')),
-        240,
-        scrollable: find
-            .descendant(
-              of: find.byType(CloudTtsSettingsPage),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      await tester.tap(find.byKey(const ValueKey('cloud-tts-add')));
       await tester.pumpAndSettle();
-      await capture('preview');
+      await capture('providers');
+      await tester.tap(find.text('豆包'));
+      await tester.pumpAndSettle();
+      await capture('doubao-editor');
+      await tester.tap(find.text('音色').first);
+      await tester.pumpAndSettle();
+      await capture('doubao-voices');
       expect(tester.takeException(), isNull);
 
       controller.dispose();

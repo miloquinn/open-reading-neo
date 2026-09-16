@@ -452,10 +452,16 @@ void main() {
               .evaluate()
               .isEmpty,
         );
-        final status = tester.widget<Text>(
-          find.byKey(const ValueKey('native-reader-status')),
-        );
-        final pageMatches = RegExp(r'(\d+)/(\d+)').allMatches(status.data!);
+        final status = tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('native-reader-status')),
+                matching: find.byType(Text),
+              ),
+            )
+            .map((text) => text.data ?? '')
+            .join(' ');
+        final pageMatches = RegExp(r'(\d+)\s*/\s*(\d+)').allMatches(status);
         expect(int.parse(pageMatches.last.group(1)!), greaterThan(1));
         final scrollable = tester.state<ScrollableState>(
           find

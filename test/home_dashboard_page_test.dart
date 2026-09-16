@@ -78,7 +78,7 @@ void main() {
     }
   });
 
-  testWidgets('首页只保留继续阅读、阅读节奏和最近阅读', (tester) async {
+  testWidgets('首页展示继续阅读、阅读节奏、排行榜和最近阅读', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 740));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -114,6 +114,12 @@ void main() {
       find.byKey(const ValueKey('home-reading-rhythm-card')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('home-reading-leaderboard-card')),
+      findsOneWidget,
+    );
+    expect(find.text('阅读排行榜'), findsOneWidget);
+    expect(find.text('登录后同步阅读记录，参与周榜'), findsOneWidget);
     expect(find.text('最近阅读'), findsOneWidget);
     expect(find.text('今日阅读计划'), findsNothing);
     expect(find.textContaining('AI'), findsNothing);
@@ -130,6 +136,10 @@ void main() {
     expect(find.text('首页'), findsNothing);
     expect(
       find.byKey(const ValueKey('home-dashboard-wide-layout')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-reading-leaderboard-card')),
       findsOneWidget,
     );
     expect(find.text('今日阅读计划'), findsNothing);

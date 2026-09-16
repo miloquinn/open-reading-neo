@@ -21,6 +21,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
+// JSONObject.optString coerces JSON null to the literal text "null" on Android.
+// Optional HTML and JavaScript must retain absence across the process boundary.
+internal fun JSONObject.sourceOptionalString(key: String): String? = opt(key) as? String
+
 internal object SourceBrowserSessionRuntime {
     val supportsIsolatedDataDirectory: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P

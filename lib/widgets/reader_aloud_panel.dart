@@ -224,15 +224,6 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
                 ),
                 const SizedBox(height: 12),
                 _playbackControls(compact: true),
-                TextButton.icon(
-                  key: const ValueKey('reader-aloud-stop'),
-                  onPressed: () async {
-                    await widget.controller.stop();
-                    if (context.mounted) Navigator.of(context).pop();
-                  },
-                  icon: const Icon(Icons.stop_rounded),
-                  label: Text(_copy('结束听书', 'Stop listening', '読み上げを終了')),
-                ),
               ],
             ),
           ),
@@ -307,12 +298,14 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
                             ),
                             const SizedBox(width: 12),
                             _roundButton(
-                              key: const ValueKey('reader-aloud-timer'),
-                              icon: controller.sleepDuration == null
-                                  ? Icons.timer_outlined
-                                  : Icons.timer_rounded,
-                              tooltip: context.l10n.ttsTimerStop,
-                              onPressed: _showSettings,
+                              key: const ValueKey('reader-aloud-stop'),
+                              icon: Icons.stop_rounded,
+                              tooltip: _copy(
+                                '结束听书',
+                                'Stop listening',
+                                '読み上げを終了',
+                              ),
+                              onPressed: () => unawaited(_stopListening()),
                             ),
                           ],
                         ),
@@ -386,6 +379,11 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _stopListening() async {
+    await widget.controller.stop();
+    if (mounted) Navigator.of(context).pop();
   }
 
   Widget _artworkAndSentence({required bool compact, required bool wide}) {
@@ -594,36 +592,69 @@ class _ReaderAloudPlayerPageState extends State<ReaderAloudPlayerPage> {
             ),
           ],
         ),
-        OutlinedButton.icon(
-          key: const ValueKey('reader-aloud-engine'),
-          onPressed: _showSettings,
-          icon: Icon(
-            widget.compactControls
-                ? Icons.settings_outlined
-                : widget.aloudService.usesCloud
-                ? Icons.cloud_outlined
-                : Icons.record_voice_over_outlined,
-            size: 20,
-          ),
-          label: Text(
-            widget.compactControls
-                ? _copy('听书设置', 'Listening settings', '読み上げ設定')
-                : widget.aloudService.usesCloud
-                ? _copy('云端朗读引擎', 'Cloud voice', 'クラウド音声')
-                : _copy('系统朗读引擎', 'System voice', 'システム音声'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: palette.secondaryText,
-            side: BorderSide(color: palette.border),
-            minimumSize: const Size(0, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: _footerButton(
+                key: const ValueKey('reader-aloud-engine'),
+                onPressed: _showSettings,
+                icon: widget.compactControls
+                    ? Icons.settings_outlined
+                    : widget.aloudService.usesCloud
+                    ? Icons.cloud_outlined
+                    : Icons.record_voice_over_outlined,
+                label: widget.compactControls
+                    ? _copy('听书设置', 'Listening settings', '読み上げ設定')
+                    : widget.aloudService.usesCloud
+                    ? _copy('云端朗读引擎', 'Cloud voice', 'クラウド音声')
+                    : _copy('系统朗读引擎', 'System voice', 'システム音声'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: widget.compactControls
+                  ? _footerButton(
+                      key: const ValueKey('reader-aloud-stop'),
+                      onPressed: () => unawaited(_stopListening()),
+                      icon: Icons.stop_rounded,
+                      label: _copy('结束听书', 'Stop listening', '読み上げを終了'),
+                    )
+                  : _footerButton(
+                      key: const ValueKey('reader-aloud-timer'),
+                      onPressed: _showSettings,
+                      icon: controller.sleepDuration == null
+                          ? Icons.timer_outlined
+                          : Icons.timer_rounded,
+                      label: _copy('定时', 'Sleep timer', 'タイマー'),
+                    ),
+            ),
+          ],
         ),
       ],
     );
   }
+
+  Widget _footerButton({
+    required Key key,
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+  }) => Tooltip(
+    message: label,
+    child: OutlinedButton.icon(
+      key: key,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: widget.palette.secondaryText,
+        side: BorderSide(color: widget.palette.border),
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+    ),
+  );
 
   Future<void> _commitVolume(double value) async {
     try {

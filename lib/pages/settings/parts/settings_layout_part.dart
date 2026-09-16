@@ -81,7 +81,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
     required AppLocalizations l10n,
     required ThemeNotifier themeNotifier,
     required AppSettingsNotifier appSettings,
-    required WebDavSyncController webDavSync,
+    required WebDavBackupController webDavSync,
     required bool useRailNavigation,
   }) {
     return Column(
@@ -143,7 +143,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
     required AppLocalizations l10n,
     required ThemeNotifier themeNotifier,
     required AppSettingsNotifier appSettings,
-    required WebDavSyncController webDavSync,
+    required WebDavBackupController webDavSync,
     required bool useRailNavigation,
   }) {
     return [
@@ -250,7 +250,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
 
   Widget _buildDataServicesSection(
     AppLocalizations l10n,
-    WebDavSyncController webDavSync,
+    WebDavBackupController webDavSync,
   ) {
     return _buildSectionCard(
       title: l10n.settingsSectionDataServices,
@@ -269,11 +269,10 @@ extension _SettingsLayoutPart on _SettingsPageState {
           icon: Icons.find_replace_outlined,
         ),
         _buildActionSetting(
-          title: l10n.cloudSyncTitle,
-          badge: l10n.webDavBetaBadge,
+          title: BackupCopy.of(context).title,
           subtitle: _webDavSyncSubtitle(webDavSync),
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const WebDavSyncPage()),
+            MaterialPageRoute<void>(builder: (_) => const WebDavBackupPage()),
           ),
           icon: Icons.cloud_outlined,
           trailing: _webDavSyncTrailing(webDavSync),

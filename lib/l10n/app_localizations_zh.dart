@@ -369,6 +369,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookSourcesDisableSelected => '停用所选';
 
   @override
+  String get bookSourcesExportSelected => '导出所选';
+
+  @override
+  String bookSourcesExportSuccess(int count, String location) {
+    return '已将 $count 个书源导出到 $location';
+  }
+
+  @override
+  String get bookSourcesExportFailed => '无法导出所选书源';
+
+  @override
+  String get bookSourcesExportUnsupported => '当前平台暂不支持导出书源';
+
+  @override
+  String get bookSourcesExportReplaceTitle => '替换已有文件？';
+
+  @override
+  String bookSourcesExportReplaceMessage(String path) {
+    return '$path 已存在文件，是否替换？';
+  }
+
+  @override
+  String get bookSourcesExportReplaceAction => '替换';
+
+  @override
   String get bookSourcesDeleteSelected => '删除所选';
 
   @override
@@ -6478,6 +6503,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get premiumTrialTitle => '高级版体验';
+
+  @override
+  String get bookSourceCheckUpdates => '检查更新';
+
+  @override
+  String get bookSourceUpdates => '书籍更新';
+
+  @override
+  String get bookSourceNotChecked => '尚未检查';
+
+  @override
+  String get bookSourceUpToDate => '目录已是最新';
+
+  @override
+  String get bookSourceUpdatesAvailable => '有新章节';
+
+  @override
+  String get bookSourceNeedsMapping => '待确认续更起点';
+
+  @override
+  String bookSourceLastChecked(String time) {
+    return '上次检查于 $time';
+  }
+
+  @override
+  String bookSourceLastUpdated(String time) {
+    return '上次更新于 $time';
+  }
+
+  @override
+  String get bookSourceUpdateTimeUnknown => '更新时刻暂无记录';
+
+  @override
+  String bookSourceLatestChapterLabel(String chapter) {
+    return '最新章节：$chapter';
+  }
+
+  @override
+  String get bookSourceUpdateHelp =>
+      '书库打开时，每 30 分钟检查一次目录，也可随时手动检查。在线书籍使用最新目录；本地 TXT 需点击续更后下载新章节。绑定或更换书源后，请先确认本地文件已有的最后一章，续更不会替换原文。更新时间优先采用书源提供的时间，否则记录首次发现新章节的时间。';
+
+  @override
+  String get bookSourceBindHelp => '在书源中搜索这本书，绑定后可补充封面、换源和续更。保留本地正文与阅读位置。';
+
+  @override
+  String get bookSourceContinueUpdate => '下载新章节';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -6843,6 +6914,31 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get bookSourcesDisableSelected => '停用所選';
+
+  @override
+  String get bookSourcesExportSelected => '匯出所選';
+
+  @override
+  String bookSourcesExportSuccess(int count, String location) {
+    return '已將 $count 個書源匯出到 $location';
+  }
+
+  @override
+  String get bookSourcesExportFailed => '無法匯出所選書源';
+
+  @override
+  String get bookSourcesExportUnsupported => '目前平台暫不支援匯出書源';
+
+  @override
+  String get bookSourcesExportReplaceTitle => '取代已有檔案？';
+
+  @override
+  String bookSourcesExportReplaceMessage(String path) {
+    return '$path 已有檔案，是否取代？';
+  }
+
+  @override
+  String get bookSourcesExportReplaceAction => '取代';
 
   @override
   String get bookSourcesDeleteSelected => '刪除所選';
@@ -12835,4 +12931,50 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get premiumTrialTitle => '進階版體驗';
+
+  @override
+  String get bookSourceCheckUpdates => '檢查更新';
+
+  @override
+  String get bookSourceUpdates => '書籍更新';
+
+  @override
+  String get bookSourceNotChecked => '尚未檢查';
+
+  @override
+  String get bookSourceUpToDate => '目錄已是最新';
+
+  @override
+  String get bookSourceUpdatesAvailable => '有新章節';
+
+  @override
+  String get bookSourceNeedsMapping => '待確認續更起點';
+
+  @override
+  String bookSourceLastChecked(String time) {
+    return '上次檢查於 $time';
+  }
+
+  @override
+  String bookSourceLastUpdated(String time) {
+    return '上次更新於 $time';
+  }
+
+  @override
+  String get bookSourceUpdateTimeUnknown => '更新時刻暫無記錄';
+
+  @override
+  String bookSourceLatestChapterLabel(String chapter) {
+    return '最新章節：$chapter';
+  }
+
+  @override
+  String get bookSourceUpdateHelp =>
+      '書庫開啟時，每 30 分鐘檢查一次目錄，也可隨時手動檢查。線上書籍使用最新目錄；本地 TXT 需點擊續更後下載新章節。綁定或更換書源後，請先確認本地檔案已有的最後一章，續更不會取代原文。更新時間優先採用書源提供的時間，否則記錄首次發現新章節的時間。';
+
+  @override
+  String get bookSourceBindHelp => '在書源中搜尋這本書，綁定後可補充封面、換源和續更。保留本地正文與閱讀位置。';
+
+  @override
+  String get bookSourceContinueUpdate => '下載新章節';
 }

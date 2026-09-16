@@ -96,6 +96,18 @@ extension _NativeReaderShell on _NativeReaderPageState {
       );
     }
     Widget withAutoSweep(Widget base) {
+      if (_pageMode == NativePageMode.pageCurl ||
+          _pageMode == NativePageMode.coverSlide) {
+        base = Listener(
+          onPointerMove: (event) {
+            if (!_annotationInteractionActive &&
+                event.delta.dx.abs() > event.delta.dy.abs()) {
+              _markReaderAloudForManualPageTurn();
+            }
+          },
+          child: base,
+        );
+      }
       if (!_autoPageTurnController.isActive ||
           _autoPageTurnController.mode != ReaderAutoPageTurnMode.sweep) {
         return base;

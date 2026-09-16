@@ -4,6 +4,7 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
   void _markReaderAloudForManualPageTurn() {
     final controller = _readerAloudController;
     _restartReaderAloudAfterManualPageTurn =
+        context.read<ReaderAloudService?>()?.followPageTurns == true &&
         controller?.state == ReaderAloudPlaybackState.playing;
   }
 
@@ -16,7 +17,9 @@ extension _BookSourceReaderAloudActions on _BookSourceReaderPageState {
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && controller.state == ReaderAloudPlaybackState.playing) {
+      if (mounted &&
+          context.read<ReaderAloudService?>()?.followPageTurns == true &&
+          controller.state == ReaderAloudPlaybackState.playing) {
         unawaited(controller.start());
       }
     });

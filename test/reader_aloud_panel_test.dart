@@ -14,6 +14,57 @@ import 'package:xxread/widgets/reader_aloud_panel.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets('page following defaults off and persists both switch values', (
+    tester,
+  ) async {
+    final fixture = await _openSettingsFromPlayer(
+      tester,
+      size: const Size(390, 844),
+    );
+    addTearDown(fixture.dispose);
+    final toggle = find.byKey(const ValueKey('reader-aloud-follow-page-turns'));
+    expect(fixture.aloud.followPageTurns, isFalse);
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(fixture.aloud.followPageTurns, isTrue);
+    expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+    expect(
+      (await SharedPreferences.getInstance()).getBool(
+        'reader_aloud_follow_page_turns',
+      ),
+      isTrue,
+    );
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(fixture.aloud.followPageTurns, isFalse);
+    expect(
+      (await SharedPreferences.getInstance()).getBool(
+        'reader_aloud_follow_page_turns',
+      ),
+      isFalse,
+    );
+  });
+
+  testWidgets('page following restores the saved preference', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'reader_aloud_follow_page_turns': true,
+    });
+    final fixture = await _openSettingsFromPlayer(
+      tester,
+      size: const Size(390, 844),
+    );
+    addTearDown(fixture.dispose);
+    expect(fixture.aloud.followPageTurns, isTrue);
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.byKey(const ValueKey('reader-aloud-follow-page-turns')),
+          )
+          .value,
+      isTrue,
+    );
+  });
   for (final presentation in ['player', 'controls']) {
     testWidgets('$presentation ends paused listening and clears highlight', (
       tester,

@@ -434,9 +434,9 @@ class ReaderAloudController extends ChangeNotifier {
     return (currentOffset / chapter.text.length).clamp(0.0, 1.0);
   }
 
-  Future<void> start() async {
+  Future<void> start({ReaderAloudPosition? position}) async {
     if (_disposed) return;
-    if (_state == ReaderAloudPlaybackState.paused) {
+    if (position == null && _state == ReaderAloudPlaybackState.paused) {
       await resume();
       return;
     }
@@ -445,11 +445,11 @@ class ReaderAloudController extends ChangeNotifier {
     _lastError = null;
     await engine.stop();
     try {
-      final position = await source.currentPosition();
+      final target = position ?? await source.currentPosition();
       if (!_isCurrent(generation)) return;
       final loaded = await _loadChapterAt(
-        position.chapterIndex,
-        startOffset: position.offset,
+        target.chapterIndex,
+        startOffset: target.offset,
       );
       if (!loaded || !_isCurrent(generation)) {
         if (_isCurrent(generation)) {

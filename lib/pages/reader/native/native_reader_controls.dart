@@ -41,22 +41,72 @@ extension _NativeReaderControls on _NativeReaderPageState {
   }
 
   void _markReaderAloudForManualPageTurn() {
+    final session = context.read<ReaderAloudSession?>();
+    if (session?.sourceId == 'local:${widget.book.id}' &&
+        session?.controller != null &&
+        _readerAloudController != session!.controller) {
+      _readerAloudController?.removeListener(_onReaderAloudChanged);
+      _readerAloudController = session.controller;
+      _readerAloudController!.addListener(_onReaderAloudChanged);
+    }
     final controller = _readerAloudController;
+    if (controller?.isActive == true) {
+      _readerAloudNavigationDetached = true;
+      ++_readerAloudNavigationRevision;
+      // Do not let an already queued spoken-position restore overwrite the
+      // page committed by this gesture on the next build.
+      if (_pageMode != NativePageMode.verticalScroll) {
+        _restoreAnchorAfterLayout = false;
+        _pendingRestoreChapterIndex = null;
+        ++_verticalScrollRevision;
+      }
+    }
     _restartReaderAloudAfterManualPageTurn =
-        controller?.state == ReaderAloudPlaybackState.playing;
+        context.read<ReaderAloudService?>()?.followPageTurns == true &&
+        (controller?.state == ReaderAloudPlaybackState.playing ||
+            controller?.state == ReaderAloudPlaybackState.loading);
   }
 
-  void _restartReaderAloudFromCurrentPageAfterManualTurn() {
+  void _restartReaderAloudFromCurrentPageAfterManualTurn({
+    ReaderAloudPosition? position,
+  }) {
     if (!_restartReaderAloudAfterManualPageTurn) return;
     _restartReaderAloudAfterManualPageTurn = false;
     final controller = _readerAloudController;
     if (controller == null ||
-        controller.state != ReaderAloudPlaybackState.playing) {
+        !controller.isActive ||
+        controller.state == ReaderAloudPlaybackState.paused) {
       return;
     }
+    final revision = _readerAloudNavigationRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && controller.state == ReaderAloudPlaybackState.playing) {
-        unawaited(controller.start());
+      if (mounted &&
+          revision == _readerAloudNavigationRevision &&
+          context.read<ReaderAloudService?>()?.followPageTurns == true &&
+          controller.isActive &&
+          controller.state != ReaderAloudPlaybackState.paused) {
+        final offset = _visiblePages.isEmpty
+            ? (_anchorOffset ?? 0)
+            : _visiblePages[_pageIndex.clamp(0, _visiblePages.length - 1)]
+                  .startOffset;
+        // Capture this route's committed page, not a source callback retained
+        // by the app session from a previously closed reader.
+        unawaited(
+          controller
+              .start(
+                position:
+                    position ??
+                    ReaderAloudPosition(
+                      chapterIndex: _chapterIndex,
+                      offset: offset,
+                    ),
+              )
+              .then((_) {
+                if (mounted && revision == _readerAloudNavigationRevision) {
+                  _readerAloudNavigationDetached = false;
+                }
+              }),
+        );
       }
     });
   }
@@ -154,6 +204,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
     final active = _readerAloudController?.isActive ?? false;
     final highlight = _readerAloudController?.highlight;
     if (!mounted) return;
+    if (!active) _readerAloudNavigationDetached = false;
     if (_readerAloudController?.state == ReaderAloudPlaybackState.playing ||
         _readerAloudController?.state == ReaderAloudPlaybackState.loading) {
       _pauseAutoPageTurn();
@@ -192,6 +243,7 @@ extension _NativeReaderControls on _NativeReaderPageState {
           chapterIndex: highlight.chapterIndex,
           offset: highlight.startOffset,
         ),
+        force: true,
       );
     } catch (_) {
       if (mounted)
@@ -205,15 +257,41 @@ extension _NativeReaderControls on _NativeReaderPageState {
     }
   }
 
-  Future<void> _revealReaderAloudPosition(ReaderAloudPosition position) async {
+  Future<void> _revealReaderAloudPosition(
+    ReaderAloudPosition position, {
+    bool force = false,
+  }) async {
     if (!mounted || _loadedChapters.isEmpty) return;
+    if (force) {
+      _readerAloudNavigationDetached = false;
+      ++_readerAloudNavigationRevision;
+    } else if (_readerAloudNavigationDetached) {
+      return;
+    }
+    final revision = _readerAloudNavigationRevision;
     final chapterIndex = position.chapterIndex.clamp(
       0,
       _loadedChapters.length - 1,
     );
     final chapter = _loadedChapters[chapterIndex];
     await chapter.loadTextAsync();
+    if (!mounted ||
+        revision != _readerAloudNavigationRevision ||
+        (!force && _readerAloudNavigationDetached))
+      return;
     final offset = position.offset.clamp(0, chapter.plainText.length);
+    if (_pageMode != NativePageMode.verticalScroll &&
+        chapterIndex == _chapterIndex &&
+        _visiblePages.isNotEmpty) {
+      final first = _pageIndex.clamp(0, _visiblePages.length - 1);
+      final last = (first + (_visibleUsesTwoPageLayout ? 1 : 0)).clamp(
+        0,
+        _visiblePages.length - 1,
+      );
+      if (offset >= _visiblePages[first].startOffset &&
+          offset < _visiblePages[last].endOffset)
+        return;
+    }
     final excerptEnd = (offset + 72).clamp(offset, chapter.plainText.length);
     final locator = CanonicalLocator.fromComponents(
       format: BookFormat.fromFileExtension(widget.book.format),
@@ -259,7 +337,6 @@ extension _NativeReaderControls on _NativeReaderPageState {
           : offset / chapter.plainText.length,
       contentSignature: _currentContentSignature,
     );
-    _anchorOffset = offset;
     final canonicalLocator = LocatorCodec.encodeCanonicalLocator(locator);
     unawaited(
       ReadingResumeService.recordPosition(

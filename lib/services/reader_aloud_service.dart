@@ -726,12 +726,24 @@ class ReaderAloudService extends ChangeNotifier
   String _activeProfileId =
       PreferencesReaderAloudCloudSettingsStore.legacyProfileId;
   ReaderAloudPresentation _presentation = ReaderAloudPresentation.player;
+  bool _followPageTurns = false;
 
   bool get supportsProfiles => _settingsStore is ReaderAloudProfileStore;
   List<ReaderAloudCloudProfile> get cloudProfiles =>
       List.unmodifiable(_profiles);
   String get activeProfileId => _activeProfileId;
   ReaderAloudPresentation get presentation => _presentation;
+  bool get followPageTurns => _followPageTurns;
+
+  Future<void> setFollowPageTurns(bool value) async {
+    await initialize();
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setBool('reader_aloud_follow_page_turns', value)) {
+      throw StateError('Could not save listening page following');
+    }
+    _followPageTurns = value;
+    _notifySafe();
+  }
 
   Future<void> setPresentation(ReaderAloudPresentation value) async {
     await initialize();
@@ -940,6 +952,8 @@ class ReaderAloudService extends ChangeNotifier
       await _reloadProfiles();
       try {
         final prefs = await SharedPreferences.getInstance();
+        _followPageTurns =
+            prefs.getBool('reader_aloud_follow_page_turns') ?? false;
         _presentation =
             prefs.getString('reader_aloud_presentation') == 'controls'
             ? ReaderAloudPresentation.controls

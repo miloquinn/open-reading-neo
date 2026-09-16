@@ -390,6 +390,8 @@ class _NativeReaderPageState extends State<NativeReaderPage>
   bool _readerAloudActive = false;
   ReaderAloudHighlight? _readerAloudHighlight;
   bool _restartReaderAloudAfterManualPageTurn = false;
+  bool _readerAloudNavigationDetached = false;
+  int _readerAloudNavigationRevision = 0;
   final ReadingStatsDao _readingStatsDao = ReadingStatsDao();
   final ReadingCloudRecorder _cloudRecorder = ReadingCloudRecorder();
   final BookmarkDao _bookmarkDao = BookmarkDao();

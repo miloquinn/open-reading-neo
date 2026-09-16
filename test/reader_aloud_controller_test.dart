@@ -104,6 +104,24 @@ void main() {
       );
     });
 
+    test(
+      'explicit page target overrides a stale reader source callback',
+      () async {
+        await controller.start();
+        await _flush();
+        const target = ReaderAloudPosition(chapterIndex: 1, offset: 4);
+        await controller.start(position: target);
+        await _flush();
+        expect(controller.currentChapter?.id, 'c2');
+        expect(engine.spokenTexts.last, '句。');
+        expect(source.revealed.last, target);
+        expect(
+          source.initialPosition,
+          const ReaderAloudPosition(chapterIndex: 0, offset: 3),
+        );
+      },
+    );
+
     test('pause retains the sentence highlight and stop clears it', () async {
       source.initialPosition = const ReaderAloudPosition(
         chapterIndex: 0,

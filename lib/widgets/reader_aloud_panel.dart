@@ -919,6 +919,41 @@ class _ReaderAloudPanelState extends State<ReaderAloudPanel> {
                   },
                 ),
                 const SizedBox(height: 16),
+                SwitchListTile.adaptive(
+                  key: const ValueKey('reader-aloud-follow-page-turns'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    _copy(context, '听书跟随翻页', 'Follow page turns', 'ページ送りに追従'),
+                  ),
+                  subtitle: Text(
+                    _copy(
+                      context,
+                      '开启后，手动翻页从新页开始朗读；关闭后，翻页不影响听书',
+                      'Read from the new page after a manual page turn. When off, listening continues independently.',
+                      'オンにすると手動で送ったページから読み上げます。オフではページ送りに影響されません。',
+                    ),
+                  ),
+                  value: aloud.followPageTurns,
+                  onChanged: (value) async {
+                    try {
+                      await aloud.setFollowPageTurns(value);
+                    } catch (_) {
+                      if (context.mounted) {
+                        showSideToast(
+                          context,
+                          _copy(
+                            context,
+                            '未能保存翻页跟随设置，请重试',
+                            'Could not save page following. Please retry.',
+                            'ページ追従設定を保存できませんでした',
+                          ),
+                          kind: SideToastKind.error,
+                        );
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
                 _engineSelector(context, controller, aloud),
                 const SizedBox(height: 20),
                 if (aloud.usesCloud)

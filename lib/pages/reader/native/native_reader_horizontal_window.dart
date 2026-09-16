@@ -93,6 +93,11 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
     if (page.chapterIndex == _chapterIndex && page.pageIndex == _pageIndex) {
       return;
     }
+    // Curl/cover gestures commit here without going through the tap actions.
+    if (_pageMode == NativePageMode.pageCurl ||
+        _pageMode == NativePageMode.coverSlide) {
+      _markReaderAloudForManualPageTurn();
+    }
     final pageController = _pageController;
     final isActiveHorizontalTurn =
         _pageMode == NativePageMode.horizontalSlide &&
@@ -158,7 +163,12 @@ extension _NativeReaderHorizontalWindowMaintenance on _NativeReaderPageState {
         _horizontalLastChapter++;
       }
     });
-    _restartReaderAloudFromCurrentPageAfterManualTurn();
+    _restartReaderAloudFromCurrentPageAfterManualTurn(
+      position: ReaderAloudPosition(
+        chapterIndex: page.chapterIndex,
+        offset: page.content.startOffset,
+      ),
+    );
     if (chapterChanged && widget.book.id != null) {
       unawaited(_queueBookProgress(widget.book.id!, page.chapterIndex));
     }

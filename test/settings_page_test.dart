@@ -148,7 +148,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
-      appName: 'Open Reading',
+      appName: 'Origo',
       packageName: 'com.niki.xxread',
       version: '2.6.7',
       buildNumber: '260908001',

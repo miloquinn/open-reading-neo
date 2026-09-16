@@ -307,7 +307,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('OpenReading includes no sources'),
+      find.textContaining('Origo includes no sources'),
       findsOneWidget,
     );
     expect(find.textContaining('bypass sign-in, payment, DRM'), findsOneWidget);

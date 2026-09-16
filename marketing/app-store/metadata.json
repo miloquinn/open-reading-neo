@@ -1,6 +1,6 @@
 {
   "bundleId": "com.niki.xxread",
-  "version": "2.6.7",
+  "version": "2.7.0",
   "localizations": {
     "zh-Hans": {
       "name": "开元阅读",
@@ -14,9 +14,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=zh-CN"
     },
     "en-US": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo",
       "subtitle": "Your books, notes and progress",
-      "description": "Open Reading is a local-first ebook reader for organizing your own books, personalizing reading, and keeping track of your reading habits.\n\n• Import your own TXT, EPUB and other supported ebooks into a personal library.\n• Adjust fonts, themes, spacing and page layout, and choose your preferred page-turning style.\n• Keep bookmarks, highlights and notes, and review reading statistics and goals.\n• Use text-to-speech and access files and iCloud documents on supported devices.\n\nBasic local reading does not require an account. Account services, third-party content services and AI features require an internet connection. AI features require your own service configuration. The app does not bundle a third-party source directory or commercial books. Only import or access content you have the right to use.\n\nOptional Premium is a one-time non-consumable in-app purchase with no automatic renewal. After purchase verification, enable additional compatible source protocols and trusted local/private-network sources in Settings. Premium does not provide books or source addresses. The membership screen displays the App Store price and includes membership terms, privacy information and Restore Purchases.",
+      "description": "Origo is a local-first ebook reader for organizing your own books, personalizing reading, and keeping track of your reading habits.\n\n• Import your own TXT, EPUB and other supported ebooks into a personal library.\n• Adjust fonts, themes, spacing and page layout, and choose your preferred page-turning style.\n• Keep bookmarks, highlights and notes, and review reading statistics and goals.\n• Use text-to-speech and access files and iCloud documents on supported devices.\n\nBasic local reading does not require an account. Account services, third-party content services and AI features require an internet connection. AI features require your own service configuration. The app does not bundle a third-party source directory or commercial books. Only import or access content you have the right to use.\n\nOptional Premium is a one-time non-consumable in-app purchase with no automatic renewal. After purchase verification, enable additional compatible source protocols and trusted local/private-network sources in Settings. Premium does not provide books or source addresses. The membership screen displays the App Store price and includes membership terms, privacy information and Restore Purchases.",
       "keywords": "ebook,reader,epub,txt,books,library,bookmarks,notes,reading,text to speech",
       "promotionalText": "Bring your own books into a personal library. Find a reading style that suits you and keep track of your progress.",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -25,9 +25,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=en"
     },
     "zh-Hant": {
-      "name": "Open Reading - 開元閱讀",
+      "name": "Origo - 開元閱讀",
       "subtitle": "跨平台、本機優先的閱讀器",
-      "description": "把閱讀留在自己的裝置裡。Open Reading 是一款跨平台、本機優先的電子書閱讀器，讓你匯入自己有權使用的 TXT、EPUB 等檔案，整理書架、保存閱讀進度，專注享受每一次閱讀。\n\n依照自己的習慣調整字體、主題、行距與翻頁方式；使用書籤、畫線和筆記記下重點，並透過閱讀統計回顧投入的時間。需要時也能使用朗讀功能，讓閱讀自然融入通勤、家務與休息時間。\n\n在支援的裝置上，你可以從本機檔案或 iCloud 匯入內容。基礎本機閱讀不需要註冊帳號；需要連線的帳號功能、第三方內容與 AI 功能則必須使用網路，其中 AI 服務需要由你自行設定。\n\nOpen Reading 不附帶商業書籍或第三方書源目錄。請只匯入或存取你有權使用的內容。",
+      "description": "把閱讀留在自己的裝置裡。Origo 是一款跨平台、本機優先的電子書閱讀器，讓你匯入自己有權使用的 TXT、EPUB 等檔案，整理書架、保存閱讀進度，專注享受每一次閱讀。\n\n依照自己的習慣調整字體、主題、行距與翻頁方式；使用書籤、畫線和筆記記下重點，並透過閱讀統計回顧投入的時間。需要時也能使用朗讀功能，讓閱讀自然融入通勤、家務與休息時間。\n\n在支援的裝置上，你可以從本機檔案或 iCloud 匯入內容。基礎本機閱讀不需要註冊帳號；需要連線的帳號功能、第三方內容與 AI 功能則必須使用網路，其中 AI 服務需要由你自行設定。\n\nOrigo 不附帶商業書籍或第三方書源目錄。請只匯入或存取你有權使用的內容。",
       "keywords": "電子書,閱讀器,TXT,EPUB,書架,筆記,書籤,朗讀,閱讀統計",
       "promotionalText": "匯入自己的 TXT、EPUB，在手機、平板與電腦上整理書架、調整排版，享受本機優先的專注閱讀。",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -36,9 +36,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=zh-CN"
     },
     "ja": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo - 开元阅读",
       "subtitle": "端末中心で使える読書アプリ",
-      "description": "読書を、自分の端末の中に。Open Reading は、手元のファイルを中心に使えるクロスプラットフォームの電子書籍リーダーです。利用する権利のある TXT や EPUB などを読み込み、本棚を整理し、読書の進み具合を保存できます。\n\nフォント、テーマ、行間、ページ送りを好みに合わせて調整できます。しおり、ハイライト、メモで大切な箇所を残し、読書統計で積み重ねた時間を振り返れます。読み上げにも対応しているため、移動中や家事の時間にも本を楽しめます。\n\n対応する端末では、端末内のファイルや iCloud からコンテンツを読み込めます。基本的なローカル読書には登録は不要です。オンラインアカウント、第三者コンテンツ、AI 機能の利用にはインターネット接続が必要で、AI サービスはご自身で設定する必要があります。\n\n市販の書籍や第三者の書籍ソース一覧は同梱していません。利用する権利のあるコンテンツだけを読み込み、アクセスしてください。",
+      "description": "読書を、自分の端末の中に。Origo は、手元のファイルを中心に使えるクロスプラットフォームの電子書籍リーダーです。利用する権利のある TXT や EPUB などを読み込み、本棚を整理し、読書の進み具合を保存できます。\n\nフォント、テーマ、行間、ページ送りを好みに合わせて調整できます。しおり、ハイライト、メモで大切な箇所を残し、読書統計で積み重ねた時間を振り返れます。読み上げにも対応しているため、移動中や家事の時間にも本を楽しめます。\n\n対応する端末では、端末内のファイルや iCloud からコンテンツを読み込めます。基本的なローカル読書には登録は不要です。オンラインアカウント、第三者コンテンツ、AI 機能の利用にはインターネット接続が必要で、AI サービスはご自身で設定する必要があります。\n\n市販の書籍や第三者の書籍ソース一覧は同梱していません。利用する権利のあるコンテンツだけを読み込み、アクセスしてください。",
       "keywords": "電子書籍,読書,TXT,EPUB,本棚,しおり,メモ,読み上げ,読書記録",
       "promotionalText": "手持ちの TXT や EPUB を読み込み、本棚と進捗を整理。スマートフォン、タブレット、パソコンで、自分好みの読書環境を整えられます。",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -47,9 +47,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=en"
     },
     "ko": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo - 开元阅读",
       "subtitle": "내 기기에 두고 읽는 전자책 리더",
-      "description": "독서를 내 기기 안에 간직하세요. Open Reading은 직접 보유하고 사용할 권리가 있는 TXT, EPUB 등의 파일을 불러와 읽는 크로스 플랫폼 전자책 리더입니다. 책장을 정리하고 읽던 위치와 진행률을 보관하며, 콘텐츠에 집중할 수 있습니다.\n\n글꼴, 테마, 줄 간격, 페이지 넘김 방식을 취향에 맞게 조절하세요. 책갈피, 밑줄, 메모로 중요한 부분을 남기고 독서 통계로 쌓아 온 시간을 돌아볼 수 있습니다. 읽어주기 기능을 이용하면 이동하거나 집안일을 하는 동안에도 책을 이어서 즐길 수 있습니다.\n\n지원하는 기기에서는 기기에 저장된 파일과 iCloud에서 콘텐츠를 가져올 수 있습니다. 기본적인 로컬 독서는 가입 없이 이용할 수 있습니다. 온라인 계정, 타사 콘텐츠, AI 기능에는 인터넷 연결이 필요하며, AI 서비스는 사용자가 직접 설정해야 합니다.\n\n상업용 도서나 타사 도서 소스 목록은 포함되어 있지 않습니다. 이용 권한이 있는 콘텐츠만 가져오거나 열어 주세요.",
+      "description": "독서를 내 기기 안에 간직하세요. Origo는 직접 보유하고 사용할 권리가 있는 TXT, EPUB 등의 파일을 불러와 읽는 크로스 플랫폼 전자책 리더입니다. 책장을 정리하고 읽던 위치와 진행률을 보관하며, 콘텐츠에 집중할 수 있습니다.\n\n글꼴, 테마, 줄 간격, 페이지 넘김 방식을 취향에 맞게 조절하세요. 책갈피, 밑줄, 메모로 중요한 부분을 남기고 독서 통계로 쌓아 온 시간을 돌아볼 수 있습니다. 읽어주기 기능을 이용하면 이동하거나 집안일을 하는 동안에도 책을 이어서 즐길 수 있습니다.\n\n지원하는 기기에서는 기기에 저장된 파일과 iCloud에서 콘텐츠를 가져올 수 있습니다. 기본적인 로컬 독서는 가입 없이 이용할 수 있습니다. 온라인 계정, 타사 콘텐츠, AI 기능에는 인터넷 연결이 필요하며, AI 서비스는 사용자가 직접 설정해야 합니다.\n\n상업용 도서나 타사 도서 소스 목록은 포함되어 있지 않습니다. 이용 권한이 있는 콘텐츠만 가져오거나 열어 주세요.",
       "keywords": "전자책,독서,TXT,EPUB,책장,책갈피,메모,읽어주기,독서통계",
       "promotionalText": "내 TXT와 EPUB을 불러와 책장과 진행률을 정리하세요. 휴대폰, 태블릿, 컴퓨터에서 취향에 맞는 로컬 중심 독서 환경을 만들 수 있습니다.",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -58,9 +58,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=en"
     },
     "de-DE": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo - 开元阅读",
       "subtitle": "Deine Bücher, deine Ruhe",
-      "description": "Open Reading ist ein lokaler Reader für deine eigenen TXT- und EPUB-Dateien. Importiere Bücher, die du rechtmäßig nutzen darfst, auf unterstützten Geräten aus der Dateien-App, vom Gerät oder aus iCloud und ordne sie übersichtlich im Bücherregal. Lesefortschritt, Lesezeichen, Markierungen, Notizen und Statistiken helfen dir, jederzeit weiterzulesen.\n\nPasse Schrift, Design, Zeilenabstand und Umblättereffekt an deine Gewohnheiten an oder lass dir Text vorlesen. Das grundlegende lokale Lesen funktioniert ohne Registrierung. Funktionen mit Online-Konto, Inhalte von Drittanbietern und KI benötigen eine Internetverbindung; KI-Dienste richtest du selbst ein.\n\nDie App enthält keine kommerziellen Bücher und keine Quellen von Drittanbietern. Bitte importiere nur Inhalte, für die du die nötigen Rechte besitzt.",
+      "description": "Origo ist ein lokaler Reader für deine eigenen TXT- und EPUB-Dateien. Importiere Bücher, die du rechtmäßig nutzen darfst, auf unterstützten Geräten aus der Dateien-App, vom Gerät oder aus iCloud und ordne sie übersichtlich im Bücherregal. Lesefortschritt, Lesezeichen, Markierungen, Notizen und Statistiken helfen dir, jederzeit weiterzulesen.\n\nPasse Schrift, Design, Zeilenabstand und Umblättereffekt an deine Gewohnheiten an oder lass dir Text vorlesen. Das grundlegende lokale Lesen funktioniert ohne Registrierung. Funktionen mit Online-Konto, Inhalte von Drittanbietern und KI benötigen eine Internetverbindung; KI-Dienste richtest du selbst ein.\n\nDie App enthält keine kommerziellen Bücher und keine Quellen von Drittanbietern. Bitte importiere nur Inhalte, für die du die nötigen Rechte besitzt.",
       "keywords": "E-Book,EPUB,TXT,Reader,Bücher,Lesen,Notizen,Lesezeichen,Vorlesen,Bibliothek",
       "promotionalText": "Deine TXT- und EPUB-Bücher an einem ruhigen Ort: lokal lesen, Fortschritt behalten und das Lesegefühl passend einstellen.",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -69,9 +69,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=en"
     },
     "fr-FR": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo - 开元阅读",
       "subtitle": "Vos livres, votre rythme",
-      "description": "Open Reading est une liseuse locale pour vos propres fichiers TXT et EPUB. Importez les livres que vous avez le droit d’utiliser sur les appareils compatibles, depuis l’app Fichiers, votre appareil ou iCloud, puis organisez-les dans une bibliothèque claire. La progression, les signets, les surlignages, les notes et les statistiques vous permettent de reprendre facilement votre lecture.\n\nAdaptez la police, le thème, l’interligne et l’effet de changement de page à vos habitudes, ou utilisez la lecture à voix haute. La lecture locale de base ne demande aucune inscription. Les fonctions liées à un compte en ligne, les contenus tiers et l’IA nécessitent une connexion Internet ; vous configurez vous-même les services d’IA.\n\nL’app ne fournit aucun livre commercial ni aucune source tierce. Importez uniquement des contenus que vous êtes autorisé à utiliser.",
+      "description": "Origo est une liseuse locale pour vos propres fichiers TXT et EPUB. Importez les livres que vous avez le droit d’utiliser sur les appareils compatibles, depuis l’app Fichiers, votre appareil ou iCloud, puis organisez-les dans une bibliothèque claire. La progression, les signets, les surlignages, les notes et les statistiques vous permettent de reprendre facilement votre lecture.\n\nAdaptez la police, le thème, l’interligne et l’effet de changement de page à vos habitudes, ou utilisez la lecture à voix haute. La lecture locale de base ne demande aucune inscription. Les fonctions liées à un compte en ligne, les contenus tiers et l’IA nécessitent une connexion Internet ; vous configurez vous-même les services d’IA.\n\nL’app ne fournit aucun livre commercial ni aucune source tierce. Importez uniquement des contenus que vous êtes autorisé à utiliser.",
       "keywords": "livres,lecture,EPUB,TXT,liseuse,notes,signets,surlignage,audio,bibliothèque",
       "promotionalText": "Réunissez vos fichiers TXT et EPUB dans un espace calme : lecture locale, progression suivie et affichage adapté à vos habitudes.",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -80,9 +80,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=en"
     },
     "es-ES": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo - 开元阅读",
       "subtitle": "Tus libros, a tu manera",
-      "description": "Open Reading es un lector local para tus propios archivos TXT y EPUB. Importa los libros que tengas derecho a utilizar en dispositivos compatibles, desde la app Archivos, el dispositivo o iCloud y ordénalos en una biblioteca clara. El progreso, los marcadores, los subrayados, las notas y las estadísticas te ayudan a retomar la lectura cuando quieras.\n\nAjusta la fuente, el tema, el interlineado y el efecto de paso de página a tus hábitos, o escucha el texto en voz alta. La lectura local básica no requiere registro. Las funciones con cuenta en línea, el contenido de terceros y la IA necesitan conexión a Internet; tú configuras los servicios de IA.\n\nLa app no incluye libros comerciales ni fuentes de terceros. Importa únicamente contenido para el que tengas los permisos necesarios.",
+      "description": "Origo es un lector local para tus propios archivos TXT y EPUB. Importa los libros que tengas derecho a utilizar en dispositivos compatibles, desde la app Archivos, el dispositivo o iCloud y ordénalos en una biblioteca clara. El progreso, los marcadores, los subrayados, las notas y las estadísticas te ayudan a retomar la lectura cuando quieras.\n\nAjusta la fuente, el tema, el interlineado y el efecto de paso de página a tus hábitos, o escucha el texto en voz alta. La lectura local básica no requiere registro. Las funciones con cuenta en línea, el contenido de terceros y la IA necesitan conexión a Internet; tú configuras los servicios de IA.\n\nLa app no incluye libros comerciales ni fuentes de terceros. Importa únicamente contenido para el que tengas los permisos necesarios.",
       "keywords": "libros,lectura,EPUB,TXT,lector,notas,marcadores,subrayado,voz alta,biblioteca",
       "promotionalText": "Reúne tus archivos TXT y EPUB en un espacio tranquilo: lectura local, progreso guardado y una experiencia adaptada a ti.",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",
@@ -91,9 +91,9 @@
       "privacyChoicesUrl": "https://open.xxread.top/privacy-choices?lang=en"
     },
     "pt-BR": {
-      "name": "Open Reading - 开元阅读",
+      "name": "Origo - 开元阅读",
       "subtitle": "Seus livros, do seu jeito",
-      "description": "Open Reading é um leitor local para seus próprios arquivos TXT e EPUB. Importe livros que você tem direito de usar em dispositivos compatíveis, pelo app Arquivos, pelo dispositivo ou pelo iCloud e organize tudo em uma estante clara. Progresso, marcadores, destaques, anotações e estatísticas ajudam você a continuar de onde parou.\n\nAjuste fonte, tema, espaçamento entre linhas e efeito de virada de página aos seus hábitos, ou ouça o texto em voz alta. A leitura local básica não exige cadastro. Recursos com conta online, conteúdo de terceiros e IA precisam de conexão com a internet; os serviços de IA são configurados por você.\n\nO app não inclui livros comerciais nem fontes de terceiros. Importe somente conteúdos para os quais você possui os direitos necessários.",
+      "description": "Origo é um leitor local para seus próprios arquivos TXT e EPUB. Importe livros que você tem direito de usar em dispositivos compatíveis, pelo app Arquivos, pelo dispositivo ou pelo iCloud e organize tudo em uma estante clara. Progresso, marcadores, destaques, anotações e estatísticas ajudam você a continuar de onde parou.\n\nAjuste fonte, tema, espaçamento entre linhas e efeito de virada de página aos seus hábitos, ou ouça o texto em voz alta. A leitura local básica não exige cadastro. Recursos com conta online, conteúdo de terceiros e IA precisam de conexão com a internet; os serviços de IA são configurados por você.\n\nO app não inclui livros comerciais nem fontes de terceiros. Importe somente conteúdos para os quais você possui os direitos necessários.",
       "keywords": "livros,leitura,EPUB,TXT,leitor,notas,marcadores,destaques,voz alta,biblioteca",
       "promotionalText": "Reúna seus arquivos TXT e EPUB em um espaço tranquilo: leitura local, progresso salvo e uma experiência ajustada ao seu jeito.",
       "supportUrl": "https://github.com/miloquinn/open-reading/issues",

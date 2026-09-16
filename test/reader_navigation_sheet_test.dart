@@ -73,7 +73,7 @@ void main() {
     );
   });
 
-  testWidgets('Open Reading current-position icon assets are bundled', (
+  testWidgets('Origo current-position icon assets are bundled', (
     tester,
   ) async {
     final svg = await rootBundle.load(OpenReadingIconAssets.currentReadingSvg);

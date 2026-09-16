@@ -4,7 +4,7 @@
 
 ## 审核操作说明（英文草稿）
 
-Open Reading is a local-first ebook reader. Basic local reading does not require
+Origo is a local-first ebook reader. Basic local reading does not require
 an account. Import a legally distributable TXT or EPUB document from Files into
 the library, open it, adjust fonts/themes and page-turning preferences, and add
 bookmarks or notes. Reading statistics are available in the app.
@@ -20,7 +20,7 @@ App Store price, and provides readable membership terms, privacy information,
 and the Apple standard EULA. The purchase is one-time and does not auto-renew.
 Restore Purchases remains available to signed-in users, including active members,
 and explicitly synchronizes with the App Store before server verification.
-Use the same Apple Account for restoration. If the former Open Reading account was deleted, sign in to a new Open Reading account and use Restore Purchases to link the retained Apple purchase again.
+Use the same Apple Account for restoration. If the former Origo account was deleted, sign in to a new Origo account and use Restore Purchases to link the retained Apple purchase again.
 Active members on iOS can open the system refund request sheet; Apple decides
 whether to approve the request. A submitted request is not treated as a refund.
 Provide a dedicated review account to test account functionality; do not use

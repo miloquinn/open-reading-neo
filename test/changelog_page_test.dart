@@ -11,7 +11,7 @@ void main() {
 
   setUp(() {
     PackageInfo.setMockInitialValues(
-      appName: 'Open Reading',
+      appName: 'Origo',
       packageName: 'com.niki.xxread',
       version: '2.3.0',
       buildNumber: '1102',

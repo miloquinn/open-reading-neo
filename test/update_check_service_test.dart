@@ -11,7 +11,7 @@ void main() {
     'check reads installed build from PackageInfo and detects build-only update',
     () async {
       PackageInfo.setMockInitialValues(
-        appName: 'Open Reading',
+        appName: 'Origo',
         packageName: 'com.niki.xxread',
         version: '2.2.0',
         buildNumber: '14118',
@@ -169,7 +169,7 @@ void main() {
   test('parses the GitHub release payload used by the update dialog', () {
     final release = AppRelease.fromGithubJson({
       'tag_name': 'v1.2.3',
-      'name': 'Open Reading v1.2.3',
+      'name': 'Origo v1.2.3',
       'body': 'Bug fixes and improvements',
       'html_url':
           'https://github.com/miloquinn/open-reading/releases/tag/v1.2.3',
@@ -401,7 +401,7 @@ void main() {
     );
     AppRelease github(String version) => AppRelease(
       version: version,
-      name: 'Open Reading v$version',
+      name: 'Origo v$version',
       notes: 'GitHub notes',
       releaseUrl: Uri.parse(
         'https://github.com/miloquinn/open-reading/releases/tag/v$version',

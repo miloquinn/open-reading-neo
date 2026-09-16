@@ -67,7 +67,7 @@ class AppUpdateDownloadService {
     final notificationTask = BackgroundDownloadTask(
       id: 'app-update:${asset.buildNumber}',
       kind: BackgroundDownloadKind.update,
-      title: 'Open Reading ${asset.buildNumber}',
+      title: 'Origo ${asset.buildNumber}',
     );
     await _notify(() => BackgroundDownloadNotifier.begin(notificationTask));
 

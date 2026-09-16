@@ -41,7 +41,7 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Open Reading Book Document</string>
+			<string>Origo Book Document</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -135,7 +135,7 @@
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
 			<key>NSUbiquitousContainerName</key>
-			<string>Open Reading</string>
+			<string>Origo</string>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>
 			<string>Any</string>
 		</dict>

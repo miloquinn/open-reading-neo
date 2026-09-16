@@ -168,7 +168,7 @@ class AppRelease {
     return AppRelease(
       version: version.split('+').first,
       buildNumber: canonicalBuild,
-      name: 'Open Reading v$version',
+      name: 'Origo v$version',
       notes: _firstString(payload, ['release_notes', 'notes', 'body']),
       releaseUrl: Uri.parse(githubUrl),
       publishedAt: DateTime.tryParse(_string(payload, 'published_at')),

@@ -1065,7 +1065,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fontMonospaceDescription => '等宽字体，适合代码、技术内容和专注排版。';
 
   @override
-  String get fontPreviewText => 'Open Reading · 自由阅读，开卷有益';
+  String get fontPreviewText => 'Origo · 自由阅读，开卷有益';
 
   @override
   String get customFonts => '我的字体';
@@ -1222,7 +1222,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsQqChannel => 'QQ 频道';
 
   @override
-  String get settingsQqChannelSubtitle => '开元阅读 · OpenReading6';
+  String get settingsQqChannelSubtitle => '开元阅读 · Origo6';
 
   @override
   String get settingsQqChannelOpenFailed => '无法打开 QQ 频道邀请链接';
@@ -2931,7 +2931,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get openSourceLicensesIntro =>
-      '以下许可文本及声明随应用离线提供。Open Reading、在线字体及第三方软件分别遵循各自的许可条款。';
+      '以下许可文本及声明随应用离线提供。Origo、在线字体及第三方软件分别遵循各自的许可条款。';
 
   @override
   String get openSourceProjectSection => '项目许可';
@@ -2952,7 +2952,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSourceDependenciesSubtitle => '查看由 Flutter 自动收集的第三方软件许可';
 
   @override
-  String get openSourceLicenseLegalese => 'Open Reading 与第三方组件分别遵循各自的许可条款。';
+  String get openSourceLicenseLegalese => 'Origo 与第三方组件分别遵循各自的许可条款。';
 
   @override
   String get openSourceLicenseLoadFailed => '无法加载许可文本。';
@@ -3964,10 +3964,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importSelectFiles => '选择文件';
 
   @override
-  String get importIosSharedDocuments => '我的 iPhone · Open Reading';
+  String get importIosSharedDocuments => '我的 iPhone · Origo';
 
   @override
-  String get importICloudDrive => 'iCloud Drive · Open Reading';
+  String get importICloudDrive => 'iCloud Drive · Origo';
 
   @override
   String get importICloudUnavailable => 'iCloud Drive 当前不可用';
@@ -7612,7 +7612,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get fontMonospaceDescription => '等寬字體，適合程式碼、技術內容和專注排版。';
 
   @override
-  String get fontPreviewText => 'Open Reading · 自由閱讀，開卷有益';
+  String get fontPreviewText => 'Origo · 自由閱讀，開卷有益';
 
   @override
   String get customFonts => '我的字體';
@@ -7729,7 +7729,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsQqChannel => 'QQ 頻道';
 
   @override
-  String get settingsQqChannelSubtitle => '開元閱讀 · OpenReading6';
+  String get settingsQqChannelSubtitle => '開元閱讀 · Origo6';
 
   @override
   String get settingsQqChannelOpenFailed => '無法開啟 QQ 頻道邀請連結';
@@ -9438,7 +9438,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get openSourceLicensesIntro =>
-      '以下授權文字及聲明隨應用程式離線提供。Open Reading、線上字型及第三方軟體分別適用各自的授權條款。';
+      '以下授權文字及聲明隨應用程式離線提供。Origo、線上字型及第三方軟體分別適用各自的授權條款。';
 
   @override
   String get openSourceProjectSection => '專案授權';
@@ -9459,7 +9459,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get openSourceDependenciesSubtitle => '查看由 Flutter 自動彙整的第三方軟體授權';
 
   @override
-  String get openSourceLicenseLegalese => 'Open Reading 與第三方元件分別適用各自的授權條款。';
+  String get openSourceLicenseLegalese => 'Origo 與第三方元件分別適用各自的授權條款。';
 
   @override
   String get openSourceLicenseLoadFailed => '無法載入授權文字。';
@@ -10471,10 +10471,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get importSelectFiles => '選擇檔案';
 
   @override
-  String get importIosSharedDocuments => '我的 iPhone · Open Reading';
+  String get importIosSharedDocuments => '我的 iPhone · Origo';
 
   @override
-  String get importICloudDrive => 'iCloud Drive · Open Reading';
+  String get importICloudDrive => 'iCloud Drive · Origo';
 
   @override
   String get importICloudUnavailable => 'iCloud Drive 目前無法使用';

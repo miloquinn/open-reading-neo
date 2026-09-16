@@ -104,7 +104,7 @@ abstract class AppLocalizations {
   /// The title of the application
   ///
   /// In en, this message translates to:
-  /// **'OpenReading'**
+  /// **'Origo'**
   String get appTitle;
 
   /// Home tab label
@@ -1125,7 +1125,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesNoOfficialSourcesNotice.
   ///
   /// In en, this message translates to:
-  /// **'OpenReading includes no sources and does not operate, recommend, or endorse third-party source services. Every source address is added by you.'**
+  /// **'Origo includes no sources and does not operate, recommend, or endorse third-party source services. Every source address is added by you.'**
   String get bookSourcesNoOfficialSourcesNotice;
 
   /// No description provided for @bookSourcesResponsibilityAck.
@@ -1281,7 +1281,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookSourcesRightsUnverifiedNotice.
   ///
   /// In en, this message translates to:
-  /// **'These statements are supplied by the independent source operator. OpenReading displays them for transparency but does not verify or endorse them.'**
+  /// **'These statements are supplied by the independent source operator. Origo displays them for transparency but does not verify or endorse them.'**
   String get bookSourcesRightsUnverifiedNotice;
 
   /// No description provided for @bookSourcesContactOperator.
@@ -2037,7 +2037,7 @@ abstract class AppLocalizations {
   /// Bilingual font preview sample
   ///
   /// In en, this message translates to:
-  /// **'Open Reading · Read freely 开卷有益'**
+  /// **'Origo · Read freely 开卷有益'**
   String get fontPreviewText;
 
   /// No description provided for @customFonts.
@@ -2331,7 +2331,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsQqChannelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Open Reading · OpenReading6'**
+  /// **'Origo · Origo6'**
   String get settingsQqChannelSubtitle;
 
   /// No description provided for @settingsQqChannelOpenFailed.
@@ -3387,7 +3387,7 @@ abstract class AppLocalizations {
   /// Welcome heading inside the agreement content
   ///
   /// In en, this message translates to:
-  /// **'Welcome to OpenReading'**
+  /// **'Welcome to Origo'**
   String get agreementWelcomeTitle;
 
   /// Welcome paragraph asking the user to read and agree to the agreement
@@ -4987,7 +4987,7 @@ abstract class AppLocalizations {
   /// Accessibility label for the paper shown in the first-home support introduction
   ///
   /// In en, this message translates to:
-  /// **'A letter from the Open Reading developer asking for voluntary support'**
+  /// **'A letter from the Origo developer asking for voluntary support'**
   String get firstHomeSupportPaperSemanticLabel;
 
   /// Title of the voluntary developer support card
@@ -5005,7 +5005,7 @@ abstract class AppLocalizations {
   /// Guest account card title in settings
   ///
   /// In en, this message translates to:
-  /// **'Sign in to Open Reading'**
+  /// **'Sign in to Origo'**
   String get settingsAccountGuestTitle;
 
   /// Guest account card subtitle in settings
@@ -5467,7 +5467,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceLicensesIntro.
   ///
   /// In en, this message translates to:
-  /// **'These license texts and notices are available offline in the app. Open Reading, on-demand fonts, and third-party software remain subject to their respective licenses.'**
+  /// **'These license texts and notices are available offline in the app. Origo, on-demand fonts, and third-party software remain subject to their respective licenses.'**
   String get openSourceLicensesIntro;
 
   /// No description provided for @openSourceProjectSection.
@@ -5509,7 +5509,7 @@ abstract class AppLocalizations {
   /// No description provided for @openSourceLicenseLegalese.
   ///
   /// In en, this message translates to:
-  /// **'Open Reading and third-party components remain subject to their respective licenses.'**
+  /// **'Origo and third-party components remain subject to their respective licenses.'**
   String get openSourceLicenseLegalese;
 
   /// No description provided for @openSourceLicenseLoadFailed.
@@ -5965,7 +5965,7 @@ abstract class AppLocalizations {
   /// Display name of the app in the about card
   ///
   /// In en, this message translates to:
-  /// **'Open Reading'**
+  /// **'Origo'**
   String get settingsAppName;
 
   /// Author line in the about card
@@ -7387,13 +7387,13 @@ abstract class AppLocalizations {
   /// No description provided for @importIosSharedDocuments.
   ///
   /// In en, this message translates to:
-  /// **'On My iPhone · Open Reading'**
+  /// **'On My iPhone · Origo'**
   String get importIosSharedDocuments;
 
   /// No description provided for @importICloudDrive.
   ///
   /// In en, this message translates to:
-  /// **'iCloud Drive · Open Reading'**
+  /// **'iCloud Drive · Origo'**
   String get importICloudDrive;
 
   /// No description provided for @importICloudUnavailable.
@@ -8219,7 +8219,7 @@ abstract class AppLocalizations {
   /// User agreement V2 hero body paragraph
   ///
   /// In en, this message translates to:
-  /// **'OpenReading is an open-source, cross-platform, local-first ebook reader. It provides reading tools; it does not provide, host, or review books you import.'**
+  /// **'Origo is an open-source, cross-platform, local-first ebook reader. It provides reading tools; it does not provide, host, or review books you import.'**
   String get agreementV2HeroBody;
 
   /// User agreement V2 local-first principle title
@@ -8291,7 +8291,7 @@ abstract class AppLocalizations {
   /// Terms step heading
   ///
   /// In en, this message translates to:
-  /// **'Use OpenReading with clear boundaries'**
+  /// **'Use Origo with clear boundaries'**
   String get agreementFlowTermsTitle;
 
   /// Terms step supporting text
@@ -8345,7 +8345,7 @@ abstract class AppLocalizations {
   /// Final onboarding button that enters the app
   ///
   /// In en, this message translates to:
-  /// **'Enter OpenReading'**
+  /// **'Enter Origo'**
   String get agreementFlowEnterApp;
 
   /// Privacy summary card title for local storage
@@ -8393,13 +8393,13 @@ abstract class AppLocalizations {
   /// User agreement V2 panel subtitle
   ///
   /// In en, this message translates to:
-  /// **'Please read before using OpenReading'**
+  /// **'Please read before using Origo'**
   String get agreementV2Subtitle;
 
   /// User agreement V2 important notice callout
   ///
   /// In en, this message translates to:
-  /// **'Important: The official OpenReading app does not preinstall, bundle, or recommend any third-party book source, and its developers do not operate, represent, or host source content. You choose every imported file and source you add; use only content you are authorized to access.'**
+  /// **'Important: The official Origo app does not preinstall, bundle, or recommend any third-party book source, and its developers do not operate, represent, or host source content. You choose every imported file and source you add; use only content you are authorized to access.'**
   String get agreementV2ImportantNotice;
 
   /// User agreement V2 source boundary card title
@@ -8435,7 +8435,7 @@ abstract class AppLocalizations {
   /// User agreement V2 section 1 body
   ///
   /// In en, this message translates to:
-  /// **'These terms apply to your download, installation, and use of OpenReading and its included features. By selecting “Agree and continue,” you confirm that you have read, understood, and accepted them. If you do not agree, stop using and exit the app. A guardian must consent where required by local law.'**
+  /// **'These terms apply to your download, installation, and use of Origo and its included features. By selecting “Agree and continue,” you confirm that you have read, understood, and accepted them. If you do not agree, stop using and exit the app. A guardian must consent where required by local law.'**
   String get agreementV2Section1Body;
 
   /// User agreement V2 section 2 title
@@ -8447,7 +8447,7 @@ abstract class AppLocalizations {
   /// User agreement V2 section 2 body
   ///
   /// In en, this message translates to:
-  /// **'Future OpenReading versions are released under the GNU Affero General Public License v3.0. You may use, copy, modify, distribute, or sell the software under that license. A distributed modified version must provide its complete corresponding source under AGPL-3.0, and a modified version used to provide a network service must also offer corresponding source to users interacting with it. MIT rights already granted for v1.0.0 and earlier versions remain valid and are not revoked. These terms do not restrict rights granted by the open-source license. Third-party components remain subject to their own licenses.'**
+  /// **'Future Origo versions are released under the GNU Affero General Public License v3.0. You may use, copy, modify, distribute, or sell the software under that license. A distributed modified version must provide its complete corresponding source under AGPL-3.0, and a modified version used to provide a network service must also offer corresponding source to users interacting with it. MIT rights already granted for v1.0.0 and earlier versions remain valid and are not revoked. These terms do not restrict rights granted by the open-source license. Third-party components remain subject to their own licenses.'**
   String get agreementV2Section2Body;
 
   /// User agreement V2 section 3 title
@@ -8495,7 +8495,7 @@ abstract class AppLocalizations {
   /// User agreement V2 section 6 body
   ///
   /// In en, this message translates to:
-  /// **'OpenReading is local-first. Books, reading progress, notes, and settings are normally stored on your device. Unless you enable a network book source, AI, sync, or another online feature, the app does not need to send book text to the developers to provide local reading. Automatic and manual update checks contact GitHub and the official site at open.xxread.top with necessary technical parameters such as platform, processor architecture, and release channel; their servers process your IP address and User-Agent as part of ordinary network communication. When you download an installer from the official site, the backend records the version, architecture, download time, IP address, and User-Agent for download counts, security protection, and troubleshooting. Download-event records containing a raw IP are retained for no more than 180 days and then deleted; only aggregate statistics without raw IP addresses are kept longer. Update requests do not include book text, your library, notes, an account, or a unique device identifier. GitHub requests are also governed by GitHub’s privacy terms. When another online feature is used, queries, selected text, network information, or necessary parameters may be sent to the provider you selected under that provider’s policies. Protect your device, API keys, and backups; uninstalling, clearing data, device failure, or user error may permanently erase data.'**
+  /// **'Origo is local-first. Books, reading progress, notes, and settings are normally stored on your device. Unless you enable a network book source, AI, sync, or another online feature, the app does not need to send book text to the developers to provide local reading. Automatic and manual update checks contact GitHub and the official site at open.xxread.top with necessary technical parameters such as platform, processor architecture, and release channel; their servers process your IP address and User-Agent as part of ordinary network communication. When you download an installer from the official site, the backend records the version, architecture, download time, IP address, and User-Agent for download counts, security protection, and troubleshooting. Download-event records containing a raw IP are retained for no more than 180 days and then deleted; only aggregate statistics without raw IP addresses are kept longer. Update requests do not include book text, your library, notes, an account, or a unique device identifier. GitHub requests are also governed by GitHub’s privacy terms. When another online feature is used, queries, selected text, network information, or necessary parameters may be sent to the provider you selected under that provider’s policies. Protect your device, API keys, and backups; uninstalling, clearing data, device failure, or user error may permanently erase data.'**
   String get agreementV2Section6Body;
 
   /// User agreement V2 section 7 title
@@ -8591,7 +8591,7 @@ abstract class AppLocalizations {
   /// User agreement V2 exit dialog body
   ///
   /// In en, this message translates to:
-  /// **'You must accept the Terms of Use to continue using OpenReading. If you do not agree, please exit the app.'**
+  /// **'You must accept the Terms of Use to continue using Origo. If you do not agree, please exit the app.'**
   String get agreementV2ExitDialogBody;
 
   /// User agreement V2 exit dialog cancel button label
@@ -9845,7 +9845,7 @@ abstract class AppLocalizations {
   /// No description provided for @accountMfaAuthenticatorTitle.
   ///
   /// In en, this message translates to:
-  /// **'Add Open Reading to your authenticator'**
+  /// **'Add Origo to your authenticator'**
   String get accountMfaAuthenticatorTitle;
 
   /// No description provided for @accountMfaAuthenticatorHint.
@@ -10007,7 +10007,7 @@ abstract class AppLocalizations {
   /// No description provided for @accountApplePurchaseHint.
   ///
   /// In en, this message translates to:
-  /// **'A one-time purchase permanently links Premium to this Open Reading account and syncs it to supported platforms.'**
+  /// **'A one-time purchase permanently links Premium to this Origo account and syncs it to supported platforms.'**
   String get accountApplePurchaseHint;
 
   /// Apple product details are still loading
@@ -11024,10 +11024,10 @@ abstract class AppLocalizations {
   /// **'This is a non-consumable, one-time purchase, not a subscription. It does not renew automatically. The App Store displays the actual price and Apple handles payment.'**
   String get premiumBillingBody;
 
-  /// After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Open Reading account. Restoring does not charge you again.
+  /// After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Origo account. Restoring does not charge you again.
   ///
   /// In en, this message translates to:
-  /// **'After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Open Reading account. Restoring does not charge you again.'**
+  /// **'After reinstalling or changing devices, restore using the Apple Account used to purchase and the linked Origo account. Restoring does not charge you again.'**
   String get premiumRestoreHelp;
 
   /// Membership terms
@@ -11060,10 +11060,10 @@ abstract class AppLocalizations {
   /// **'Account and access'**
   String get premiumAccountBindingTitle;
 
-  /// After verification, Premium is linked to the current Open Reading account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing.
+  /// After verification, Premium is linked to the current Origo account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing.
   ///
   /// In en, this message translates to:
-  /// **'After verification, Premium is linked to the current Open Reading account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing.'**
+  /// **'After verification, Premium is linked to the current Origo account and syncs across supported platforms. Advanced settings become available with membership. Signing out or revocation disables advanced features. Check your account before purchasing.'**
   String get premiumAccountBindingBody;
 
   /// Request a refund
@@ -11084,10 +11084,10 @@ abstract class AppLocalizations {
   /// **'Purchase verification data'**
   String get premiumPrivacyPurchaseTitle;
 
-  /// Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Open Reading account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password.
+  /// Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Origo account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password.
   ///
   /// In en, this message translates to:
-  /// **'Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Open Reading account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password.'**
+  /// **'Apple handles payment information. The app sends the product identifier and Apple-signed transaction verification data to the Origo account service to verify purchases and link or restore Premium. This purchase flow does not give the developer your full payment-card number or Apple Account password.'**
   String get premiumPrivacyPurchaseBody;
 
   /// Account service
@@ -11096,10 +11096,10 @@ abstract class AppLocalizations {
   /// **'Account service'**
   String get premiumPrivacyAccountTitle;
 
-  /// The Open Reading account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website.
+  /// The Origo account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website.
   ///
   /// In en, this message translates to:
-  /// **'The Open Reading account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website.'**
+  /// **'The Origo account service processes account details and membership records for sign-in, security verification and access across devices. Contact us about support or privacy using the contact options on the official website.'**
   String get premiumPrivacyAccountBody;
 
   /// Premium unlocked
@@ -11126,10 +11126,10 @@ abstract class AppLocalizations {
   /// **'Purchase restored. Premium is synced.'**
   String get premiumRestoreSuccess;
 
-  /// No restorable purchase was found. Check your Apple Account and the Open Reading account linked to the purchase.
+  /// No restorable purchase was found. Check your Apple Account and the Origo account linked to the purchase.
   ///
   /// In en, this message translates to:
-  /// **'No restorable purchase was found. Check your Apple Account and the Open Reading account linked to the purchase.'**
+  /// **'No restorable purchase was found. Check your Apple Account and the Origo account linked to the purchase.'**
   String get premiumRestoreEmpty;
 
   /// Purchase canceled
@@ -11180,10 +11180,10 @@ abstract class AppLocalizations {
   /// **'Unable to open this link. Please try again later.'**
   String get premiumLinkFailed;
 
-  /// Sign in to Open Reading before purchasing or restoring Premium.
+  /// Sign in to Origo before purchasing or restoring Premium.
   ///
   /// In en, this message translates to:
-  /// **'Sign in to Open Reading before purchasing or restoring Premium.'**
+  /// **'Sign in to Origo before purchasing or restoring Premium.'**
   String get premiumSignInRequired;
 
   /// No description provided for @premiumRefundUnavailable.
@@ -11207,7 +11207,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumBillingBodyOther.
   ///
   /// In en, this message translates to:
-  /// **'Unlock Premium through the available purchase or redemption options. The purchase channel displays the price and payment method. Verified membership is linked to your current Open Reading account.'**
+  /// **'Unlock Premium through the available purchase or redemption options. The purchase channel displays the price and payment method. Verified membership is linked to your current Origo account.'**
   String get premiumBillingBodyOther;
 
   /// Title of the account deletion screen and its entry tile
@@ -11489,13 +11489,13 @@ abstract class AppLocalizations {
   /// Body of the deletion success dialog
   ///
   /// In en, this message translates to:
-  /// **'Your account and its data are permanently gone, and every device has been signed out. Thank you for having used Open Reading.'**
+  /// **'Your account and its data are permanently gone, and every device has been signed out. Thank you for having used Origo.'**
   String get accountDeleteDoneBody;
 
   /// Manual Apple authorization removal guidance shown after deleting a legacy Apple account
   ///
   /// In en, this message translates to:
-  /// **'After closing this dialog, open Apple Account Settings > Sign-In & Security > Sign in with Apple > Open Reading, then choose Stop Using Sign in with Apple.'**
+  /// **'After closing this dialog, open Apple Account Settings > Sign-In & Security > Sign in with Apple > Origo, then choose Stop Using Sign in with Apple.'**
   String get accountDeleteAppleManualRevocation;
 
   /// Button closing the deletion success dialog
